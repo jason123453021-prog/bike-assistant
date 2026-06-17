@@ -36,8 +36,8 @@ export interface RouteResult {
   steps: TurnStep[];
 }
 
-// OSRM 公開端點（cycling profile）
-const OSRM_BASE = "https://router.project-osrm.org/route/v1/cycling";
+// OSRM 公開端點基礎 URL
+const OSRM_HOST = "https://router.project-osrm.org/route/v1";
 
 /**
  * 將 OSRM 轉彎指令轉換為中文
@@ -171,13 +171,15 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 /**
  * 計算從起點到終點的自行車路由
  *
- * @param from 起點座標（當前位置）
- * @param to   終點座標（最近路線點）
- * @returns    路由結果，失敗時返回 null
+ * @param from            起點座標（當前位置）
+ * @param to              終點座標（最近路線點）
+ * @param preferCycleway  是否優先自行車道（預設 true）
+ * @returns               路由結果，失敗時返回 null
  */
 export async function fetchBikeRoute(
   from: RouteCoordinate,
-  to: RouteCoordinate
+  to: RouteCoordinate,
+  preferCycleway: boolean = true
 ): Promise<RouteResult | null> {
   // 兩點距離太近（< 20m）不需要路由
   const directDist = haversine(from.latitude, from.longitude, to.latitude, to.longitude);
@@ -191,8 +193,11 @@ export async function fetchBikeRoute(
   }
 
   try {
+    // preferCycleway=true 使用 cycling profile（對自行車道有更高權重）
+    // preferCycleway=false 使用 foot profile（一般道路）
+    const profile = preferCycleway ? "cycling" : "foot";
     const url =
-      `${OSRM_BASE}/${from.longitude},${from.latitude};${to.longitude},${to.latitude}` +
+      `${OSRM_HOST}/${profile}/${from.longitude},${from.latitude};${to.longitude},${to.latitude}` +
       `?overview=full&geometries=polyline6&steps=true`;
 
     const controller = new AbortController();

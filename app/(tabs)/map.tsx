@@ -200,6 +200,11 @@ export default function MapScreen() {
   const ROUTE_FETCH_COOLDOWN_MS = 20000; // 最少 20 秒才重新計算一次
   // 偏離指引開關（預設開啟）
   const [guidanceEnabled, setGuidanceEnabled] = useState(true);
+  // 用 ref 追蹤指引開關狀態，讓非同步回調（OSRM Promise）也能讀到最新值
+  const guidanceEnabledRef = useRef(true);
+  // 自行車道優先開關（預設開啟）
+  const [preferCycleway, setPreferCycleway] = useState(true);
+  const preferCyclewayRef = useRef(true);
   // 回歸路由轉彎步驟
   const [returnSteps, setReturnSteps] = useState<TurnStep[]>([]);
   const [currentReturnStepIdx, setCurrentReturnStepIdx] = useState(0);
@@ -555,7 +560,8 @@ export default function MapScreen() {
           setIsFetchingRoute(true);
           fetchBikeRoute(
             { latitude: lat, longitude: lon },
-            { latitude: nearPt.lat, longitude: nearPt.lon }
+            { latitude: nearPt.lat, longitude: nearPt.lon },
+            preferCyclewayRef.current  // 自行車道優先開關
           ).then((result) => {
             setIsFetchingRoute(false);
             if (result && result.coordinates.length > 1) {
@@ -566,8 +572,8 @@ export default function MapScreen() {
               const filteredSteps = result.steps.filter(s => s.instruction !== "出發，進入路線");
               setReturnSteps(filteredSteps);
               setCurrentReturnStepIdx(0);
-              // 語音播報第一個轉彎指令
-              if (filteredSteps.length > 0 && settings.ttsEnabled) {
+              // 語音播報第一個轉彎指令（用 ref 檢查，避免 closure 問題）
+              if (filteredSteps.length > 0 && settings.ttsEnabled && guidanceEnabledRef.current) {
                 speak(`回歸路線：${filteredSteps[0].instruction}，${formatRouteDistance(filteredSteps[0].distanceM)}後`, settings.ttsEnabled);
               }
             }
@@ -583,7 +589,8 @@ export default function MapScreen() {
         if (now - lastRerouteRef.current > REROUTE_COOLDOWN_MS) {
           lastRerouteRef.current = now;
           setNavInstruction("⚠️ 偏離路線");
-          speak("您已偏離路線，請返回路線", settings.ttsEnabled);
+          // 用 ref 檢查，避免按下關閉後仍播放
+          if (guidanceEnabledRef.current) speak("您已偏離路線，請返回路線", settings.ttsEnabled);
           vibrateLight();
         }
         return;
@@ -596,7 +603,7 @@ export default function MapScreen() {
           setRouteDistM(null);
           setRouteDurSec(null);
           setReturnSteps([]);
-          speak("已回到路線，繼續前進", settings.ttsEnabled);
+          if (guidanceEnabledRef.current) speak("已回到路線，繼續前進", settings.ttsEnabled);
         }
       }
 
@@ -613,8 +620,8 @@ export default function MapScreen() {
         if (Math.abs(diff) >= TURN_ANGLE_DEG) {
           const distToTurn = lookaheadDist;
           if (distToTurn < 50) {
-            if (diff > 0) { turnInstruction = "右轉"; speak("右轉", settings.ttsEnabled); }
-            else { turnInstruction = "左轉"; speak("左轉", settings.ttsEnabled); }
+            if (diff > 0) { turnInstruction = "右轉"; if (guidanceEnabledRef.current) speak("右轉", settings.ttsEnabled); }
+            else { turnInstruction = "左轉"; if (guidanceEnabledRef.current) speak("左轉", settings.ttsEnabled); }
           } else {
             const distStr = distToTurn < 100 ? "前方" : `${Math.round(distToTurn)} 公尺後`;
             turnInstruction = diff > 0 ? `${distStr}右轉` : `${distStr}左轉`;
@@ -873,6 +880,7 @@ export default function MapScreen() {
             style={[styles.toolBtn, guidanceEnabled && styles.toolBtnActive]}
             onPress={() => {
               const next = !guidanceEnabled;
+              guidanceEnabledRef.current = next; // 同步更新 ref，讓非同步回調也能立即感知
               setGuidanceEnabled(next);
               if (!next) {
                 // 關閉指引：立即停止語音、清除所有偏離狀態
@@ -891,6 +899,28 @@ export default function MapScreen() {
             <IconSymbol name="location.fill" size={18} color={guidanceEnabled ? "#FF9500" : "rgba(255,255,255,0.4)"} />
             <Text style={[styles.returnBtnLabel, { color: guidanceEnabled ? "#FF9500" : "rgba(255,255,255,0.4)" }]}>
               {guidanceEnabled ? "指引" : "關閉"}
+            </Text>
+          </Pressable>
+        )}
+        {/* 自行車道優先開關（導航中顯示） */}
+        {isNavigating && (
+          <Pressable
+            style={[styles.toolBtn, preferCycleway && styles.toolBtnActive]}
+            onPress={() => {
+              const next = !preferCycleway;
+              preferCyclewayRef.current = next;
+              setPreferCycleway(next);
+              // 切換後重置路由從取定時器，讓下次偏離時重新計算
+              lastRouteFetchRef.current = 0;
+              if (isOffRoute) {
+                setReturnPolyline([]);
+                setIsFetchingRoute(false);
+              }
+            }}
+          >
+            <IconSymbol name="bicycle" size={18} color={preferCycleway ? "#34C759" : "rgba(255,255,255,0.4)"} />
+            <Text style={[styles.returnBtnLabel, { color: preferCycleway ? "#34C759" : "rgba(255,255,255,0.4)" }]}>
+              {preferCycleway ? "車道" : "一般"}
             </Text>
           </Pressable>
         )}
