@@ -1,30 +1,52 @@
-// Fallback for using MaterialIcons on Android and web.
-
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SymbolWeight, SymbolViewProps } from "expo-symbols";
 import { ComponentProps } from "react";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
-type IconMapping = Record<SymbolViewProps["name"], ComponentProps<typeof MaterialIcons>["name"]>;
+type IconMapping = Record<string, ComponentProps<typeof MaterialIcons>["name"]>;
 type IconSymbolName = keyof typeof MAPPING;
 
-/**
- * Add your SF Symbols to Material Icons mappings here.
- * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
- * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
- */
 const MAPPING = {
-  "house.fill": "home",
-  "paperplane.fill": "send",
+  // Navigation tabs
+  "house.fill":                          "directions-bike",
+  "map.fill":                            "map",
+  "clock.fill":                          "history",
+  "gearshape.fill":                      "settings",
+  // Ride screen
+  "play.fill":                           "play-arrow",
+  "pause.fill":                          "pause",
+  "stop.fill":                           "stop",
+  "bolt.fill":                           "flash-on",
+  "wind":                                "air",
+  "thermometer":                         "thermostat",
+  "drop.fill":                           "water-drop",
+  "flame.fill":                          "local-fire-department",
+  "arrow.up":                            "arrow-upward",
+  "arrow.down":                          "arrow-downward",
+  // Navigation
+  "location.fill":                       "my-location",
+  "doc.fill":                            "description",
+  "square.and.arrow.up":                 "share",
+  // Settings
+  "person.fill":                         "person",
+  "bell.fill":                           "notifications",
+  "speaker.wave.2.fill":                 "volume-up",
+  "iphone.radiowaves.left.and.right":    "vibration",
+  "moon.fill":                           "dark-mode",
+  "chevron.right":                       "chevron-right",
   "chevron.left.forwardslash.chevron.right": "code",
-  "chevron.right": "chevron-right",
+  "paperplane.fill":                     "send",
+  "checkmark.circle.fill":               "check-circle",
+  "xmark.circle.fill":                   "cancel",
+  "plus.circle.fill":                    "add-circle",
+  "minus.circle.fill":                   "remove-circle",
+  "info.circle.fill":                    "info",
+  "exclamationmark.triangle.fill":       "warning",
+  "speedometer":                         "speed",
+  "waveform.path.ecg":                   "monitor-heart",
+  "music.note":                          "music-note",
 } as IconMapping;
 
-/**
- * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
- * This ensures a consistent look across platforms, and optimal resource usage.
- * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
- */
 export function IconSymbol({
   name,
   size = 24,
@@ -37,5 +59,6 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+  const mappedName = MAPPING[name as string] ?? "help-outline";
+  return <MaterialIcons color={color} size={size} name={mappedName} style={style} />;
 }

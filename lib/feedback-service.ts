@@ -1,0 +1,145 @@
+/**
+ * 回饋服務 — 震動、TTS 語音播報、通知
+ */
+
+import * as Haptics from "expo-haptics";
+import * as Speech from "expo-speech";
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+
+// ─── 震動回饋 ─────────────────────────────────────────────────────────────────
+
+export async function vibrateLight() {
+  if (Platform.OS === "web") return;
+  try {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  } catch {}
+}
+
+export async function vibrateMedium() {
+  if (Platform.OS === "web") return;
+  try {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  } catch {}
+}
+
+export async function vibrateHeavy() {
+  if (Platform.OS === "web") return;
+  try {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  } catch {}
+}
+
+export async function vibrateSuccess() {
+  if (Platform.OS === "web") return;
+  try {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  } catch {}
+}
+
+export async function vibrateWarning() {
+  if (Platform.OS === "web") return;
+  try {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  } catch {}
+}
+
+// ─── TTS 語音播報 ─────────────────────────────────────────────────────────────
+
+export async function speak(text: string, enabled: boolean = true) {
+  if (!enabled || Platform.OS === "web") return;
+  try {
+    const isSpeaking = await Speech.isSpeakingAsync();
+    if (isSpeaking) await Speech.stop();
+    Speech.speak(text, {
+      language: "zh-TW",
+      pitch: 1.0,
+      rate: 0.9,
+    });
+  } catch {}
+}
+
+export async function speakRideUpdate(
+  speed: number,
+  power: number,
+  distance: number,
+  enabled: boolean
+) {
+  if (!enabled) return;
+  const distKm = (distance / 1000).toFixed(1);
+  await speak(`速度 ${Math.round(speed)} 公里，功率 ${power} 瓦，距離 ${distKm} 公里`, enabled);
+}
+
+export async function speakSupplyReminder(type: "calorie" | "water", enabled: boolean) {
+  if (!enabled) return;
+  const msg = type === "calorie"
+    ? "補給提醒，請補充能量棒或食物"
+    : "補給提醒，請補充水分";
+  await speak(msg, enabled);
+}
+
+export async function speakAutoPause(enabled: boolean) {
+  await speak("自動暫停", enabled);
+}
+
+export async function speakAutoResume(enabled: boolean) {
+  await speak("繼續騎乘", enabled);
+}
+
+// ─── 通知設定 ─────────────────────────────────────────────────────────────────
+
+export async function setupNotifications() {
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("ride", {
+      name: "騎乘通知",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#00C896",
+    });
+    await Notifications.setNotificationChannelAsync("supply", {
+      name: "補給提醒",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 500, 200, 500],
+      lightColor: "#FF9500",
+    });
+  }
+}
+
+export async function requestNotificationPermission(): Promise<boolean> {
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  if (existing === "granted") return true;
+  const { status } = await Notifications.requestPermissionsAsync();
+  return status === "granted";
+}
+
+export async function showSupplyNotification(type: "calorie" | "water") {
+  const title = type === "calorie" ? "🍌 補給提醒" : "💧 補水提醒";
+  const body = type === "calorie"
+    ? "已消耗大量卡路里，請補充能量！"
+    : "水分不足，請補充水分！";
+  await Notifications.scheduleNotificationAsync({
+    content: { title, body, sound: true },
+    trigger: null,
+  });
+}
+
+export async function showRidingNotification(
+  speed: number,
+  distance: number,
+  elapsed: number
+) {
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const timeStr = h > 0 ? `${h}時${m}分` : `${m}分`;
+  await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "🚴 智慧單車騎乘助手",
+        body: `速度 ${Math.round(speed)} km/h · 距離 ${(distance / 1000).toFixed(1)} km · 時間 ${timeStr}`,
+      },
+    trigger: null,
+  });
+}
+
+export async function cancelRidingNotification() {
+  await Notifications.dismissAllNotificationsAsync();
+}
