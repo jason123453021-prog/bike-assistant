@@ -150,7 +150,7 @@ const DARK_MAP_STYLE = [
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { state, dispatch, saveRecord } = useRide();
+  const { state, dispatch, saveRecord, updateRecordName } = useRide();
   const { settings } = useSettings();
   const { sharedRoute, clearSharedRoute } = useGpx();
 
@@ -590,7 +590,7 @@ export default function MapScreen() {
       {
         text: "結束",
         style: "destructive",
-        onPress: async () => {
+          onPress: async () => {
           dispatch({ type: "STOP" });
           setMapRideActive(false);
           setIsNavigating(false);
@@ -600,6 +600,7 @@ export default function MapScreen() {
           await stopBackgroundLocationTracking();
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           await cancelRidingNotification();
+          // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新
           await saveRecord();
           setShowSummary(true);
           if (settings.vibrationEnabled) vibrateSuccess();
@@ -835,9 +836,34 @@ export default function MapScreen() {
           />
         </View>
 
-        {/* ── 展開後：進度條 ── */}
+        {/* ── 展開後：總爬升 + 進度條 ── */}
         {panelExpanded && (
           <View style={styles.expandedSection}>
+            {/* 總爬升資訊列 */}
+            <View style={styles.ascentRow}>
+              <View style={styles.ascentItem}>
+                <IconSymbol name="arrow.up" size={13} color="#00C853" />
+                <Text style={styles.ascentLabel}>總爬升</Text>
+                <Text style={styles.ascentValue}>{Math.round(state.totalAscent)}</Text>
+                <Text style={styles.ascentUnit}>m</Text>
+              </View>
+              <View style={styles.ascentDivider} />
+              <View style={styles.ascentItem}>
+                <IconSymbol name="arrow.down" size={13} color="#4FC3F7" />
+                <Text style={styles.ascentLabel}>坡度</Text>
+                <Text style={[styles.ascentValue, { color: currentGrade > 5 ? "#F59E0B" : currentGrade > 8 ? "#EF4444" : "rgba(255,255,255,0.9)" }]}>
+                  {isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"}
+                </Text>
+                <Text style={styles.ascentUnit}>%</Text>
+              </View>
+              <View style={styles.ascentDivider} />
+              <View style={styles.ascentItem}>
+                <IconSymbol name="bolt.fill" size={13} color="#00E676" />
+                <Text style={styles.ascentLabel}>最大功率</Text>
+                <Text style={[styles.ascentValue, { color: "#00E676" }]}>{state.maxPower}</Text>
+                <Text style={styles.ascentUnit}>W</Text>
+              </View>
+            </View>
             {/* 卡路里進度條 */}
             <View style={styles.progressSection}>
               <View style={styles.progressHeader}>
@@ -954,8 +980,13 @@ export default function MapScreen() {
       {/* ── 騎乘摘要 Modal ── */}
       <RideSummaryModal
         visible={showSummary}
-        onClose={() => {
+        onClose={(routeName) => {
           setShowSummary(false);
+          // 如果使用者輸入了路線名稱，更新最新一筆記錄的名稱
+          if (routeName && routeName.trim() && state.records.length > 0) {
+            const latestRecord = state.records[0];
+            updateRecordName(latestRecord.id, routeName.trim());
+          }
           dispatch({ type: "RESET" });
         }}
       />
@@ -1141,4 +1172,30 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   expandHintText: { color: "rgba(255,255,255,0.25)", fontSize: 10 },
+
+  // 總爬升資訊列
+  ascentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  ascentItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    flexWrap: "wrap",
+  },
+  ascentDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  ascentLabel: { color: "rgba(255,255,255,0.38)", fontSize: 10 },
+  ascentValue: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "700" },
+  ascentUnit: { color: "rgba(255,255,255,0.35)", fontSize: 10 },
 });

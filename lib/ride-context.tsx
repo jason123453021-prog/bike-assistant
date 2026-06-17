@@ -221,7 +221,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
 interface RideContextValue {
   state: RideState;
   dispatch: React.Dispatch<RideAction>;
-  saveRecord: () => Promise<void>;
+  saveRecord: (name?: string) => Promise<void>;
   loadRecords: () => Promise<void>;
   updateRecordName: (id: string, name: string) => Promise<void>;
 }
@@ -258,13 +258,13 @@ function generateDefaultName(date: number): string {
 export function RideProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(rideReducer, initialState);
 
-  const saveRecord = useCallback(async () => {
+  const saveRecord = useCallback(async (name?: string) => {
     if (state.elapsed < 10) return;
     const now = Date.now();
     const record: RideRecord = {
       id: now.toString(),
       date: now,
-      name: generateDefaultName(now),
+      name: (name && name.trim()) ? name.trim() : generateDefaultName(now),
       duration: state.elapsed,
       distance: state.distance,
       avgSpeed: state.avgSpeed,
