@@ -446,43 +446,31 @@ export default function NavigateScreen() {
 
               {/* ── 坡度分析卡片 ───────────────────────────────────────── */}
               <View style={[styles.gradientCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>坡度分析</Text>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>坡度區間分布</Text>
+                <Text style={[styles.gradDistTitle, { color: colors.muted }]}>各區間佔路線距離百分比</Text>
 
-                {/* 平均坡度 + 最大坡度 */}
-                <View style={[styles.gradSummaryRow, { borderBottomColor: colors.border }]}>
-                  <View style={styles.gradSummaryItem}>
-                    <Text style={[styles.gradSummaryValue, { color: colors.accent }]}>
-                      {route.avgGradient.toFixed(1)}%
-                    </Text>
-                    <Text style={[styles.gradSummaryLabel, { color: colors.muted }]}>平均坡度（爬升段）</Text>
-                  </View>
-                  <View style={[styles.gradSummaryDivider, { backgroundColor: colors.border }]} />
-                  <View style={styles.gradSummaryItem}>
-                    <Text style={[styles.gradSummaryValue, { color: route.maxGradient >= 10 ? colors.error : route.maxGradient >= 6 ? colors.warning : colors.foreground }]}>
-                      {route.maxGradient.toFixed(1)}%
-                    </Text>
-                    <Text style={[styles.gradSummaryLabel, { color: colors.muted }]}>最大坡度</Text>
-                  </View>
-                </View>
-
-                {/* 坡度分布橫條圖 */}
-                <Text style={[styles.gradDistTitle, { color: colors.muted }]}>各坡度區間佔路線距離百分比</Text>
-                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((bucket) => {
+                {[
+                  { bucket: 0, label: "平路", range: "< 1%",    color: "#94A3B8" },
+                  { bucket: 1, label: "緩坡", range: "1% – 5%",   color: "#22C55E" },
+                  { bucket: 2, label: "中坡", range: "6% – 10%",  color: "#84CC16" },
+                  { bucket: 3, label: "陡坡", range: "11% – 15%", color: "#F59E0B" },
+                  { bucket: 4, label: "急坡", range: "16% – 20%", color: "#F97316" },
+                  { bucket: 5, label: "極陡", range: "21% – 25%", color: "#EF4444" },
+                  { bucket: 6, label: "極限", range: "≥ 26%",    color: "#9333EA" },
+                ].map(({ bucket, label, range, color }) => {
                   const pct = route.gradientDistribution[bucket] ?? 0;
-                  if (pct === 0) return null;
-                  const label = bucket === 0 ? "平路 (<1%)" : bucket === 10 ? "陶坡 (≥ 10%)" : `${bucket}%`;
-                  const barColor = bucket === 0 ? colors.accent
-                    : bucket <= 3 ? "#22C55E"
-                    : bucket <= 6 ? "#F59E0B"
-                    : bucket <= 9 ? "#F97316"
-                    : colors.error;
                   return (
                     <View key={bucket} style={styles.gradRow}>
-                      <Text style={[styles.gradLabel, { color: colors.muted }]}>{label}</Text>
-                      <View style={[styles.gradBarBg, { backgroundColor: colors.border }]}>
-                        <View style={[styles.gradBarFill, { width: `${pct}%`, backgroundColor: barColor }]} />
+                      <View style={styles.gradLabelWrap}>
+                        <Text style={[styles.gradLabelMain, { color: colors.foreground }]}>{label}</Text>
+                        <Text style={[styles.gradLabelRange, { color: colors.muted }]}>{range}</Text>
                       </View>
-                      <Text style={[styles.gradPct, { color: colors.foreground }]}>{pct}%</Text>
+                      <View style={[styles.gradBarBg, { backgroundColor: colors.border }]}>
+                        <View style={[styles.gradBarFill, { width: `${pct}%`, backgroundColor: pct > 0 ? color : "transparent" }]} />
+                      </View>
+                      <Text style={[styles.gradPct, { color: pct > 0 ? colors.foreground : colors.muted }]}>
+                        {pct > 0 ? `${pct}%` : "–"}
+                      </Text>
                     </View>
                   );
                 })}
@@ -799,6 +787,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   gradLabel: { fontSize: 12, width: 80 },
+  gradLabelWrap: { width: 80, gap: 1 },
+  gradLabelMain: { fontSize: 13, fontWeight: "600" },
+  gradLabelRange: { fontSize: 10 },
   gradBarBg: {
     flex: 1,
     height: 8,

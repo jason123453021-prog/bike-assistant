@@ -34,7 +34,17 @@ export interface GpxPoint {
   time?: string;
 }
 
-/** 坡度分布 bucket：key 為坡度百分比（0=平路, 1=1%, 2=2%...），value 為佔路線距離百分比 */
+/**
+ * 坡度分布 bucket：
+ *   0  = 平路 (< 1%)
+ *   1  = 1%–5%
+ *   2  = 6%–10%
+ *   3  = 11%–15%
+ *   4  = 16%–20%
+ *   5  = 21%–25%
+ *   6  = 26% 以上
+ * value 為佔路線距離百分比（0-100）
+ */
 export type GradientDistribution = Record<number, number>;
 
 export interface GpxRoute {
@@ -184,8 +194,16 @@ export function parseGpx(xmlString: string): GpxRoute | null {
           totalClimbDist += d;
           weightedGradSum += gradPct * d;
         }
-        // 分配到 bucket（0=平路, 1-9=1%-9%, 10=10%以上）
-        const bucket = gradPct < 0.5 ? 0 : Math.min(10, Math.round(gradPct));
+        // 分配到六個坡度區間 bucket
+        // 0=平路(<1%), 1=1-5%, 2=6-10%, 3=11-15%, 4=16-20%, 5=21-25%, 6=26%+
+        let bucket: number;
+        if (gradPct < 1) bucket = 0;
+        else if (gradPct <= 5) bucket = 1;
+        else if (gradPct <= 10) bucket = 2;
+        else if (gradPct <= 15) bucket = 3;
+        else if (gradPct <= 20) bucket = 4;
+        else if (gradPct <= 25) bucket = 5;
+        else bucket = 6;
         gradBuckets[bucket] = (gradBuckets[bucket] ?? 0) + d;
       }
     }
