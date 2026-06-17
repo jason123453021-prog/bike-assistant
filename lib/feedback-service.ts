@@ -61,6 +61,14 @@ export async function speak(text: string, enabled: boolean = true) {
   } catch {}
 }
 
+export async function stopSpeech() {
+  if (Platform.OS === "web") return;
+  try {
+    const isSpeaking = await Speech.isSpeakingAsync();
+    if (isSpeaking) await Speech.stop();
+  } catch {}
+}
+
 export async function speakRideUpdate(
   speed: number,
   power: number,

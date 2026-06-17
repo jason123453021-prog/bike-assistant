@@ -57,6 +57,7 @@ import {
   showRidingNotification,
   cancelRidingNotification,
   requestNotificationPermission,
+  stopSpeech,
 } from "@/lib/feedback-service";
 import {
   calculatePower,
@@ -870,7 +871,22 @@ export default function MapScreen() {
         {isNavigating && (
           <Pressable
             style={[styles.toolBtn, guidanceEnabled && styles.toolBtnActive]}
-            onPress={() => setGuidanceEnabled(v => !v)}
+            onPress={() => {
+              const next = !guidanceEnabled;
+              setGuidanceEnabled(next);
+              if (!next) {
+                // 關閉指引：立即停止語音、清除所有偏離狀態
+                stopSpeech();
+                setIsOffRoute(false);
+                setReturnPolyline([]);
+                setReturnBearing("");
+                setRouteDistM(null);
+                setRouteDurSec(null);
+                setReturnSteps([]);
+                setCurrentReturnStepIdx(0);
+                lastRerouteRef.current = 0;
+              }
+            }}
           >
             <IconSymbol name="location.fill" size={18} color={guidanceEnabled ? "#FF9500" : "rgba(255,255,255,0.4)"} />
             <Text style={[styles.returnBtnLabel, { color: guidanceEnabled ? "#FF9500" : "rgba(255,255,255,0.4)" }]}>
