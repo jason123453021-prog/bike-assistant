@@ -16,6 +16,15 @@ export interface RouteCoordinate {
   longitude: number;
 }
 
+export interface TurnStep {
+  /** 轉彎指令（中文） */
+  instruction: string;
+  /** 距下一個轉彎點的距離（公尺） */
+  distanceM: number;
+  /** 轉彎點座標 */
+  location: RouteCoordinate;
+}
+
 export interface RouteResult {
   /** 路徑座標點陣列（沿道路） */
   coordinates: RouteCoordinate[];
@@ -23,10 +32,78 @@ export interface RouteResult {
   distanceM: number;
   /** 預估騎乘時間（秒） */
   durationSec: number;
+  /** 轉彎指令陣列 */
+  steps: TurnStep[];
 }
 
 // OSRM 公開端點（cycling profile）
 const OSRM_BASE = "https://router.project-osrm.org/route/v1/cycling";
+
+/**
+ * 將 OSRM 轉彎指令轉換為中文
+ */
+function translateModifier(modifier: string): string {
+  const map: Record<string, string> = {
+    "left": "左轉",
+    "right": "右轉",
+    "slight left": "稍向左",
+    "slight right": "稍向右",
+    "sharp left": "鎖左轉",
+    "sharp right": "鎖右轉",
+    "straight": "直行",
+    "uturn": "辭回",
+    "u-turn": "辭回",
+  };
+  return map[modifier?.toLowerCase()] ?? modifier ?? "";
+}
+
+function translateType(type: string): string {
+  const map: Record<string, string> = {
+    "turn": "轉彎",
+    "new name": "進入",
+    "depart": "出發",
+    "arrive": "到達目的地",
+    "merge": "彙入",
+    "on ramp": "上匹道",
+    "off ramp": "下匹道",
+    "fork": "分岔",
+    "end of road": "路尾",
+    "roundabout": "圓環",
+    "rotary": "圓環",
+    "continue": "繼續前進",
+    "use lane": "使用車道",
+  };
+  return map[type?.toLowerCase()] ?? type ?? "";
+}
+
+/**
+ * 解析 OSRM steps 為中文轉彎指令陣列
+ */
+function parseSteps(steps: any[]): TurnStep[] {
+  if (!steps || !Array.isArray(steps)) return [];
+  return steps
+    .filter((s: any) => s.maneuver)
+    .map((s: any) => {
+      const type = s.maneuver?.type ?? "";
+      const modifier = s.maneuver?.modifier ?? "";
+      const loc = s.maneuver?.location ?? [0, 0];
+      let instruction = "";
+      if (type === "depart") {
+        instruction = "出發，進入路線";
+      } else if (type === "arrive") {
+        instruction = "到達目的地";
+      } else {
+        const typeStr = translateType(type);
+        const modStr = translateModifier(modifier);
+        instruction = modStr ? `${modStr}${typeStr !== "轉彎" ? "，" + typeStr : ""}` : typeStr;
+      }
+      return {
+        instruction: instruction || "繼續前進",
+        distanceM: Math.round(s.distance ?? 0),
+        location: { latitude: loc[1], longitude: loc[0] },
+      };
+    });
+}
 
 // 請求逾時（ms）
 const FETCH_TIMEOUT_MS = 8000;
@@ -107,15 +184,16 @@ export async function fetchBikeRoute(
   if (directDist < 20) {
     return {
       coordinates: [from, to],
-      distanceM: directDist,
-      durationSec: Math.round(directDist / 4), // 假設步行速度 4m/s
+      distanceM: Math.round(directDist),
+      durationSec: Math.round(directDist / 4),
+      steps: [],
     };
   }
 
   try {
     const url =
       `${OSRM_BASE}/${from.longitude},${from.latitude};${to.longitude},${to.latitude}` +
-      `?overview=full&geometries=polyline6&steps=false`;
+      `?overview=full&geometries=polyline6&steps=true`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -137,11 +215,18 @@ export async function fetchBikeRoute(
 
     const route = data.routes[0];
     const coordinates = decodePolyline6(route.geometry);
+    // 解析所有 leg 的 steps
+    const allSteps: any[] = [];
+    for (const leg of route.legs ?? []) {
+      if (leg.steps) allSteps.push(...leg.steps);
+    }
+    const steps = parseSteps(allSteps);
 
     return {
       coordinates,
       distanceM: Math.round(route.distance),
       durationSec: Math.round(route.duration),
+      steps,
     };
   } catch (err) {
     if ((err as Error).name === "AbortError") {

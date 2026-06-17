@@ -67,7 +67,7 @@ import {
   formatDuration,
 } from "@/lib/power-calc";
 import { fetchWeather, getHeadwindMs, getRelativeWindInfo, type WeatherData } from "@/lib/weather-service";
-import { fetchBikeRoute, formatRouteDistance, formatRouteDuration, type RouteCoordinate } from "@/lib/route-service";
+import { fetchBikeRoute, formatRouteDistance, formatRouteDuration, type RouteCoordinate, type TurnStep } from "@/lib/route-service";
 import {
   calculateSweatLoss,
   DEFAULT_HYDRATION_THRESHOLD_ML,
@@ -197,6 +197,11 @@ export default function MapScreen() {
   const [isFetchingRoute, setIsFetchingRoute] = useState(false);
   const lastRouteFetchRef = useRef<number>(0);
   const ROUTE_FETCH_COOLDOWN_MS = 20000; // 最少 20 秒才重新計算一次
+  // 偏離指引開關（預設開啟）
+  const [guidanceEnabled, setGuidanceEnabled] = useState(true);
+  // 回歸路由轉彎步驟
+  const [returnSteps, setReturnSteps] = useState<TurnStep[]>([]);
+  const [currentReturnStepIdx, setCurrentReturnStepIdx] = useState(0);
 
   // 當共享路線更新時，自動適配地圖視角
   useEffect(() => {
@@ -239,11 +244,10 @@ export default function MapScreen() {
   // 騎乘狀態
   const [mapRideActive, setMapRideActive] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
-  const [supplyModal, setSupplyModal] = useState<{
-    visible: boolean;
-    type: "calorie" | "water";
-    recommendedMl?: number;
-  }>({ visible: false, type: "calorie" });
+  // 補給提醒分別管理（支援兩種同時顯示）
+  const [calorieAlert, setCalorieAlert] = useState(false);
+  const [waterAlert, setWaterAlert] = useState(false);
+  const [supplyRecommendedMl, setSupplyRecommendedMl] = useState<number | undefined>(undefined);
 
   const calorieReminderSentRef = useRef(false);
   const waterReminderSentRef = useRef(false);
@@ -303,7 +307,12 @@ export default function MapScreen() {
   // ─── 補給提醒 ────────────────────────────────────────────────────────────────
   const triggerSupplyReminder = useCallback(
     async (type: "calorie" | "water", recommendedMl?: number) => {
-      setSupplyModal({ visible: true, type, recommendedMl });
+      if (type === "calorie") {
+        setCalorieAlert(true);
+      } else {
+        setWaterAlert(true);
+        if (recommendedMl) setSupplyRecommendedMl(recommendedMl);
+      }
       if (settings.vibrationEnabled) vibrateWarning();
       if (settings.ttsEnabled) speakSupplyReminder(type, true);
       if (settings.soundEnabled) {
@@ -548,6 +557,14 @@ export default function MapScreen() {
               setReturnPolyline(result.coordinates);
               setRouteDistM(result.distanceM);
               setRouteDurSec(result.durationSec);
+              // 儲存轉彎步驟，從第一步開始（跳過 depart）
+              const filteredSteps = result.steps.filter(s => s.instruction !== "出發，進入路線");
+              setReturnSteps(filteredSteps);
+              setCurrentReturnStepIdx(0);
+              // 語音播報第一個轉彎指令
+              if (filteredSteps.length > 0 && guidanceEnabled && settings.ttsEnabled) {
+                speak(`回歸路線：${filteredSteps[0].instruction}，${formatRouteDistance(filteredSteps[0].distanceM)}後`, settings.ttsEnabled);
+              }
             }
           }).catch(() => setIsFetchingRoute(false));
         }
@@ -603,7 +620,7 @@ export default function MapScreen() {
         setNavInstruction("沿路線前進");
       }
     },
-    [gpxRoute, settings.ttsEnabled, isOffRoute]
+    [gpxRoute, settings.ttsEnabled, isOffRoute, guidanceEnabled, returnSteps, currentReturnStepIdx]
   );
 
   // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
@@ -627,6 +644,8 @@ export default function MapScreen() {
     setRouteDurSec(null);
     setIsFetchingRoute(false);
     lastRouteFetchRef.current = 0;
+    setReturnSteps([]);
+    setCurrentReturnStepIdx(0);
     setMapRideActive(true);
     setFollowUser(true);
 
@@ -758,8 +777,8 @@ export default function MapScreen() {
         {passedPolyline.length > 1 && (
           <Polyline coordinates={passedPolyline} strokeColor="#8B0000" strokeWidth={4} />
         )}
-        {/* 自由騎乘即時軌跡（綠色） */}
-        {liveTrail.length > 1 && !gpxRoute && (
+        {/* 騎乘即時軌跡（綠色）：無論是自由騎乘或 GPX 導航均顯示 */}
+        {liveTrail.length > 1 && (
           <Polyline coordinates={liveTrail} strokeColor="#00E676" strokeWidth={3} />
         )}
         {/* GPX 起點 */}
@@ -837,28 +856,22 @@ export default function MapScreen() {
             <IconSymbol name="xmark.circle.fill" size={20} color="#FF3B30" />
           </Pressable>
         )}
-        {/* 回歸路線按鈕（偏離且導航中顯示） */}
-        {isOffRoute && isNavigating && (
+        {/* 偏離指引開關（導航中顯示） */}
+        {isNavigating && (
           <Pressable
-            style={[styles.toolBtn, styles.returnBtn]}
-            onPress={() => {
-              if (!gpxRoute || !currentPos) return;
-              const nearPt = gpxRoute.points[nearestIdx];
-              mapRef.current?.animateCamera(
-                { center: { latitude: nearPt.lat, longitude: nearPt.lon }, zoom: 16 },
-                { duration: 800 }
-              );
-              setFollowUser(false);
-            }}
+            style={[styles.toolBtn, guidanceEnabled && styles.toolBtnActive]}
+            onPress={() => setGuidanceEnabled(v => !v)}
           >
-            <IconSymbol name="location.fill" size={16} color="#FF9500" />
-            <Text style={styles.returnBtnLabel}>回歸</Text>
+            <IconSymbol name="location.fill" size={18} color={guidanceEnabled ? "#FF9500" : "rgba(255,255,255,0.4)"} />
+            <Text style={[styles.returnBtnLabel, { color: guidanceEnabled ? "#FF9500" : "rgba(255,255,255,0.4)" }]}>
+              {guidanceEnabled ? "指引" : "關閉"}
+            </Text>
           </Pressable>
         )}
       </View>
 
-      {/* ── 偏離路線提示橫幅（偏離且導航中顯示） ── */}
-      {isOffRoute && isNavigating && returnBearing !== "" && (
+      {/* ── 偏離路線提示橫幅（偏離且導航中且指引開啟顯示） ── */}
+      {isOffRoute && isNavigating && guidanceEnabled && returnBearing !== "" && (
         <View style={[
           styles.offRouteBanner,
           { top: insets.top + 60 }
@@ -868,6 +881,20 @@ export default function MapScreen() {
             <Text style={styles.offRouteBannerTitle}>偏離路線 {offRouteDist} m</Text>
             {isFetchingRoute ? (
               <Text style={styles.offRouteBannerSub}>計算回歸路徑中…</Text>
+            ) : returnSteps.length > 0 && currentReturnStepIdx < returnSteps.length ? (
+              <>
+                <Text style={styles.offRouteBannerSub}>
+                  {returnSteps[currentReturnStepIdx].instruction}
+                  {returnSteps[currentReturnStepIdx].distanceM > 0
+                    ? `，${formatRouteDistance(returnSteps[currentReturnStepIdx].distanceM)}後`
+                    : ""}
+                </Text>
+                {routeDistM !== null && (
+                  <Text style={styles.offRouteBannerSub}>
+                    回歸距離：{formatRouteDistance(routeDistM)}，預估 {routeDurSec !== null ? formatRouteDuration(routeDurSec) : ""}
+                  </Text>
+                )}
+              </>
             ) : routeDistM !== null ? (
               <Text style={styles.offRouteBannerSub}>
                 騎車回歸：{formatRouteDistance(routeDistM)}，{routeDurSec !== null ? formatRouteDuration(routeDurSec) : ""}
@@ -1088,23 +1115,28 @@ export default function MapScreen() {
 
       {/* ── 補給 Modal ── */}
       <SupplyModal
-        visible={supplyModal.visible}
-        type={supplyModal.type}
-        recommendedMl={supplyModal.recommendedMl}
-        onConfirm={() => {
-          setSupplyModal({ ...supplyModal, visible: false });
-          if (supplyModal.type === "calorie") {
-            dispatch({ type: "CONSUME_CALORIES" });
-            calorieAnim.setValue(0);
-            calorieReminderSentRef.current = false;
-          } else {
-            dispatch({ type: "CONSUME_WATER" });
-            waterAnim.setValue(0);
-            waterReminderSentRef.current = false;
-          }
+        calorieAlert={calorieAlert}
+        waterAlert={waterAlert}
+        recommendedMl={supplyRecommendedMl}
+        onConfirmCalorie={() => {
+          setCalorieAlert(false);
+          dispatch({ type: "CONSUME_CALORIES" });
+          calorieAnim.setValue(0);
+          calorieReminderSentRef.current = false;
           if (settings.vibrationEnabled) vibrateSuccess();
         }}
-        onDismiss={() => setSupplyModal({ ...supplyModal, visible: false })}
+        onConfirmWater={() => {
+          setWaterAlert(false);
+          setSupplyRecommendedMl(undefined);
+          dispatch({ type: "CONSUME_WATER" });
+          waterAnim.setValue(0);
+          waterReminderSentRef.current = false;
+          if (settings.vibrationEnabled) vibrateSuccess();
+        }}
+        onDismiss={() => {
+          setCalorieAlert(false);
+          setWaterAlert(false);
+        }}
       />
 
       {/* ── 騎乘摘要 Modal ── */}
