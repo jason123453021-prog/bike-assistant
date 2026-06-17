@@ -75,6 +75,8 @@ export default function RideScreen() {
   }>({ visible: false, type: "calorie" });
   const [showSummary, setShowSummary] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  // 相對風向 state（每次 GPS 更新時重算，確保轉彎後即時反映）
+  const [relativeWindInfo, setRelativeWindInfo] = useState<ReturnType<typeof getRelativeWindInfo> | null>(null);
 
   // Refs
   const locationSubscriber = useRef<Location.LocationSubscription | null>(null);
@@ -168,6 +170,8 @@ export default function RideScreen() {
       windDataRef.current = { speed: w.windSpeed / 3.6, direction: w.windDirection };
       // 天氣連動空氣密度：溫度越高 → 空氣密度越低 → 空氣阻力越小
       airDensityRef.current = calcAirDensity(w.temperature);
+      // 天氣更新後同步更新相對風向
+      setRelativeWindInfo(getRelativeWindInfo(headingRef.current, w.windDirection, w.windSpeed));
     }
   }, []);
 
@@ -201,7 +205,14 @@ export default function RideScreen() {
       },
       (location) => {
         const { latitude, longitude, altitude, speed, heading } = location.coords;
-        if (heading !== null) headingRef.current = heading;
+        if (heading !== null) {
+          headingRef.current = heading;
+          // 每次 GPS 更新時重算相對風向，確保轉彎後即時反映
+          const wd = windDataRef.current;
+          if (wd.speed > 0) {
+            setRelativeWindInfo(getRelativeWindInfo(heading, wd.direction, wd.speed * 3.6));
+          }
+        }
 
         const speedKmh = (speed ?? 0) * 3.6;
         const currentState = stateRef.current;
@@ -430,7 +441,8 @@ export default function RideScreen() {
               <WeatherItem icon="thermometer" value={`${weather.temperature}°C`} color={colors.muted} />
               <WeatherItem icon="drop.fill" value={`${weather.humidity}%`} color="#4FC3F7" />
               {(() => {
-                const windInfo = getRelativeWindInfo(
+                // 優先使用即時更新的 relativeWindInfo（每 3 秒），fallback 到即時計算
+                const windInfo = relativeWindInfo ?? getRelativeWindInfo(
                   headingRef.current,
                   weather.windDirection,
                   weather.windSpeed
