@@ -4,6 +4,8 @@
 
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
+// expo-notifications 僅用於本地通知（Android channel + scheduleNotification）
+// 遠端推播在 Expo Go SDK 53+ 已移除，此 app 只使用本地通知
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
