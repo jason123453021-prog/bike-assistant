@@ -127,7 +127,8 @@ export default function MapScreen() {
   const { settings } = useSettings();
 
   // 地圖 ref
-  const mapRef = useRef<MapView>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapRef = useRef<any>(null);
 
   // 當前位置
   const [currentPos, setCurrentPos] = useState<{ lat: number; lon: number; heading: number } | null>(null);

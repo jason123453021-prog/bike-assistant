@@ -110,12 +110,6 @@ const config: ExpoConfig = {
         },
       },
     ],
-    [
-      "react-native-maps",
-      {
-        androidMapsApiKey: "",
-      },
-    ],
   ],
   experiments: {
     typedRoutes: true,
