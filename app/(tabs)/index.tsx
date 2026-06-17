@@ -123,21 +123,38 @@ export default function RideScreen() {
     })();
   }, []);
 
-  // ─── 計時器 ──────────────────────────────────────────────────────────────────
-  const startTimer = useCallback(() => {
-    startTimeRef.current = Date.now() - pausedElapsedRef.current * 1000;
-    timerRef.current = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      dispatch({ type: "TICK", elapsed });
-    }, 1000);
-  }, [dispatch]);
-
-  const stopTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+  // ─── 計時器：用 useEffect 監聽 status，避免 useCallback 閉包問題 ──────────────
+  // 當 status 變為 active 時啟動計時器；非 active 時停止
+  useEffect(() => {
+    if (state.status === "active") {
+      // 從 pausedElapsedRef 恢復（首次開始或手動恢復）
+      startTimeRef.current = Date.now() - pausedElapsedRef.current * 1000;
+      timerRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        dispatch({ type: "TICK", elapsed });
+      }, 1000);
+    } else {
+      // paused / finished / idle — 一律停止計時器
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      // 記錄暫停時的 elapsed，供下次恢復使用
+      if (state.status === "paused") {
+        pausedElapsedRef.current = state.elapsed;
+      }
     }
-  }, []);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [state.status]); // 只依賴 status，不依賴 dispatch（dispatch 是穩定的）
+
+  // 保留空函數供 GPS callback 呼叫（自動暫停/恢復路徑），實際計時由上方 useEffect 控制
+  const startTimer = useCallback(() => {}, []);
+  const stopTimer = useCallback(() => {}, []);
 
   // ─── 天氣更新 ────────────────────────────────────────────────────────────────
   const updateWeather = useCallback(async (lat: number, lon: number) => {
@@ -186,15 +203,14 @@ export default function RideScreen() {
 
         // 自動暫停/恢復
         if (currentState.status === "active" && speedKmh < AUTO_PAUSE_THRESHOLD) {
+          pausedElapsedRef.current = currentState.elapsed; // 先記錄，再 dispatch
           dispatch({ type: "PAUSE" });
-          stopTimer();
-          pausedElapsedRef.current = currentState.elapsed;
           if (settings.ttsEnabled) speakAutoPause(true);
           if (settings.vibrationEnabled) vibrateMedium();
           return;
         } else if (currentState.status === "paused" && speedKmh >= AUTO_PAUSE_THRESHOLD) {
+          // pausedElapsedRef 已在暫停時設定，直接 dispatch RESUME
           dispatch({ type: "RESUME" });
-          startTimer();
           if (settings.ttsEnabled) speakAutoResume(true);
           return;
         }
@@ -316,14 +332,13 @@ export default function RideScreen() {
 
   // ─── 騎乘控制 ────────────────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
-    dispatch({ type: "START", hydrationThresholdMl });
-    pausedElapsedRef.current = 0;
+    pausedElapsedRef.current = 0; // 重置暫停時間，讓 useEffect 從 0 開始計時
+    dispatch({ type: "START", hydrationThresholdMl }); // status 變 active，觸發計時器 useEffect
     calorieReminderSentRef.current = false;
     waterReminderSentRef.current = false;
     calorieAnim.setValue(0);
     waterAnim.setValue(0);
     lastLocationRef.current = null;
-    startTimer();
     await startLocationTracking();
     // 取得初始天氣
     const loc = await Location.getLastKnownPositionAsync();
@@ -333,34 +348,32 @@ export default function RideScreen() {
       const l = await Location.getLastKnownPositionAsync();
       if (l) updateWeather(l.coords.latitude, l.coords.longitude);
     }, WEATHER_INTERVAL);
-  }, [dispatch, startTimer, startLocationTracking, updateWeather, calorieAnim, waterAnim, hydrationThresholdMl]);
+  }, [dispatch, startLocationTracking, updateWeather, calorieAnim, waterAnim, hydrationThresholdMl]);
 
   const handlePause = useCallback(() => {
+    pausedElapsedRef.current = state.elapsed; // 先記錄再 dispatch，確保 useEffect 拿到正確值
     dispatch({ type: "PAUSE" });
-    pausedElapsedRef.current = state.elapsed;
-    stopTimer();
-  }, [dispatch, state.elapsed, stopTimer]);
+  }, [dispatch, state.elapsed]);
 
   const handleResume = useCallback(() => {
+    // pausedElapsedRef 已在 handlePause 或自動暫停時設定好
     dispatch({ type: "RESUME" });
-    startTimer();
-  }, [dispatch, startTimer]);
+  }, [dispatch]);
 
   const handleStop = useCallback(async () => {
-    dispatch({ type: "STOP" });
-    stopTimer();
+    dispatch({ type: "STOP" }); // useEffect 監聽到 status=finished 會自動停止計時器
     await stopLocationTracking();
     if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
     await cancelRidingNotification();
     await saveRecord();
     setShowSummary(true);
     if (settings.vibrationEnabled) vibrateSuccess();
-  }, [dispatch, stopTimer, stopLocationTracking, saveRecord, settings.vibrationEnabled]);
+  }, [dispatch, stopLocationTracking, saveRecord, settings.vibrationEnabled]);
 
   // ─── Cleanup ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      stopTimer();
+      // 計時器由 status useEffect 的 cleanup 處理，這裡只清理其他資源
       stopLocationTracking();
       if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
     };
