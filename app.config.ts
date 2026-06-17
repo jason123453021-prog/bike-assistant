@@ -109,13 +109,8 @@ const config: ExpoConfig = {
         },
       },
     ],
-    [
-      "react-native-maps",
-      {
-        // 不提供 Google Maps API Key 時，Android 會自動使用 OSM (MapLibre)
-        // 避免因缺少 API Key 導致 APK 閃退
-      },
-    ],
+    // react-native-maps 插件：不提供 googleMapsApiKey 時 Android 使用 OSM
+    "react-native-maps",
   ],
   experiments: {
     typedRoutes: true,
