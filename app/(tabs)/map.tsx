@@ -67,6 +67,7 @@ import {
   formatDuration,
 } from "@/lib/power-calc";
 import { fetchWeather, getHeadwindMs, getRelativeWindInfo, type WeatherData } from "@/lib/weather-service";
+import { fetchBikeRoute, formatRouteDistance, formatRouteDuration, type RouteCoordinate } from "@/lib/route-service";
 import {
   calculateSweatLoss,
   DEFAULT_HYDRATION_THRESHOLD_ML,
@@ -186,10 +187,16 @@ export default function MapScreen() {
   // 偏離路線狀態
   const [isOffRoute, setIsOffRoute] = useState(false);
   const [offRouteDist, setOffRouteDist] = useState(0);
-  // 回歸路徑（從當前位置到最近路線點的連線）
+  // 回歸路徑（OSRM 計算後的多點折線）
   const [returnPolyline, setReturnPolyline] = useState<{ latitude: number; longitude: number }[]>([]);
   const [returnBearing, setReturnBearing] = useState<string>("");
   const showReturnRef = useRef(false);
+  // OSRM 路由計算結果
+  const [routeDistM, setRouteDistM] = useState<number | null>(null);
+  const [routeDurSec, setRouteDurSec] = useState<number | null>(null);
+  const [isFetchingRoute, setIsFetchingRoute] = useState(false);
+  const lastRouteFetchRef = useRef<number>(0);
+  const ROUTE_FETCH_COOLDOWN_MS = 20000; // 最少 20 秒才重新計算一次
 
   // 當共享路線更新時，自動適配地圖視角
   useEffect(() => {
@@ -512,17 +519,38 @@ export default function MapScreen() {
       if (distToNearest > OFF_ROUTE_THRESHOLD_M) {
         setIsOffRoute(true);
         setOffRouteDist(Math.round(distToNearest));
-        // 計算回歸路徑（當前位置 → 最近路線點）
+
         const nearPt = pts[idx];
-        setReturnPolyline([
-          { latitude: lat, longitude: lon },
-          { latitude: nearPt.lat, longitude: nearPt.lon },
-        ]);
-        // 計算方位詞
+
+        // 計算方位詞（直線方向，供橫幅提示用）
         const brg = bearing(lat, lon, nearPt.lat, nearPt.lon);
         const dirs = ["正北", "東北", "正東", "東南", "正南", "西南", "正西", "西北", "正北"];
         const dirIdx = Math.round(brg / 45) % 8;
         setReturnBearing(dirs[dirIdx]);
+
+        // 先顯示直線路徑（即時回歸）
+        const straightLine: RouteCoordinate[] = [
+          { latitude: lat, longitude: lon },
+          { latitude: nearPt.lat, longitude: nearPt.lon },
+        ];
+        setReturnPolyline(straightLine);
+
+        // 非同步呼叫 OSRM，取得沿道路路徑（有冷卻時間）
+        if (now - lastRouteFetchRef.current > ROUTE_FETCH_COOLDOWN_MS && !isFetchingRoute) {
+          lastRouteFetchRef.current = now;
+          setIsFetchingRoute(true);
+          fetchBikeRoute(
+            { latitude: lat, longitude: lon },
+            { latitude: nearPt.lat, longitude: nearPt.lon }
+          ).then((result) => {
+            setIsFetchingRoute(false);
+            if (result && result.coordinates.length > 1) {
+              setReturnPolyline(result.coordinates);
+              setRouteDistM(result.distanceM);
+              setRouteDurSec(result.durationSec);
+            }
+          }).catch(() => setIsFetchingRoute(false));
+        }
 
         if (now - lastRerouteRef.current > REROUTE_COOLDOWN_MS) {
           lastRerouteRef.current = now;
@@ -537,6 +565,8 @@ export default function MapScreen() {
           setIsOffRoute(false);
           setReturnPolyline([]);
           setReturnBearing("");
+          setRouteDistM(null);
+          setRouteDurSec(null);
           speak("已回到路線，繼續前進", settings.ttsEnabled);
         }
       }
@@ -593,6 +623,10 @@ export default function MapScreen() {
     setIsOffRoute(false);
     setReturnPolyline([]);
     setReturnBearing("");
+    setRouteDistM(null);
+    setRouteDurSec(null);
+    setIsFetchingRoute(false);
+    lastRouteFetchRef.current = 0;
     setMapRideActive(true);
     setFollowUser(true);
 
@@ -832,7 +866,15 @@ export default function MapScreen() {
           <Text style={styles.offRouteBannerIcon}>⚠️</Text>
           <View style={styles.offRouteBannerText}>
             <Text style={styles.offRouteBannerTitle}>偏離路線 {offRouteDist} m</Text>
-            <Text style={styles.offRouteBannerSub}>朝{returnBearing}方向回到路線</Text>
+            {isFetchingRoute ? (
+              <Text style={styles.offRouteBannerSub}>計算回歸路徑中…</Text>
+            ) : routeDistM !== null ? (
+              <Text style={styles.offRouteBannerSub}>
+                騎車回歸：{formatRouteDistance(routeDistM)}，{routeDurSec !== null ? formatRouteDuration(routeDurSec) : ""}
+              </Text>
+            ) : (
+              <Text style={styles.offRouteBannerSub}>朝{returnBearing}方向回到路線</Text>
+            )}
           </View>
         </View>
       )}
