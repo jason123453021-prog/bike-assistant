@@ -68,8 +68,18 @@ export default function SettingsScreen() {
           />
           <Divider colors={colors} />
           <NumberRow
+            icon="bicycle"
+            label="單車+裝備重量"
+            value={settings.bikeWeight ?? 10}
+            unit="kg"
+            colors={colors}
+            hint="包含單車、水壺、工具等裝備的總重，用於 GPX 卡路里預估"
+            onPress={() => openEdit("bikeWeight", "單車+裝備重量", settings.bikeWeight ?? 10, "kg")}
+          />
+          <Divider colors={colors} />
+          <NumberRow
             icon="bolt.fill"
-            label="FTP（功能閾值功率）"
+            label="FTP（功能閾値功率）"
             value={settings.ftp}
             unit="W"
             colors={colors}

@@ -3,9 +3,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface AppSettings {
   // Personal
-  weight: number;       // kg
+  weight: number;       // kg 騎手體重
   height: number;       // cm
   ftp: number;          // Functional Threshold Power (watts)
+  bikeWeight: number;   // kg 單車+裝備總重
   // Thresholds
   calorieThreshold: number;   // kcal before reminder
   waterThreshold: number;     // ml before reminder
@@ -24,6 +25,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   weight: 70,
   height: 175,
   ftp: 200,
+  bikeWeight: 10,  // 預設單車 10 kg
   calorieThreshold: 300,
   waterThreshold: 500,
   vibrationEnabled: true,

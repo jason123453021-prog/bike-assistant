@@ -28,6 +28,7 @@ const MAPPING = {
   "doc.fill":                            "description",
   "square.and.arrow.up":                 "share",
   // Settings
+  "bicycle":                             "directions-bike",
   "person.fill":                         "person",
   "bell.fill":                           "notifications",
   "speaker.wave.2.fill":                 "volume-up",
