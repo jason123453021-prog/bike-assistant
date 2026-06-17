@@ -3,12 +3,14 @@
  *
  * 功能：
  * - 全螢幕深色地圖（react-native-maps）
- * - 即時位置標記（藍點 + 方向扇形）
- * - GPX 路線疊加（紅色軌跡）
+ * - 即時位置標記（藍點）
+ * - GPX 路線疊加（從路線頁共享 Context 讀取，紅色軌跡）
  * - 自由騎乘即時軌跡繪製（綠色）
  * - GPX 導航語音播報（偏離提示、轉彎提示、到達提示）
- * - 底部面板：可上滑展開（完整儀表板）/ 下滑收縮（僅速度+時間）
- * - 功率計算、卡路里/水分進度條、補給提醒
+ * - 底部面板（螢幕下方三分之一）：
+ *     收縮狀態：時間、速度、距離、坡度、功率（六格）
+ *     展開狀態：加入卡路里/水分進度條、補給提醒
+ * - 功率計算、補給提醒
  * - 天氣資訊（溫度/濕度/相對風向）
  * - 自動暫停/恢復
  */
@@ -24,17 +26,15 @@ import {
   Alert,
   Animated,
   Dimensions,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { PanResponder } from "react-native";
 import MapView, { Circle, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 import * as Location from "expo-location";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
@@ -42,7 +42,8 @@ import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
 import { useSettings } from "@/lib/settings-context";
-import { parseGpx, GpxPoint, GpxRoute } from "@/lib/gpx-parser";
+import { useGpx } from "@/lib/gpx-context";
+import { type GpxPoint } from "@/lib/gpx-parser";
 import {
   speak,
   vibrateLight,
@@ -91,9 +92,9 @@ const AUTO_PAUSE_THRESHOLD = 2;
 const WEATHER_INTERVAL = 10 * 60 * 1000;
 const LOCATION_INTERVAL_SEC = 3;
 
-// 底部面板高度
-const PANEL_COLLAPSED_H = 200;  // 收縮：速度 + 時間 + 按鈕
-const PANEL_EXPANDED_H = 480;   // 展開：完整儀表板
+// 底部面板高度：螢幕下方三分之一（收縮）/ 五分之三（展開）
+const PANEL_COLLAPSED_H = Math.round(SCREEN_H / 3);
+const PANEL_EXPANDED_H = Math.round(SCREEN_H * 0.62);
 
 // ─── 工具函數 ─────────────────────────────────────────────────────────────────
 
@@ -130,14 +131,6 @@ function findNearestPointIndex(lat: number, lon: number, points: GpxPoint[]): nu
   return minIdx;
 }
 
-function formatTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-}
-
 // ─── 深色地圖樣式 ─────────────────────────────────────────────────────────────
 const DARK_MAP_STYLE = [
   { elementType: "geometry", stylers: [{ color: "#1a1a2e" }] },
@@ -159,6 +152,7 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { state, dispatch, saveRecord } = useRide();
   const { settings } = useSettings();
+  const { sharedRoute, clearSharedRoute } = useGpx();
 
   useKeepAwake();
 
@@ -178,9 +172,8 @@ export default function MapScreen() {
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const [followUser, setFollowUser] = useState(true);
 
-  // GPX 路線
-  const [gpxRoute, setGpxRoute] = useState<GpxRoute | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
+  // GPX 路線（從共享 Context 讀取，不再有本地匯入）
+  const gpxRoute = sharedRoute;
 
   // 導航狀態
   const [isNavigating, setIsNavigating] = useState(false);
@@ -189,6 +182,27 @@ export default function MapScreen() {
   const [distToEnd, setDistToEnd] = useState<number | null>(null);
   const lastRerouteRef = useRef<number>(0);
   const arrivedRef = useRef(false);
+
+  // 當共享路線更新時，自動適配地圖視角
+  useEffect(() => {
+    if (gpxRoute && gpxRoute.points.length > 0) {
+      setNearestIdx(0);
+      arrivedRef.current = false;
+      setNavInstruction("路線已載入，點擊開始即可啟動導航");
+      const coords = gpxRoute.points.map((p) => ({ latitude: p.lat, longitude: p.lon }));
+      setTimeout(() => {
+        mapRef.current?.fitToCoordinates(coords, {
+          edgePadding: { top: 80, right: 40, bottom: PANEL_COLLAPSED_H + 40, left: 40 },
+          animated: true,
+        });
+        setFollowUser(false);
+      }, 400);
+    } else {
+      setNavInstruction("");
+      setIsNavigating(false);
+      setDistToEnd(null);
+    }
+  }, [gpxRoute]);
 
   // 即時軌跡
   const [liveTrail, setLiveTrail] = useState<{ latitude: number; longitude: number }[]>([]);
@@ -248,23 +262,13 @@ export default function MapScreen() {
     }).start();
   }, [panelAnim]);
 
-  // PanResponder 處理上滑/下滑手勢
-  const panStartY = useRef(0);
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
-      onPanResponderGrant: (_, gs) => {
-        panStartY.current = gs.y0;
-      },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy < -30) {
-          // 上滑 → 展開
-          togglePanel(true);
-        } else if (gs.dy > 30) {
-          // 下滑 → 收縮
-          togglePanel(false);
-        }
+        if (gs.dy < -30) togglePanel(true);
+        else if (gs.dy > 30) togglePanel(false);
       },
     })
   ).current;
@@ -295,7 +299,7 @@ export default function MapScreen() {
     [settings, alertPlayer]
   );
 
-  // ─── 計時器（透過 RideContext 的 TICK 驅動） ─────────────────────────────────
+  // ─── 計時器 ──────────────────────────────────────────────────────────────────
   const startTimeRef = useRef<number>(0);
   const pausedElapsedRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -318,7 +322,7 @@ export default function MapScreen() {
     };
   }, [state.status]);
 
-  // ─── GPS 訂閱（地圖 + 騎乘功能整合） ────────────────────────────────────────
+  // ─── GPS 訂閱 ────────────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
     (async () => {
@@ -340,7 +344,6 @@ export default function MapScreen() {
 
           setCurrentPos({ lat: latitude, lon: longitude, heading: hdg });
 
-          // 地圖跟隨
           if (followUser) {
             mapRef.current?.animateCamera(
               { center: { latitude, longitude }, heading: hdg, zoom: 17 },
@@ -348,7 +351,6 @@ export default function MapScreen() {
             );
           }
 
-          // 更新相對風向
           const wd = windDataRef.current;
           if (wd.speed > 0) {
             setRelativeWindInfo(getRelativeWindInfo(hdg, wd.direction, wd.speed * 3.6));
@@ -370,7 +372,7 @@ export default function MapScreen() {
             return;
           }
 
-          // 即時軌跡（地圖繪製）
+          // 即時軌跡
           if (mapRideActive) {
             setLiveTrail((prev) => [...prev, { latitude, longitude }]);
           }
@@ -425,8 +427,6 @@ export default function MapScreen() {
             power, calories: calIncrement, ascent,
           });
 
-          // 水分流失
-          const currentWeather = weatherRef.current;
           const sweatResult = calculateSweatLoss({
             weightKg: settings.weight,
             heightCm: settings.height,
@@ -434,9 +434,9 @@ export default function MapScreen() {
             speedKmh,
             ascentPerInterval: ascent,
             intervalSec: LOCATION_INTERVAL_SEC,
-            temperatureC: currentWeather?.temperature ?? 25,
-            humidityPct: currentWeather?.humidity ?? 60,
-            weatherCode: currentWeather?.weatherCode ?? 1,
+            temperatureC: weatherRef.current?.temperature ?? 25,
+            humidityPct: weatherRef.current?.humidity ?? 60,
+            weatherCode: weatherRef.current?.weatherCode ?? 1,
           });
           dispatch({
             type: "SWEAT_UPDATE",
@@ -445,7 +445,6 @@ export default function MapScreen() {
             intensityLabel: sweatResult.intensityLabel,
           });
 
-          // 進度條動畫
           const newCalories = currentState.calories + calIncrement;
           const calPct = Math.min(1, newCalories / settings.calorieThreshold);
           const newSweatSince = currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
@@ -454,7 +453,6 @@ export default function MapScreen() {
           Animated.timing(calorieAnim, { toValue: calPct, duration: 500, useNativeDriver: false }).start();
           Animated.timing(waterAnim, { toValue: waterPct, duration: 500, useNativeDriver: false }).start();
 
-          // 補給提醒
           if (calPct >= 1 && !calorieReminderSentRef.current) {
             calorieReminderSentRef.current = true;
             triggerSupplyReminder("calorie");
@@ -464,7 +462,6 @@ export default function MapScreen() {
             triggerSupplyReminder("water", sweatResult.recommendedRefillMl);
           }
 
-          // 前台通知
           if (notifPermRef.current && settings.notificationEnabled && currentState.elapsed % 30 === 0) {
             showRidingNotification(speedKmh, currentState.distance, currentState.elapsed);
           }
@@ -545,39 +542,6 @@ export default function MapScreen() {
     [gpxRoute, settings.ttsEnabled]
   );
 
-  // ─── 匯入 GPX ────────────────────────────────────────────────────────────────
-  const handleImportGpx = useCallback(async () => {
-    try {
-      setIsImporting(true);
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/gpx+xml", "text/xml", "application/xml", "*/*"],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-      const content = await FileSystem.readAsStringAsync(result.assets[0].uri);
-      const route = parseGpx(content);
-      if (!route) {
-        Alert.alert("解析失敗", "無法解析此 GPX 檔案，請確認格式是否正確。");
-        return;
-      }
-      setGpxRoute(route);
-      setNearestIdx(0);
-      arrivedRef.current = false;
-      setNavInstruction("路線已載入，點擊開始導航");
-      if (route.points.length > 0) {
-        mapRef.current?.fitToCoordinates(
-          route.points.map((p) => ({ latitude: p.lat, longitude: p.lon })),
-          { edgePadding: { top: 80, right: 40, bottom: PANEL_COLLAPSED_H + 40, left: 40 }, animated: true }
-        );
-        setFollowUser(false);
-      }
-    } catch {
-      Alert.alert("錯誤", "匯入 GPX 失敗");
-    } finally {
-      setIsImporting(false);
-    }
-  }, []);
-
   // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
     pausedElapsedRef.current = 0;
@@ -601,10 +565,8 @@ export default function MapScreen() {
       speak("導航已啟動，沿路線前進", settings.ttsEnabled);
     }
 
-    // 啟動背景追蹤
     await startBackgroundLocationTracking();
 
-    // 取得初始天氣
     const loc = await Location.getLastKnownPositionAsync();
     if (loc) updateWeather(loc.coords.latitude, loc.coords.longitude);
     weatherTimerRef.current = setInterval(async () => {
@@ -645,17 +607,6 @@ export default function MapScreen() {
       },
     ]);
   }, [dispatch, saveRecord, settings.vibrationEnabled]);
-
-  // ─── 清除路線 ────────────────────────────────────────────────────────────────
-  const handleClearRoute = useCallback(() => {
-    if (mapRideActive) return;
-    setGpxRoute(null);
-    setIsNavigating(false);
-    setNavInstruction("");
-    setNearestIdx(0);
-    arrivedRef.current = false;
-    setDistToEnd(null);
-  }, [mapRideActive]);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {
@@ -789,28 +740,30 @@ export default function MapScreen() {
         >
           <IconSymbol name="location.fill" size={20} color={followUser ? "#fff" : "#007AFF"} />
         </Pressable>
-        <Pressable
-          style={styles.toolBtn}
-          onPress={handleImportGpx}
-          disabled={isImporting || mapRideActive}
-        >
-          <IconSymbol name="doc.fill" size={20} color={mapRideActive ? "#555" : "#fff"} />
-        </Pressable>
+        {/* GPX 路線狀態指示（有路線時顯示清除按鈕） */}
         {gpxRoute && !mapRideActive && (
-          <Pressable style={styles.toolBtn} onPress={handleClearRoute}>
+          <Pressable style={styles.toolBtn} onPress={clearSharedRoute}>
             <IconSymbol name="xmark.circle.fill" size={20} color="#FF3B30" />
           </Pressable>
         )}
       </View>
 
-      {/* ── 底部面板（可上滑展開） ── */}
+      {/* ── GPX 路線提示（無路線時） ── */}
+      {!gpxRoute && !isActive && (
+        <View style={[styles.noRouteBadge, { top: insets.top + 8, left: 16, right: 72 }]}>
+          <IconSymbol name="map.fill" size={13} color="rgba(255,255,255,0.5)" />
+          <Text style={styles.noRouteText}>前往「路線」頁面匯入 GPX 路線</Text>
+        </View>
+      )}
+
+      {/* ── 底部面板（螢幕下方三分之一，可上滑展開） ── */}
       <Animated.View
         style={[styles.panel, { height: panelAnim, paddingBottom: insets.bottom + 8 }]}
       >
-        {/* 拖拉把手（觸控區域） */}
+        {/* 拖拉把手 */}
         <View {...panResponder.panHandlers} style={styles.handleArea}>
           <View style={styles.panelHandle} />
-          {/* 天氣列（收縮時也顯示） */}
+          {/* 天氣列 */}
           {weather && (
             <View style={styles.weatherRow}>
               <Text style={styles.weatherItem}>{weather.temperature}°C</Text>
@@ -828,44 +781,63 @@ export default function MapScreen() {
                   </Text>
                 </>
               )}
+              {isPaused && (
+                <View style={styles.pausedBadge}>
+                  <Text style={styles.pausedText}>已暫停</Text>
+                </View>
+              )}
+            </View>
+          )}
+          {!weather && isPaused && (
+            <View style={[styles.weatherRow, { justifyContent: "center" }]}>
+              <View style={styles.pausedBadge}>
+                <Text style={styles.pausedText}>已暫停</Text>
+              </View>
             </View>
           )}
         </View>
 
-        {/* 主要數據：時間 + 速度 */}
-        <View style={styles.mainRow}>
-          <View style={styles.mainCell}>
-            <Text style={styles.mainLabel}>騎乘時間</Text>
-            <Text style={styles.mainValue}>{formatTime(state.elapsed)}</Text>
-          </View>
-          <View style={styles.mainDivider} />
-          <View style={styles.mainCell}>
-            <Text style={styles.mainLabel}>速度</Text>
-            <Text style={styles.mainValue}>
-              {state.currentSpeed > 0 ? state.currentSpeed.toFixed(1) : "--"}
-              <Text style={styles.mainUnit}> km/h</Text>
-            </Text>
-          </View>
+        {/* ── 六格儀表板（收縮狀態常駐顯示） ── */}
+        <View style={styles.sixGrid}>
+          <BigMetric
+            label="騎乘時間"
+            value={formatDuration(state.elapsed)}
+            unit=""
+            wide
+          />
+          <BigMetric
+            label="速度"
+            value={state.currentSpeed > 0 ? state.currentSpeed.toFixed(1) : "--"}
+            unit="km/h"
+            highlight
+          />
+          <BigMetric
+            label="距離"
+            value={(state.distance / 1000).toFixed(2)}
+            unit="km"
+          />
+          <BigMetric
+            label="坡度"
+            value={isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"}
+            unit="%"
+            warn={currentGrade > 5}
+          />
+          <BigMetric
+            label="功率"
+            value={`${state.currentPower}`}
+            unit="W"
+            accent
+          />
+          <BigMetric
+            label="均速"
+            value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"}
+            unit="km/h"
+          />
         </View>
 
-        {/* 展開後顯示的內容 */}
+        {/* ── 展開後：進度條 ── */}
         {panelExpanded && (
-          <>
-            {/* 六格儀表板 */}
-            <View style={styles.metricsGrid}>
-              <MetricCell label="功率" value={`${state.currentPower}`} unit="W" accent />
-              <MetricCell label="距離" value={(state.distance / 1000).toFixed(2)} unit="km" />
-              <MetricCell label="爬升" value={`${Math.round(state.totalAscent)}`} unit="m" />
-              <MetricCell label="均速" value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"} unit="km/h" />
-              <MetricCell label="均功率" value={`${state.avgPower}`} unit="W" accent />
-              <MetricCell
-                label="坡度"
-                value={isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"}
-                unit="%"
-                warn={currentGrade > 5}
-              />
-            </View>
-
+          <View style={styles.expandedSection}>
             {/* 卡路里進度條 */}
             <View style={styles.progressSection}>
               <View style={styles.progressHeader}>
@@ -883,7 +855,7 @@ export default function MapScreen() {
             </View>
 
             {/* 水分進度條 */}
-            <View style={[styles.progressSection, { marginTop: 8 }]}>
+            <View style={[styles.progressSection, { marginTop: 10 }]}>
               <View style={styles.progressHeader}>
                 <View style={styles.progressLabelRow}>
                   <IconSymbol name="drop.fill" size={13} color={waterBarColor} />
@@ -900,16 +872,17 @@ export default function MapScreen() {
                 <Animated.View style={[styles.progressFill, { width: waterWidth, backgroundColor: waterBarColor }]} />
               </View>
             </View>
-          </>
+          </View>
         )}
 
-        {/* 控制按鈕 */}
+        {/* ── 控制按鈕 ── */}
         <View style={styles.btnRow}>
           {!isActive ? (
             <Pressable
               style={({ pressed }) => [styles.startBtn, { opacity: pressed ? 0.85 : 1 }]}
               onPress={handleStart}
             >
+              <IconSymbol name="play.fill" size={20} color="#fff" />
               <Text style={styles.startBtnText}>開始</Text>
             </Pressable>
           ) : (
@@ -933,6 +906,7 @@ export default function MapScreen() {
                 style={({ pressed }) => [styles.startBtn, styles.stopBtn, { opacity: pressed ? 0.85 : 1 }]}
                 onPress={handleStop}
               >
+                <IconSymbol name="stop.fill" size={18} color="#fff" />
                 <Text style={styles.startBtnText}>結束</Text>
               </Pressable>
             </View>
@@ -940,12 +914,20 @@ export default function MapScreen() {
         </View>
 
         {/* 展開/收縮提示 */}
-        {!panelExpanded && isActive && (
-          <Pressable style={styles.expandHint} onPress={() => togglePanel(true)}>
-            <Text style={styles.expandHintText}>上滑查看更多</Text>
-            <IconSymbol name="chevron.right" size={12} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: "-90deg" }] }} />
-          </Pressable>
-        )}
+        <Pressable
+          style={styles.expandHint}
+          onPress={() => togglePanel(!panelExpanded)}
+        >
+          <Text style={styles.expandHintText}>
+            {panelExpanded ? "下滑收起" : "上滑查看更多"}
+          </Text>
+          <IconSymbol
+            name="chevron.right"
+            size={12}
+            color="rgba(255,255,255,0.3)"
+            style={{ transform: [{ rotate: panelExpanded ? "90deg" : "-90deg" }] }}
+          />
+        </Pressable>
       </Animated.View>
 
       {/* ── 補給 Modal ── */}
@@ -983,24 +965,43 @@ export default function MapScreen() {
 
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
-function MetricCell({ label, value, unit, accent, warn }: {
-  label: string; value: string; unit: string; accent?: boolean; warn?: boolean;
+function BigMetric({ label, value, unit, accent, highlight, warn, wide }: {
+  label: string;
+  value: string;
+  unit: string;
+  accent?: boolean;
+  highlight?: boolean;
+  warn?: boolean;
+  wide?: boolean;
 }) {
-  const color = accent ? "#00E676" : warn ? "#F59E0B" : "#fff";
+  const color = accent ? "#00E676" : highlight ? "#fff" : warn ? "#F59E0B" : "rgba(255,255,255,0.9)";
+  const fontSize = highlight ? 32 : wide ? 26 : 22;
   return (
-    <View style={metricStyles.cell}>
-      <Text style={[metricStyles.value, { color }]}>{value}</Text>
-      <Text style={metricStyles.unit}>{unit}</Text>
-      <Text style={metricStyles.label}>{label}</Text>
+    <View style={[bigMetricStyles.cell, wide && bigMetricStyles.wideCell]}>
+      <Text style={bigMetricStyles.label}>{label}</Text>
+      <View style={bigMetricStyles.valueRow}>
+        <Text style={[bigMetricStyles.value, { color, fontSize }]}>{value}</Text>
+        {unit ? <Text style={bigMetricStyles.unit}>{unit}</Text> : null}
+      </View>
     </View>
   );
 }
 
-const metricStyles = StyleSheet.create({
-  cell: { flex: 1, alignItems: "center", paddingVertical: 8 },
-  value: { fontSize: 18, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  unit: { fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 1 },
-  label: { fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 },
+const bigMetricStyles = StyleSheet.create({
+  cell: {
+    width: "33.33%",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: "rgba(255,255,255,0.06)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  wideCell: {},
+  label: { color: "rgba(255,255,255,0.38)", fontSize: 10, marginBottom: 3, letterSpacing: 0.3 },
+  valueRow: { flexDirection: "row", alignItems: "baseline", gap: 3 },
+  value: { fontWeight: "700", fontVariant: ["tabular-nums"] },
+  unit: { fontSize: 10, color: "rgba(255,255,255,0.35)" },
 });
 
 // ─── 樣式 ─────────────────────────────────────────────────────────────────────
@@ -1032,6 +1033,18 @@ const styles = StyleSheet.create({
   },
   toolBtnActive: { backgroundColor: "rgba(0,122,255,0.2)", borderColor: "#007AFF" },
 
+  noRouteBadge: {
+    position: "absolute",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  noRouteText: { color: "rgba(255,255,255,0.5)", fontSize: 11 },
+
   // 底部面板
   panel: {
     position: "absolute",
@@ -1039,7 +1052,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#0d0d1a",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.08)",
     overflow: "hidden",
@@ -1059,31 +1072,35 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  weatherItem: { color: "rgba(255,255,255,0.5)", fontSize: 11 },
+  weatherItem: { color: "rgba(255,255,255,0.45)", fontSize: 11 },
   weatherSep: { color: "rgba(255,255,255,0.2)", fontSize: 11 },
-
-  mainRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
+  pausedBadge: {
+    backgroundColor: "rgba(245,158,11,0.2)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 6,
   },
-  mainCell: { flex: 1, alignItems: "center" },
-  mainDivider: { width: 1, height: 40, backgroundColor: "rgba(255,255,255,0.1)" },
-  mainLabel: { color: "rgba(255,255,255,0.45)", fontSize: 11, marginBottom: 2 },
-  mainValue: { color: "#fff", fontSize: 30, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  mainUnit: { fontSize: 13, fontWeight: "400", color: "rgba(255,255,255,0.5)" },
+  pausedText: { color: "#F59E0B", fontSize: 11, fontWeight: "600" },
 
-  metricsGrid: {
+  // 六格儀表板
+  sixGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255,255,255,0.08)",
-    paddingTop: 4,
-    marginBottom: 8,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    marginTop: 2,
   },
 
+  // 展開區域
+  expandedSection: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    paddingTop: 12,
+    marginTop: 4,
+  },
   progressSection: {},
   progressHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
   progressLabelRow: { flexDirection: "row", alignItems: "center", gap: 5 },
@@ -1094,15 +1111,21 @@ const styles = StyleSheet.create({
   ratePill: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 },
   rateText: { fontSize: 10, fontWeight: "600" },
 
-  btnRow: { alignItems: "center", marginTop: 10 },
+  // 控制按鈕
+  btnRow: { alignItems: "center", marginTop: 10, marginBottom: 2 },
   activeButtons: { flexDirection: "row", alignItems: "center", gap: 12 },
   startBtn: {
-    width: 160, height: 48, borderRadius: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 32,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "#00C853",
-    alignItems: "center", justifyContent: "center",
+    justifyContent: "center",
   },
   stopBtn: { backgroundColor: "#FF3B30" },
-  startBtnText: { color: "#fff", fontSize: 18, fontWeight: "700", letterSpacing: 1 },
+  startBtnText: { color: "#fff", fontSize: 17, fontWeight: "700", letterSpacing: 0.5 },
   controlBtn: {
     width: 48, height: 48, borderRadius: 24,
     backgroundColor: "rgba(255,255,255,0.1)",
@@ -1115,7 +1138,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
-    paddingTop: 6,
+    paddingTop: 4,
   },
-  expandHintText: { color: "rgba(255,255,255,0.3)", fontSize: 11 },
+  expandHintText: { color: "rgba(255,255,255,0.25)", fontSize: 10 },
 });

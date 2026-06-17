@@ -66,3 +66,13 @@
 - [x] 歷史記錄頁：加入「查看軌跡」按鈕
 - [x] 歷史記錄頁：顯示路線名稱
 - [x] icon-symbol 加入 pencil 映射
+
+## GPX 共享與底部面板優化（2025-06 第二批）
+- [x] 建立 GpxContext（lib/gpx-context.tsx）：路線頁與導航頁共享 GPX 資料
+- [x] 在 _layout.tsx 加入 GpxProvider
+- [x] 路線頁（navigate.tsx）匯入 GPX 後自動寫入 GpxContext
+- [x] 導航頁（map.tsx）從 GpxContext 讀取 GPX，移除本地匯入按鈕
+- [x] 導航頁底部面板預設高度為螢幕三分之一（六格：時間、速度、距離、坡度、功率、均速）
+- [x] 上滑展開後顯示卡路里/水分進度條
+- [x] GPX 路線有載入時右側工具列顯示清除按鈕
+- [x] 無路線時顯示提示引導使用者前往路線頁匯入

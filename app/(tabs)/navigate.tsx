@@ -20,6 +20,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useSettings } from "@/lib/settings-context";
 import * as Location from "expo-location";
 import { parseGpx, estimateRouteCalories, type GpxRoute } from "@/lib/gpx-parser";
+import { useGpx } from "@/lib/gpx-context";
 import { formatDuration, formatDistance, calcAirDensity } from "@/lib/power-calc";
 import { fetchWeather, type WeatherData } from "@/lib/weather-service";
 
@@ -30,6 +31,7 @@ const CHART_HEIGHT = 120;
 export default function NavigateScreen() {
   const colors = useColors();
   const { settings } = useSettings();
+  const { setSharedRoute } = useGpx();
 
   const [route, setRoute] = useState<GpxRoute | null>(null);
   const [loading, setLoading] = useState(false);
@@ -79,6 +81,7 @@ export default function NavigateScreen() {
         setError("無法解析 GPX 檔案，請確認格式正確");
       } else {
         setRoute(parsed);
+        setSharedRoute(parsed);  // 同步至導航頁共享 Context
         // 自動取得路線起點天氣（優先用 GPX 第一點座標）
         fetchRouteWeather(parsed.points[0].lat, parsed.points[0].lon);
       }

@@ -11,6 +11,7 @@ import "../global.css";
 import "@/lib/background-location";
 import { ThemeProvider, useThemeContext } from "@/lib/theme-provider";
 import { RideProvider } from "@/lib/ride-context";
+import { GpxProvider } from "@/lib/gpx-context";
 import { SettingsProvider } from "@/lib/settings-context";
 import { setupNotifications } from "@/lib/feedback-service";
 
@@ -52,11 +53,13 @@ export default function RootLayout() {
 
   return (
     <SettingsProvider>
+      <GpxProvider>
       <RideProvider>
         <ThemeProvider>
           <InnerLayout />
         </ThemeProvider>
       </RideProvider>
+      </GpxProvider>
     </SettingsProvider>
   );
 }
