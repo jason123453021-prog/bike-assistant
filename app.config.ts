@@ -37,6 +37,7 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
+    edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
     permissions: [
@@ -107,13 +108,6 @@ const config: ExpoConfig = {
           minSdkVersion: 24,
           targetSdkVersion: 35,
         },
-      },
-    ],
-    [
-      "react-native-maps",
-      {
-        // 不提供 Google Maps API Key 時，Android 會自動使用 OSM (MapLibre)
-        // 避免因缺少 API Key 導致 APK 閃退
       },
     ],
   ],

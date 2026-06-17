@@ -33,7 +33,7 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Circle, Polyline } from "react-native-maps";
+import MapView, { Circle, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 import * as Location from "expo-location";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
@@ -700,8 +700,6 @@ export default function MapScreen() {
         text: "結束",
         style: "destructive",
           onPress: async () => {
-          // 先儲存記錄（stateRef 仍有完整騎乘數據），再 dispatch STOP
-          await saveRecord();
           dispatch({ type: "STOP" });
           setMapRideActive(false);
           setIsNavigating(false);
@@ -711,6 +709,8 @@ export default function MapScreen() {
           await stopBackgroundLocationTracking();
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           await cancelRidingNotification();
+          // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新
+          await saveRecord();
           setShowSummary(true);
           if (settings.vibrationEnabled) vibrateSuccess();
         },
@@ -774,7 +774,8 @@ export default function MapScreen() {
       <MapView
         ref={mapRef}
         style={[styles.map, { height: SCREEN_H - tabBarH }]}
-        customMapStyle={Platform.OS === "android" ? undefined : DARK_MAP_STYLE}
+        provider={PROVIDER_DEFAULT}
+        customMapStyle={DARK_MAP_STYLE}
         showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={false}

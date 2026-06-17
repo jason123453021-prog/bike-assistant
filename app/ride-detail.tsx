@@ -26,7 +26,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import MapView, { Circle, Polyline } from "react-native-maps";
+import MapView, { Circle, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 import Svg, { G, Path } from "react-native-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
@@ -237,7 +237,8 @@ export default function RideDetailScreen() {
       <MapView
         ref={mapRef}
         style={styles.map}
-        customMapStyle={Platform.OS === "android" ? undefined : DARK_MAP_STYLE}
+        provider={PROVIDER_DEFAULT}
+        customMapStyle={DARK_MAP_STYLE}
         showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={false}

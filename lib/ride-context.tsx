@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useReducer, useRef, useEffect } from "react";
+import React, { createContext, useCallback, useContext, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -258,37 +258,32 @@ function generateDefaultName(date: number): string {
 export function RideProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(rideReducer, initialState);
 
-  // 使用 ref 追蹤最新 state，避免 useCallback closure 問題
-  const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
-
   const saveRecord = useCallback(async (name?: string) => {
-    const s = stateRef.current;
-    if (s.elapsed < 10) return;
+    if (state.elapsed < 10) return;
     const now = Date.now();
     const record: RideRecord = {
       id: now.toString(),
       date: now,
       name: (name && name.trim()) ? name.trim() : generateDefaultName(now),
-      duration: s.elapsed,
-      distance: s.distance,
-      avgSpeed: s.avgSpeed,
-      maxSpeed: s.maxSpeed,
-      totalAscent: s.totalAscent,
-      calories: Math.round(s.calories),
-      avgPower: s.avgPower,
-      maxPower: s.maxPower,
-      powerZones: s.powerZones,
-      route: decimateRoute(s.route),  // 抽樣壓縮，最多 500 點
-      totalSweatMl: Math.round(s.totalSweatMl),
-      refillCount: s.refillCount,
+      duration: state.elapsed,
+      distance: state.distance,
+      avgSpeed: state.avgSpeed,
+      maxSpeed: state.maxSpeed,
+      totalAscent: state.totalAscent,
+      calories: Math.round(state.calories),
+      avgPower: state.avgPower,
+      maxPower: state.maxPower,
+      powerZones: state.powerZones,
+      route: decimateRoute(state.route),  // 抽樣壓縮，最多 500 點
+      totalSweatMl: Math.round(state.totalSweatMl),
+      refillCount: state.refillCount,
     };
     dispatch({ type: "ADD_RECORD", record });
     const existing = await AsyncStorage.getItem(STORAGE_KEY);
     const records: RideRecord[] = existing ? JSON.parse(existing) : [];
     records.unshift(record);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(records.slice(0, 100)));
-  }, []);  // 不依賴 state，改用 stateRef.current 讀取最新值
+  }, [state]);
 
   const loadRecords = useCallback(async () => {
     try {
