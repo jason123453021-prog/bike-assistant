@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   Alert,
+  TextInput,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
@@ -20,10 +21,34 @@ const STORAGE_KEY = "@bike_records";
 export default function HistoryScreen() {
   const colors = useColors();
   const { state, dispatch, loadRecords } = useRide();
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     loadRecords();
   }, []);
+
+  // 依關鍵字過濾記錄（搜尋路線名稱、日期、距離、時間）
+  const filteredRecords = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return state.records;
+    return state.records.filter((r) => {
+      const date = new Date(r.date);
+      const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
+      const distKm = (r.distance / 1000).toFixed(2);
+      const name = (r.name || dateStr).toLowerCase();
+      const dur = formatDuration(r.duration).toLowerCase();
+      const cal = `${r.calories}`;
+      const speed = r.avgSpeed.toFixed(1);
+      return (
+        name.includes(q) ||
+        dateStr.includes(q) ||
+        distKm.includes(q) ||
+        dur.includes(q) ||
+        cal.includes(q) ||
+        speed.includes(q)
+      );
+    });
+  }, [state.records, searchQuery]);
 
   const handleDelete = (id: string) => {
     Alert.alert("刪除記錄", "確定要刪除這筆騎乘記錄嗎？", [
@@ -123,13 +148,40 @@ export default function HistoryScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background">
+      {/* 標題列 */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.foreground }]}>騎乘記錄</Text>
-        {state.records.length > 0 && (
-          <Text style={[styles.subtitle, { color: colors.muted }]}>
-            共 {state.records.length} 筆記錄
-          </Text>
-        )}
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { color: colors.foreground }]}>騎乘記錄</Text>
+          {state.records.length > 0 && (
+            <Text style={[styles.subtitle, { color: colors.muted }]}>
+              {searchQuery.trim()
+                ? `${filteredRecords.length} / ${state.records.length} 筆`
+                : `共 ${state.records.length} 筆`}
+            </Text>
+          )}
+        </View>
+
+        {/* 搜索欄 */}
+        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <IconSymbol name="magnifyingglass" size={16} color={colors.muted} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.foreground }]}
+            placeholder="搜尋路線名稱、日期、距離..."
+            placeholderTextColor={colors.muted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          {searchQuery.length > 0 && (
+            <Pressable
+              onPress={() => setSearchQuery("")}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            >
+              <IconSymbol name="xmark.circle.fill" size={16} color={colors.muted} />
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {state.records.length === 0 ? (
@@ -140,14 +192,23 @@ export default function HistoryScreen() {
             完成一次騎乘後{"\n"}記錄將顯示在這裡
           </Text>
         </View>
+      ) : filteredRecords.length === 0 ? (
+        <View style={styles.emptyState}>
+          <IconSymbol name="magnifyingglass" size={48} color={colors.border} />
+          <Text style={[styles.emptyTitle, { color: colors.muted }]}>找不到符合的記錄</Text>
+          <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
+            試試其他關鍵字{"\n"}例如日期、距離或路線名稱
+          </Text>
+        </View>
       ) : (
         <FlatList
-          data={state.records}
+          data={filteredRecords}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          keyboardShouldPersistTaps="handled"
         />
       )}
     </ScreenContainer>
@@ -164,10 +225,27 @@ function StatChip({ icon, value, color }: { icon: string; value: string; color: 
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12 },
+  header: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 },
+  titleRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 },
   title: { fontSize: 28, fontWeight: "700", letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, marginTop: 4 },
-  listContent: { paddingHorizontal: 16, paddingBottom: 24 },
+  subtitle: { fontSize: 13 },
+
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+
+  listContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
 
   recordCard: {
     padding: 14,

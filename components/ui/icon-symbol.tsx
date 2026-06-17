@@ -49,6 +49,7 @@ const MAPPING = {
   "waveform.path.ecg":                   "monitor-heart",
   "music.note":                          "music-note",
   "pencil":                               "edit",
+  "magnifyingglass":                       "search",
 } as IconMapping;
 
 export function IconSymbol({
