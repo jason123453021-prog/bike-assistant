@@ -1,23 +1,37 @@
 /**
  * 虛擬功率計算模組
- * 基於 GPS 速度、坡度、風阻、滾動阻力計算估算功率
+ * 基於 GPS 速度、坡度、風阻、滚動阻力計算估算功率
+ * 支援天氣連動空氣密度（温度修正）
  */
 
 // 物理常數
-const RHO = 1.225;       // 空氣密度 kg/m³ (海平面)
-const G = 9.81;          // 重力加速度 m/s²
+const RHO_STD = 1.225;   // 標準空氣密度 kg/m³（海平面 15°C）
+export const G = 9.81;   // 重力加速度 m/s²
 
-// 騎乘參數預設值
+// 騎乘參數預設値
 const CDA = 0.32;        // 空氣阻力係數 × 正面面積 (m²) — 一般公路車姿勢
-const CRR = 0.004;       // 滾動阻力係數 — 公路車胎
+const CRR = 0.004;       // 滚動阻力係數 — 公路車胎
 const DRIVETRAIN_LOSS = 0.97; // 傳動效率
+
+/**
+ * 依溫度計算空氣密度（理想氣體公式）
+ * 溫度越高 → 空氣密度越低 → 空氣阻力越小
+ * @param tempC 環境溫度 °C
+ * @returns 空氣密度 kg/m³
+ */
+export function calcAirDensity(tempC: number): number {
+  // 公式：ρ = 1.225 × (288.15 / (273.15 + T))
+  return RHO_STD * (288.15 / (273.15 + tempC));
+}
 
 export interface PowerInput {
   speedMs: number;       // 速度 m/s
-  gradePct: number;      // 坡度 % (正值=上坡)
+  gradePct: number;      // 坡度 % (正値=上坡)
   windSpeedMs: number;   // 風速 m/s (逆風為正)
   riderMassKg: number;   // 騎士體重 kg
   bikeMassKg?: number;   // 自行車重量 kg (預設 8kg)
+  /** 空氣密度 kg/m³，預設 1.225（可由 calcAirDensity(tempC) 獲得） */
+  airDensityKgM3?: number;
 }
 
 export function calculatePower(input: PowerInput): number {
@@ -27,6 +41,7 @@ export function calculatePower(input: PowerInput): number {
     windSpeedMs,
     riderMassKg,
     bikeMassKg = 8,
+    airDensityKgM3 = RHO_STD,  // 預設使用標準空氣密度
   } = input;
 
   if (speedMs <= 0) return 0;
@@ -34,9 +49,9 @@ export function calculatePower(input: PowerInput): number {
   const totalMass = riderMassKg + bikeMassKg;
   const gradeDecimal = gradePct / 100;
 
-  // 空氣阻力功率
+  // 空氣阻力功率（使用天氣連動空氣密度）
   const vAir = speedMs + windSpeedMs;
-  const fAero = 0.5 * RHO * CDA * vAir * vAir;
+  const fAero = 0.5 * airDensityKgM3 * CDA * vAir * vAir;
   const pAero = fAero * speedMs;
 
   // 滾動阻力功率

@@ -21,6 +21,7 @@ import { useSettings } from "@/lib/settings-context";
 import {
   calculatePower,
   calculateCalories,
+  calcAirDensity,
   calcGrade,
   haversineDistance,
   formatDuration,
@@ -49,7 +50,7 @@ import {
 } from "@/lib/background-location";
 
 const AUTO_PAUSE_THRESHOLD = 2; // km/h 以下自動暫停
-const WEATHER_INTERVAL = 5 * 60 * 1000; // 5 分鐘更新一次天氣
+const WEATHER_INTERVAL = 10 * 60 * 1000; // 10 分鐘更新一次天氣
 const LOCATION_INTERVAL_SEC = 3; // GPS 更新間隔秒數
 
 export default function RideScreen() {
@@ -85,6 +86,8 @@ export default function RideScreen() {
   const headingRef = useRef<number>(0);
   const windDataRef = useRef<{ speed: number; direction: number }>({ speed: 0, direction: 0 });
   const weatherRef = useRef<WeatherData | null>(null);
+  // 天氣連動空氣密度（預設海平面 25°C）
+  const airDensityRef = useRef<number>(calcAirDensity(25));
   const calorieReminderSentRef = useRef<boolean>(false);
   const waterReminderSentRef = useRef<boolean>(false);
   const notifPermRef = useRef<boolean>(false);
@@ -163,6 +166,8 @@ export default function RideScreen() {
       setWeather(w);
       weatherRef.current = w;
       windDataRef.current = { speed: w.windSpeed / 3.6, direction: w.windDirection };
+      // 天氣連動空氣密度：溫度越高 → 空氣密度越低 → 空氣阻力越小
+      airDensityRef.current = calcAirDensity(w.temperature);
     }
   }, []);
 
@@ -240,12 +245,14 @@ export default function RideScreen() {
           windDataRef.current.speed * 3.6
         );
 
-        // 計算功率
+        // 計算功率（使用天氣連動空氣密度）
         const power = calculatePower({
           speedMs: speed ?? 0,
           gradePct: grade,
           windSpeedMs: headwindMs,
           riderMassKg: settings.weight,
+          bikeMassKg: settings.bikeWeight ?? 10,
+          airDensityKgM3: airDensityRef.current,
         });
 
         // 計算卡路里（3秒間隔）

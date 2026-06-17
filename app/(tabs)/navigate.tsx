@@ -18,8 +18,10 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useSettings } from "@/lib/settings-context";
+import * as Location from "expo-location";
 import { parseGpx, estimateRouteCalories, type GpxRoute } from "@/lib/gpx-parser";
-import { formatDuration, formatDistance } from "@/lib/power-calc";
+import { formatDuration, formatDistance, calcAirDensity } from "@/lib/power-calc";
+import { fetchWeather, type WeatherData } from "@/lib/weather-service";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CHART_WIDTH = SCREEN_WIDTH - 48;
@@ -32,26 +34,35 @@ export default function NavigateScreen() {
   const [route, setRoute] = useState<GpxRoute | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 路線起點天氣（GPX 匯入後自動取得）
+  const [routeWeather, setRouteWeather] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
 
   // 重量輸入（從設定預載，可在此頁面臨時覆蓋）
   const [riderWeightStr, setRiderWeightStr] = useState(String(settings.weight));
   const [bikeWeightStr, setBikeWeightStr] = useState(String(settings.bikeWeight ?? 10));
   const [avgSpeedStr, setAvgSpeedStr] = useState("20");
 
-  // 解析後的數值
+  // 解析後的數値
   const riderKg = parseFloat(riderWeightStr) || 70;
   const bikeKg = parseFloat(bikeWeightStr) || 10;
   const totalMassKg = riderKg + bikeKg;
   const avgSpeedKmh = parseFloat(avgSpeedStr) || 20;
 
-  // 即時重算卡路里
+  // 天氣連動溫度：如果已取得路線天氣則使用即時溫度，否則預設 25°C
+  const routeTempC = routeWeather?.temperature ?? 25;
+  // 空氣密度（依溫度計算）
+  const routeAirDensity = calcAirDensity(routeTempC);
+
+  // 即時重算卡路里（天氣連動空氣密度）
   const calorieResult = useMemo(() => {
     if (!route) return null;
-    return estimateRouteCalories(route, totalMassKg, avgSpeedKmh, 25);
-  }, [route, totalMassKg, avgSpeedKmh]);
+    return estimateRouteCalories(route, totalMassKg, avgSpeedKmh, routeTempC);
+  }, [route, totalMassKg, avgSpeedKmh, routeTempC]);
 
   const handleImportGpx = async () => {
     setError(null);
+    setRouteWeather(null);
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["application/gpx+xml", "text/xml", "application/xml", "*/*"],
@@ -66,12 +77,24 @@ export default function NavigateScreen() {
         setError("無法解析 GPX 檔案，請確認格式正確");
       } else {
         setRoute(parsed);
+        // 自動取得路線起點天氣（優先用 GPX 第一點座標）
+        fetchRouteWeather(parsed.points[0].lat, parsed.points[0].lon);
       }
     } catch {
       setError("匯入失敗，請重試");
     } finally {
       setLoading(false);
     }
+  };
+
+  // 取得路線起點天氣
+  const fetchRouteWeather = async (lat: number, lon: number) => {
+    setWeatherLoading(true);
+    try {
+      const w = await fetchWeather(lat, lon);
+      if (w) setRouteWeather(w);
+    } catch {}
+    finally { setWeatherLoading(false); }
   };
 
   // ─── 高度剖面圖 ──────────────────────────────────────────────────────────────
@@ -235,6 +258,51 @@ export default function NavigateScreen() {
                 <Text style={[styles.routeName, { color: colors.foreground }]} numberOfLines={1}>
                   {route.name}
                 </Text>
+              </View>
+
+              {/* ── 天氣資訊卡片 ──────────────────────────────────────────────────────── */}
+              <View style={[styles.weatherCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={styles.weatherHeader}>
+                  <Text style={[styles.weatherTitle, { color: colors.foreground }]}>路線天氣狀況</Text>
+                  {weatherLoading && (
+                    <ActivityIndicator size="small" color={colors.accent} />
+                  )}
+                  {!weatherLoading && !routeWeather && (
+                    <Text style={[styles.weatherFetching, { color: colors.muted }]}>取得中...</Text>
+                  )}
+                </View>
+                {routeWeather ? (
+                  <>
+                    <View style={styles.weatherGrid}>
+                      <WeatherCell icon="thermometer" label="溫度"
+                        value={`${routeWeather.temperature}°C`} colors={colors} />
+                      <WeatherCell icon="drop.fill" label="濕度"
+                        value={`${routeWeather.humidity}%`} colors={colors} />
+                      <WeatherCell icon="wind" label="風速"
+                        value={`${routeWeather.windSpeed} km/h`} colors={colors} />
+                      <WeatherCell icon="arrow.up" label="風向"
+                        value={`${routeWeather.windDirection}°`} colors={colors} />
+                    </View>
+                    {/* 空氣密度資訊行 */}
+                    <View style={[styles.airDensityRow, { borderTopColor: colors.border }]}>
+                      <Text style={[styles.airDensityLabel, { color: colors.muted }]}>
+                        天氣連動空氣密度（{routeWeather.temperature}°C）
+                      </Text>
+                      <Text style={[styles.airDensityValue, { color: colors.accent }]}>
+                        {routeAirDensity.toFixed(4)} kg/m³
+                      </Text>
+                    </View>
+                    <Text style={[styles.weatherDesc, { color: colors.muted }]}>
+                      {routeWeather.description}，降雨機率 {routeWeather.precipitationProb}%
+                    </Text>
+                  </>
+                ) : (
+                  !weatherLoading && (
+                    <Text style={[styles.weatherNoData, { color: colors.muted }]}>
+                      無法取得天氣，使用預設 25°C 計算
+                    </Text>
+                  )
+                )}
               </View>
 
               {/* Basic Stats Grid */}
@@ -412,6 +480,20 @@ function BreakdownItem({
   );
 }
 
+function WeatherCell({ icon, label, value, colors }: {
+  icon: string; label: string; value: string; colors: any;
+}) {
+  return (
+    <View style={styles.weatherCellWrap}>
+      <IconSymbol name={icon as any} size={14} color={colors.accent} />
+      <View>
+        <Text style={[styles.weatherCellLabel, { color: colors.muted }]}>{label}</Text>
+        <Text style={[styles.weatherCellValue, { color: colors.foreground }]}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
   header: { marginBottom: 20 },
@@ -566,4 +648,32 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: "center", paddingVertical: 60, gap: 12 },
   emptyTitle: { fontSize: 18, fontWeight: "600" },
   emptySubtitle: { fontSize: 14, textAlign: "center", lineHeight: 22 },
+
+  // Weather Card
+  weatherCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  weatherHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  weatherTitle: { fontSize: 14, fontWeight: "600" },
+  weatherFetching: { fontSize: 12 },
+  weatherGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  weatherCellWrap: { width: "48%", flexDirection: "row", alignItems: "center", gap: 6 },
+  weatherCellLabel: { fontSize: 11 },
+  weatherCellValue: { fontSize: 14, fontWeight: "600" },
+  airDensityRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 10,
+    marginTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginBottom: 6,
+  },
+  airDensityLabel: { fontSize: 12 },
+  airDensityValue: { fontSize: 13, fontWeight: "700" },
+  weatherDesc: { fontSize: 12, marginTop: 4 },
+  weatherNoData: { fontSize: 12, marginTop: 4 },
 });
