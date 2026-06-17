@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform, View, Text, StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
+import { Text } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { HapticTab } from "@/components/haptic-tab";
 import { useColors } from "@/hooks/use-colors";
@@ -39,18 +40,15 @@ export default function TabLayout() {
         tabBarShowLabel: true,
       }}
     >
+      {/* 原騎乘頁面隱藏（功能已整合至導航頁） */}
       <Tabs.Screen
         name="index"
         options={{
-          title: "騎乘",
-          tabBarIcon: ({ color, size }) => (
-            <IconSymbol size={size} name="house.fill" color={color} />
-          ),
-          tabBarLabel: ({ focused, color }) => (
-            <TabLabel label="騎乘" focused={focused} color={color} />
-          ),
+          href: null,  // 從標籤列隱藏
         }}
       />
+
+      {/* 導航（整合騎乘+地圖） */}
       <Tabs.Screen
         name="map"
         options={{
@@ -63,6 +61,8 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* 路線分析 */}
       <Tabs.Screen
         name="navigate"
         options={{
@@ -75,6 +75,8 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* 騎乘記錄 */}
       <Tabs.Screen
         name="history"
         options={{
@@ -87,6 +89,8 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* 設定 */}
       <Tabs.Screen
         name="settings"
         options={{

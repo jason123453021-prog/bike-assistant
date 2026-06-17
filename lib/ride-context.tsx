@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useRef, useCallback } from "react";
+import React, { createContext, useCallback, useContext, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -16,6 +16,7 @@ export interface LocationPoint {
 export interface RideRecord {
   id: string;
   date: number;
+  name: string;           // 自訂路線名稱（可編輯）
   duration: number;       // seconds
   distance: number;       // meters
   avgSpeed: number;       // km/h
@@ -77,7 +78,8 @@ type RideAction =
   | { type: "CONSUME_CALORIES" }
   | { type: "CONSUME_WATER" }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
-  | { type: "ADD_RECORD"; record: RideRecord };
+  | { type: "ADD_RECORD"; record: RideRecord }
+  | { type: "UPDATE_RECORD_NAME"; id: string; name: string };
 
 // ─── Power Zone Thresholds ────────────────────────────────────────────────────
 const ZONE_THRESHOLDS = [110, 150, 180, 210, 999];
@@ -202,6 +204,13 @@ function rideReducer(state: RideState, action: RideAction): RideState {
     case "ADD_RECORD":
       return { ...state, records: [action.record, ...state.records] };
 
+    case "UPDATE_RECORD_NAME": {
+      const updated = state.records.map((r) =>
+        r.id === action.id ? { ...r, name: action.name } : r
+      );
+      return { ...state, records: updated };
+    }
+
     default:
       return state;
   }
@@ -214,20 +223,48 @@ interface RideContextValue {
   dispatch: React.Dispatch<RideAction>;
   saveRecord: () => Promise<void>;
   loadRecords: () => Promise<void>;
+  updateRecordName: (id: string, name: string) => Promise<void>;
 }
 
 const RideContext = createContext<RideContextValue | null>(null);
 
 const STORAGE_KEY = "@bike_records";
 
+/** GPS 點抽樣：每隔 N 點保留一個，減少儲存大小 */
+function decimateRoute(route: LocationPoint[], maxPoints = 500): LocationPoint[] {
+  if (route.length <= maxPoints) return route;
+  const step = Math.ceil(route.length / maxPoints);
+  const result: LocationPoint[] = [];
+  for (let i = 0; i < route.length; i += step) {
+    result.push(route[i]);
+  }
+  // 確保最後一點保留
+  if (result[result.length - 1] !== route[route.length - 1]) {
+    result.push(route[route.length - 1]);
+  }
+  return result;
+}
+
+/** 生成預設路線名稱（依日期時間） */
+function generateDefaultName(date: number): string {
+  const d = new Date(date);
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const hour = d.getHours();
+  const period = hour < 6 ? "深夜" : hour < 12 ? "早晨" : hour < 18 ? "下午" : "夜間";
+  return `${month}月${day}日 ${period}騎乘`;
+}
+
 export function RideProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(rideReducer, initialState);
 
   const saveRecord = useCallback(async () => {
     if (state.elapsed < 10) return;
+    const now = Date.now();
     const record: RideRecord = {
-      id: Date.now().toString(),
-      date: Date.now(),
+      id: now.toString(),
+      date: now,
+      name: generateDefaultName(now),
       duration: state.elapsed,
       distance: state.distance,
       avgSpeed: state.avgSpeed,
@@ -237,7 +274,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       avgPower: state.avgPower,
       maxPower: state.maxPower,
       powerZones: state.powerZones,
-      route: state.route,
+      route: decimateRoute(state.route),  // 抽樣壓縮，最多 500 點
       totalSweatMl: Math.round(state.totalSweatMl),
       refillCount: state.refillCount,
     };
@@ -252,13 +289,31 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEY);
       if (data) {
-        dispatch({ type: "LOAD_RECORDS", records: JSON.parse(data) });
+        const records: RideRecord[] = JSON.parse(data);
+        // 向後相容：補充缺少 name 欄位的舊記錄
+        const migrated = records.map((r) => ({
+          ...r,
+          name: r.name ?? generateDefaultName(r.date),
+        }));
+        dispatch({ type: "LOAD_RECORDS", records: migrated });
+      }
+    } catch (_) {}
+  }, []);
+
+  const updateRecordName = useCallback(async (id: string, name: string) => {
+    dispatch({ type: "UPDATE_RECORD_NAME", id, name });
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEY);
+      if (data) {
+        const records: RideRecord[] = JSON.parse(data);
+        const updated = records.map((r) => (r.id === id ? { ...r, name } : r));
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       }
     } catch (_) {}
   }, []);
 
   return (
-    <RideContext.Provider value={{ state, dispatch, saveRecord, loadRecords }}>
+    <RideContext.Provider value={{ state, dispatch, saveRecord, loadRecords, updateRecordName }}>
       {children}
     </RideContext.Provider>
   );

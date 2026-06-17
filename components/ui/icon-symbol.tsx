@@ -48,6 +48,7 @@ const MAPPING = {
   "speedometer":                         "speed",
   "waveform.path.ecg":                   "monitor-heart",
   "music.note":                          "music-note",
+  "pencil":                               "edit",
 } as IconMapping;
 
 export function IconSymbol({
