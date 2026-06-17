@@ -23,6 +23,8 @@ const MAPPING = {
   "flame.fill":                          "local-fire-department",
   "arrow.up":                            "arrow-upward",
   "arrow.down":                          "arrow-downward",
+  "arrow.left":                          "arrow-back",
+  "arrow.right":                         "arrow-forward",
   // Navigation
   "location.fill":                       "my-location",
   "doc.fill":                            "description",

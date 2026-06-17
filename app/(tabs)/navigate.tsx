@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -34,9 +34,11 @@ export default function NavigateScreen() {
   const [route, setRoute] = useState<GpxRoute | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // 路線起點天氣（GPX 匯入後自動取得）
+  // 即時天氣（進入頁面即自動取得）
   const [routeWeather, setRouteWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
+  // 是否已將天氣連結到路線起點（GPX 匯入後更新）
+  const [weatherLinkedToRoute, setWeatherLinkedToRoute] = useState(false);
 
   // 重量輸入（從設定預載，可在此頁面臨時覆蓋）
   const [riderWeightStr, setRiderWeightStr] = useState(String(settings.weight));
@@ -88,8 +90,26 @@ export default function NavigateScreen() {
   };
 
   // 取得路線起點天氣
+  // 進入頁面自動取得即時位置天氣
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        setWeatherLoading(true);
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        const w = await fetchWeather(loc.coords.latitude, loc.coords.longitude);
+        if (w) setRouteWeather(w);
+      } catch {}
+      finally { setWeatherLoading(false); }
+    })();
+  }, []);
+
   const fetchRouteWeather = async (lat: number, lon: number) => {
     setWeatherLoading(true);
+    setWeatherLinkedToRoute(true);
     try {
       const w = await fetchWeather(lat, lon);
       if (w) setRouteWeather(w);
@@ -249,6 +269,52 @@ export default function NavigateScreen() {
             </View>
           )}
 
+          {/* ── 天氣資訊卡片（常驐顯示，不需要路線） ────────────────────────────────────────── */}
+          <View style={[styles.weatherCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.weatherHeader}>
+              <Text style={[styles.weatherTitle, { color: colors.foreground }]}>
+                {weatherLinkedToRoute ? "路線起點天氣" : "當前位置天氣"}
+              </Text>
+              {weatherLoading && (
+                <ActivityIndicator size="small" color={colors.accent} />
+              )}
+              {!weatherLoading && !routeWeather && (
+                <Text style={[styles.weatherFetching, { color: colors.muted }]}>取得中...</Text>
+              )}
+            </View>
+            {routeWeather ? (
+              <>
+                <View style={styles.weatherGrid}>
+                  <WeatherCell icon="thermometer" label="溫度"
+                    value={`${routeWeather.temperature}°C`} colors={colors} />
+                  <WeatherCell icon="drop.fill" label="濕度"
+                    value={`${routeWeather.humidity}%`} colors={colors} />
+                  <WeatherCell icon="wind" label="風速"
+                    value={`${routeWeather.windSpeed} km/h`} colors={colors} />
+                  <WeatherCell icon="arrow.up" label="風向"
+                    value={`${routeWeather.windDirection}°`} colors={colors} />
+                </View>
+                <View style={[styles.airDensityRow, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.airDensityLabel, { color: colors.muted }]}>
+                    天氣連動空氣密度（{routeWeather.temperature}°C）
+                  </Text>
+                  <Text style={[styles.airDensityValue, { color: colors.accent }]}>
+                    {routeAirDensity.toFixed(4)} kg/m³
+                  </Text>
+                </View>
+                <Text style={[styles.weatherDesc, { color: colors.muted }]}>
+                  {routeWeather.description}，降雨機率 {routeWeather.precipitationProb}%
+                </Text>
+              </>
+            ) : (
+              !weatherLoading && (
+                <Text style={[styles.weatherNoData, { color: colors.muted }]}>
+                  無法取得天氣，使用預設 25°C 計算
+                </Text>
+              )
+            )}
+          </View>
+
           {/* Route Info */}
           {route && calorieResult && (
             <>
@@ -258,51 +324,6 @@ export default function NavigateScreen() {
                 <Text style={[styles.routeName, { color: colors.foreground }]} numberOfLines={1}>
                   {route.name}
                 </Text>
-              </View>
-
-              {/* ── 天氣資訊卡片 ──────────────────────────────────────────────────────── */}
-              <View style={[styles.weatherCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={styles.weatherHeader}>
-                  <Text style={[styles.weatherTitle, { color: colors.foreground }]}>路線天氣狀況</Text>
-                  {weatherLoading && (
-                    <ActivityIndicator size="small" color={colors.accent} />
-                  )}
-                  {!weatherLoading && !routeWeather && (
-                    <Text style={[styles.weatherFetching, { color: colors.muted }]}>取得中...</Text>
-                  )}
-                </View>
-                {routeWeather ? (
-                  <>
-                    <View style={styles.weatherGrid}>
-                      <WeatherCell icon="thermometer" label="溫度"
-                        value={`${routeWeather.temperature}°C`} colors={colors} />
-                      <WeatherCell icon="drop.fill" label="濕度"
-                        value={`${routeWeather.humidity}%`} colors={colors} />
-                      <WeatherCell icon="wind" label="風速"
-                        value={`${routeWeather.windSpeed} km/h`} colors={colors} />
-                      <WeatherCell icon="arrow.up" label="風向"
-                        value={`${routeWeather.windDirection}°`} colors={colors} />
-                    </View>
-                    {/* 空氣密度資訊行 */}
-                    <View style={[styles.airDensityRow, { borderTopColor: colors.border }]}>
-                      <Text style={[styles.airDensityLabel, { color: colors.muted }]}>
-                        天氣連動空氣密度（{routeWeather.temperature}°C）
-                      </Text>
-                      <Text style={[styles.airDensityValue, { color: colors.accent }]}>
-                        {routeAirDensity.toFixed(4)} kg/m³
-                      </Text>
-                    </View>
-                    <Text style={[styles.weatherDesc, { color: colors.muted }]}>
-                      {routeWeather.description}，降雨機率 {routeWeather.precipitationProb}%
-                    </Text>
-                  </>
-                ) : (
-                  !weatherLoading && (
-                    <Text style={[styles.weatherNoData, { color: colors.muted }]}>
-                      無法取得天氣，使用預設 25°C 計算
-                    </Text>
-                  )
-                )}
               </View>
 
               {/* Basic Stats Grid */}

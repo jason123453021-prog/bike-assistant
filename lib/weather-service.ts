@@ -66,3 +66,63 @@ export function getHeadwindMs(
   const headwindKmh = windSpeedKmh * Math.cos(diff);
   return headwindKmh / 3.6; // 轉換為 m/s
 }
+
+export interface RelativeWindInfo {
+  /** 相對風向文字 */
+  label: string;
+  /** 風势強度：弱/中/強 */
+  intensity: "弱" | "中" | "強";
+  /** 風向圖示（SF Symbols 名稱） */
+  icon: string;
+  /** 風向對騎乘的影響（正數=逆風阻力，負數=順風助力） */
+  headwindKmh: number;
+}
+
+/**
+ * 依騎行方向與風向計算相對風向分類與強度
+ * @param headingDeg 騎行方向（0=北, 90=東...）
+ * @param windDirDeg 風的來向（0=北風, 90=東風...）
+ * @param windSpeedKmh 風速 km/h
+ */
+export function getRelativeWindInfo(
+  headingDeg: number,
+  windDirDeg: number,
+  windSpeedKmh: number
+): RelativeWindInfo {
+  // 風向與騎行方向的夹角（順時针）
+  const angleDiff = (windDirDeg - headingDeg + 360) % 360;
+  // 逆風分量（正=逆風，負=順風）
+  const headwindKmh = windSpeedKmh * Math.cos((angleDiff * Math.PI) / 180);
+
+  // 強度分級（依風速絕對値）
+  let intensity: RelativeWindInfo["intensity"];
+  if (windSpeedKmh < 10) intensity = "弱";
+  else if (windSpeedKmh < 25) intensity = "中";
+  else intensity = "強";
+
+  // 相對風向分類（依夹角判斷）
+  // 0° = 順風（風從騎行方向吹來）
+  // 180° = 逆風（風從騎行方向對面吹來）
+  let label: string;
+  let icon: string;
+
+  if (angleDiff <= 30 || angleDiff >= 330) {
+    // 順風（風從後方吹來）
+    label = `順風 ${windSpeedKmh.toFixed(0)} km/h`;
+    icon = "arrow.down";
+  } else if (angleDiff >= 150 && angleDiff <= 210) {
+    // 逆風（風從正前方吹來）
+    label = `逆風 ${windSpeedKmh.toFixed(0)} km/h`;
+    icon = "arrow.up";
+  } else if (angleDiff > 30 && angleDiff < 150) {
+    // 左側風（騎行方向的左側）
+    label = `左側風 ${windSpeedKmh.toFixed(0)} km/h`;
+    icon = "arrow.left";
+  } else {
+    // 右側風
+    label = `右側風 ${windSpeedKmh.toFixed(0)} km/h`;
+    icon = "arrow.right";
+  }
+
+  return { label, intensity, icon, headwindKmh };
+}

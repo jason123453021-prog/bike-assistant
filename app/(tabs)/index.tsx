@@ -26,7 +26,7 @@ import {
   haversineDistance,
   formatDuration,
 } from "@/lib/power-calc";
-import { fetchWeather, getHeadwindMs, type WeatherData } from "@/lib/weather-service";
+import { fetchWeather, getHeadwindMs, getRelativeWindInfo, type WeatherData } from "@/lib/weather-service";
 import {
   calculateSweatLoss,
   DEFAULT_HYDRATION_THRESHOLD_ML,
@@ -429,7 +429,24 @@ export default function RideScreen() {
             <>
               <WeatherItem icon="thermometer" value={`${weather.temperature}°C`} color={colors.muted} />
               <WeatherItem icon="drop.fill" value={`${weather.humidity}%`} color="#4FC3F7" />
-              <WeatherItem icon="wind" value={`${weather.windSpeed} km/h`} color={colors.muted} />
+              {(() => {
+                const windInfo = getRelativeWindInfo(
+                  headingRef.current,
+                  weather.windDirection,
+                  weather.windSpeed
+                );
+                const windColor =
+                  windInfo.intensity === "強" ? colors.error :
+                  windInfo.intensity === "中" ? colors.warning :
+                  colors.muted;
+                return (
+                  <WeatherItem
+                    icon={windInfo.icon as any}
+                    value={windInfo.label}
+                    color={windColor}
+                  />
+                );
+              })()}
               <Text style={[styles.weatherDesc, { color: colors.muted }]}>{weather.description}</Text>
             </>
           ) : (
