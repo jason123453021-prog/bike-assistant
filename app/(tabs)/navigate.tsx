@@ -332,7 +332,6 @@ export default function NavigateScreen() {
                 <RouteStatCell label="預估時間" value={formatDuration(route.estimatedDuration)} colors={colors} />
                 <RouteStatCell label="總爬升" value={`${Math.round(route.totalAscent)} m`} colors={colors} />
                 <RouteStatCell label="總下降" value={`${Math.round(route.totalDescent)} m`} colors={colors} />
-                <RouteStatCell label="路線點數" value={`${route.points.length}`} colors={colors} />
                 <RouteStatCell label="預估均速" value={`${avgSpeedKmh} km/h`} colors={colors} />
               </View>
 

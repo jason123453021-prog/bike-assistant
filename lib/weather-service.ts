@@ -23,17 +23,16 @@ const WMO_CODES: Record<number, string> = {
   95: "雷雨", 96: "雷雨夾冰雹", 99: "強雷雨",
 };
 
-export async function fetchWeather(
-  latitude: number,
-  longitude: number
-): Promise<WeatherData | null> {
+// 記憶體快取：同一座標在 5 分鐘內不重新請求
+const _cache = new Map<string, { data: WeatherData; ts: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 分鐘
+
+async function _doFetch(url: string): Promise<WeatherData | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000); // 5 秒 timeout
   try {
-    const url =
-      `https://api.open-meteo.com/v1/forecast` +
-      `?latitude=${latitude}&longitude=${longitude}` +
-      `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,weather_code` +
-      `&wind_speed_unit=kmh&timezone=auto`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
     if (!response.ok) return null;
     const data = await response.json();
     const c = data.current;
@@ -47,8 +46,40 @@ export async function fetchWeather(
       description: WMO_CODES[c.weather_code] ?? "未知",
     };
   } catch {
+    clearTimeout(timer);
     return null;
   }
+}
+
+export async function fetchWeather(
+  latitude: number,
+  longitude: number
+): Promise<WeatherData | null> {
+  // 座標四捨五入到小數點後一位作為快取 key
+  const key = `${latitude.toFixed(1)},${longitude.toFixed(1)}`;
+  const cached = _cache.get(key);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    return cached.data;
+  }
+
+  const url =
+    `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${latitude}&longitude=${longitude}` +
+    `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,weather_code` +
+    `&wind_speed_unit=kmh&timezone=auto&forecast_days=1`;
+
+  // 第一次嘗試
+  let result = await _doFetch(url);
+  // 失敗則等待 1 秒後重試一次
+  if (!result) {
+    await new Promise((r) => setTimeout(r, 1000));
+    result = await _doFetch(url);
+  }
+
+  if (result) {
+    _cache.set(key, { data: result, ts: Date.now() });
+  }
+  return result;
 }
 
 /**

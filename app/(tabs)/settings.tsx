@@ -148,25 +148,6 @@ export default function SettingsScreen() {
           />
         </View>
 
-        {/* ── 關於 ── */}
-        <SectionHeader title="關於" colors={colors} />
-        <View style={[styles.section, { borderColor: colors.border }]}>
-          <View style={styles.aboutRow}>
-            <Text style={[styles.aboutLabel, { color: colors.muted }]}>版本</Text>
-            <Text style={[styles.aboutValue, { color: colors.foreground }]}>1.0.0</Text>
-          </View>
-          <Divider colors={colors} />
-          <View style={styles.aboutRow}>
-            <Text style={[styles.aboutLabel, { color: colors.muted }]}>天氣來源</Text>
-            <Text style={[styles.aboutValue, { color: colors.foreground }]}>Open-Meteo（免費）</Text>
-          </View>
-          <Divider colors={colors} />
-          <View style={styles.aboutRow}>
-            <Text style={[styles.aboutLabel, { color: colors.muted }]}>功率計算</Text>
-            <Text style={[styles.aboutValue, { color: colors.foreground }]}>虛擬功率（GPS + 高度）</Text>
-          </View>
-        </View>
-
         <View style={{ height: 20 }} />
       </ScrollView>
 
