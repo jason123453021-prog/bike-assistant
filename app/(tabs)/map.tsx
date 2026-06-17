@@ -700,6 +700,8 @@ export default function MapScreen() {
         text: "結束",
         style: "destructive",
           onPress: async () => {
+          // 先儲存記錄（stateRef 仍有完整騎乘數據），再 dispatch STOP
+          await saveRecord();
           dispatch({ type: "STOP" });
           setMapRideActive(false);
           setIsNavigating(false);
@@ -709,8 +711,6 @@ export default function MapScreen() {
           await stopBackgroundLocationTracking();
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           await cancelRidingNotification();
-          // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新
-          await saveRecord();
           setShowSummary(true);
           if (settings.vibrationEnabled) vibrateSuccess();
         },
