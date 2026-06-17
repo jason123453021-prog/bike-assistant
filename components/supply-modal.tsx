@@ -10,14 +10,16 @@ import {
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 
-interface SupplyModalProps {
+export interface SupplyModalProps {
   visible: boolean;
   type: "calorie" | "water";
+  /** 建議補水量 ml（僅 water 類型使用，由汗液流失計算得出） */
+  recommendedMl?: number;
   onConfirm: () => void;
   onDismiss: () => void;
 }
 
-export function SupplyModal({ visible, type, onConfirm, onDismiss }: SupplyModalProps) {
+export function SupplyModal({ visible, type, recommendedMl, onConfirm, onDismiss }: SupplyModalProps) {
   const colors = useColors();
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -40,7 +42,9 @@ export function SupplyModal({ visible, type, onConfirm, onDismiss }: SupplyModal
   const title = isCalorie ? "補充能量" : "補充水分";
   const subtitle = isCalorie
     ? "您已消耗大量卡路里，建議立即補充能量棒或食物"
-    : "水分不足，建議立即補充 500ml 水分";
+    : recommendedMl
+    ? `汗液流失達到補水條件，建議補充 ${recommendedMl} ml 水分`
+    : "水分流失達到補水條件，建議立即補充水分";
 
   return (
     <Modal
@@ -69,6 +73,15 @@ export function SupplyModal({ visible, type, onConfirm, onDismiss }: SupplyModal
           {/* Text */}
           <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
           <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text>
+
+          {/* 水分補充提示框 */}
+          {!isCalorie && recommendedMl && (
+            <View style={[styles.tipBox, { backgroundColor: "#4FC3F7" + "15", borderColor: "#4FC3F7" + "35" }]}>
+              <Text style={[styles.tipText, { color: "#4FC3F7" }]}>
+                💧 建議一次補充 {recommendedMl} ml，小口慢飲效果更佳
+              </Text>
+            </View>
+          )}
 
           {/* Buttons */}
           <View style={styles.buttonRow}>
@@ -144,6 +157,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     alignItems: "center",
+  },
+  tipBox: {
+    width: "100%",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  tipText: {
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
   },
   dismissText: {
     fontSize: 15,

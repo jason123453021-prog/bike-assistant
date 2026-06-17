@@ -4,9 +4,10 @@
  */
 
 export interface WeatherData {
-  temperature: number;      // °C
-  windSpeed: number;        // km/h
-  windDirection: number;    // degrees
+  temperature: number;       // °C
+  humidity: number;          // % 相對濕度
+  windSpeed: number;         // km/h
+  windDirection: number;     // degrees
   precipitationProb: number; // %
   weatherCode: number;
   description: string;
@@ -27,13 +28,18 @@ export async function fetchWeather(
   longitude: number
 ): Promise<WeatherData | null> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,weather_code&wind_speed_unit=kmh&timezone=auto`;
+    const url =
+      `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${latitude}&longitude=${longitude}` +
+      `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,weather_code` +
+      `&wind_speed_unit=kmh&timezone=auto`;
     const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!response.ok) return null;
     const data = await response.json();
     const c = data.current;
     return {
       temperature: Math.round(c.temperature_2m),
+      humidity: Math.round(c.relative_humidity_2m ?? 60),
       windSpeed: Math.round(c.wind_speed_10m),
       windDirection: c.wind_direction_10m,
       precipitationProb: c.precipitation_probability ?? 0,

@@ -27,6 +27,11 @@ import {
 } from "@/lib/power-calc";
 import { fetchWeather, getHeadwindMs, type WeatherData } from "@/lib/weather-service";
 import {
+  calculateSweatLoss,
+  DEFAULT_HYDRATION_THRESHOLD_ML,
+  formatSweatRate,
+} from "@/lib/hydration-calc";
+import {
   vibrateWarning,
   vibrateSuccess,
   vibrateMedium,
@@ -45,6 +50,7 @@ import {
 
 const AUTO_PAUSE_THRESHOLD = 2; // km/h 以下自動暫停
 const WEATHER_INTERVAL = 5 * 60 * 1000; // 5 分鐘更新一次天氣
+const LOCATION_INTERVAL_SEC = 3; // GPS 更新間隔秒數
 
 export default function RideScreen() {
   const colors = useColors();
@@ -61,10 +67,11 @@ export default function RideScreen() {
 
   // Local state
   const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [supplyModal, setSupplyModal] = useState<{ visible: boolean; type: "calorie" | "water" }>({
-    visible: false,
-    type: "calorie",
-  });
+  const [supplyModal, setSupplyModal] = useState<{
+    visible: boolean;
+    type: "calorie" | "water";
+    recommendedMl?: number;
+  }>({ visible: false, type: "calorie" });
   const [showSummary, setShowSummary] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
@@ -77,6 +84,7 @@ export default function RideScreen() {
   const lastLocationRef = useRef<Location.LocationObject | null>(null);
   const headingRef = useRef<number>(0);
   const windDataRef = useRef<{ speed: number; direction: number }>({ speed: 0, direction: 0 });
+  const weatherRef = useRef<WeatherData | null>(null);
   const calorieReminderSentRef = useRef<boolean>(false);
   const waterReminderSentRef = useRef<boolean>(false);
   const notifPermRef = useRef<boolean>(false);
@@ -90,6 +98,11 @@ export default function RideScreen() {
   const isRiding = state.status === "active";
   const isPaused = state.status === "paused";
   const isActive = isRiding || isPaused;
+
+  // 補水閾值（使用者設定 waterThreshold 作為 ml 閾值）
+  const hydrationThresholdMl = settings.waterThreshold > 0
+    ? settings.waterThreshold
+    : DEFAULT_HYDRATION_THRESHOLD_ML;
 
   // ─── Audio Setup ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -131,14 +144,15 @@ export default function RideScreen() {
     const w = await fetchWeather(lat, lon);
     if (w) {
       setWeather(w);
+      weatherRef.current = w;
       windDataRef.current = { speed: w.windSpeed / 3.6, direction: w.windDirection };
     }
   }, []);
 
   // ─── 補給提醒 ────────────────────────────────────────────────────────────────
   const triggerSupplyReminder = useCallback(
-    async (type: "calorie" | "water") => {
-      setSupplyModal({ visible: true, type });
+    async (type: "calorie" | "water", recommendedMl?: number) => {
+      setSupplyModal({ visible: true, type, recommendedMl });
       if (settings.vibrationEnabled) vibrateWarning();
       if (settings.ttsEnabled) speakSupplyReminder(type, true);
       if (settings.soundEnabled) {
@@ -160,7 +174,7 @@ export default function RideScreen() {
     locationSubscriber.current = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 3000,
+        timeInterval: LOCATION_INTERVAL_SEC * 1000,
         distanceInterval: 5,
       },
       (location) => {
@@ -187,7 +201,7 @@ export default function RideScreen() {
 
         if (currentState.status !== "active") return;
 
-        // 計算坡度
+        // 計算坡度與爬升
         let grade = 0;
         let ascent = 0;
         if (lastLocationRef.current) {
@@ -219,7 +233,7 @@ export default function RideScreen() {
         });
 
         // 計算卡路里（3秒間隔）
-        const calIncrement = calculateCalories(power, 3);
+        const calIncrement = calculateCalories(power, LOCATION_INTERVAL_SEC);
 
         dispatch({
           type: "LOCATION_UPDATE",
@@ -229,10 +243,34 @@ export default function RideScreen() {
           ascent,
         });
 
-        // 更新進度條動畫
+        // ─── 智慧水分流失計算 ──────────────────────────────────────────────
+        const currentWeather = weatherRef.current;
+        const sweatResult = calculateSweatLoss({
+          weightKg: settings.weight,
+          heightCm: settings.height,
+          powerW: power,
+          speedKmh,
+          ascentPerInterval: ascent,
+          intervalSec: LOCATION_INTERVAL_SEC,
+          temperatureC: currentWeather?.temperature ?? 25,
+          humidityPct: currentWeather?.humidity ?? 60,
+          weatherCode: currentWeather?.weatherCode ?? 1,
+        });
+
+        dispatch({
+          type: "SWEAT_UPDATE",
+          sweatLossMl: sweatResult.sweatLossMl,
+          sweatRatePerHour: sweatResult.sweatRatePerHour,
+          intensityLabel: sweatResult.intensityLabel,
+        });
+
+        // ─── 進度條動畫 ────────────────────────────────────────────────────
         const newCalories = currentState.calories + calIncrement;
         const calPct = Math.min(1, newCalories / settings.calorieThreshold);
-        const waterPct = Math.min(1, currentState.elapsed / (settings.waterThreshold * 6));
+
+        // 水分進度：基於本次間隔後的累計流失量
+        const newSweatSince = currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
+        const waterPct = Math.min(1, newSweatSince / hydrationThresholdMl);
 
         Animated.timing(calorieAnim, {
           toValue: calPct,
@@ -245,14 +283,14 @@ export default function RideScreen() {
           useNativeDriver: false,
         }).start();
 
-        // 補給提醒觸發
+        // ─── 補給提醒觸發 ──────────────────────────────────────────────────
         if (calPct >= 1 && !calorieReminderSentRef.current) {
           calorieReminderSentRef.current = true;
           triggerSupplyReminder("calorie");
         }
         if (waterPct >= 1 && !waterReminderSentRef.current) {
           waterReminderSentRef.current = true;
-          triggerSupplyReminder("water");
+          triggerSupplyReminder("water", sweatResult.recommendedRefillMl);
         }
 
         // 更新前台通知（每 30 秒）
@@ -268,7 +306,7 @@ export default function RideScreen() {
 
     // 嘗試啟動背景追蹤
     await startBackgroundLocationTracking();
-  }, [settings, dispatch, startTimer, stopTimer, triggerSupplyReminder, calorieAnim, waterAnim]);
+  }, [settings, dispatch, startTimer, stopTimer, triggerSupplyReminder, calorieAnim, waterAnim, hydrationThresholdMl]);
 
   const stopLocationTracking = useCallback(async () => {
     locationSubscriber.current?.remove();
@@ -278,7 +316,7 @@ export default function RideScreen() {
 
   // ─── 騎乘控制 ────────────────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
-    dispatch({ type: "START" });
+    dispatch({ type: "START", hydrationThresholdMl });
     pausedElapsedRef.current = 0;
     calorieReminderSentRef.current = false;
     waterReminderSentRef.current = false;
@@ -295,7 +333,7 @@ export default function RideScreen() {
       const l = await Location.getLastKnownPositionAsync();
       if (l) updateWeather(l.coords.latitude, l.coords.longitude);
     }, WEATHER_INTERVAL);
-  }, [dispatch, startTimer, startLocationTracking, updateWeather, calorieAnim, waterAnim]);
+  }, [dispatch, startTimer, startLocationTracking, updateWeather, calorieAnim, waterAnim, hydrationThresholdMl]);
 
   const handlePause = useCallback(() => {
     dispatch({ type: "PAUSE" });
@@ -341,8 +379,23 @@ export default function RideScreen() {
   });
 
   const calCurrent = Math.round(state.calories);
-  const waterMinutes = Math.round(state.elapsed / 60);
-  const waterTarget = Math.round(settings.waterThreshold / 10);
+
+  // 水分顯示：流失量 / 閾值
+  const sweatCurrent = Math.round(state.sweatSinceLastRefill);
+  const sweatTarget = Math.round(hydrationThresholdMl);
+
+  // 汗液流失率標籤（騎乘中顯示）
+  const sweatRateLabel = isActive && state.currentSweatRatePerHour > 0
+    ? formatSweatRate(state.currentSweatRatePerHour)
+    : null;
+
+  // 水分進度條顏色：隨流失量增加由藍轉橘轉紅
+  const waterProgress = sweatCurrent / sweatTarget;
+  const waterBarColor = waterProgress < 0.5
+    ? "#4FC3F7"
+    : waterProgress < 0.8
+    ? colors.warning
+    : colors.error;
 
   return (
     <ScreenContainer containerClassName="bg-background">
@@ -355,8 +408,8 @@ export default function RideScreen() {
           {weather ? (
             <>
               <WeatherItem icon="thermometer" value={`${weather.temperature}°C`} color={colors.muted} />
+              <WeatherItem icon="drop.fill" value={`${weather.humidity}%`} color="#4FC3F7" />
               <WeatherItem icon="wind" value={`${weather.windSpeed} km/h`} color={colors.muted} />
-              <WeatherItem icon="drop.fill" value={`${weather.precipitationProb}%`} color="#4FC3F7" />
               <Text style={[styles.weatherDesc, { color: colors.muted }]}>{weather.description}</Text>
             </>
           ) : (
@@ -374,7 +427,15 @@ export default function RideScreen() {
           <Text style={[styles.speedUnit, { color: colors.muted }]}>km/h</Text>
           {isPaused && (
             <View style={[styles.pauseBadge, { backgroundColor: colors.warning + "20" }]}>
-              <Text style={[styles.pauseText, { color: colors.warning }]}>⏸ 已暫停</Text>
+              <Text style={[styles.pauseText, { color: colors.warning }]}>已暫停</Text>
+            </View>
+          )}
+          {/* 強度標籤（騎乘中） */}
+          {isActive && state.intensityLabel !== "休息" && (
+            <View style={[styles.intensityBadge, { backgroundColor: colors.accent + "18" }]}>
+              <Text style={[styles.intensityText, { color: colors.accent }]}>
+                {state.intensityLabel}
+              </Text>
             </View>
           )}
         </View>
@@ -397,6 +458,7 @@ export default function RideScreen() {
 
         {/* ── 進度條 ── */}
         <View style={styles.progressSection}>
+          {/* 卡路里進度條 */}
           <ProgressBar
             label="卡路里"
             icon="flame.fill"
@@ -405,17 +467,19 @@ export default function RideScreen() {
             current={calCurrent}
             target={settings.calorieThreshold}
             unit="kcal"
+            barColor={colors.warning}
             colors={colors}
           />
-          <View style={{ height: 14 }} />
-          <ProgressBar
-            label="水分計時"
-            icon="drop.fill"
-            iconColor="#4FC3F7"
-            width={waterWidth}
-            current={waterMinutes}
-            target={waterTarget}
-            unit="min"
+          <View style={{ height: 16 }} />
+          {/* 水分流失進度條 */}
+          <HydrationBar
+            sweatCurrent={sweatCurrent}
+            sweatTarget={sweatTarget}
+            waterWidth={waterWidth}
+            waterBarColor={waterBarColor}
+            sweatRateLabel={sweatRateLabel}
+            totalSweatMl={Math.round(state.totalSweatMl)}
+            refillCount={state.refillCount}
             colors={colors}
           />
         </View>
@@ -475,6 +539,7 @@ export default function RideScreen() {
       <SupplyModal
         visible={supplyModal.visible}
         type={supplyModal.type}
+        recommendedMl={supplyModal.recommendedMl}
         onConfirm={() => {
           setSupplyModal({ ...supplyModal, visible: false });
           if (supplyModal.type === "calorie") {
@@ -529,11 +594,11 @@ function MetricCell({
 }
 
 function ProgressBar({
-  label, icon, iconColor, width, current, target, unit, colors,
+  label, icon, iconColor, width, current, target, unit, barColor, colors,
 }: {
   label: string; icon: string; iconColor: string;
   width: Animated.AnimatedInterpolation<string | number>;
-  current: number; target: number; unit: string; colors: any;
+  current: number; target: number; unit: string; barColor: string; colors: any;
 }) {
   return (
     <View>
@@ -547,8 +612,67 @@ function ProgressBar({
         </Text>
       </View>
       <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-        <Animated.View style={[styles.progressFill, { width, backgroundColor: iconColor }]} />
+        <Animated.View style={[styles.progressFill, { width, backgroundColor: barColor }]} />
       </View>
+    </View>
+  );
+}
+
+function HydrationBar({
+  sweatCurrent,
+  sweatTarget,
+  waterWidth,
+  waterBarColor,
+  sweatRateLabel,
+  totalSweatMl,
+  refillCount,
+  colors,
+}: {
+  sweatCurrent: number;
+  sweatTarget: number;
+  waterWidth: Animated.AnimatedInterpolation<string | number>;
+  waterBarColor: string;
+  sweatRateLabel: string | null;
+  totalSweatMl: number;
+  refillCount: number;
+  colors: any;
+}) {
+  return (
+    <View>
+      {/* 標題列 */}
+      <View style={styles.progressHeader}>
+        <View style={styles.progressLabelRow}>
+          <IconSymbol name="drop.fill" size={14} color={waterBarColor} />
+          <Text style={[styles.progressLabel, { color: colors.muted }]}>水分流失</Text>
+          {sweatRateLabel && (
+            <View style={[styles.ratePill, { backgroundColor: waterBarColor + "20" }]}>
+              <Text style={[styles.rateText, { color: waterBarColor }]}>{sweatRateLabel}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={[styles.progressValue, { color: colors.foreground }]}>
+          {sweatCurrent} / {sweatTarget} ml
+        </Text>
+      </View>
+
+      {/* 進度條 */}
+      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+        <Animated.View style={[styles.progressFill, { width: waterWidth, backgroundColor: waterBarColor }]} />
+      </View>
+
+      {/* 輔助資訊：全程流失量 + 補水次數 */}
+      {(totalSweatMl > 0 || refillCount > 0) && (
+        <View style={styles.hydrationStats}>
+          <Text style={[styles.hydrationStatText, { color: colors.muted }]}>
+            全程流失 {totalSweatMl} ml
+          </Text>
+          {refillCount > 0 && (
+            <Text style={[styles.hydrationStatText, { color: colors.muted }]}>
+              已補水 {refillCount} 次
+            </Text>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -568,11 +692,13 @@ const styles = StyleSheet.create({
   weatherItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   weatherValue: { fontSize: 12, fontWeight: "500" },
   weatherDesc: { fontSize: 12, marginLeft: "auto" },
-  speedSection: { alignItems: "center", paddingVertical: 32, paddingHorizontal: 20 },
+  speedSection: { alignItems: "center", paddingVertical: 28, paddingHorizontal: 20 },
   speedValue: { fontSize: 88, fontWeight: "200", letterSpacing: -4, lineHeight: 96 },
   speedUnit: { fontSize: 18, fontWeight: "300", marginTop: 4 },
-  pauseBadge: { marginTop: 12, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
+  pauseBadge: { marginTop: 10, paddingHorizontal: 16, paddingVertical: 5, borderRadius: 20 },
   pauseText: { fontSize: 13, fontWeight: "600" },
+  intensityBadge: { marginTop: 8, paddingHorizontal: 14, paddingVertical: 4, borderRadius: 20 },
+  intensityText: { fontSize: 12, fontWeight: "600" },
   metricsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -603,8 +729,21 @@ const styles = StyleSheet.create({
   progressLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   progressLabel: { fontSize: 13, fontWeight: "500" },
   progressValue: { fontSize: 12, fontWeight: "500" },
-  progressTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
-  progressFill: { height: "100%", borderRadius: 3 },
+  progressTrack: { height: 7, borderRadius: 4, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: 4 },
+  ratePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 4,
+  },
+  rateText: { fontSize: 11, fontWeight: "600" },
+  hydrationStats: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 5,
+  },
+  hydrationStatText: { fontSize: 11 },
   controlRow: {
     flexDirection: "row",
     justifyContent: "center",

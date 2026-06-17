@@ -26,6 +26,8 @@ export interface RideRecord {
   maxPower: number;       // watts
   powerZones: number[];   // [z1, z2, z3, z4, z5] percentage
   route: LocationPoint[];
+  totalSweatMl: number;   // 總汗液流失量 ml
+  refillCount: number;    // 補水次數
 }
 
 export interface RideState {
@@ -41,9 +43,22 @@ export interface RideState {
   maxPower: number;
   totalAscent: number;
   calories: number;
-  waterConsumed: number;    // ml
   calorieProgress: number;  // 0-1
-  waterProgress: number;    // 0-1
+
+  // ─── 水分流失追蹤 ─────────────────────────────────────────────────────────
+  /** 累計汗液流失量 ml（自上次補水後重置） */
+  sweatSinceLastRefill: number;
+  /** 騎乘全程累計汗液流失量 ml */
+  totalSweatMl: number;
+  /** 當前每小時汗液流失率 ml/h */
+  currentSweatRatePerHour: number;
+  /** 當前強度標籤 */
+  intensityLabel: string;
+  /** 補水次數 */
+  refillCount: number;
+  /** 補水閾值 ml（動態，由設定決定） */
+  hydrationThresholdMl: number;
+
   route: LocationPoint[];
   powerHistory: number[];
   powerZones: number[];     // [z1, z2, z3, z4, z5] count
@@ -51,21 +66,20 @@ export interface RideState {
 }
 
 type RideAction =
-  | { type: "START" }
+  | { type: "START"; hydrationThresholdMl: number }
   | { type: "PAUSE" }
   | { type: "RESUME" }
   | { type: "STOP" }
   | { type: "RESET" }
   | { type: "TICK"; elapsed: number }
   | { type: "LOCATION_UPDATE"; point: LocationPoint; power: number; calories: number; ascent: number }
+  | { type: "SWEAT_UPDATE"; sweatLossMl: number; sweatRatePerHour: number; intensityLabel: string }
   | { type: "CONSUME_CALORIES" }
   | { type: "CONSUME_WATER" }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
   | { type: "ADD_RECORD"; record: RideRecord };
 
-// ─── Power Zone Thresholds (% of FTP, simplified) ────────────────────────────
-// Zone 1: <55%, Zone 2: 55-75%, Zone 3: 75-90%, Zone 4: 90-105%, Zone 5: >105%
-// We use absolute watts based on avg rider FTP ~200W
+// ─── Power Zone Thresholds ────────────────────────────────────────────────────
 const ZONE_THRESHOLDS = [110, 150, 180, 210, 999];
 
 function getPowerZone(watts: number): number {
@@ -90,9 +104,13 @@ const initialState: RideState = {
   maxPower: 0,
   totalAscent: 0,
   calories: 0,
-  waterConsumed: 0,
   calorieProgress: 0,
-  waterProgress: 0,
+  sweatSinceLastRefill: 0,
+  totalSweatMl: 0,
+  currentSweatRatePerHour: 0,
+  intensityLabel: "休息",
+  refillCount: 0,
+  hydrationThresholdMl: 250,
   route: [],
   powerHistory: [],
   powerZones: [0, 0, 0, 0, 0],
@@ -102,7 +120,13 @@ const initialState: RideState = {
 function rideReducer(state: RideState, action: RideAction): RideState {
   switch (action.type) {
     case "START":
-      return { ...initialState, records: state.records, status: "active", startTime: Date.now() };
+      return {
+        ...initialState,
+        records: state.records,
+        status: "active",
+        startTime: Date.now(),
+        hydrationThresholdMl: action.hydrationThresholdMl,
+      };
 
     case "PAUSE":
       return { ...state, status: "paused" };
@@ -128,10 +152,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       const zone = getPowerZone(power);
       const newZones = [...state.powerZones];
       newZones[zone]++;
-
-      // Calorie/water progress (per settings thresholds — defaults 300 kcal / 500 ml)
       const newCalories = state.calories + calories;
-      const newWater = state.waterConsumed;
 
       return {
         ...state,
@@ -146,10 +167,22 @@ function rideReducer(state: RideState, action: RideAction): RideState {
         maxPower: Math.max(state.maxPower, power),
         totalAscent: state.totalAscent + ascent,
         calories: newCalories,
-        waterConsumed: newWater,
-        distance: state.distance + (point.speed ?? 0) * 3,  // approx 3s interval
+        distance: state.distance + (point.speed ?? 0) * 3,
         powerHistory: newPowerHistory,
         powerZones: newZones,
+      };
+    }
+
+    case "SWEAT_UPDATE": {
+      const { sweatLossMl, sweatRatePerHour, intensityLabel } = action;
+      const newSweatSince = state.sweatSinceLastRefill + sweatLossMl;
+      const newTotalSweat = state.totalSweatMl + sweatLossMl;
+      return {
+        ...state,
+        sweatSinceLastRefill: newSweatSince,
+        totalSweatMl: newTotalSweat,
+        currentSweatRatePerHour: sweatRatePerHour,
+        intensityLabel,
       };
     }
 
@@ -157,7 +190,11 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       return { ...state, calorieProgress: 0 };
 
     case "CONSUME_WATER":
-      return { ...state, waterProgress: 0 };
+      return {
+        ...state,
+        sweatSinceLastRefill: 0,
+        refillCount: state.refillCount + 1,
+      };
 
     case "LOAD_RECORDS":
       return { ...state, records: action.records };
@@ -201,6 +238,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       maxPower: state.maxPower,
       powerZones: state.powerZones,
       route: state.route,
+      totalSweatMl: Math.round(state.totalSweatMl),
+      refillCount: state.refillCount,
     };
     dispatch({ type: "ADD_RECORD", record });
     const existing = await AsyncStorage.getItem(STORAGE_KEY);

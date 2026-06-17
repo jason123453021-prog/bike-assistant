@@ -92,12 +92,13 @@ export default function SettingsScreen() {
           <Divider colors={colors} />
           <NumberRow
             icon="drop.fill"
-            label="水分提醒閾值"
+            label="汗液流失提醒閾值"
             value={settings.waterThreshold}
             unit="ml"
             colors={colors}
             iconColor="#4FC3F7"
-            onPress={() => openEdit("waterThreshold", "水分提醒閾值", settings.waterThreshold, "ml")}
+            hint="每流失此量汗液即提醒補水"
+            onPress={() => openEdit("waterThreshold", "汗液流失提醒閾值 (ml)", settings.waterThreshold, "ml")}
           />
         </View>
 
@@ -219,10 +220,10 @@ function Divider({ colors }: { colors: any }) {
 }
 
 function NumberRow({
-  icon, label, value, unit, colors, iconColor, onPress,
+  icon, label, value, unit, colors, iconColor, hint, onPress,
 }: {
   icon: string; label: string; value: number; unit: string;
-  colors: any; iconColor?: string; onPress: () => void;
+  colors: any; iconColor?: string; hint?: string; onPress: () => void;
 }) {
   return (
     <Pressable
@@ -230,7 +231,12 @@ function NumberRow({
       onPress={onPress}
     >
       <IconSymbol name={icon as any} size={18} color={iconColor ?? colors.muted} />
-      <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
+        {hint && (
+          <Text style={[styles.rowHint, { color: colors.muted }]}>{hint}</Text>
+        )}
+      </View>
       <View style={styles.rowRight}>
         <Text style={[styles.rowValue, { color: colors.accent }]}>
           {value} {unit}
@@ -285,7 +291,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  rowLabel: { flex: 1, fontSize: 15 },
+  rowLabel: { fontSize: 15 },
+  rowHint: { fontSize: 11, marginTop: 2 },
   rowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
   rowValue: { fontSize: 15, fontWeight: "500" },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 46 },
