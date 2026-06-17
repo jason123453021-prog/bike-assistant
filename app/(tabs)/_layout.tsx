@@ -54,12 +54,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="navigate"
         options={{
-          title: "導航",
+          title: "路線分析",
           tabBarIcon: ({ color, size }) => (
             <IconSymbol size={size} name="map.fill" color={color} />
           ),
           tabBarLabel: ({ focused, color }) => (
-            <TabLabel label="導航" focused={focused} color={color} />
+            <TabLabel label="路線" focused={focused} color={color} />
           ),
         }}
       />

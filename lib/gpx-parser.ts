@@ -34,6 +34,9 @@ export interface GpxPoint {
   time?: string;
 }
 
+/** 坡度分布 bucket：key 為坡度百分比（0=平路, 1=1%, 2=2%...），value 為佔路線距離百分比 */
+export type GradientDistribution = Record<number, number>;
+
 export interface GpxRoute {
   name: string;
   points: GpxPoint[];
@@ -44,6 +47,12 @@ export interface GpxRoute {
   /** 使用預設體重 70kg + 單車 10kg 計算的基礎卡路里，供顯示用 */
   estimatedCalories: number;
   elevationProfile: { distance: number; elevation: number }[];
+  /** 坡度分布：各坡度區間佔路線距離的百分比（0-100） */
+  gradientDistribution: GradientDistribution;
+  /** 平均坡度（僅計算爬升段）% */
+  avgGradient: number;
+  /** 最大坡度 % */
+  maxGradient: number;
 }
 
 /**
@@ -145,6 +154,11 @@ export function parseGpx(xmlString: string): GpxRoute | null {
     let totalAscent = 0;
     let totalDescent = 0;
     const elevationProfile: { distance: number; elevation: number }[] = [];
+    // 坡度分布：以 1% 為一個 bucket，0=平路(<0.5%)，1=1%，2=2%...，10+=10%以上
+    const gradBuckets: Record<number, number> = {};
+    let maxGradient = 0;
+    let totalClimbDist = 0;
+    let weightedGradSum = 0;
 
     elevationProfile.push({ distance: 0, elevation: points[0].ele });
 
@@ -160,12 +174,38 @@ export function parseGpx(xmlString: string): GpxRoute | null {
       else totalDescent += Math.abs(altDiff);
 
       elevationProfile.push({ distance: totalDistance, elevation: points[i].ele });
+
+      // ── 坡度計算（僅針對有距離的段落）────────────────────────────────────
+      if (d > 0.5) { // 忽略 < 0.5m 的極短段落（GPS 誤差）
+        const gradPct = Math.abs((altDiff / d) * 100);
+        if (gradPct > maxGradient) maxGradient = gradPct;
+        // 爬升段加入加權平均計算
+        if (altDiff > 0) {
+          totalClimbDist += d;
+          weightedGradSum += gradPct * d;
+        }
+        // 分配到 bucket（0=平路, 1-9=1%-9%, 10=10%以上）
+        const bucket = gradPct < 0.5 ? 0 : Math.min(10, Math.round(gradPct));
+        gradBuckets[bucket] = (gradBuckets[bucket] ?? 0) + d;
+      }
     }
 
     // ── 預估時間（平地 20 km/h，每 100m 爬升 +10 分鐘）──────────────────────
     const flatTime = (totalDistance / 1000) / 20 * 3600;
     const climbTime = (totalAscent / 100) * 600;
     const estimatedDuration = Math.round(flatTime + climbTime);
+
+    // ── 坡度分布百分比（轉換為佔路線距離的 %）────────────────────────────────
+    const gradientDistribution: GradientDistribution = {};
+    if (totalDistance > 0) {
+      for (const [bucket, dist] of Object.entries(gradBuckets)) {
+        gradientDistribution[Number(bucket)] = Math.round((dist / totalDistance) * 100);
+      }
+    }
+    const avgGradient = totalClimbDist > 0
+      ? Math.round((weightedGradSum / totalClimbDist) * 10) / 10
+      : 0;
+    const maxGradientRounded = Math.round(maxGradient * 10) / 10;
 
     // ── 預估卡路里（預設 70kg 騎手 + 10kg 單車 = 80kg 總重）────────────────
     const baseRoute: GpxRoute = {
@@ -177,6 +217,9 @@ export function parseGpx(xmlString: string): GpxRoute | null {
       estimatedDuration,
       estimatedCalories: 0,
       elevationProfile,
+      gradientDistribution,
+      avgGradient,
+      maxGradient: maxGradientRounded,
     };
     const { totalKcal } = estimateRouteCalories(baseRoute, 80, 20, 25);
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -89,6 +89,11 @@ export default function NavigateScreen() {
     }
   };
 
+  // 離線天氣備用：保留上次成功取得的天氣資料
+  const lastWeatherRef = useRef<WeatherData | null>(null);
+  // 是否為離線備用天氣
+  const [weatherOffline, setWeatherOffline] = useState(false);
+
   // 取得路線起點天氣
   // 進入頁面自動取得即時位置天氣
   useEffect(() => {
@@ -97,24 +102,47 @@ export default function NavigateScreen() {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") return;
         setWeatherLoading(true);
+        setWeatherOffline(false);
         const loc = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
         const w = await fetchWeather(loc.coords.latitude, loc.coords.longitude);
-        if (w) setRouteWeather(w);
-      } catch {}
-      finally { setWeatherLoading(false); }
+        if (w) {
+          setRouteWeather(w);
+          lastWeatherRef.current = w;
+        } else if (lastWeatherRef.current) {
+          // 離線時保留上次資料
+          setRouteWeather(lastWeatherRef.current);
+          setWeatherOffline(true);
+        }
+      } catch {
+        if (lastWeatherRef.current) {
+          setRouteWeather(lastWeatherRef.current);
+          setWeatherOffline(true);
+        }
+      } finally { setWeatherLoading(false); }
     })();
   }, []);
 
   const fetchRouteWeather = async (lat: number, lon: number) => {
     setWeatherLoading(true);
     setWeatherLinkedToRoute(true);
+    setWeatherOffline(false);
     try {
       const w = await fetchWeather(lat, lon);
-      if (w) setRouteWeather(w);
-    } catch {}
-    finally { setWeatherLoading(false); }
+      if (w) {
+        setRouteWeather(w);
+        lastWeatherRef.current = w;
+      } else if (lastWeatherRef.current) {
+        setRouteWeather(lastWeatherRef.current);
+        setWeatherOffline(true);
+      }
+    } catch {
+      if (lastWeatherRef.current) {
+        setRouteWeather(lastWeatherRef.current);
+        setWeatherOffline(true);
+      }
+    } finally { setWeatherLoading(false); }
   };
 
   // ─── 高度剖面圖 ──────────────────────────────────────────────────────────────
@@ -186,8 +214,8 @@ export default function NavigateScreen() {
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.foreground }]}>路線導航</Text>
-            <Text style={[styles.subtitle, { color: colors.muted }]}>匯入 GPX 檔案規劃路線</Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>路線分析</Text>
+            <Text style={[styles.subtitle, { color: colors.muted }]}>匯入 GPX 檔案分析路線與預估消耗</Text>
           </View>
 
           {/* ── 重量設定卡片 ─────────────────────────────────────────────────── */}
@@ -280,6 +308,9 @@ export default function NavigateScreen() {
               )}
               {!weatherLoading && !routeWeather && (
                 <Text style={[styles.weatherFetching, { color: colors.muted }]}>取得中...</Text>
+              )}
+              {weatherOffline && routeWeather && (
+                <Text style={[styles.weatherFetching, { color: colors.warning }]}>離線備用</Text>
               )}
             </View>
             {routeWeather ? (
@@ -409,6 +440,50 @@ export default function NavigateScreen() {
 
               {/* Elevation Chart */}
               {renderElevationChart()}
+
+              {/* ── 坡度分析卡片 ───────────────────────────────────────── */}
+              <View style={[styles.gradientCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>坡度分析</Text>
+
+                {/* 平均坡度 + 最大坡度 */}
+                <View style={[styles.gradSummaryRow, { borderBottomColor: colors.border }]}>
+                  <View style={styles.gradSummaryItem}>
+                    <Text style={[styles.gradSummaryValue, { color: colors.accent }]}>
+                      {route.avgGradient.toFixed(1)}%
+                    </Text>
+                    <Text style={[styles.gradSummaryLabel, { color: colors.muted }]}>平均坡度（爬升段）</Text>
+                  </View>
+                  <View style={[styles.gradSummaryDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.gradSummaryItem}>
+                    <Text style={[styles.gradSummaryValue, { color: route.maxGradient >= 10 ? colors.error : route.maxGradient >= 6 ? colors.warning : colors.foreground }]}>
+                      {route.maxGradient.toFixed(1)}%
+                    </Text>
+                    <Text style={[styles.gradSummaryLabel, { color: colors.muted }]}>最大坡度</Text>
+                  </View>
+                </View>
+
+                {/* 坡度分布橫條圖 */}
+                <Text style={[styles.gradDistTitle, { color: colors.muted }]}>各坡度區間佔路線距離百分比</Text>
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((bucket) => {
+                  const pct = route.gradientDistribution[bucket] ?? 0;
+                  if (pct === 0) return null;
+                  const label = bucket === 0 ? "平路 (<1%)" : bucket === 10 ? "陶坡 (≥ 10%)" : `${bucket}%`;
+                  const barColor = bucket === 0 ? colors.accent
+                    : bucket <= 3 ? "#22C55E"
+                    : bucket <= 6 ? "#F59E0B"
+                    : bucket <= 9 ? "#F97316"
+                    : colors.error;
+                  return (
+                    <View key={bucket} style={styles.gradRow}>
+                      <Text style={[styles.gradLabel, { color: colors.muted }]}>{label}</Text>
+                      <View style={[styles.gradBarBg, { backgroundColor: colors.border }]}>
+                        <View style={[styles.gradBarFill, { width: `${pct}%`, backgroundColor: barColor }]} />
+                      </View>
+                      <Text style={[styles.gradPct, { color: colors.foreground }]}>{pct}%</Text>
+                    </View>
+                  );
+                })}
+              </View>
 
               {/* Tips */}
               <View style={[styles.tipsBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -696,4 +771,38 @@ const styles = StyleSheet.create({
   airDensityValue: { fontSize: 13, fontWeight: "700" },
   weatherDesc: { fontSize: 12, marginTop: 4 },
   weatherNoData: { fontSize: 12, marginTop: 4 },
+  // ── 坡度分析卡片 ──────────────────────────────────────────────────────────────
+  gradientCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  gradSummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 12,
+    marginBottom: 12,
+  },
+  gradSummaryItem: { flex: 1, alignItems: "center" },
+  gradSummaryDivider: { width: StyleSheet.hairlineWidth, height: 36, marginHorizontal: 8 },
+  gradSummaryValue: { fontSize: 26, fontWeight: "700", letterSpacing: -0.5 },
+  gradSummaryLabel: { fontSize: 11, marginTop: 2, textAlign: "center" },
+  gradDistTitle: { fontSize: 11, marginBottom: 8 },
+  gradRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  gradLabel: { fontSize: 12, width: 80 },
+  gradBarBg: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+    marginHorizontal: 8,
+  },
+  gradBarFill: { height: 8, borderRadius: 4 },
+  gradPct: { fontSize: 12, width: 32, textAlign: "right", fontWeight: "500" },
 });

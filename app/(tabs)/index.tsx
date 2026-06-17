@@ -7,6 +7,7 @@ import {
   ScrollView,
   Animated,
   Platform,
+  Alert,
 } from "react-native";
 import * as Location from "expo-location";
 import { useKeepAwake } from "expo-keep-awake";
@@ -378,14 +379,28 @@ export default function RideScreen() {
     dispatch({ type: "RESUME" });
   }, [dispatch]);
 
-  const handleStop = useCallback(async () => {
-    dispatch({ type: "STOP" }); // useEffect 監聽到 status=finished 會自動停止計時器
-    await stopLocationTracking();
-    if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
-    await cancelRidingNotification();
-    await saveRecord();
-    setShowSummary(true);
-    if (settings.vibrationEnabled) vibrateSuccess();
+  const handleStop = useCallback(() => {
+    Alert.alert(
+      "結束騎乘",
+      "確定要結束本次騎乘并儲存記錄？",
+      [
+        { text: "取消", style: "cancel" },
+        {
+          text: "結束",
+          style: "destructive",
+          onPress: async () => {
+            dispatch({ type: "STOP" });
+            await stopLocationTracking();
+            if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
+            await cancelRidingNotification();
+            await saveRecord();
+            setShowSummary(true);
+            if (settings.vibrationEnabled) vibrateSuccess();
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   }, [dispatch, stopLocationTracking, saveRecord, settings.vibrationEnabled]);
 
   // ─── Cleanup ─────────────────────────────────────────────────────────────────
