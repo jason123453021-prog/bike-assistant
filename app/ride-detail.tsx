@@ -26,7 +26,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import MapView, { Circle, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
+import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
 import Svg, { G, Path } from "react-native-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
@@ -87,8 +87,7 @@ export default function RideDetailScreen() {
   }, [record, nameInput, updateRecordName]);
 
   // 地圖 ref
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<LeafletMapHandle>(null);
 
   // 底部面板
   const [panelExpanded, setPanelExpanded] = useState(false);
@@ -120,8 +119,10 @@ export default function RideDetailScreen() {
     return record.route.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
   }, [record]);
 
+  const [mapReady, setMapReady] = useState(false);
+
   useEffect(() => {
-    if (polylineCoords.length > 1) {
+    if (mapReady && polylineCoords.length > 1) {
       setTimeout(() => {
         mapRef.current?.fitToCoordinates(polylineCoords, {
           edgePadding: {
@@ -134,7 +135,7 @@ export default function RideDetailScreen() {
         });
       }, 600);
     }
-  }, [polylineCoords]);
+  }, [mapReady, polylineCoords]);
 
   // 功率分布圓餅圖
   const renderPie = useCallback(() => {
@@ -233,61 +234,19 @@ export default function RideDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* ── 全螢幕地圖 ── */}
-      <MapView
+      {/* ── 全螢幕地圖（Leaflet WebView） ── */}
+      <LeafletMapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_DEFAULT}
-        customMapStyle={DARK_MAP_STYLE}
-        showsUserLocation={false}
-        showsMyLocationButton={false}
-        showsCompass={false}
-        rotateEnabled={false}
         initialRegion={{
           latitude: polylineCoords[0]?.latitude ?? 25.0478,
           longitude: polylineCoords[0]?.longitude ?? 121.5319,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         }}
-      >
-        {/* 軌跡線 */}
-        {polylineCoords.length > 1 && (
-          <Polyline
-            coordinates={polylineCoords}
-            strokeColor="#00E676"
-            strokeWidth={4}
-            lineDashPattern={undefined}
-          />
-        )}
-        {/* 起點 */}
-        {polylineCoords.length > 0 && (
-          <Circle
-            center={polylineCoords[0]}
-            radius={10}
-            fillColor="#00C853"
-            strokeColor="#fff"
-            strokeWidth={2.5}
-          />
-        )}
-        {/* 終點 */}
-        {polylineCoords.length > 1 && (
-          <Circle
-            center={polylineCoords[polylineCoords.length - 1]}
-            radius={10}
-            fillColor="#FF3B30"
-            strokeColor="#fff"
-            strokeWidth={2.5}
-          />
-        )}
-        {/* 無軌跡提示 */}
-        {polylineCoords.length === 0 && (
-          <Circle
-            center={{ latitude: 25.0478, longitude: 121.5319 }}
-            radius={1}
-            fillColor="transparent"
-          />
-        )}
-      </MapView>
+        onMapReady={() => setMapReady(true)}
+        gpxPolyline={polylineCoords}
+      />
 
       {/* ── 頂部導覽列 ── */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>

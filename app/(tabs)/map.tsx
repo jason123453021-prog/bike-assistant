@@ -33,7 +33,7 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Circle, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
+import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
 import * as Location from "expo-location";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
@@ -166,8 +166,7 @@ export default function MapScreen() {
   }, []);
 
   // 地圖 ref
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<LeafletMapHandle>(null);
 
   // 當前位置
   const [currentPos, setCurrentPos] = useState<{ lat: number; lon: number; heading: number } | null>(null);
@@ -376,8 +375,7 @@ export default function MapScreen() {
 
           if (followUser) {
             mapRef.current?.animateCamera(
-              { center: { latitude, longitude }, heading: hdg, zoom: 17 },
-              { duration: 600 }
+              { center: { latitude, longitude }, zoom: 17 }
             );
           }
 
@@ -723,8 +721,7 @@ export default function MapScreen() {
     setFollowUser(true);
     if (currentPos) {
       mapRef.current?.animateCamera(
-        { center: { latitude: currentPos.lat, longitude: currentPos.lon }, zoom: 17 },
-        { duration: 600 }
+        { center: { latitude: currentPos.lat, longitude: currentPos.lon }, zoom: 17 }
       );
     }
   }, [currentPos]);
@@ -770,16 +767,10 @@ export default function MapScreen() {
   // ─── 渲染 ────────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* ── 全螢幕地圖 ── */}
-      <MapView
+      {/* ── 全螢幕地圖（Leaflet WebView） ── */}
+      <LeafletMapView
         ref={mapRef}
         style={[styles.map, { height: SCREEN_H - tabBarH }]}
-        provider={PROVIDER_DEFAULT}
-        customMapStyle={DARK_MAP_STYLE}
-        showsUserLocation={false}
-        showsMyLocationButton={false}
-        showsCompass={false}
-        rotateEnabled={true}
         initialRegion={{
           latitude: 25.0478,
           longitude: 121.5319,
@@ -787,65 +778,13 @@ export default function MapScreen() {
           longitudeDelta: 0.05,
         }}
         onPanDrag={() => setFollowUser(false)}
-      >
-        {/* GPX 路線（未通過段：紅色） */}
-        {gpxPolyline.length > 0 && (
-          <Polyline coordinates={gpxPolyline} strokeColor="#FF3B30" strokeWidth={4} />
-        )}
-        {/* GPX 路線（已通過段：暗紅色） */}
-        {passedPolyline.length > 1 && (
-          <Polyline coordinates={passedPolyline} strokeColor="#8B0000" strokeWidth={4} />
-        )}
-        {/* 騎乘即時軌跡（綠色）：無論是自由騎乘或 GPX 導航均顯示 */}
-        {liveTrail.length > 1 && (
-          <Polyline coordinates={liveTrail} strokeColor="#00E676" strokeWidth={3} />
-        )}
-        {/* GPX 起點 */}
-        {gpxPolyline.length > 0 && (
-          <Circle center={gpxPolyline[0]} radius={8} fillColor="#00C853" strokeColor="#fff" strokeWidth={2} />
-        )}
-        {/* GPX 終點 */}
-        {gpxPolyline.length > 1 && (
-          <Circle center={gpxPolyline[gpxPolyline.length - 1]} radius={8} fillColor="#FF3B30" strokeColor="#fff" strokeWidth={2} />
-        )}
-        {/* 回歸路徑（偏離時顯示：橘色實線沿街道繪製） */}
-        {isOffRoute && returnPolyline.length >= 2 && (
-          <>
-            <Polyline
-              coordinates={returnPolyline}
-              strokeColor="#FF9500"
-              strokeWidth={4}
-            />
-            <Circle
-              center={returnPolyline[returnPolyline.length - 1]}
-              radius={12}
-              fillColor="rgba(255,149,0,0.3)"
-              strokeColor="#FF9500"
-              strokeWidth={2}
-            />
-          </>
-        )}
-
-        {/* 當前位置 */}
-        {currentPos && (
-          <>
-            <Circle
-              center={{ latitude: currentPos.lat, longitude: currentPos.lon }}
-              radius={30}
-              fillColor="rgba(0, 122, 255, 0.15)"
-              strokeColor="rgba(0, 122, 255, 0.3)"
-              strokeWidth={1}
-            />
-            <Circle
-              center={{ latitude: currentPos.lat, longitude: currentPos.lon }}
-              radius={8}
-              fillColor="#007AFF"
-              strokeColor="#fff"
-              strokeWidth={2.5}
-            />
-          </>
-        )}
-      </MapView>
+        currentPos={currentPos}
+        gpxPolyline={gpxPolyline}
+        passedPolyline={passedPolyline}
+        liveTrail={liveTrail}
+        returnPolyline={returnPolyline}
+        isOffRoute={isOffRoute}
+      />
 
       {/* ── 頂部導航指令條 ── */}
       {(isNavigating || navInstruction !== "") && (

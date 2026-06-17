@@ -1,11 +1,13 @@
 /**
  * 回饋服務 — 震動、TTS 語音播報、通知
+ *
+ * 注意：expo-notifications 的遠端推播功能在 Expo Go SDK 53+ 已移除。
+ * 本地通知（scheduleNotificationAsync）在 Expo Go 中仍可使用，
+ * 但所有呼叫均加上 try-catch 以防止未預期的錯誤。
  */
 
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
-// expo-notifications 僅用於本地通知（Android channel + scheduleNotification）
-// 遠端推播在 Expo Go SDK 53+ 已移除，此 app 只使用本地通知
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
@@ -100,26 +102,32 @@ export async function speakAutoResume(enabled: boolean) {
 
 export async function setupNotifications() {
   if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("ride", {
-      name: "騎乘通知",
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#00C896",
-    });
-    await Notifications.setNotificationChannelAsync("supply", {
-      name: "補給提醒",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 500, 200, 500],
-      lightColor: "#FF9500",
-    });
+    try {
+      await Notifications.setNotificationChannelAsync("ride", {
+        name: "騎乘通知",
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#00C896",
+      });
+      await Notifications.setNotificationChannelAsync("supply", {
+        name: "補給提醒",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 500, 200, 500],
+        lightColor: "#FF9500",
+      });
+    } catch {}
   }
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  if (existing === "granted") return true;
-  const { status } = await Notifications.requestPermissionsAsync();
-  return status === "granted";
+  try {
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    if (existing === "granted") return true;
+    const { status } = await Notifications.requestPermissionsAsync();
+    return status === "granted";
+  } catch {
+    return false;
+  }
 }
 
 export async function showSupplyNotification(type: "calorie" | "water") {
@@ -127,10 +135,12 @@ export async function showSupplyNotification(type: "calorie" | "water") {
   const body = type === "calorie"
     ? "已消耗大量卡路里，請補充能量！"
     : "水分不足，請補充水分！";
-  await Notifications.scheduleNotificationAsync({
-    content: { title, body, sound: true },
-    trigger: null,
-  });
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body, sound: true },
+      trigger: null,
+    });
+  } catch {}
 }
 
 export async function showRidingNotification(
@@ -141,15 +151,19 @@ export async function showRidingNotification(
   const h = Math.floor(elapsed / 3600);
   const m = Math.floor((elapsed % 3600) / 60);
   const timeStr = h > 0 ? `${h}時${m}分` : `${m}分`;
-  await Notifications.scheduleNotificationAsync({
+  try {
+    await Notifications.scheduleNotificationAsync({
       content: {
         title: "🚴 智慧單車騎乘助手",
         body: `速度 ${Math.round(speed)} km/h · 距離 ${(distance / 1000).toFixed(1)} km · 時間 ${timeStr}`,
       },
-    trigger: null,
-  });
+      trigger: null,
+    });
+  } catch {}
 }
 
 export async function cancelRidingNotification() {
-  await Notifications.dismissAllNotificationsAsync();
+  try {
+    await Notifications.dismissAllNotificationsAsync();
+  } catch {}
 }
