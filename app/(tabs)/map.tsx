@@ -183,6 +183,14 @@ export default function MapScreen() {
   const lastRerouteRef = useRef<number>(0);
   const arrivedRef = useRef(false);
 
+  // 偏離路線狀態
+  const [isOffRoute, setIsOffRoute] = useState(false);
+  const [offRouteDist, setOffRouteDist] = useState(0);
+  // 回歸路徑（從當前位置到最近路線點的連線）
+  const [returnPolyline, setReturnPolyline] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [returnBearing, setReturnBearing] = useState<string>("");
+  const showReturnRef = useRef(false);
+
   // 當共享路線更新時，自動適配地圖視角
   useEffect(() => {
     if (gpxRoute && gpxRoute.points.length > 0) {
@@ -499,12 +507,38 @@ export default function MapScreen() {
       }
 
       const now = Date.now();
-      if (distToNearest > OFF_ROUTE_THRESHOLD_M && now - lastRerouteRef.current > REROUTE_COOLDOWN_MS) {
-        lastRerouteRef.current = now;
-        setNavInstruction("⚠️ 偏離路線");
-        speak("您已偏離路線，請返回路線", settings.ttsEnabled);
-        vibrateLight();
+
+      // 偏離偵測：更新偏離狀態與回歸路徑
+      if (distToNearest > OFF_ROUTE_THRESHOLD_M) {
+        setIsOffRoute(true);
+        setOffRouteDist(Math.round(distToNearest));
+        // 計算回歸路徑（當前位置 → 最近路線點）
+        const nearPt = pts[idx];
+        setReturnPolyline([
+          { latitude: lat, longitude: lon },
+          { latitude: nearPt.lat, longitude: nearPt.lon },
+        ]);
+        // 計算方位詞
+        const brg = bearing(lat, lon, nearPt.lat, nearPt.lon);
+        const dirs = ["正北", "東北", "正東", "東南", "正南", "西南", "正西", "西北", "正北"];
+        const dirIdx = Math.round(brg / 45) % 8;
+        setReturnBearing(dirs[dirIdx]);
+
+        if (now - lastRerouteRef.current > REROUTE_COOLDOWN_MS) {
+          lastRerouteRef.current = now;
+          setNavInstruction("⚠️ 偏離路線");
+          speak("您已偏離路線，請返回路線", settings.ttsEnabled);
+          vibrateLight();
+        }
         return;
+      } else {
+        // 回到路線範圍內，清除偏離狀態
+        if (isOffRoute) {
+          setIsOffRoute(false);
+          setReturnPolyline([]);
+          setReturnBearing("");
+          speak("已回到路線，繼續前進", settings.ttsEnabled);
+        }
       }
 
       let lookaheadDist = 0;
@@ -539,7 +573,7 @@ export default function MapScreen() {
         setNavInstruction("沿路線前進");
       }
     },
-    [gpxRoute, settings.ttsEnabled]
+    [gpxRoute, settings.ttsEnabled, isOffRoute]
   );
 
   // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
@@ -556,6 +590,9 @@ export default function MapScreen() {
     prevAltRef.current = null;
     prevPosRef.current = null;
     arrivedRef.current = false;
+    setIsOffRoute(false);
+    setReturnPolyline([]);
+    setReturnBearing("");
     setMapRideActive(true);
     setFollowUser(true);
 
@@ -699,6 +736,25 @@ export default function MapScreen() {
         {gpxPolyline.length > 1 && (
           <Circle center={gpxPolyline[gpxPolyline.length - 1]} radius={8} fillColor="#FF3B30" strokeColor="#fff" strokeWidth={2} />
         )}
+        {/* 回歸路徑（偏離時顯示：橘色虛線 + 最近路線點標記） */}
+        {isOffRoute && returnPolyline.length === 2 && (
+          <>
+            <Polyline
+              coordinates={returnPolyline}
+              strokeColor="#FF9500"
+              strokeWidth={3}
+              lineDashPattern={[8, 6]}
+            />
+            <Circle
+              center={returnPolyline[1]}
+              radius={12}
+              fillColor="rgba(255,149,0,0.3)"
+              strokeColor="#FF9500"
+              strokeWidth={2}
+            />
+          </>
+        )}
+
         {/* 當前位置 */}
         {currentPos && (
           <>
@@ -747,7 +803,39 @@ export default function MapScreen() {
             <IconSymbol name="xmark.circle.fill" size={20} color="#FF3B30" />
           </Pressable>
         )}
+        {/* 回歸路線按鈕（偏離且導航中顯示） */}
+        {isOffRoute && isNavigating && (
+          <Pressable
+            style={[styles.toolBtn, styles.returnBtn]}
+            onPress={() => {
+              if (!gpxRoute || !currentPos) return;
+              const nearPt = gpxRoute.points[nearestIdx];
+              mapRef.current?.animateCamera(
+                { center: { latitude: nearPt.lat, longitude: nearPt.lon }, zoom: 16 },
+                { duration: 800 }
+              );
+              setFollowUser(false);
+            }}
+          >
+            <IconSymbol name="location.fill" size={16} color="#FF9500" />
+            <Text style={styles.returnBtnLabel}>回歸</Text>
+          </Pressable>
+        )}
       </View>
+
+      {/* ── 偏離路線提示橫幅（偏離且導航中顯示） ── */}
+      {isOffRoute && isNavigating && returnBearing !== "" && (
+        <View style={[
+          styles.offRouteBanner,
+          { top: insets.top + 60 }
+        ]}>
+          <Text style={styles.offRouteBannerIcon}>⚠️</Text>
+          <View style={styles.offRouteBannerText}>
+            <Text style={styles.offRouteBannerTitle}>偏離路線 {offRouteDist} m</Text>
+            <Text style={styles.offRouteBannerSub}>朝{returnBearing}方向回到路線</Text>
+          </View>
+        </View>
+      )}
 
       {/* ── GPX 路線提示（無路線時） ── */}
       {!gpxRoute && !isActive && (
@@ -1063,6 +1151,34 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "rgba(255,255,255,0.15)",
   },
   toolBtnActive: { backgroundColor: "rgba(0,122,255,0.2)", borderColor: "#007AFF" },
+  returnBtn: {
+    backgroundColor: "rgba(255,149,0,0.2)",
+    borderColor: "#FF9500",
+    height: 52,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    flexDirection: "column",
+    gap: 2,
+  },
+  returnBtnLabel: { color: "#FF9500", fontSize: 10, fontWeight: "700" },
+
+  // 偏離路線提示橫幅
+  offRouteBanner: {
+    position: "absolute",
+    left: 16,
+    right: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(255,149,0,0.88)",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  offRouteBannerIcon: { fontSize: 18 },
+  offRouteBannerText: { flex: 1 },
+  offRouteBannerTitle: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  offRouteBannerSub: { color: "rgba(255,255,255,0.85)", fontSize: 12, marginTop: 1 },
 
   noRouteBadge: {
     position: "absolute",
