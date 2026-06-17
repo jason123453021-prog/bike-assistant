@@ -524,8 +524,19 @@ export default function MapScreen() {
 
       const now = Date.now();
 
-      // 偏離偵測：更新偏離狀態與回歸路徑
-      if (distToNearest > OFF_ROUTE_THRESHOLD_M) {
+      // 偏離偵測：若指引關閉則完全跳過（清除任何殘留偏離狀態）
+      if (!guidanceEnabled) {
+        if (isOffRoute) {
+          setIsOffRoute(false);
+          setReturnPolyline([]);
+          setReturnBearing("");
+          setRouteDistM(null);
+          setRouteDurSec(null);
+          setReturnSteps([]);
+        }
+        // 指引關閉時跳過偏離偵測，直接進入轉彎導航邏輯
+      } else if (distToNearest > OFF_ROUTE_THRESHOLD_M) {
+        // 偏離偵測：更新偏離狀態與回歸路徑
         setIsOffRoute(true);
         setOffRouteDist(Math.round(distToNearest));
 
@@ -536,13 +547,6 @@ export default function MapScreen() {
         const dirs = ["正北", "東北", "正東", "東南", "正南", "西南", "正西", "西北", "正北"];
         const dirIdx = Math.round(brg / 45) % 8;
         setReturnBearing(dirs[dirIdx]);
-
-        // 先顯示直線路徑（即時回歸）
-        const straightLine: RouteCoordinate[] = [
-          { latitude: lat, longitude: lon },
-          { latitude: nearPt.lat, longitude: nearPt.lon },
-        ];
-        setReturnPolyline(straightLine);
 
         // 非同步呼叫 OSRM，取得沿道路路徑（有冷卻時間）
         if (now - lastRouteFetchRef.current > ROUTE_FETCH_COOLDOWN_MS && !isFetchingRoute) {
@@ -562,11 +566,17 @@ export default function MapScreen() {
               setReturnSteps(filteredSteps);
               setCurrentReturnStepIdx(0);
               // 語音播報第一個轉彎指令
-              if (filteredSteps.length > 0 && guidanceEnabled && settings.ttsEnabled) {
+              if (filteredSteps.length > 0 && settings.ttsEnabled) {
                 speak(`回歸路線：${filteredSteps[0].instruction}，${formatRouteDistance(filteredSteps[0].distanceM)}後`, settings.ttsEnabled);
               }
             }
           }).catch(() => setIsFetchingRoute(false));
+        } else if (!isFetchingRoute && returnPolyline.length === 0) {
+          // 尚未有路徑時先顯示直線作為備用
+          setReturnPolyline([
+            { latitude: lat, longitude: lon },
+            { latitude: nearPt.lat, longitude: nearPt.lon },
+          ]);
         }
 
         if (now - lastRerouteRef.current > REROUTE_COOLDOWN_MS) {
@@ -584,6 +594,7 @@ export default function MapScreen() {
           setReturnBearing("");
           setRouteDistM(null);
           setRouteDurSec(null);
+          setReturnSteps([]);
           speak("已回到路線，繼續前進", settings.ttsEnabled);
         }
       }
@@ -789,17 +800,16 @@ export default function MapScreen() {
         {gpxPolyline.length > 1 && (
           <Circle center={gpxPolyline[gpxPolyline.length - 1]} radius={8} fillColor="#FF3B30" strokeColor="#fff" strokeWidth={2} />
         )}
-        {/* 回歸路徑（偏離時顯示：橘色虛線 + 最近路線點標記） */}
-        {isOffRoute && returnPolyline.length === 2 && (
+        {/* 回歸路徑（偏離時顯示：橘色實線沿街道繪製） */}
+        {isOffRoute && returnPolyline.length >= 2 && (
           <>
             <Polyline
               coordinates={returnPolyline}
               strokeColor="#FF9500"
-              strokeWidth={3}
-              lineDashPattern={[8, 6]}
+              strokeWidth={4}
             />
             <Circle
-              center={returnPolyline[1]}
+              center={returnPolyline[returnPolyline.length - 1]}
               radius={12}
               fillColor="rgba(255,149,0,0.3)"
               strokeColor="#FF9500"
