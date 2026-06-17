@@ -51,9 +51,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     AsyncStorage.getItem(SETTINGS_KEY).then((data) => {
       if (data) {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(data) });
+        try {
+          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(data) });
+        } catch (_) {
+          // 設定資料損壞時使用預設値
+        }
       }
-    });
+    }).catch(() => {});
   }, []);
 
   const updateSettings = async (partial: Partial<AppSettings>) => {

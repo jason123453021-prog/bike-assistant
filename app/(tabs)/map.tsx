@@ -33,7 +33,7 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Circle, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Circle, Polyline } from "react-native-maps";
 import * as Location from "expo-location";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
@@ -774,8 +774,7 @@ export default function MapScreen() {
       <MapView
         ref={mapRef}
         style={[styles.map, { height: SCREEN_H - tabBarH }]}
-        provider={PROVIDER_DEFAULT}
-        customMapStyle={DARK_MAP_STYLE}
+        customMapStyle={Platform.OS === "android" ? undefined : DARK_MAP_STYLE}
         showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={false}
