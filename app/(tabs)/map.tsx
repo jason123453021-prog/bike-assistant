@@ -195,8 +195,10 @@ export default function MapScreen() {
   const [routeDistM, setRouteDistM] = useState<number | null>(null);
   const [routeDurSec, setRouteDurSec] = useState<number | null>(null);
   const [isFetchingRoute, setIsFetchingRoute] = useState(false);
+  const isFetchingRouteRef = useRef(false); // ref 版本，避免 closure 問題
   const lastRouteFetchRef = useRef<number>(0);
-  const ROUTE_FETCH_COOLDOWN_MS = 20000; // 最少 20 秒才重新計算一次
+  const ROUTE_FETCH_COOLDOWN_MS = 30000; // 最少 30 秒才重新計算一次（避免 API 過載）
+  const routeFetchFailCountRef = useRef(0); // 連續失敗次數
   // 偏離指引開關（預設開啟）
   const [guidanceEnabled, setGuidanceEnabled] = useState(true);
   // 用 ref 追蹤指引開關狀態，讓非同步回調（OSRM Promise）也能讀到最新值
@@ -552,36 +554,82 @@ export default function MapScreen() {
         const dirIdx = Math.round(brg / 45) % 8;
         setReturnBearing(dirs[dirIdx]);
 
-        // 非同步呼叫 OSRM，取得沿道路路徑（有冷卻時間）
-        if (now - lastRouteFetchRef.current > ROUTE_FETCH_COOLDOWN_MS && !isFetchingRoute) {
+        // 非同步呼叫路由引擎，取得沿道路路徑（有冷卻時間）
+        // 使用 ref 版本的 isFetchingRouteRef 避免 closure 問題
+        if (now - lastRouteFetchRef.current > ROUTE_FETCH_COOLDOWN_MS && !isFetchingRouteRef.current) {
           lastRouteFetchRef.current = now;
+          isFetchingRouteRef.current = true;
           setIsFetchingRoute(true);
+          // 先顯示直線作為即時備用（讓使用者知道方向）
+          setReturnPolyline([
+            { latitude: lat, longitude: lon },
+            { latitude: nearPt.lat, longitude: nearPt.lon },
+          ]);
           fetchBikeRoute(
             { latitude: lat, longitude: lon },
             { latitude: nearPt.lat, longitude: nearPt.lon },
             preferCyclewayRef.current  // 自行車道優先開關
           ).then((result) => {
+            isFetchingRouteRef.current = false;
             setIsFetchingRoute(false);
             if (result && result.coordinates.length > 1) {
+              routeFetchFailCountRef.current = 0;
               setReturnPolyline(result.coordinates);
               setRouteDistM(result.distanceM);
               setRouteDurSec(result.durationSec);
-              // 儲存轉彎步驟，從第一步開始（跳過 depart）
+              // 儲存轉灣步驟，從第一步開始（跳過 depart）
               const filteredSteps = result.steps.filter(s => s.instruction !== "出發，進入路線");
               setReturnSteps(filteredSteps);
               setCurrentReturnStepIdx(0);
-              // 語音播報第一個轉彎指令（用 ref 檢查，避免 closure 問題）
+              // 語音播報第一個轉灣指令（用 ref 檢查，避免 closure 問題）
               if (filteredSteps.length > 0 && settings.ttsEnabled && guidanceEnabledRef.current) {
                 speak(`回歸路線：${filteredSteps[0].instruction}，${formatRouteDistance(filteredSteps[0].distanceM)}後`, settings.ttsEnabled);
               }
+            } else {
+              // API 回傳空結果：保留直線備用
+              routeFetchFailCountRef.current += 1;
+              // 失敗次數導致冷卻縮短，讓下次請求更快重試
+              if (routeFetchFailCountRef.current >= 2) {
+                lastRouteFetchRef.current = now - ROUTE_FETCH_COOLDOWN_MS + 10000; // 10秒後重試
+                routeFetchFailCountRef.current = 0;
+              }
             }
-          }).catch(() => setIsFetchingRoute(false));
-        } else if (!isFetchingRoute && returnPolyline.length === 0) {
+          }).catch(() => {
+            isFetchingRouteRef.current = false;
+            setIsFetchingRoute(false);
+            routeFetchFailCountRef.current += 1;
+            // 網路錯誤：10 秒後重試
+            lastRouteFetchRef.current = now - ROUTE_FETCH_COOLDOWN_MS + 10000;
+          });
+        } else if (!isFetchingRouteRef.current && returnPolyline.length === 0) {
           // 尚未有路徑時先顯示直線作為備用
           setReturnPolyline([
             { latitude: lat, longitude: lon },
             { latitude: nearPt.lat, longitude: nearPt.lon },
           ]);
+        } else if (!isFetchingRouteRef.current && returnPolyline.length > 0) {
+          // 已有路徑：更新路徑起點為當前位置（讓路徑跟著移動）
+          setReturnPolyline(prev => [
+            { latitude: lat, longitude: lon },
+            ...prev.slice(1),
+          ]);
+        }
+
+        // 自動推進回歸步驟：檢查是否已經通過當前步驟的轉灣點
+        if (returnSteps.length > 0 && currentReturnStepIdx < returnSteps.length) {
+          const step = returnSteps[currentReturnStepIdx];
+          const distToStep = haversine(lat, lon, step.location.latitude, step.location.longitude);
+          // 如果已接近轉灣點（50m 內），推進到下一步
+          if (distToStep < 50 && currentReturnStepIdx + 1 < returnSteps.length) {
+            const nextStep = returnSteps[currentReturnStepIdx + 1];
+            setCurrentReturnStepIdx(i => i + 1);
+            if (guidanceEnabledRef.current && settings.ttsEnabled) {
+              speak(`${nextStep.instruction}${nextStep.distanceM > 0 ? `，${formatRouteDistance(nextStep.distanceM)}後` : ""}`, settings.ttsEnabled);
+            }
+          } else if (distToStep < 150 && guidanceEnabledRef.current) {
+            // 接近轉灣點時語音提醒（每個步驟只播報一次）
+            // 用 REROUTE_COOLDOWN_MS 防止重複播報
+          }
         }
 
         if (now - lastRerouteRef.current > REROUTE_COOLDOWN_MS) {
@@ -660,7 +708,9 @@ export default function MapScreen() {
     setRouteDistM(null);
     setRouteDurSec(null);
     setIsFetchingRoute(false);
+    isFetchingRouteRef.current = false;
     lastRouteFetchRef.current = 0;
+    routeFetchFailCountRef.current = 0;
     setReturnSteps([]);
     setCurrentReturnStepIdx(0);
     setMapRideActive(true);
@@ -851,9 +901,11 @@ export default function MapScreen() {
               setPreferCycleway(next);
               // 切換後重置路由從取定時器，讓下次偏離時重新計算
               lastRouteFetchRef.current = 0;
+              routeFetchFailCountRef.current = 0;
               if (isOffRoute) {
                 setReturnPolyline([]);
                 setIsFetchingRoute(false);
+                isFetchingRouteRef.current = false;
               }
             }}
           >
@@ -875,7 +927,7 @@ export default function MapScreen() {
           <View style={styles.offRouteBannerText}>
             <Text style={styles.offRouteBannerTitle}>偏離路線 {offRouteDist} m</Text>
             {isFetchingRoute ? (
-              <Text style={styles.offRouteBannerSub}>計算回歸路徑中…</Text>
+              <Text style={styles.offRouteBannerSub}>朝{returnBearing}方向前進（計算路徑中…）</Text>
             ) : returnSteps.length > 0 && currentReturnStepIdx < returnSteps.length ? (
               <>
                 <Text style={styles.offRouteBannerSub}>

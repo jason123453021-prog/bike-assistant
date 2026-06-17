@@ -65,8 +65,8 @@ const LEAFLET_HTML = `<!DOCTYPE html>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body, #map { width: 100%; height: 100%; background: #0d0d1a; }
-  .leaflet-container { background: #0d0d1a; }
+  html, body, #map { width: 100%; height: 100%; background: #2c2c3e; }
+  .leaflet-container { background: #2c2c3e; }
 </style>
 </head>
 <body>
@@ -83,8 +83,8 @@ var map = L.map('map', {
   scrollWheelZoom: false,
 }).setView([25.0478, 121.5319], 14);
 
-// Dark tile layer
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+// Tile layer: CartoDB Voyager (bright roads, good contrast for cycling)
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
   maxZoom: 19,
   subdomains: 'abcd',
 }).addTo(map);
