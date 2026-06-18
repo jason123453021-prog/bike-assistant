@@ -237,7 +237,7 @@ export default function MapScreen() {
       const coords = gpxRoute.points.map((p) => ({ latitude: p.lat, longitude: p.lon }));
       setTimeout(() => {
         mapRef.current?.fitToCoordinates(coords, {
-          edgePadding: { top: 80, right: 40, bottom: PANEL_COLLAPSED_H + 40, left: 40 },
+          edgePadding: { top: 80, right: 40, bottom: dynamicCollapsedH + 40, left: 40 },
           animated: true,
         });
         setFollowUser(false);
@@ -338,16 +338,55 @@ export default function MapScreen() {
 
   // ─── 底部面板滑桿 ─────────────────────────────────────────────────────────────
   const [panelExpanded, setPanelExpanded] = useState(false);
-  const panelAnim = useRef(new Animated.Value(PANEL_COLLAPSED_H)).current;
+  // ── 動態儀表板高度：依啟用欄位數計算，最多不超過螢幕三分之一 ──
+  const dashFieldCount = useMemo(() => {
+    const f = settings.normalModeFields;
+    return [
+      f?.showElapsed ?? true,
+      f?.showSpeed ?? true,
+      f?.showDistance ?? true,
+      f?.showGrade ?? true,
+      f?.showPower ?? true,
+      f?.showAvgSpeed ?? true,
+      f?.showCalories ?? false,
+      f?.showPausedTime ?? false,
+    ].filter(Boolean).length;
+  }, [settings.normalModeFields]);
+
+  // 每行3格，每格約60px；最少1行，最多不超過 SCREEN_H/3
+  const CELL_H = 60;
+  const HEADER_H = 80; // 天氣列 + 暫停徽章
+  const CTRL_H = 64;   // 控制按鈕列
+  const dashRows = Math.ceil(dashFieldCount / 3) || 1;
+  const dashGridH = dashRows * CELL_H;
+  const dynamicCollapsedH = Math.min(
+    HEADER_H + dashGridH + CTRL_H,
+    PANEL_COLLAPSED_H
+  );
+
+  const panelAnim = useRef(new Animated.Value(dynamicCollapsedH)).current;
+  const prevCollapsedH = useRef(dynamicCollapsedH);
+
+  // 當欄位數變化時，若面板未展開則更新動畫值
+  useEffect(() => {
+    if (!panelExpanded && dynamicCollapsedH !== prevCollapsedH.current) {
+      prevCollapsedH.current = dynamicCollapsedH;
+      Animated.timing(panelAnim, {
+        toValue: dynamicCollapsedH,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [dynamicCollapsedH, panelExpanded, panelAnim]);
 
   const togglePanel = useCallback((expand: boolean) => {
     setPanelExpanded(expand);
     Animated.timing(panelAnim, {
-      toValue: expand ? PANEL_EXPANDED_H : PANEL_COLLAPSED_H,
+      toValue: expand ? PANEL_EXPANDED_H : dynamicCollapsedH,
       duration: 280,
       useNativeDriver: false,
     }).start();
-  }, [panelAnim]);
+  }, [panelAnim, dynamicCollapsedH]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -960,7 +999,7 @@ export default function MapScreen() {
         { latitude: currentPos.lat, longitude: currentPos.lon },
         { latitude: friendLat, longitude: friendLon },
       ],
-      { edgePadding: { top: 80, right: 40, bottom: PANEL_COLLAPSED_H + 40, left: 40 }, animated: true }
+      { edgePadding: { top: 80, right: 40, bottom: dynamicCollapsedH + 40, left: 40 }, animated: true }
     );
     try {
       const result = await fetchBikeRoute(
@@ -1423,6 +1462,9 @@ export default function MapScreen() {
           {(settings.normalModeFields?.showCalories ?? false) && (
             <BigMetric label="卡路里" value={`${Math.round(state.calories)}`} unit="kcal" />
           )}
+          {(settings.normalModeFields?.showPausedTime ?? false) && (
+            <BigMetric label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" />
+          )}
         </View>
 
         {/* ── 展開後：總爬升 + 進度條 ── */}
@@ -1586,7 +1628,7 @@ export default function MapScreen() {
 
       {/* ── 隊伍遙測橫幅（騎乘中、已登入、開啟隊伍遙測）── */}
       {isActive && isAuthenticated && settings.teamTelemetryEnabled && teamQuery.data && teamQuery.data.length > 0 && (
-        <View style={[styles.teamBanner, { bottom: tabBarH + PANEL_COLLAPSED_H + 8 }]}>
+        <View style={[styles.teamBanner, { bottom: tabBarH + dynamicCollapsedH + 8 }]}>
           {teamQuery.data.slice(0, 3).map((friend) => {
             const distM = currentPos
               ? Math.round(haversine(currentPos.lat, currentPos.lon, friend.latitude, friend.longitude))

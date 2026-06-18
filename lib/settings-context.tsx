@@ -10,6 +10,7 @@ export interface NormalModeFields {
   showPower: boolean;     // 功率
   showAvgSpeed: boolean;  // 均速
   showCalories: boolean;  // 卡路里
+  showPausedTime: boolean; // 暫停時間
 }
 
 // 精簡導航模式可顯示的欄位
@@ -64,6 +65,7 @@ const DEFAULT_NORMAL_FIELDS: NormalModeFields = {
   showPower: true,
   showAvgSpeed: true,
   showCalories: false,
+  showPausedTime: false,
 };
 
 const DEFAULT_SIMPLIFIED_FIELDS: SimplifiedModeFields = {

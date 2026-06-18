@@ -83,8 +83,18 @@ export default function SettingsScreen() {
           />
           <Divider colors={colors} />
           <NumberRow
+            icon="person.fill"
+            label="年齡"
+            value={settings.age ?? 32}
+            unit="歲"
+            colors={colors}
+            hint="用於推算最大心率（MHR）與水分消耗演算"
+            onPress={() => openEdit("age", "年齡", settings.age ?? 32, "歲")}
+          />
+          <Divider colors={colors} />
+          <NumberRow
             icon="bolt.fill"
-            label="FTP（功能閾値功率）"
+            label="FTP（功能閨値功率）"
             value={settings.ftp}
             unit="W"
             colors={colors}
@@ -331,6 +341,7 @@ export default function SettingsScreen() {
             { key: "showPower",   label: "功率" },
             { key: "showAvgSpeed",label: "均速" },
             { key: "showCalories",label: "卡路里" },
+            { key: "showPausedTime",label: "暫停時間" },
           ] as { key: keyof typeof settings.normalModeFields; label: string }[]).map((item, idx, arr) => (
             <React.Fragment key={item.key}>
               <View style={styles.row}>
