@@ -81,6 +81,9 @@ import {
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SupplyModal } from "@/components/supply-modal";
 import { RideSummaryModal } from "@/components/ride-summary-modal";
+import { SimplifiedNavOverlay } from "@/components/simplified-nav-overlay";
+import { useAuth } from "@/hooks/use-auth";
+import { trpc } from "@/lib/trpc";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -283,9 +286,25 @@ export default function MapScreen() {
   const calorieAnim = useRef(new Animated.Value(0)).current;
   const waterAnim = useRef(new Animated.Value(0)).current;
 
+  const { user, isAuthenticated } = useAuth();
+
+  // 精簡導航模式
+  const [simplifiedNavVisible, setSimplifiedNavVisible] = useState(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastInteractionRef = useRef<number>(Date.now());
+
   const isRiding = state.status === "active";
   const isPaused = state.status === "paused";
   const isActive = isRiding || isPaused;
+
+  // 隊伍遙測：查詢好友即時位置（每 5 秒更新）
+  const teamQuery = trpc.friends.getFriendsLocations.useQuery(
+    undefined,
+    {
+      enabled: isAuthenticated && settings.teamTelemetryEnabled && isActive,
+      refetchInterval: 5000,
+    }
+  );
 
   const hydrationThresholdMl = settings.waterThreshold > 0
     ? settings.waterThreshold
@@ -858,6 +877,50 @@ export default function MapScreen() {
     return () => clearInterval(timer);
   }, [state.status, saveSnapshot]);
 
+  // ─── 位置上傳 mutation（隊伍遙測）────────────────────────────────────────────
+  const updateLocationMutation = trpc.friends.updateMyLocation.useMutation();
+
+  // 每次 GPS 更新時，若隊伍遙測開啟且已登入，上傳位置
+  useEffect(() => {
+    if (!isAuthenticated || !settings.shareLocation || !currentPos || !isActive) return;
+    updateLocationMutation.mutate({
+      latitude: currentPos.lat,
+      longitude: currentPos.lon,
+      speed: state.currentSpeed ?? 0,
+      heading: currentPos.heading,
+      altitude: 0,
+      isGhostMode: settings.ghostMode,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPos]);
+
+  // ─── 精簡導航閒置計時器（自動模式）─────────────────────────────────────────
+  const resetIdleTimer = useCallback(() => {
+    lastInteractionRef.current = Date.now();
+    if (simplifiedNavVisible) setSimplifiedNavVisible(false);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (settings.simplifiedNavMode === "auto" && isActive) {
+      const idleSec = settings.simplifiedNavIdleSec ?? 30;
+      idleTimerRef.current = setTimeout(() => {
+        setSimplifiedNavVisible(true);
+      }, idleSec * 1000);
+    }
+  }, [simplifiedNavVisible, settings.simplifiedNavMode, settings.simplifiedNavIdleSec, isActive]);
+
+  // 騎乘開始時啟動閒置計時器
+  useEffect(() => {
+    if (isActive && settings.simplifiedNavMode === "auto") {
+      resetIdleTimer();
+    } else {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      setSimplifiedNavVisible(false);
+    }
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, settings.simplifiedNavMode]);
+
   // ─── 計算值 ──────────────────────────────────────────────────────────────────
   const gpxPolyline = useMemo(() => {
     if (!gpxRoute) return [];
@@ -1029,7 +1092,6 @@ export default function MapScreen() {
               const next = !preferCycleway;
               preferCyclewayRef.current = next;
               setPreferCycleway(next);
-              // 切換後重置路由從取定時器，讓下次偏離時重新計算
               lastRouteFetchRef.current = 0;
               routeFetchFailCountRef.current = 0;
               if (isOffRoute) {
@@ -1043,6 +1105,18 @@ export default function MapScreen() {
             <Text style={[styles.returnBtnLabel, { color: preferCycleway ? "#34C759" : "rgba(255,255,255,0.4)" }]}>
               {preferCycleway ? "車道" : "一般"}
             </Text>
+          </Pressable>
+        )}
+        {/* 精簡導航手動觸發按鈕（騎乘中且設定為手動模式時顯示） */}
+        {isActive && settings.simplifiedNavMode === "manual" && (
+          <Pressable
+            style={[styles.toolBtn, simplifiedNavVisible && styles.toolBtnActive]}
+            onPress={() => {
+              setSimplifiedNavVisible(true);
+            }}
+          >
+            <Text style={{ fontSize: 16, color: simplifiedNavVisible ? "#FFD60A" : "rgba(255,255,255,0.8)" }}>&#9632;</Text>
+            <Text style={[styles.returnBtnLabel, { color: simplifiedNavVisible ? "#FFD60A" : "rgba(255,255,255,0.8)" }]}>精簡</Text>
           </Pressable>
         )}
       </View>
@@ -1321,13 +1395,53 @@ export default function MapScreen() {
         visible={showSummary}
         onClose={(routeName) => {
           setShowSummary(false);
-          // 如果使用者輸入了路線名稱，更新最新一筆記錄的名稱
           if (routeName && routeName.trim() && state.records.length > 0) {
             const latestRecord = state.records[0];
             updateRecordName(latestRecord.id, routeName.trim());
           }
           dispatch({ type: "RESET" });
         }}
+      />
+
+      {/* ── 隊伍遙測橫幅（騎乘中、已登入、開啟隊伍遙測）── */}
+      {isActive && isAuthenticated && settings.teamTelemetryEnabled && teamQuery.data && teamQuery.data.length > 0 && (
+        <View style={[styles.teamBanner, { bottom: tabBarH + PANEL_COLLAPSED_H + 8 }]}>
+          {teamQuery.data.slice(0, 3).map((friend) => {
+            const distM = currentPos
+              ? Math.round(haversine(currentPos.lat, currentPos.lon, friend.latitude, friend.longitude))
+              : null;
+            const dwellInfo = (teamQuery.data as any[]).find?.((d: any) => d.userId === friend.userId);
+            return (
+              <View key={friend.userId} style={styles.teamMember}>
+                <View style={[styles.teamDot, { backgroundColor: friend.speed > 1 ? "#34C759" : "#FF9500" }]} />
+                <Text style={styles.teamName} numberOfLines={1}>{friend.name ?? "好友"}</Text>
+                {distM !== null && settings.showFriendDistance && (
+                  <Text style={styles.teamDist}>
+                    {distM < 1000 ? `${distM}m` : `${(distM / 1000).toFixed(1)}km`}
+                  </Text>
+                )}
+                {friend.speed > 0 && (
+                  <Text style={styles.teamSpeed}>{(friend.speed * 3.6).toFixed(0)}km/h</Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* ── 精簡導航模式── */}
+      <SimplifiedNavOverlay
+        visible={simplifiedNavVisible}
+        onDismiss={() => {
+          setSimplifiedNavVisible(false);
+          resetIdleTimer();
+        }}
+        speed={state.currentSpeed ?? 0}
+        distance={(state.distance ?? 0) / 1000}
+        remainingDist={distToEnd !== null ? distToEnd / 1000 : undefined}
+        direction={navInstruction || undefined}
+        currentTime={new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false })}
+        elapsedTime={formatDuration(state.elapsed ?? 0)}
       />
     </View>
   );
@@ -1601,6 +1715,51 @@ const styles = StyleSheet.create({
   recoveryBtnText: {
     color: "#fff",
     fontSize: 14,
+    fontWeight: "600",
+  },
+  // 隊伍遙測橫幅
+  teamBanner: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    zIndex: 150,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  teamMember: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  teamDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  teamName: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    maxWidth: 60,
+  },
+  teamDist: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 11,
+  },
+  teamSpeed: {
+    color: "#34C759",
+    fontSize: 11,
     fontWeight: "600",
   },
 });

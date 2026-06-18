@@ -10,14 +10,18 @@ import {
   Alert,
   Modal,
 } from "react-native";
+import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useSettings } from "@/lib/settings-context";
+import { useAuth } from "@/hooks/use-auth";
+import { startOAuthLogin } from "@/constants/oauth";
 
 export default function SettingsScreen() {
   const colors = useColors();
   const { settings, updateSettings } = useSettings();
+  const { user, isAuthenticated, logout } = useAuth();
   const [editModal, setEditModal] = useState<{
     visible: boolean;
     key: string;
@@ -146,6 +150,147 @@ export default function SettingsScreen() {
             colors={colors}
             onToggle={(v) => updateSettings({ notificationEnabled: v })}
           />
+                </View>
+
+        {/* ── 帳號與社交 ── */}
+        <SectionHeader title="帳號與好友" colors={colors} />
+        <View style={[styles.section, { borderColor: colors.border }]}>
+          {isAuthenticated ? (
+            <>
+              <View style={styles.row}>
+                <IconSymbol name="person.fill" size={18} color={colors.muted} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowLabel, { color: colors.foreground }]}>{user?.name ?? "未命名"}</Text>
+                  <Text style={[styles.rowHint, { color: colors.muted }]}>{user?.email ?? ""}</Text>
+                </View>
+              </View>
+              <Divider colors={colors} />
+              <Pressable
+                style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
+                onPress={() => router.push("/friends")}
+              >
+                <IconSymbol name="person.2.fill" size={18} color={colors.muted} />
+                <Text style={[styles.rowLabel, { color: colors.foreground }]}>好友管理</Text>
+                <View style={styles.rowRight}>
+                  <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+                </View>
+              </Pressable>
+              <Divider colors={colors} />
+              <Pressable
+                style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
+                onPress={() => Alert.alert("登出", "確定要登出帳號？", [
+                  { text: "取消", style: "cancel" },
+                  { text: "登出", style: "destructive", onPress: logout },
+                ])}
+              >
+                <IconSymbol name="arrow.left" size={18} color={colors.error} />
+                <Text style={[styles.rowLabel, { color: colors.error }]}>登出帳號</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
+              onPress={startOAuthLogin}
+            >
+              <IconSymbol name="person.fill" size={18} color={colors.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.rowLabel, { color: colors.accent }]}>登入帳號</Text>
+                <Text style={[styles.rowHint, { color: colors.muted }]}>登入後可使用好友功能與隱私設定</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </Pressable>
+          )}
+        </View>
+
+        {/* ── 隔伍遙測 ── */}
+        <SectionHeader title="隊伍遙測" colors={colors} />
+        <View style={[styles.section, { borderColor: colors.border }]}>
+          <ToggleRow
+            icon="person.2.fill"
+            label="開啟隊伍遙測"
+            value={settings.teamTelemetryEnabled}
+            colors={colors}
+            onToggle={(v) => updateSettings({ teamTelemetryEnabled: v })}
+          />
+          <Divider colors={colors} />
+          <ToggleRow
+            icon="location.fill"
+            label="顯示隊友位置"
+            value={settings.showFriendLocation}
+            colors={colors}
+            onToggle={(v) => updateSettings({ showFriendLocation: v })}
+          />
+          <Divider colors={colors} />
+          <ToggleRow
+            icon="arrow.up.circle.fill"
+            label="顯示隊友距離"
+            value={settings.showFriendDistance}
+            colors={colors}
+            onToggle={(v) => updateSettings({ showFriendDistance: v })}
+          />
+        </View>
+
+        {/* ── 隱私設定 ── */}
+        <SectionHeader title="安全與隱私" colors={colors} />
+        <View style={[styles.section, { borderColor: colors.border }]}>
+          <ToggleRow
+            icon="eye.slash.fill"
+            label="隱身模式"
+            value={settings.ghostMode}
+            colors={colors}
+            onToggle={(v) => updateSettings({ ghostMode: v })}
+          />
+          <Divider colors={colors} />
+          <ToggleRow
+            icon="location.fill"
+            label="分享位置給好友"
+            value={settings.shareLocation}
+            colors={colors}
+            onToggle={(v) => updateSettings({ shareLocation: v })}
+          />
+        </View>
+
+        {/* ── 精簡導航模式 ── */}
+        <SectionHeader title="精簡導航模式" colors={colors} />
+        <View style={[styles.section, { borderColor: colors.border }]}>
+          <View style={styles.row}>
+            <IconSymbol name="moon.fill" size={18} color={colors.muted} />
+            <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>模式選擇</Text>
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              {(["off", "manual", "auto"] as const).map((mode) => (
+                <Pressable
+                  key={mode}
+                  style={({ pressed }) => ([
+                    styles.modeChip,
+                    {
+                      backgroundColor: settings.simplifiedNavMode === mode ? colors.accent : colors.surface,
+                      borderColor: settings.simplifiedNavMode === mode ? colors.accent : colors.border,
+                      opacity: pressed ? 0.7 : 1,
+                    },
+                  ])}
+                  onPress={() => updateSettings({ simplifiedNavMode: mode })}
+                >
+                  <Text style={[styles.modeChipText, { color: settings.simplifiedNavMode === mode ? "#fff" : colors.muted }]}>
+                    {mode === "off" ? "關閉" : mode === "manual" ? "手動" : "自動"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          {settings.simplifiedNavMode === "auto" && (
+            <>
+              <Divider colors={colors} />
+              <NumberRow
+                icon="clock.fill"
+                label="自動開啟閒置時間"
+                value={settings.simplifiedNavIdleSec}
+                unit="秒"
+                colors={colors}
+                hint="騎乘中閒置此時間後自動進入精簡模式"
+                onPress={() => openEdit("simplifiedNavIdleSec", "自動開啟閒置時間", settings.simplifiedNavIdleSec, "秒")}
+              />
+            </>
+          )}
         </View>
 
         <View style={{ height: 20 }} />
@@ -338,4 +483,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   editSaveText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  // Mode chip
+  modeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  modeChipText: { fontSize: 13, fontWeight: "600" },
 });

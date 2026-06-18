@@ -53,6 +53,24 @@ const MAPPING = {
   "arrow.up.circle.fill":                  "navigation",
   "location.north.fill":                   "explore",
   "compass":                               "explore",
+  // Friends & social
+  "person.2.fill":                         "group",
+  "person.badge.plus":                     "person-add",
+  "qrcode":                                "qr-code",
+  "qrcode.viewfinder":                     "qr-code-scanner",
+  "eye.slash.fill":                        "visibility-off",
+  "eye.fill":                              "visibility",
+  "wifi":                                  "wifi",
+  "wifi.slash":                            "wifi-off",
+  "envelope.fill":                         "email",
+  "checkmark":                             "check",
+  "xmark":                                 "close",
+  "clock.badge.exclamationmark":           "alarm",
+  "arrow.triangle.2.circlepath":           "sync",
+  "bolt.horizontal.fill":                  "electric-bolt",
+  "chart.bar.fill":                        "bar-chart",
+  "moon.stars.fill":                       "bedtime",
+  "sun.max.fill":                          "wb-sunny",
 } as IconMapping;
 
 export function IconSymbol({

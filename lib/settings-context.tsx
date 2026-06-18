@@ -19,13 +19,23 @@ export interface AppSettings {
   darkMode: boolean;
   // Weather
   weatherApiKey: string;
+  // 精簡導航模式
+  simplifiedNavMode: "off" | "manual" | "auto"; // off=關閉, manual=手動, auto=自動
+  simplifiedNavIdleSec: number; // 自動模式開啟前的閒置秒數（預設 30 秒）
+  // 隊伍遙測
+  teamTelemetryEnabled: boolean; // 是否開啟隊伍遙測
+  showFriendDistance: boolean;   // 顯示隊友距離
+  showFriendLocation: boolean;   // 顯示隊友位置
+  // 隱私
+  ghostMode: boolean;            // 隱身模式：不分享自己位置
+  shareLocation: boolean;        // 是否分享位置給好友
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   weight: 70,
   height: 175,
   ftp: 200,
-  bikeWeight: 10,  // 預設單車 10 kg
+  bikeWeight: 10,
   calorieThreshold: 300,
   waterThreshold: 500,
   vibrationEnabled: true,
@@ -34,6 +44,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   notificationEnabled: true,
   darkMode: true,
   weatherApiKey: "",
+  simplifiedNavMode: "off",
+  simplifiedNavIdleSec: 30,
+  teamTelemetryEnabled: false,
+  showFriendDistance: true,
+  showFriendLocation: true,
+  ghostMode: false,
+  shareLocation: true,
 };
 
 const SETTINGS_KEY = "@bike_settings";
