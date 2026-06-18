@@ -21,6 +21,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from "@rea
 import { RideProvider } from "@/lib/ride-context";
 import { GpxProvider } from "@/lib/gpx-context";
 import { SettingsProvider } from "@/lib/settings-context";
+import { FriendNavProvider } from "@/lib/friend-nav-context";
 import { setupNotifications } from "@/lib/feedback-service";
 // 必須在頂層引入以確保 TaskManager 任務被定義
 import "@/lib/background-location";
@@ -107,11 +108,13 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <SettingsProvider>
             <GpxProvider>
-              <RideProvider>
-                <ThemeProvider>
-                  <InnerLayout />
-                </ThemeProvider>
-              </RideProvider>
+              <FriendNavProvider>
+                <RideProvider>
+                  <ThemeProvider>
+                    <InnerLayout />
+                  </ThemeProvider>
+                </RideProvider>
+              </FriendNavProvider>
             </GpxProvider>
           </SettingsProvider>
         </QueryClientProvider>

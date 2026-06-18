@@ -115,8 +115,29 @@ export async function setupNotifications() {
         vibrationPattern: [0, 500, 200, 500],
         lightColor: "#FF9500",
       });
+      await Notifications.setNotificationChannelAsync("friends", {
+        name: "好友邀請",
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 300, 150, 300],
+        lightColor: "#4ADE80",
+      });
     } catch {}
   }
+}
+
+export async function showFriendInviteNotification(senderName: string) {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "👥 好友邀請",
+        body: `${senderName} 向您發送了好友邀請`,
+        sound: true,
+        data: { type: "friend_invite" },
+        ...(Platform.OS === "android" ? { channelId: "friends" } : {}),
+      },
+      trigger: null,
+    });
+  } catch {}
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {

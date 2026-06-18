@@ -18,7 +18,8 @@ import { useColors } from "@/hooks/use-colors";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
 import { fetchWeather, WeatherData } from "@/lib/weather-service";
-import { fetchBikeRoute } from "@/lib/route-service";
+import { useFriendNav } from "@/lib/friend-nav-context";
+import { useRouter } from "expo-router";
 
 // ── Haversine 距離計算 ──────────────────────────────────────────────────
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -230,6 +231,12 @@ function FriendDetailModal({
 export default function FriendsScreen() {
   const colors = useColors();
   const { isAuthenticated } = useAuth();
+  const { requestFriendNav } = useFriendNav();
+  const router = useRouter();
+
+  // 搜尋與排序
+  const [searchText, setSearchText] = useState("");
+  const [sortMode, setSortMode] = useState<"default" | "online" | "distance">("default");
 
   // 新增好友 input
   const [addEmail, setAddEmail] = useState("");
@@ -313,33 +320,22 @@ export default function FriendsScreen() {
     ? (locationsQuery.data ?? []).find((l) => l.userId === selectedFriend.id) ?? null
     : null;
 
-  // 導航到好友位置（開啟地圖 tab 並傳遞目的地）
-  const handleNavigate = useCallback(async (mode: "bike" | "road") => {
+  // 導航到好友位置（透過 Context 跳轉至導航 Tab）
+  const handleNavigate = useCallback((mode: "bike" | "road") => {
     if (!selectedLocation) {
       Alert.alert("無法導航", "好友目前不在線上");
       return;
     }
-    if (!myPos) {
-      Alert.alert("無法導航", "無法取得您的位置");
-      return;
-    }
-    try {
-      const dest = { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude };
-      const origin = { latitude: myPos.lat, longitude: myPos.lon };
-      if (mode === "bike") {
-        await fetchBikeRoute(origin, dest, true);
-      } else {
-        await fetchBikeRoute(origin, dest, false);
-      }
-      Alert.alert(
-        "導航已規劃",
-        `已規劃${mode === "bike" ? "自行車道優先" : "一般道路優先"}路線至 ${selectedLocation.name}，請前往導航頁面查看。`,
-        [{ text: "確定" }]
-      );
-    } catch {
-      Alert.alert("路線規劃失敗", "請稍後再試");
-    }
-  }, [selectedLocation, myPos]);
+    const friendName = selectedFriend?.name ?? "好友";
+    requestFriendNav({
+      friendName,
+      lat: selectedLocation.latitude,
+      lon: selectedLocation.longitude,
+      preferCycleway: mode === "bike",
+    });
+    setSelectedFriend(null);
+    router.push("/");
+  }, [selectedLocation, selectedFriend, requestFriendNav, router]);
 
   if (!isAuthenticated) {
     return (
@@ -355,6 +351,33 @@ export default function FriendsScreen() {
   const pending = pendingQuery.data ?? [];
   const locations = locationsQuery.data ?? [];
 
+  // 搜尋過濾
+  const filteredFriends = friends.filter((f) => {
+    if (!searchText.trim()) return true;
+    const q = searchText.toLowerCase();
+    return (
+      (f.name ?? "").toLowerCase().includes(q) ||
+      (f.email ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  // 排序
+  const sortedFriends = [...filteredFriends].sort((a, b) => {
+    const locA = locations.find((l) => l.userId === a.id);
+    const locB = locations.find((l) => l.userId === b.id);
+    if (sortMode === "online") {
+      const onA = locA ? 1 : 0;
+      const onB = locB ? 1 : 0;
+      return onB - onA;
+    }
+    if (sortMode === "distance" && myPos) {
+      const dA = locA ? haversine(myPos.lat, myPos.lon, locA.latitude, locA.longitude) : Infinity;
+      const dB = locB ? haversine(myPos.lat, myPos.lon, locB.latitude, locB.longitude) : Infinity;
+      return dA - dB;
+    }
+    return 0;
+  });
+
   return (
     <ScreenContainer>
       <ScrollView
@@ -366,6 +389,50 @@ export default function FriendsScreen() {
         <View style={[styles.pageHeader, { borderBottomColor: colors.border }]}>
           <Text style={[styles.pageTitle, { color: colors.foreground }]}>好友</Text>
           <Text style={[styles.pageCount, { color: colors.muted }]}>{friends.length} 位好友</Text>
+        </View>
+
+        {/* 搜尋與排序 */}
+        <View style={[styles.searchSection, { paddingHorizontal: 16, marginTop: 12 }]}>
+          <View style={[styles.searchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <IconSymbol name="magnifyingglass" size={16} color={colors.muted} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.foreground }]}
+              placeholder="搜尋好友名稱或 Email"
+              placeholderTextColor={colors.muted}
+              value={searchText}
+              onChangeText={setSearchText}
+              returnKeyType="search"
+              autoCapitalize="none"
+            />
+            {searchText.length > 0 && (
+              <Pressable onPress={() => setSearchText("")}>
+                <IconSymbol name="xmark.circle.fill" size={16} color={colors.muted} />
+              </Pressable>
+            )}
+          </View>
+          <View style={styles.sortRow}>
+            {(["default", "online", "distance"] as const).map((mode) => (
+              <Pressable
+                key={mode}
+                style={({ pressed }) => [
+                  styles.sortBtn,
+                  {
+                    backgroundColor: sortMode === mode ? colors.primary : colors.surface,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+                onPress={() => setSortMode(mode)}
+              >
+                <Text style={[
+                  styles.sortBtnText,
+                  { color: sortMode === mode ? "#fff" : colors.muted },
+                ]}>
+                  {mode === "default" ? "預設" : mode === "online" ? "在線優先" : "距離近優先"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
 
         {/* 新增好友 */}
@@ -452,9 +519,14 @@ export default function FriendsScreen() {
                 輸入好友的 Email 發送邀請
               </Text>
             </View>
+          ) : sortedFriends.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={{ fontSize: 36 }}>🔍</Text>
+              <Text style={[styles.emptyHint, { color: colors.muted }]}>找不到符合的好友</Text>
+            </View>
           ) : (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {friends.map((friend, idx) => {
+              {sortedFriends.map((friend, idx) => {
                 const loc = locations.find((l) => l.userId === friend.id);
                 const dist = myPos && loc
                   ? haversine(myPos.lat, myPos.lon, loc.latitude, loc.longitude)
@@ -659,4 +731,24 @@ const styles = StyleSheet.create({
   // 離線
   offlineBox: { alignItems: "center", paddingVertical: 32, gap: 10 },
   offlineText: { fontSize: 14, textAlign: "center" },
+  // 搜尋與排序
+  searchSection: { gap: 8 },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
+  sortRow: { flexDirection: "row", gap: 8 },
+  sortBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  sortBtnText: { fontSize: 12, fontWeight: "600" },
 });

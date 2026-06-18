@@ -84,6 +84,7 @@ import { RideSummaryModal } from "@/components/ride-summary-modal";
 import { SimplifiedNavOverlay } from "@/components/simplified-nav-overlay";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
+import { useFriendNav } from "@/lib/friend-nav-context";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -287,6 +288,7 @@ export default function MapScreen() {
   const waterAnim = useRef(new Animated.Value(0)).current;
 
   const { user, isAuthenticated } = useAuth();
+  const { pendingNav, clearFriendNav } = useFriendNav();
 
   // 好友詳細卡片
   const [tappedFriend, setTappedFriend] = useState<{
@@ -955,6 +957,17 @@ export default function MapScreen() {
     setFriendNavDurSec(null);
     setIsFetchingFriendNav(false);
   }, []);
+
+  // 監聽好友頁面傳來的導航請求
+  useEffect(() => {
+    if (!pendingNav) return;
+    const { friendName, lat, lon, preferCycleway: pref } = pendingNav;
+    clearFriendNav();
+    setTimeout(() => {
+      startFriendNav(friendName, lat, lon, pref);
+    }, 300);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingNav]);
 
   // ─── 騎乘進度快照（每 10 秒儲存一次，用於崩潰恢復）───────────────────────────────────────
   useEffect(() => {
