@@ -158,17 +158,25 @@ export default function SettingsScreen() {
         <View style={[styles.section, { borderColor: colors.border }]}>
           {isAuthenticated ? (
             <>
-              <View style={styles.row}>
-                <IconSymbol name="person.fill" size={18} color={colors.muted} />
+              {/* 個人資料卡片 */}
+              <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
+                <View style={[styles.profileAvatar, { backgroundColor: colors.accent }]}>
+                  <Text style={styles.profileAvatarText}>
+                    {(user?.name ?? "?").charAt(0).toUpperCase()}
+                  </Text>
+                </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: colors.foreground }]}>{user?.name ?? "未命名"}</Text>
-                  <Text style={[styles.rowHint, { color: colors.muted }]}>{user?.email ?? ""}</Text>
+                  <Text style={[styles.profileName, { color: colors.foreground }]}>{user?.name ?? "未命名"}</Text>
+                  <Text style={[styles.profileEmail, { color: colors.muted }]}>{user?.email ?? ""}</Text>
+                  <View style={[styles.profileBadge, { backgroundColor: colors.accent + "22" }]}>
+                    <Text style={[styles.profileBadgeText, { color: colors.accent }]}>已登入</Text>
+                  </View>
                 </View>
               </View>
               <Divider colors={colors} />
               <Pressable
                 style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
-                onPress={() => router.push("/friends")}
+                onPress={() => router.push("/friends" as any)}
               >
                 <IconSymbol name="person.2.fill" size={18} color={colors.muted} />
                 <Text style={[styles.rowLabel, { color: colors.foreground }]}>好友管理</Text>
@@ -563,4 +571,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   modeChipText: { fontSize: 13, fontWeight: "600" },
+  // Profile card
+  profileCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 16,
+    borderRadius: 12,
+    margin: 4,
+  },
+  profileAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileAvatarText: { fontSize: 22, fontWeight: "700", color: "#fff" },
+  profileName: { fontSize: 16, fontWeight: "700", marginBottom: 2 },
+  profileEmail: { fontSize: 12, marginBottom: 6 },
+  profileBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  profileBadgeText: { fontSize: 11, fontWeight: "600" },
 });

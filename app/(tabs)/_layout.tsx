@@ -90,6 +90,20 @@ export default function TabLayout() {
         }}
       />
 
+      {/* 好友 */}
+      <Tabs.Screen
+        name="friends"
+        options={{
+          title: "好友",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="person.2.fill" color={color} />
+          ),
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="好友" focused={focused} color={color} />
+          ),
+        }}
+      />
+
       {/* 設定 */}
       <Tabs.Screen
         name="settings"
