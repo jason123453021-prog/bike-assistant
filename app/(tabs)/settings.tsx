@@ -496,8 +496,8 @@ export default function SettingsScreen() {
 
         {/* ── 精簡導航模式欄位 ── */}
         <SectionHeader title="精簡模式欄位" colors={colors} />
-        <View style={[styles.section, { borderColor: colors.border }]}>
-          {([
+        {(() => {
+          const SIMPLIFIED_FIELDS = [
             { key: "showDirection",   label: "方向指引" },
             { key: "showRemaining",   label: "剩餘距離" },
             { key: "showSpeed",       label: "速度" },
@@ -509,22 +509,61 @@ export default function SettingsScreen() {
             { key: "showAvgSpeed",    label: "均速" },
             { key: "showCalories",    label: "卡路里" },
             { key: "showPausedTime",  label: "暫停時間" },
-          ] as { key: keyof typeof settings.simplifiedModeFields; label: string }[]).map((item, idx, arr) => (
-            <React.Fragment key={item.key}>
-              <View style={styles.row}>
-                <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>{item.label}</Text>
-                <Switch
-                  value={settings.simplifiedModeFields?.[item.key] ?? true}
-                  onValueChange={(v) => updateSimplifiedFields({ [item.key]: v })}
-                  trackColor={{ false: "#767577", true: "#34C759" }}
-                  thumbColor="#fff"
-                  ios_backgroundColor="#767577"
-                />
+          ] as { key: keyof typeof settings.simplifiedModeFields; label: string }[];
+          const SIMPLIFIED_MAX = 3;
+          const simplifiedEnabledCount = SIMPLIFIED_FIELDS.filter(
+            (f) => settings.simplifiedModeFields?.[f.key] ?? false
+          ).length;
+          return (
+            <>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, paddingHorizontal: 4 }}>
+                <Text style={{ fontSize: 11, color: colors.muted, flex: 1 }}>
+                  精簡模式底部最多顯示 3 個欄位
+                </Text>
+                <Text style={[
+                  { fontSize: 12, fontWeight: "700", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+                  simplifiedEnabledCount >= SIMPLIFIED_MAX
+                    ? { color: "#fff", backgroundColor: "#FF3B30" }
+                    : { color: "#34C759", backgroundColor: "#34C75920" },
+                ]}>
+                  {simplifiedEnabledCount} / {SIMPLIFIED_MAX}
+                </Text>
               </View>
-              {idx < arr.length - 1 && <Divider colors={colors} />}
-            </React.Fragment>
-          ))}
-        </View>
+              <View style={[styles.section, { borderColor: colors.border }]}>
+                {SIMPLIFIED_FIELDS.map((item, idx, arr) => {
+                  const isOn = settings.simplifiedModeFields?.[item.key] ?? false;
+                  const isDisabled = !isOn && simplifiedEnabledCount >= SIMPLIFIED_MAX;
+                  return (
+                    <React.Fragment key={item.key}>
+                      <View style={[styles.row, isDisabled && { opacity: 0.4 }]}>
+                        <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>{item.label}</Text>
+                        <Switch
+                          value={isOn}
+                          disabled={isDisabled}
+                          onValueChange={(v) => {
+                            if (v && simplifiedEnabledCount >= SIMPLIFIED_MAX) {
+                              Alert.alert(
+                                "已達上限",
+                                `精簡模式最多只能開啟 ${SIMPLIFIED_MAX} 個欄位，請先關閉其中一個再開啟新欄位。`,
+                                [{ text: "瞭解" }]
+                              );
+                              return;
+                            }
+                            updateSimplifiedFields({ [item.key]: v });
+                          }}
+                          trackColor={{ false: "#767577", true: "#34C759" }}
+                          thumbColor="#fff"
+                          ios_backgroundColor="#767577"
+                        />
+                      </View>
+                      {idx < arr.length - 1 && <Divider colors={colors} />}
+                    </React.Fragment>
+                  );
+                })}
+              </View>
+            </>
+          );
+        })()}
 
         <View style={{ height: 20 }} />
       </ScrollView>
