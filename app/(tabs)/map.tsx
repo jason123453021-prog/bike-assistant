@@ -388,6 +388,7 @@ export default function MapScreen() {
     }).start();
   }, [panelAnim, dynamicCollapsedH]);
 
+  // 面板手勢（整個面板區域可上拉/下滑）
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -1400,10 +1401,11 @@ export default function MapScreen() {
 
       {/* ── 底部面板（螢幕下方三分之一，可上滑展開） ── */}
       <Animated.View
+        {...panResponder.panHandlers}
         style={[styles.panel, { height: panelAnim, paddingBottom: insets.bottom + 8 }]}
       >
         {/* 拖拉把手 */}
-        <View {...panResponder.panHandlers} style={styles.handleArea}>
+        <View style={styles.handleArea}>
           <View style={styles.panelHandle} />
           {/* 天氣列 */}
           {weather && (

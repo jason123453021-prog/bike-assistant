@@ -23,6 +23,21 @@ export interface SimplifiedModeFields {
   showDirection: boolean;    // 方向指引
 }
 
+// 儀表板欄位 key 型別
+export type NormalFieldKey = keyof NormalModeFields;
+
+// 預設欄位排序（與 NormalModeFields key 對應）
+export const DEFAULT_FIELD_ORDER: NormalFieldKey[] = [
+  "showElapsed",
+  "showSpeed",
+  "showDistance",
+  "showGrade",
+  "showPower",
+  "showAvgSpeed",
+  "showCalories",
+  "showPausedTime",
+];
+
 export interface AppSettings {
   // Personal
   weight: number;       // kg 騎手體重
@@ -55,6 +70,8 @@ export interface AppSettings {
   // 自訂顯示欄位
   normalModeFields: NormalModeFields;
   simplifiedModeFields: SimplifiedModeFields;
+  // 儀表板欄位排序（key 陣列，決定渲染順序）
+  normalModeFieldOrder: NormalFieldKey[];
 }
 
 const DEFAULT_NORMAL_FIELDS: NormalModeFields = {
@@ -100,6 +117,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   shareLocation: true,
   normalModeFields: DEFAULT_NORMAL_FIELDS,
   simplifiedModeFields: DEFAULT_SIMPLIFIED_FIELDS,
+  normalModeFieldOrder: DEFAULT_FIELD_ORDER,
 };
 
 const SETTINGS_KEY = "@bike_settings";
@@ -109,6 +127,7 @@ interface SettingsContextValue {
   updateSettings: (partial: Partial<AppSettings>) => Promise<void>;
   updateNormalFields: (partial: Partial<NormalModeFields>) => Promise<void>;
   updateSimplifiedFields: (partial: Partial<SimplifiedModeFields>) => Promise<void>;
+  updateFieldOrder: (order: NormalFieldKey[]) => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -120,11 +139,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.getItem(SETTINGS_KEY).then((data) => {
       if (data) {
         const saved = JSON.parse(data);
+        // 確保 fieldOrder 包含所有 key（向後相容）
+        const savedOrder: NormalFieldKey[] = saved.normalModeFieldOrder ?? [];
+        const mergedOrder = [
+          ...savedOrder.filter((k: NormalFieldKey) => DEFAULT_FIELD_ORDER.includes(k)),
+          ...DEFAULT_FIELD_ORDER.filter((k) => !savedOrder.includes(k)),
+        ];
         setSettings({
           ...DEFAULT_SETTINGS,
           ...saved,
           normalModeFields: { ...DEFAULT_NORMAL_FIELDS, ...(saved.normalModeFields ?? {}) },
           simplifiedModeFields: { ...DEFAULT_SIMPLIFIED_FIELDS, ...(saved.simplifiedModeFields ?? {}) },
+          normalModeFieldOrder: mergedOrder,
         });
       }
     });
@@ -154,8 +180,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   };
 
+  const updateFieldOrder = async (order: NormalFieldKey[]) => {
+    const next = { ...settings, normalModeFieldOrder: order };
+    setSettings(next);
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+  };
+
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, updateNormalFields, updateSimplifiedFields }}>
+    <SettingsContext.Provider value={{ settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder }}>
       {children}
     </SettingsContext.Provider>
   );
