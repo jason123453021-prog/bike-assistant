@@ -19,6 +19,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
@@ -222,6 +223,8 @@ export default function MapScreen() {
   const [guidanceEnabled, setGuidanceEnabled] = useState(true);
   // 用 ref 追蹤指引開關狀態，讓非同步回調（OSRM Promise）也能讀到最新值
   const guidanceEnabledRef = useRef(true);
+  // 強制重渲染計數器（讓 ref 變更立即反映到 UI）
+  const [, forceRender] = useReducer((n: number) => n + 1, 0);
   // 自行車道優先開關（預設開啟）
   const [preferCycleway, setPreferCycleway] = useState(true);
   const preferCyclewayRef = useRef(true);
@@ -1295,9 +1298,10 @@ export default function MapScreen() {
           <Pressable
             style={[styles.toolBtn, guidanceEnabled && styles.toolBtnActive]}
             onPress={() => {
-              const next = !guidanceEnabled;
-              guidanceEnabledRef.current = next; // 同步更新 ref，讓非同步回調也能立即感知
-              setGuidanceEnabled(next);
+              const next = !guidanceEnabledRef.current; // 直接讀 ref，避免 closure 舊值
+              guidanceEnabledRef.current = next;
+              setGuidanceEnabled(next); // 同步 state 供其他 effect 使用
+              forceRender(); // 立即重渲染，不等 React 批次更新
               if (!next) {
                 // 關閉指引：立即停止語音、清除所有偷離狀態（包含 returnBearing）
                 stopSpeech();
@@ -1360,10 +1364,10 @@ export default function MapScreen() {
       </View>
 
       {/* ── 偏離路線提示橫幅（偏離且導航中且指引開啟顯示） ── */}
-      {isOffRoute && isNavigating && guidanceEnabled && returnBearing !== "" && (
+      {isOffRoute && isNavigating && guidanceEnabledRef.current && returnBearing !== "" && (
         <View style={[
           styles.offRouteBanner,
-          { top: insets.top + 60 }
+          { top: insets.top + 8 }
         ]}>
           <Text style={styles.offRouteBannerIcon}>⚠️</Text>
           <View style={styles.offRouteBannerText}>
