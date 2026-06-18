@@ -50,6 +50,9 @@ const MAPPING = {
   "music.note":                          "music-note",
   "pencil":                               "edit",
   "magnifyingglass":                       "search",
+  "arrow.up.circle.fill":                  "navigation",
+  "location.north.fill":                   "explore",
+  "compass":                               "explore",
 } as IconMapping;
 
 export function IconSymbol({

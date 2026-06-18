@@ -152,7 +152,7 @@ const DARK_MAP_STYLE = [
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { state, dispatch, saveRecord, updateRecordName } = useRide();
+  const { state, dispatch, saveRecord, updateRecordName, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
   const { settings } = useSettings();
   const { sharedRoute, clearSharedRoute } = useGpx();
 
@@ -172,6 +172,20 @@ export default function MapScreen() {
   const [currentPos, setCurrentPos] = useState<{ lat: number; lon: number; heading: number } | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const [followUser, setFollowUser] = useState(true);
+
+  // 地圖方向模式：true = 車頭朝前（heading-up），false = 指北（north-up）
+  const [headingUp, setHeadingUp] = useState(false);
+
+  // 功率平滑：5 點滑動平均
+  const powerWindowRef = useRef<number[]>([]);
+
+  // 自動暫停連續計數（需連續 3 次低速才暫停，避免 GPS 抖動誤觸發）
+  const lowSpeedCountRef = useRef(0);
+  const AUTO_PAUSE_CONSECUTIVE = 3;
+
+  // 崩潰恢復
+  const [showRecoveryAlert, setShowRecoveryAlert] = useState(false);
+  const [recoverySnapshot, setRecoverySnapshot] = useState<Partial<import("@/lib/ride-context").RideState> | null>(null);
 
   // GPX 路線（從共享 Context 讀取，不再有本地匯入）
   const gpxRoute = sharedRoute;
@@ -353,7 +367,19 @@ export default function MapScreen() {
     };
   }, [state.status]);
 
-  // ─── GPS 訂閱 ────────────────────────────────────────────────────────────────
+  // ─── 崩潰恢復檢查 ──────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const snapshot = await checkSnapshot();
+      if (snapshot && snapshot.elapsed && snapshot.elapsed > 30) {
+        setRecoverySnapshot(snapshot);
+        setShowRecoveryAlert(true);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── GPS 訂閱 ──────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
     (async () => {
@@ -380,6 +406,10 @@ export default function MapScreen() {
               { center: { latitude, longitude }, zoom: 17 }
             );
           }
+          // 車頭朝前模式：每次位置更新時同步地圖方向
+          if (headingUp && hdg !== 0) {
+            mapRef.current?.setBearing(hdg, true);
+          }
 
           const wd = windDataRef.current;
           if (wd.speed > 0) {
@@ -389,14 +419,25 @@ export default function MapScreen() {
           const speedKmh = (speed ?? 0) * 3.6;
           const currentState = stateRef.current;
 
-          // 自動暫停/恢復
-          if (currentState.status === "active" && speedKmh < AUTO_PAUSE_THRESHOLD) {
-            pausedElapsedRef.current = currentState.elapsed;
-            dispatch({ type: "PAUSE" });
-            if (settings.ttsEnabled) speakAutoPause(true);
-            if (settings.vibrationEnabled) vibrateMedium();
-            return;
+          // 自動暫停/恢復（連續 3 次低速才暫停，避免 GPS 抖動誤觸發）
+          if (currentState.status === "active") {
+            if (speedKmh < AUTO_PAUSE_THRESHOLD) {
+              lowSpeedCountRef.current += 1;
+              if (lowSpeedCountRef.current >= AUTO_PAUSE_CONSECUTIVE) {
+                lowSpeedCountRef.current = 0;
+                pausedElapsedRef.current = currentState.elapsed;
+                dispatch({ type: "PAUSE" });
+                // 暫停時強制歸零速度與功率
+                dispatch({ type: "LOCATION_UPDATE", point: { latitude, longitude, altitude: altitude ?? 0, speed: 0, timestamp: Date.now() }, power: 0, calories: 0, ascent: 0 });
+                if (settings.ttsEnabled) speakAutoPause(true);
+                if (settings.vibrationEnabled) vibrateMedium();
+                return;
+              }
+            } else {
+              lowSpeedCountRef.current = 0;
+            }
           } else if (currentState.status === "paused" && speedKmh >= AUTO_PAUSE_THRESHOLD) {
+            lowSpeedCountRef.current = 0;
             dispatch({ type: "RESUME" });
             if (settings.ttsEnabled) speakAutoResume(true);
             return;
@@ -441,7 +482,7 @@ export default function MapScreen() {
           lastLocationRef.current = loc;
 
           const headwindMs = getHeadwindMs(headingRef.current, windDataRef.current.direction, windDataRef.current.speed * 3.6);
-          const power = calculatePower({
+          const rawPower = calculatePower({
             speedMs: speed ?? 0,
             gradePct: grade,
             windSpeedMs: headwindMs,
@@ -449,6 +490,12 @@ export default function MapScreen() {
             bikeMassKg: settings.bikeWeight ?? 10,
             airDensityKgM3: airDensityRef.current,
           });
+          // 5 點滑動平均：平滑功率，消除 GPS 抖動造成的瞬間高峰
+          powerWindowRef.current.push(rawPower);
+          if (powerWindowRef.current.length > 5) powerWindowRef.current.shift();
+          const power = Math.round(
+            powerWindowRef.current.reduce((a, b) => a + b, 0) / powerWindowRef.current.length
+          );
           const calIncrement = calculateCalories(power, LOCATION_INTERVAL_SEC);
 
           dispatch({
@@ -701,6 +748,8 @@ export default function MapScreen() {
     setCurrentGrade(0);
     prevAltRef.current = null;
     prevPosRef.current = null;
+    powerWindowRef.current = [];
+    lowSpeedCountRef.current = 0;
     arrivedRef.current = false;
     setIsOffRoute(false);
     setReturnPolyline([]);
@@ -757,6 +806,8 @@ export default function MapScreen() {
           await stopBackgroundLocationTracking();
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           await cancelRidingNotification();
+          // 結束騎乘時清除崩潰恢復快照
+          await clearSnapshot();
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新
           await saveRecord();
           setShowSummary(true);
@@ -764,7 +815,7 @@ export default function MapScreen() {
         },
       },
     ]);
-  }, [dispatch, saveRecord, settings.vibrationEnabled]);
+  }, [dispatch, saveRecord, clearSnapshot, settings.vibrationEnabled]);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {
@@ -783,6 +834,15 @@ export default function MapScreen() {
       if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
     };
   }, []);
+
+  // ─── 騎乘進度快照（每 10 秒儲存一次，用於崩潰恢復）───────────────────────────────────────
+  useEffect(() => {
+    if (state.status !== "active" && state.status !== "paused") return;
+    const timer = setInterval(() => {
+      saveSnapshot();
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [state.status, saveSnapshot]);
 
   // ─── 計算值 ──────────────────────────────────────────────────────────────────
   const gpxPolyline = useMemo(() => {
@@ -817,6 +877,43 @@ export default function MapScreen() {
   // ─── 渲染 ────────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
+      {/* ── 崩潰恢復強調表示 */}
+      {showRecoveryAlert && recoverySnapshot && (
+        <View style={[styles.recoveryBanner, { top: insets.top + 8 }]}>
+          <Text style={styles.recoveryTitle}>偵測到未完成的騎乘</Text>
+          <Text style={styles.recoveryDesc}>
+            騎乘時間 {formatDuration(recoverySnapshot.elapsed ?? 0)}，
+            距離 {((recoverySnapshot.distance ?? 0) / 1000).toFixed(2)} km
+          </Text>
+          <View style={styles.recoveryBtns}>
+            <Pressable
+              style={[styles.recoveryBtn, { backgroundColor: "#007AFF" }]}
+              onPress={() => {
+                if (recoverySnapshot) {
+                  dispatch({ type: "RESTORE", snapshot: recoverySnapshot });
+                  setMapRideActive(true);
+                  setShowRecoveryAlert(false);
+                  setRecoverySnapshot(null);
+                  startBackgroundLocationTracking();
+                }
+              }}
+            >
+              <Text style={styles.recoveryBtnText}>繼續騎乘</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.recoveryBtn, { backgroundColor: "rgba(255,255,255,0.15)" }]}
+              onPress={() => {
+                clearSnapshot();
+                setShowRecoveryAlert(false);
+                setRecoverySnapshot(null);
+              }}
+            >
+              <Text style={styles.recoveryBtnText}>新騎乘</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       {/* ── 全螢幕地圖（Leaflet WebView） ── */}
       <LeafletMapView
         ref={mapRef}
@@ -851,11 +948,30 @@ export default function MapScreen() {
 
       {/* ── 右側工具列 ── */}
       <View style={[styles.toolBar, { top: insets.top + 8, right: 16 }]}>
+        {/* 車頭朝前/指北切換按鈕（同時回到當前位置） */}
         <Pressable
-          style={[styles.toolBtn, !followUser && styles.toolBtnActive]}
-          onPress={handleRecenter}
+          style={[styles.toolBtn, headingUp && styles.toolBtnActive]}
+          onPress={() => {
+            const next = !headingUp;
+            setHeadingUp(next);
+            setFollowUser(true);
+            const bearing = next ? (currentPos?.heading ?? 0) : 0;
+            mapRef.current?.setBearing(bearing, next);
+            if (currentPos) {
+              mapRef.current?.animateCamera(
+                { center: { latitude: currentPos.lat, longitude: currentPos.lon }, zoom: 17 }
+              );
+            }
+          }}
         >
-          <IconSymbol name="location.fill" size={20} color={followUser ? "#fff" : "#007AFF"} />
+          <IconSymbol
+            name={headingUp ? "arrow.up" : "compass.north"}
+            size={20}
+            color={headingUp ? "#34C759" : "#fff"}
+          />
+          <Text style={[styles.returnBtnLabel, { color: headingUp ? "#34C759" : "rgba(255,255,255,0.8)" }]}>
+            {headingUp ? "車頭" : "指北"}
+          </Text>
         </Pressable>
         {/* GPX 路線狀態指示（有路線時顯示清除按鈕） */}
         {gpxRoute && !mapRideActive && (
@@ -1435,4 +1551,42 @@ const styles = StyleSheet.create({
   ascentLabel: { color: "rgba(255,255,255,0.38)", fontSize: 10 },
   ascentValue: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "700" },
   ascentUnit: { color: "rgba(255,255,255,0.35)", fontSize: 10 },
+  // 崩潰恢復橫幅
+  recoveryBanner: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(0,0,0,0.88)",
+    borderRadius: 14,
+    padding: 16,
+    zIndex: 200,
+    borderWidth: 1,
+    borderColor: "rgba(0,122,255,0.5)",
+  },
+  recoveryTitle: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  recoveryDesc: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  recoveryBtns: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  recoveryBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  recoveryBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
 });

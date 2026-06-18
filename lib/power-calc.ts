@@ -34,6 +34,11 @@ export interface PowerInput {
   airDensityKgM3?: number;
 }
 
+// 功率計算上限（超過此值視為 GPS 誤差，截斷）
+const MAX_POWER_W = 800;
+// 坡度限制（GPS 高度誤差可能造成瞬間極端坡度）
+const MAX_GRADE_PCT = 25;
+
 export function calculatePower(input: PowerInput): number {
   const {
     speedMs,
@@ -45,9 +50,13 @@ export function calculatePower(input: PowerInput): number {
   } = input;
 
   if (speedMs <= 0) return 0;
+  // 速度上限：超過 25 m/s（90 km/h）視為 GPS 誤差
+  if (speedMs > 25) return 0;
 
   const totalMass = riderMassKg + bikeMassKg;
-  const gradeDecimal = gradePct / 100;
+  // 坡度限制：GPS 高度誤差可能造成瞬間極端坡度，限制在 ±25%
+  const clampedGrade = Math.max(-MAX_GRADE_PCT, Math.min(MAX_GRADE_PCT, gradePct));
+  const gradeDecimal = clampedGrade / 100;
 
   // 空氣阻力功率（使用天氣連動空氣密度）
   const vAir = speedMs + windSpeedMs;
@@ -64,7 +73,8 @@ export function calculatePower(input: PowerInput): number {
   // 總功率（考慮傳動損耗）
   const totalPower = (pAero + pRoll + pGrav) / DRIVETRAIN_LOSS;
 
-  return Math.max(0, Math.round(totalPower));
+  // 截斷異常高功率（GPS 誤差導致）
+  return Math.max(0, Math.min(MAX_POWER_W, Math.round(totalPower)));
 }
 
 /**

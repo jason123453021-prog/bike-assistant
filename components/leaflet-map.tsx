@@ -54,6 +54,7 @@ export interface LeafletMapProps {
 export interface LeafletMapHandle {
   animateCamera: (opts: { center: { latitude: number; longitude: number }; zoom?: number }, anim?: { duration: number }) => void;
   fitToCoordinates: (coords: LatLng[], opts?: { edgePadding?: { top: number; right: number; bottom: number; left: number }; animated?: boolean }) => void;
+  setBearing: (bearing: number, headingUp: boolean) => void;
 }
 
 const LEAFLET_HTML = `<!DOCTYPE html>
@@ -198,6 +199,26 @@ function handleMessage(data) {
       case 'animateCamera':
         map.setView([msg.lat, msg.lon], msg.zoom || map.getZoom(), { animate: true, duration: 0.6 });
         break;
+      case 'setBearing':
+        // Rotate map container to simulate heading-up mode
+        var deg = msg.bearing || 0;
+        var container = map.getContainer();
+        if (msg.headingUp) {
+          container.style.transform = 'rotate(' + (-deg) + 'deg)';
+          container.style.transformOrigin = '50% 50%';
+          // Counter-rotate markers so they stay upright
+          var allMarkers = document.querySelectorAll('.leaflet-marker-icon, .leaflet-marker-shadow');
+          for (var i = 0; i < allMarkers.length; i++) {
+            allMarkers[i].style.transform = (allMarkers[i].style.transform || '') + ' rotate(' + deg + 'deg)';
+          }
+        } else {
+          container.style.transform = '';
+          var allMarkers2 = document.querySelectorAll('.leaflet-marker-icon, .leaflet-marker-shadow');
+          for (var j = 0; j < allMarkers2.length; j++) {
+            allMarkers2[j].style.transform = '';
+          }
+        }
+        break;
       case 'fitToCoordinates':
         if (msg.coords && msg.coords.length > 0) {
           var bounds = L.latLngBounds(msg.coords);
@@ -253,6 +274,12 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
 
     // Expose imperative API
     useImperativeHandle(ref, () => ({
+      setBearing: (bearing: number, headingUp: boolean) => {
+        if (!webViewRef.current) return;
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "setBearing", bearing, headingUp })
+        );
+      },
       animateCamera: (opts, _anim) => {
         if (!webViewRef.current) return;
         followUserRef.current = true;

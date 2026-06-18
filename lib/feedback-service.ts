@@ -143,6 +143,8 @@ export async function showSupplyNotification(type: "calorie" | "water") {
   } catch {}
 }
 
+const RIDING_NOTIFICATION_ID = "bike-assistant-riding-status";
+
 export async function showRidingNotification(
   speed: number,
   distance: number,
@@ -152,10 +154,15 @@ export async function showRidingNotification(
   const m = Math.floor((elapsed % 3600) / 60);
   const timeStr = h > 0 ? `${h}時${m}分` : `${m}分`;
   try {
+    // 先取消舊通知，再建立同 identifier 的新通知（保持通知欄只有一則）
+    await Notifications.dismissNotificationAsync(RIDING_NOTIFICATION_ID).catch(() => {});
     await Notifications.scheduleNotificationAsync({
+      identifier: RIDING_NOTIFICATION_ID,
       content: {
         title: "🚴 智慧單車騎乘助手",
         body: `速度 ${Math.round(speed)} km/h · 距離 ${(distance / 1000).toFixed(1)} km · 時間 ${timeStr}`,
+        sticky: true,
+        data: { type: "riding_status" },
       },
       trigger: null,
     });
@@ -164,6 +171,7 @@ export async function showRidingNotification(
 
 export async function cancelRidingNotification() {
   try {
+    await Notifications.dismissNotificationAsync(RIDING_NOTIFICATION_ID).catch(() => {});
     await Notifications.dismissAllNotificationsAsync();
   } catch {}
 }

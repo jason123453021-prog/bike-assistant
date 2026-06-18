@@ -79,7 +79,8 @@ type RideAction =
   | { type: "CONSUME_WATER" }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
   | { type: "ADD_RECORD"; record: RideRecord }
-  | { type: "UPDATE_RECORD_NAME"; id: string; name: string };
+  | { type: "UPDATE_RECORD_NAME"; id: string; name: string }
+  | { type: "RESTORE"; snapshot: Partial<RideState> };
 
 // ─── Power Zone Thresholds ────────────────────────────────────────────────────
 const ZONE_THRESHOLDS = [110, 150, 180, 210, 999];
@@ -189,7 +190,8 @@ function rideReducer(state: RideState, action: RideAction): RideState {
     }
 
     case "CONSUME_CALORIES":
-      return { ...state, calorieProgress: 0 };
+      // 重置卡路里累計和進度（下次補給從零開始計算）
+      return { ...state, calories: 0, calorieProgress: 0 };
 
     case "CONSUME_WATER":
       return {
@@ -211,6 +213,15 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       return { ...state, records: updated };
     }
 
+    case "RESTORE":
+      // 從快照恢復騎乘狀態（崩潰後重啟）
+      return {
+        ...state,
+        ...action.snapshot,
+        status: "paused", // 恢復後狀態為暫停，等待使用者手動繼續
+        records: state.records, // 保留現有記錄
+      };
+
     default:
       return state;
   }
@@ -224,6 +235,12 @@ interface RideContextValue {
   saveRecord: (name?: string) => Promise<void>;
   loadRecords: () => Promise<void>;
   updateRecordName: (id: string, name: string) => Promise<void>;
+  /** 儲存騎乘進度快照（每 10 秒呼叫一次） */
+  saveSnapshot: () => Promise<void>;
+  /** 清除進度快照（騎乘結束後呼叫） */
+  clearSnapshot: () => Promise<void>;
+  /** 檢查是否有未完成的騎乘快照 */
+  checkSnapshot: () => Promise<Partial<RideState> | null>;
 }
 
 const RideContext = createContext<RideContextValue | null>(null);
@@ -312,8 +329,61 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     } catch (_) {}
   }, []);
 
+  const SNAPSHOT_KEY = "@bike_ride_snapshot";
+
+  const saveSnapshot = useCallback(async () => {
+    if (state.status !== "active" && state.status !== "paused") return;
+    try {
+      const snapshot = {
+        status: state.status,
+        startTime: state.startTime,
+        elapsed: state.elapsed,
+        distance: state.distance,
+        currentSpeed: state.currentSpeed,
+        maxSpeed: state.maxSpeed,
+        avgSpeed: state.avgSpeed,
+        currentPower: state.currentPower,
+        avgPower: state.avgPower,
+        maxPower: state.maxPower,
+        totalAscent: state.totalAscent,
+        calories: state.calories,
+        calorieProgress: state.calorieProgress,
+        sweatSinceLastRefill: state.sweatSinceLastRefill,
+        totalSweatMl: state.totalSweatMl,
+        refillCount: state.refillCount,
+        hydrationThresholdMl: state.hydrationThresholdMl,
+        // route 太大，只儲存最後 100 點
+        route: state.route.slice(-100),
+        powerHistory: state.powerHistory.slice(-50),
+        powerZones: state.powerZones,
+        savedAt: Date.now(),
+      };
+      await AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+    } catch (_) {}
+  }, [state]);
+
+  const clearSnapshot = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(SNAPSHOT_KEY);
+    } catch (_) {}
+  }, []);
+
+  const checkSnapshot = useCallback(async (): Promise<Partial<RideState> | null> => {
+    try {
+      const data = await AsyncStorage.getItem(SNAPSHOT_KEY);
+      if (!data) return null;
+      const snapshot = JSON.parse(data);
+      // 超過 2 小時的快照視為過期
+      if (Date.now() - snapshot.savedAt > 2 * 60 * 60 * 1000) {
+        await AsyncStorage.removeItem(SNAPSHOT_KEY);
+        return null;
+      }
+      return snapshot;
+    } catch (_) { return null; }
+  }, []);
+
   return (
-    <RideContext.Provider value={{ state, dispatch, saveRecord, loadRecords, updateRecordName }}>
+    <RideContext.Provider value={{ state, dispatch, saveRecord, loadRecords, updateRecordName, saveSnapshot, clearSnapshot, checkSnapshot }}>
       {children}
     </RideContext.Provider>
   );
