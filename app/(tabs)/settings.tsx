@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
 } from "react-native";
+import Slider from "@react-native-community/slider";
 import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -280,15 +281,33 @@ export default function SettingsScreen() {
           {settings.simplifiedNavMode === "auto" && (
             <>
               <Divider colors={colors} />
-              <NumberRow
-                icon="clock.fill"
-                label="自動開啟閒置時間"
-                value={settings.simplifiedNavIdleSec}
-                unit="秒"
-                colors={colors}
-                hint="騎乘中閒置此時間後自動進入精簡模式"
-                onPress={() => openEdit("simplifiedNavIdleSec", "自動開啟閒置時間", settings.simplifiedNavIdleSec, "秒")}
-              />
+              <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <IconSymbol name="clock.fill" size={16} color={colors.muted} />
+                    <Text style={{ fontSize: 15, color: colors.foreground }}>自動開啟閒置時間</Text>
+                  </View>
+                  <Text style={{ fontSize: 15, fontWeight: "600", color: colors.primary }}>
+                    {settings.simplifiedNavIdleSec ?? 30} 秒
+                  </Text>
+                </View>
+                <Slider
+                  style={{ width: "100%", height: 36 }}
+                  minimumValue={10}
+                  maximumValue={120}
+                  step={5}
+                  value={settings.simplifiedNavIdleSec ?? 30}
+                  onValueChange={(v) => updateSettings({ simplifiedNavIdleSec: Math.round(v) })}
+                  minimumTrackTintColor={colors.primary}
+                  maximumTrackTintColor={colors.border}
+                  thumbTintColor={colors.primary}
+                />
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>10 秒</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>120 秒</Text>
+                </View>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>騎乘中閒置此時間後自動進入精簡模式</Text>
+              </View>
             </>
           )}
         </View>

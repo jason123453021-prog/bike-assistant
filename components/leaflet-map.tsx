@@ -32,6 +32,15 @@ export interface LatLng {
   longitude: number;
 }
 
+export interface FriendMarker {
+  userId: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  speed: number; // m/s
+  isMoving: boolean;
+}
+
 export interface LeafletMapProps {
   style?: object;
   initialRegion?: {
@@ -49,6 +58,7 @@ export interface LeafletMapProps {
   liveTrail?: LatLng[];
   returnPolyline?: LatLng[];
   isOffRoute?: boolean;
+  friendMarkers?: FriendMarker[];
 }
 
 export interface LeafletMapHandle {
@@ -232,6 +242,26 @@ function handleMessage(data) {
         returnLayer.setLatLngs([]);
         if (returnEndMarker) { map.removeLayer(returnEndMarker); returnEndMarker = null; }
         break;
+      case 'setFriendMarkers':
+        // Remove old friend markers
+        if (!window._friendLayers) window._friendLayers = {};
+        Object.values(window._friendLayers).forEach(function(layer) { map.removeLayer(layer); });
+        window._friendLayers = {};
+        // Add new friend markers
+        if (msg.friends && msg.friends.length > 0) {
+          msg.friends.forEach(function(f) {
+            var color = f.isMoving ? '#34C759' : '#FF9500';
+            // Create custom icon: colored circle + name label
+            var iconHtml = '<div style="position:relative;display:inline-block">' +
+              '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>' +
+              '<div style="position:absolute;top:16px;left:50%;transform:translateX(-50%);white-space:nowrap;background:rgba(0,0,0,0.72);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;pointer-events:none">' + f.name + '</div>' +
+              '</div>';
+            var icon = L.divIcon({ html: iconHtml, className: '', iconAnchor: [7, 7] });
+            var marker = L.marker([f.lat, f.lon], { icon: icon, zIndexOffset: 800 }).addTo(map);
+            window._friendLayers[f.userId] = marker;
+          });
+        }
+        break;
       case 'animateCamera':
         map.setView([msg.lat, msg.lon], msg.zoom || map.getZoom(), { animate: true, duration: 0.6 });
         break;
@@ -301,6 +331,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       liveTrail,
       returnPolyline,
       isOffRoute,
+      friendMarkers,
     },
     ref
   ) => {
@@ -399,6 +430,21 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         );
       }
     }, [returnPolyline, isOffRoute, isReady]);
+
+    // Send friend markers
+    useEffect(() => {
+      if (!isReady || !webViewRef.current) return;
+      const friends = (friendMarkers ?? []).map((f) => ({
+        userId: f.userId,
+        name: f.name,
+        lat: f.latitude,
+        lon: f.longitude,
+        isMoving: f.isMoving,
+      }));
+      webViewRef.current.postMessage(
+        JSON.stringify({ type: "setFriendMarkers", friends })
+      );
+    }, [friendMarkers, isReady]);
 
     const handleMessage = (event: { nativeEvent: { data: string } }) => {
       try {

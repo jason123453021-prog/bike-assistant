@@ -1008,6 +1008,18 @@ export default function MapScreen() {
         liveTrail={liveTrail}
         returnPolyline={returnPolyline}
         isOffRoute={isOffRoute}
+        friendMarkers={
+          isAuthenticated && settings.teamTelemetryEnabled && teamQuery.data
+            ? teamQuery.data.map((f: any) => ({
+                userId: f.userId,
+                name: f.displayName ?? f.email?.split('@')[0] ?? '好友',
+                latitude: f.latitude,
+                longitude: f.longitude,
+                speed: f.speed ?? 0,
+                isMoving: (f.speed ?? 0) > 0.5,
+              }))
+            : []
+        }
       />
 
       {/* ── 頂部導航指令條 ── */}
