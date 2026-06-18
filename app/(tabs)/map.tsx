@@ -294,6 +294,19 @@ export default function MapScreen() {
     speed: number; isMoving: boolean;
   } | null>(null);
 
+  // 好友導航狀態
+  const [friendNavDest, setFriendNavDest] = useState<{
+    name: string; lat: number; lon: number;
+  } | null>(null);
+  const [friendNavPolyline, setFriendNavPolyline] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [friendNavSteps, setFriendNavSteps] = useState<TurnStep[]>([]);
+  const [friendNavStepIdx, setFriendNavStepIdx] = useState(0);
+  const [friendNavDistM, setFriendNavDistM] = useState<number | null>(null);
+  const [friendNavDurSec, setFriendNavDurSec] = useState<number | null>(null);
+  const [isFetchingFriendNav, setIsFetchingFriendNav] = useState(false);
+  const [friendNavPreferCycleway, setFriendNavPreferCycleway] = useState(true);
+  const friendNavDestRef = useRef<{ lat: number; lon: number } | null>(null);
+
   // 精簡導航模式
   const [simplifiedNavVisible, setSimplifiedNavVisible] = useState(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -874,6 +887,75 @@ export default function MapScreen() {
     };
   }, []);
 
+  // ─── 好友導航：開始導航至好友位置 ──────────────────────────────────────────────────────────────────────────────
+  const startFriendNav = useCallback(async (
+    friendName: string,
+    friendLat: number,
+    friendLon: number,
+    preferCycleway: boolean,
+  ) => {
+    if (!currentPos) {
+      Alert.alert("導航失敗", "無法取得目前位置，請確認已開啟位置權限。");
+      return;
+    }
+    setIsFetchingFriendNav(true);
+    setFriendNavDest({ name: friendName, lat: friendLat, lon: friendLon });
+    friendNavDestRef.current = { lat: friendLat, lon: friendLon };
+    setFriendNavPreferCycleway(preferCycleway);
+    // 先顯示直線備用路徑
+    setFriendNavPolyline([
+      { latitude: currentPos.lat, longitude: currentPos.lon },
+      { latitude: friendLat, longitude: friendLon },
+    ]);
+    setFriendNavSteps([]);
+    setFriendNavStepIdx(0);
+    setFriendNavDistM(null);
+    setFriendNavDurSec(null);
+    setTappedFriend(null);
+    setFollowUser(false);
+    // 適配地圖視角包含自己與好友
+    mapRef.current?.fitToCoordinates(
+      [
+        { latitude: currentPos.lat, longitude: currentPos.lon },
+        { latitude: friendLat, longitude: friendLon },
+      ],
+      { edgePadding: { top: 80, right: 40, bottom: PANEL_COLLAPSED_H + 40, left: 40 }, animated: true }
+    );
+    try {
+      const result = await fetchBikeRoute(
+        { latitude: currentPos.lat, longitude: currentPos.lon },
+        { latitude: friendLat, longitude: friendLon },
+        preferCycleway,
+      );
+      if (result && result.coordinates.length > 1) {
+        setFriendNavPolyline(result.coordinates);
+        setFriendNavDistM(result.distanceM);
+        setFriendNavDurSec(result.durationSec);
+        const filtered = result.steps.filter(s => s.instruction !== "出發，進入路線");
+        setFriendNavSteps(filtered);
+        setFriendNavStepIdx(0);
+        speak(`開始導航至${friendName}，${formatRouteDistance(result.distanceM)}，${formatRouteDuration(result.durationSec)}`, settings.ttsEnabled);
+      } else {
+        speak(`導航至${friendName}，請朝好友方向前進`, settings.ttsEnabled);
+      }
+    } catch {
+      speak(`導航至${friendName}，請朝好友方向前進`, settings.ttsEnabled);
+    } finally {
+      setIsFetchingFriendNav(false);
+    }
+  }, [currentPos, settings.ttsEnabled]);
+
+  const stopFriendNav = useCallback(() => {
+    setFriendNavDest(null);
+    friendNavDestRef.current = null;
+    setFriendNavPolyline([]);
+    setFriendNavSteps([]);
+    setFriendNavStepIdx(0);
+    setFriendNavDistM(null);
+    setFriendNavDurSec(null);
+    setIsFetchingFriendNav(false);
+  }, []);
+
   // ─── 騎乘進度快照（每 10 秒儲存一次，用於崩潰恢復）───────────────────────────────────────
   useEffect(() => {
     if (state.status !== "active" && state.status !== "paused") return;
@@ -1012,8 +1094,8 @@ export default function MapScreen() {
         gpxPolyline={gpxPolyline}
         passedPolyline={passedPolyline}
         liveTrail={liveTrail}
-        returnPolyline={returnPolyline}
-        isOffRoute={isOffRoute}
+        returnPolyline={friendNavDest ? friendNavPolyline : returnPolyline}
+        isOffRoute={friendNavDest ? friendNavPolyline.length > 0 : isOffRoute}
         friendMarkers={
           isAuthenticated && settings.teamTelemetryEnabled && teamQuery.data
             ? teamQuery.data.map((f: any) => ({
@@ -1037,7 +1119,7 @@ export default function MapScreen() {
       />
 
       {/* ── 頂部導航指令條 ── */}
-      {(isNavigating || navInstruction !== "") && (
+      {(isNavigating || navInstruction !== "") && !friendNavDest && (
         <View style={[styles.navBar, { top: insets.top + 8 }]}>
           <IconSymbol name="location.fill" size={16} color="#fff" />
           <Text style={styles.navText} numberOfLines={1}>{navInstruction || "沿路線前進"}</Text>
@@ -1046,6 +1128,40 @@ export default function MapScreen() {
               {distToEnd < 1000 ? `${Math.round(distToEnd)} m` : `${(distToEnd / 1000).toFixed(1)} km`}
             </Text>
           )}
+        </View>
+      )}
+
+      {/* ── 好友導航指令條 ── */}
+      {friendNavDest && (
+        <View style={[styles.navBar, { top: insets.top + 8, backgroundColor: "rgba(52,199,89,0.92)" }]}>
+          <IconSymbol name="person.fill" size={16} color="#fff" />
+          <View style={{ flex: 1 }}>
+            {isFetchingFriendNav ? (
+              <Text style={styles.navText} numberOfLines={1}>計算至 {friendNavDest.name} 的路線…</Text>
+            ) : friendNavSteps.length > 0 && friendNavStepIdx < friendNavSteps.length ? (
+              <Text style={styles.navText} numberOfLines={1}>
+                {friendNavSteps[friendNavStepIdx].instruction}
+                {friendNavSteps[friendNavStepIdx].distanceM > 0
+                  ? `，${formatRouteDistance(friendNavSteps[friendNavStepIdx].distanceM)}後`
+                  : ""}
+              </Text>
+            ) : (
+              <Text style={styles.navText} numberOfLines={1}>導航至 {friendNavDest.name}</Text>
+            )}
+            {friendNavDistM !== null && (
+              <Text style={[styles.navDist, { fontSize: 11 }]}>
+                {formatRouteDistance(friendNavDistM)}
+                {friendNavDurSec !== null ? `·${formatRouteDuration(friendNavDurSec)}` : ""}
+                ·{friendNavPreferCycleway ? "車道優先" : "一般路"}
+              </Text>
+            )}
+          </View>
+          <Pressable
+            style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+            onPress={stopFriendNav}
+          >
+            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>×</Text>
+          </Pressable>
         </View>
       )}
 
@@ -1496,6 +1612,23 @@ export default function MapScreen() {
               </Text>
             </View>
           </View>
+          {/* 導航前往按鈕區 */}
+          <View style={styles.friendCardNavRow}>
+            <Pressable
+              style={styles.friendCardNavBtn}
+              onPress={() => startFriendNav(tappedFriend.name, tappedFriend.lat, tappedFriend.lon, true)}
+            >
+              <IconSymbol name="bicycle" size={16} color="#fff" />
+              <Text style={styles.friendCardNavBtnText}>車道優先</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.friendCardNavBtn, { backgroundColor: "rgba(0,122,255,0.85)" }]}
+              onPress={() => startFriendNav(tappedFriend.name, tappedFriend.lat, tappedFriend.lon, false)}
+            >
+              <IconSymbol name="location.fill" size={16} color="#fff" />
+              <Text style={styles.friendCardNavBtnText}>一般路線</Text>
+            </Pressable>
+          </View>
         </View>
       )}
     </View>
@@ -1878,6 +2011,28 @@ const styles = StyleSheet.create({
   friendCardMetricValue: {
     color: "#fff",
     fontSize: 20,
+    fontWeight: "700",
+  },
+  friendCardNavRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    paddingTop: 4,
+  },
+  friendCardNavBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "rgba(52,199,89,0.85)",
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  friendCardNavBtnText: {
+    color: "#fff",
+    fontSize: 14,
     fontWeight: "700",
   },
 });
