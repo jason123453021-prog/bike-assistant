@@ -139,6 +139,7 @@ export const friendsRouter = router({
         heading: z.number().default(0),
         altitude: z.number().default(0),
         isGhostMode: z.boolean().default(false),
+        batteryLevel: z.number().int().min(-1).max(100).default(-1),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -161,6 +162,7 @@ export const friendsRouter = router({
             heading: String(input.heading),
             altitude: String(input.altitude),
             isGhostMode: input.isGhostMode ? 1 : 0,
+            batteryLevel: input.batteryLevel,
           })
           .where(eq(locationShares.userId, uid));
       } else {
@@ -172,6 +174,7 @@ export const friendsRouter = router({
           heading: String(input.heading),
           altitude: String(input.altitude),
           isGhostMode: input.isGhostMode ? 1 : 0,
+          batteryLevel: input.batteryLevel,
         });
       }
       return { success: true };
@@ -224,6 +227,7 @@ export const friendsRouter = router({
       speed: parseFloat(loc.speed ?? "0"),
       heading: parseFloat(loc.heading ?? "0"),
       altitude: parseFloat(loc.altitude ?? "0"),
+      batteryLevel: loc.batteryLevel ?? -1,
       updatedAt: loc.updatedAt,
     }));
   }),

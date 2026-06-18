@@ -48,6 +48,7 @@ export const locationShares = mysqlTable("locationShares", {
   heading: text("heading").default("0"),        // degrees
   altitude: text("altitude").default("0"),      // meters
   isGhostMode: int("isGhostMode").default(0).notNull(), // 1=隱身，不顯示給好友
+  batteryLevel: int("batteryLevel").default(-1), // 0-100, -1=未知
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type LocationShare = typeof locationShares.$inferSelect;

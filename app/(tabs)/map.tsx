@@ -35,6 +35,7 @@ import {
 } from "react-native";
 import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
 import * as Location from "expo-location";
+import * as Battery from "expo-battery";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
@@ -327,7 +328,7 @@ export default function MapScreen() {
   const teamQuery = trpc.friends.getFriendsLocations.useQuery(
     undefined,
     {
-      enabled: isAuthenticated && settings.teamTelemetryEnabled && isActive,
+      enabled: isAuthenticated && settings.teamTelemetryEnabled,
       refetchInterval: 5000,
     }
   );
@@ -1058,17 +1059,28 @@ export default function MapScreen() {
   // ─── 位置上傳 mutation（隊伍遙測）────────────────────────────────────────────
   const updateLocationMutation = trpc.friends.updateMyLocation.useMutation();
 
-  // 每次 GPS 更新時，若隊伍遙測開啟且已登入，上傳位置
+  // 每次 GPS 更新時，若已登入且開啟分享位置，即上報位置（不限騎乘中）
   useEffect(() => {
-    if (!isAuthenticated || !settings.shareLocation || !currentPos || !isActive) return;
-    updateLocationMutation.mutate({
-      latitude: currentPos.lat,
-      longitude: currentPos.lon,
-      speed: state.currentSpeed ?? 0,
-      heading: currentPos.heading,
-      altitude: 0,
-      isGhostMode: settings.ghostMode,
-    });
+    if (!isAuthenticated || !settings.shareLocation || !currentPos) return;
+    const doUpload = async () => {
+      let batteryLevel = -1;
+      try {
+        if (Platform.OS !== "web") {
+          const level = await Battery.getBatteryLevelAsync();
+          batteryLevel = Math.round(level * 100);
+        }
+      } catch { /* 忽略電量讀取失敗 */ }
+      updateLocationMutation.mutate({
+        latitude: currentPos.lat,
+        longitude: currentPos.lon,
+        speed: state.currentSpeed ?? 0,
+        heading: currentPos.heading,
+        altitude: 0,
+        isGhostMode: settings.ghostMode,
+        batteryLevel,
+      });
+    };
+    doUpload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPos]);
 

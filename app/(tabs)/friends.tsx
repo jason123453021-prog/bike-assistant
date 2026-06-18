@@ -58,6 +58,7 @@ interface FriendLocation {
   speed: number;
   heading: number;
   altitude: number;
+  batteryLevel?: number;
   updatedAt: string | Date;
 }
 
@@ -97,6 +98,8 @@ function FriendDetailModal({
 
   const speedKmh = location ? Math.round(location.speed * 3.6) : null;
   const isMoving = speedKmh !== null && speedKmh > 2;
+  const battery = location?.batteryLevel ?? -1;
+  const batteryColor = battery >= 20 ? "#34C759" : battery >= 10 ? "#FF9500" : "#FF3B30";
 
   const lastSeen = location
     ? (() => {
@@ -148,6 +151,13 @@ function FriendDetailModal({
                   <Text style={[styles.statusLabel, { color: colors.muted }]}>距離</Text>
                   <Text style={[styles.statusValue, { color: colors.foreground }]}>
                     {distance !== null ? formatDist(distance) : "—"}
+                  </Text>
+                </View>
+                <View style={[styles.statusDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.statusItem}>
+                  <Text style={[styles.statusLabel, { color: colors.muted }]}>電量</Text>
+                  <Text style={[styles.statusValue, { color: battery >= 0 ? batteryColor : colors.muted }]}>
+                    {battery >= 0 ? `${battery}%` : "—"}
                   </Text>
                 </View>
               </View>
