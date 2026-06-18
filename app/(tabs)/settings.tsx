@@ -21,7 +21,7 @@ import { startOAuthLogin } from "@/constants/oauth";
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const { settings, updateSettings } = useSettings();
+  const { settings, updateSettings, updateNormalFields, updateSimplifiedFields } = useSettings();
   const { user, isAuthenticated, logout } = useAuth();
   const [editModal, setEditModal] = useState<{
     visible: boolean;
@@ -310,6 +310,59 @@ export default function SettingsScreen() {
               </View>
             </>
           )}
+        </View>
+
+        {/* ── 正常導航模式欄位 ── */}
+        <SectionHeader title="導航儀表板欄位" colors={colors} />
+        <View style={[styles.section, { borderColor: colors.border }]}>
+          {([
+            { key: "showElapsed", label: "騎乘時間" },
+            { key: "showSpeed",   label: "速度" },
+            { key: "showDistance",label: "距離" },
+            { key: "showGrade",   label: "坡度" },
+            { key: "showPower",   label: "功率" },
+            { key: "showAvgSpeed",label: "均速" },
+            { key: "showCalories",label: "卡路里" },
+          ] as { key: keyof typeof settings.normalModeFields; label: string }[]).map((item, idx, arr) => (
+            <React.Fragment key={item.key}>
+              <View style={styles.row}>
+                <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>{item.label}</Text>
+                <Switch
+                  value={settings.normalModeFields?.[item.key] ?? true}
+                  onValueChange={(v) => updateNormalFields({ [item.key]: v })}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {idx < arr.length - 1 && <Divider colors={colors} />}
+            </React.Fragment>
+          ))}
+        </View>
+
+        {/* ── 精簡導航模式欄位 ── */}
+        <SectionHeader title="精簡模式欄位" colors={colors} />
+        <View style={[styles.section, { borderColor: colors.border }]}>
+          {([
+            { key: "showDirection",   label: "方向指引" },
+            { key: "showRemaining",   label: "剩餘距離" },
+            { key: "showSpeed",       label: "速度" },
+            { key: "showDistance",    label: "距離" },
+            { key: "showElapsed",     label: "騎乘時間" },
+            { key: "showCurrentTime", label: "現在時間" },
+          ] as { key: keyof typeof settings.simplifiedModeFields; label: string }[]).map((item, idx, arr) => (
+            <React.Fragment key={item.key}>
+              <View style={styles.row}>
+                <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>{item.label}</Text>
+                <Switch
+                  value={settings.simplifiedModeFields?.[item.key] ?? true}
+                  onValueChange={(v) => updateSimplifiedFields({ [item.key]: v })}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {idx < arr.length - 1 && <Divider colors={colors} />}
+            </React.Fragment>
+          ))}
         </View>
 
         <View style={{ height: 20 }} />

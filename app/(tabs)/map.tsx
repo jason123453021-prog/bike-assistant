@@ -288,6 +288,12 @@ export default function MapScreen() {
 
   const { user, isAuthenticated } = useAuth();
 
+  // 好友詳細卡片
+  const [tappedFriend, setTappedFriend] = useState<{
+    userId: string; name: string; lat: number; lon: number;
+    speed: number; isMoving: boolean;
+  } | null>(null);
+
   // 精簡導航模式
   const [simplifiedNavVisible, setSimplifiedNavVisible] = useState(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1020,6 +1026,14 @@ export default function MapScreen() {
               }))
             : []
         }
+        onFriendTap={(friend) => setTappedFriend({
+          userId: friend.userId,
+          name: friend.name,
+          lat: friend.lat,
+          lon: friend.lon,
+          speed: friend.speed,
+          isMoving: friend.isMoving,
+        })}
       />
 
       {/* ── 頂部導航指令條 ── */}
@@ -1218,42 +1232,29 @@ export default function MapScreen() {
           )}
         </View>
 
-        {/* ── 六格儀表板（收縮狀態常駐顯示） ── */}
+        {/* ── 儀表板（依設定動態顯示欄位） ── */}
         <View style={styles.sixGrid}>
-          <BigMetric
-            label="騎乘時間"
-            value={formatDuration(state.elapsed)}
-            unit=""
-            wide
-          />
-          <BigMetric
-            label="速度"
-            value={state.currentSpeed > 0 ? state.currentSpeed.toFixed(1) : "--"}
-            unit="km/h"
-            highlight
-          />
-          <BigMetric
-            label="距離"
-            value={(state.distance / 1000).toFixed(2)}
-            unit="km"
-          />
-          <BigMetric
-            label="坡度"
-            value={isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"}
-            unit="%"
-            warn={currentGrade > 5}
-          />
-          <BigMetric
-            label="功率"
-            value={`${state.currentPower}`}
-            unit="W"
-            accent
-          />
-          <BigMetric
-            label="均速"
-            value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"}
-            unit="km/h"
-          />
+          {(settings.normalModeFields?.showElapsed ?? true) && (
+            <BigMetric label="騎乘時間" value={formatDuration(state.elapsed)} unit="" wide />
+          )}
+          {(settings.normalModeFields?.showSpeed ?? true) && (
+            <BigMetric label="速度" value={state.currentSpeed > 0 ? state.currentSpeed.toFixed(1) : "--"} unit="km/h" highlight />
+          )}
+          {(settings.normalModeFields?.showDistance ?? true) && (
+            <BigMetric label="距離" value={(state.distance / 1000).toFixed(2)} unit="km" />
+          )}
+          {(settings.normalModeFields?.showGrade ?? true) && (
+            <BigMetric label="坡度" value={isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"} unit="%" warn={currentGrade > 5} />
+          )}
+          {(settings.normalModeFields?.showPower ?? true) && (
+            <BigMetric label="功率" value={`${state.currentPower}`} unit="W" accent />
+          )}
+          {(settings.normalModeFields?.showAvgSpeed ?? true) && (
+            <BigMetric label="均速" value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"} unit="km/h" />
+          )}
+          {(settings.normalModeFields?.showCalories ?? false) && (
+            <BigMetric label="卡路里" value={`${Math.round(state.calories)}`} unit="kcal" />
+          )}
         </View>
 
         {/* ── 展開後：總爬升 + 進度條 ── */}
@@ -1454,7 +1455,49 @@ export default function MapScreen() {
         direction={navInstruction || undefined}
         currentTime={new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false })}
         elapsedTime={formatDuration(state.elapsed ?? 0)}
+        fields={settings.simplifiedModeFields}
       />
+
+      {/* ── 好友詳細卡片 ── */}
+      {tappedFriend !== null && (
+        <View style={styles.friendCard}>
+          <View style={styles.friendCardHeader}>
+            <View style={[styles.friendCardDot, { backgroundColor: tappedFriend.isMoving ? "#34C759" : "#FF9500" }]} />
+            <Text style={styles.friendCardName}>{tappedFriend.name}</Text>
+            <Pressable
+              style={styles.friendCardClose}
+              onPress={() => setTappedFriend(null)}
+            >
+              <Text style={styles.friendCardCloseText}>×</Text>
+            </Pressable>
+          </View>
+          <View style={styles.friendCardBody}>
+            <View style={styles.friendCardMetric}>
+              <Text style={styles.friendCardMetricLabel}>狀態</Text>
+              <Text style={[styles.friendCardMetricValue, { color: tappedFriend.isMoving ? "#34C759" : "#FF9500" }]}>
+                {tappedFriend.isMoving ? "行進中" : "停留中"}
+              </Text>
+            </View>
+            <View style={styles.friendCardMetric}>
+              <Text style={styles.friendCardMetricLabel}>速度</Text>
+              <Text style={styles.friendCardMetricValue}>
+                {tappedFriend.speed > 0 ? `${(tappedFriend.speed * 3.6).toFixed(1)} km/h` : "--"}
+              </Text>
+            </View>
+            <View style={styles.friendCardMetric}>
+              <Text style={styles.friendCardMetricLabel}>距我</Text>
+              <Text style={styles.friendCardMetricValue}>
+                {currentPos
+                  ? (() => {
+                      const d = haversine(currentPos.lat, currentPos.lon, tappedFriend.lat, tappedFriend.lon);
+                      return d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`;
+                    })()
+                  : "--"}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -1773,5 +1816,68 @@ const styles = StyleSheet.create({
     color: "#34C759",
     fontSize: 11,
     fontWeight: "600",
+  },
+  // 好友詳細卡片
+  friendCard: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 0,
+    backgroundColor: "rgba(18,18,18,0.96)",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+    zIndex: 300,
+    borderTopWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  friendCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  friendCardDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  friendCardName: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  friendCardClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  friendCardCloseText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  friendCardBody: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  friendCardMetric: {
+    alignItems: "center",
+    gap: 4,
+  },
+  friendCardMetricLabel: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 12,
+  },
+  friendCardMetricValue: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
   },
 });

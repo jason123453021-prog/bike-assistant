@@ -59,6 +59,7 @@ export interface LeafletMapProps {
   returnPolyline?: LatLng[];
   isOffRoute?: boolean;
   friendMarkers?: FriendMarker[];
+  onFriendTap?: (friend: FriendMarker & { lat: number; lon: number }) => void;
 }
 
 export interface LeafletMapHandle {
@@ -258,6 +259,21 @@ function handleMessage(data) {
               '</div>';
             var icon = L.divIcon({ html: iconHtml, className: '', iconAnchor: [7, 7] });
             var marker = L.marker([f.lat, f.lon], { icon: icon, zIndexOffset: 800 }).addTo(map);
+            // Click event: notify RN layer to show friend detail card
+            (function(friend) {
+              marker.on('click', function(e) {
+                L.DomEvent.stopPropagation(e);
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'friendTapped',
+                  userId: friend.userId,
+                  name: friend.name,
+                  lat: friend.lat,
+                  lon: friend.lon,
+                  speed: friend.speed,
+                  isMoving: friend.isMoving,
+                }));
+              });
+            })(f);
             window._friendLayers[f.userId] = marker;
           });
         }
@@ -332,6 +348,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       returnPolyline,
       isOffRoute,
       friendMarkers,
+      onFriendTap,
     },
     ref
   ) => {
@@ -439,6 +456,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         name: f.name,
         lat: f.latitude,
         lon: f.longitude,
+        speed: f.speed,
         isMoving: f.isMoving,
       }));
       webViewRef.current.postMessage(
@@ -469,6 +487,17 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         } else if (msg.type === "panDrag") {
           followUserRef.current = false;
           onPanDrag?.();
+        } else if (msg.type === "friendTapped") {
+          onFriendTap?.({
+            userId: msg.userId,
+            name: msg.name,
+            latitude: msg.lat,
+            longitude: msg.lon,
+            lat: msg.lat,
+            lon: msg.lon,
+            speed: msg.speed ?? 0,
+            isMoving: msg.isMoving ?? false,
+          });
         }
       } catch {}
     };

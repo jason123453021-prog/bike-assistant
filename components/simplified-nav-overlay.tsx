@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -8,10 +8,11 @@ import {
   StatusBar,
 } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import type { SimplifiedModeFields } from "@/lib/settings-context";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
-interface SimplifiedNavOverlayProps {
+export interface SimplifiedNavOverlayProps {
   visible: boolean;
   onDismiss: () => void;
   // 核心數據
@@ -22,7 +23,18 @@ interface SimplifiedNavOverlayProps {
   directionIcon?: string;  // SF Symbol 名稱
   currentTime: string;     // HH:MM
   elapsedTime: string;     // MM:SS 或 HH:MM:SS
+  // 自訂顯示欄位（由設定頁面控制）
+  fields?: SimplifiedModeFields;
 }
+
+const DEFAULT_FIELDS: SimplifiedModeFields = {
+  showSpeed: true,
+  showDistance: true,
+  showElapsed: true,
+  showCurrentTime: true,
+  showRemaining: true,
+  showDirection: true,
+};
 
 export function SimplifiedNavOverlay({
   visible,
@@ -34,20 +46,36 @@ export function SimplifiedNavOverlay({
   directionIcon,
   currentTime,
   elapsedTime,
+  fields,
 }: SimplifiedNavOverlayProps) {
   if (!visible) return null;
+
+  const f = fields ?? DEFAULT_FIELDS;
+
+  // 底部欄位（距離、時間、現在時間）
+  const bottomItems: { value: string; label: string }[] = [];
+  if (f.showDistance) bottomItems.push({ value: distance.toFixed(2), label: "公里" });
+  if (f.showElapsed) bottomItems.push({ value: elapsedTime, label: "時間" });
+  if (f.showCurrentTime) bottomItems.push({ value: currentTime, label: "現在" });
 
   return (
     <Pressable style={styles.overlay} onPress={onDismiss}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
+
       {/* 頂部：方向指引 */}
-      {direction ? (
-        <View style={styles.directionRow}>
-          {directionIcon && (
-            <IconSymbol name={directionIcon as any} size={36} color="#fff" />
-          )}
-          <Text style={styles.directionText}>{direction}</Text>
-        </View>
+      {f.showDirection ? (
+        direction ? (
+          <View style={styles.directionRow}>
+            {directionIcon && (
+              <IconSymbol name={directionIcon as any} size={36} color="#fff" />
+            )}
+            <Text style={styles.directionText}>{direction}</Text>
+          </View>
+        ) : (
+          <View style={styles.directionRow}>
+            <Text style={styles.directionPlaceholder}>騎乘中</Text>
+          </View>
+        )
       ) : (
         <View style={styles.directionRow}>
           <Text style={styles.directionPlaceholder}>騎乘中</Text>
@@ -55,7 +83,7 @@ export function SimplifiedNavOverlay({
       )}
 
       {/* 剩餘距離 */}
-      {remainingDist !== undefined && (
+      {f.showRemaining && remainingDist !== undefined && (
         <View style={styles.remainRow}>
           <Text style={styles.remainLabel}>剩餘</Text>
           <Text style={styles.remainValue}>
@@ -67,28 +95,29 @@ export function SimplifiedNavOverlay({
       )}
 
       {/* 主要數據：速度 */}
-      <View style={styles.speedBlock}>
-        <Text style={styles.speedValue}>{speed.toFixed(1)}</Text>
-        <Text style={styles.speedUnit}>km/h</Text>
-      </View>
+      {f.showSpeed ? (
+        <View style={styles.speedBlock}>
+          <Text style={styles.speedValue}>{speed.toFixed(1)}</Text>
+          <Text style={styles.speedUnit}>km/h</Text>
+        </View>
+      ) : (
+        <View style={styles.speedBlock} />
+      )}
 
-      {/* 底部：距離 + 時間 + 當前時間 */}
-      <View style={styles.bottomRow}>
-        <View style={styles.bottomItem}>
-          <Text style={styles.bottomValue}>{distance.toFixed(2)}</Text>
-          <Text style={styles.bottomLabel}>公里</Text>
+      {/* 底部：距離 + 時間 + 當前時間（依設定動態顯示） */}
+      {bottomItems.length > 0 && (
+        <View style={styles.bottomRow}>
+          {bottomItems.map((item, idx) => (
+            <React.Fragment key={item.label}>
+              {idx > 0 && <View style={styles.bottomDivider} />}
+              <View style={styles.bottomItem}>
+                <Text style={styles.bottomValue}>{item.value}</Text>
+                <Text style={styles.bottomLabel}>{item.label}</Text>
+              </View>
+            </React.Fragment>
+          ))}
         </View>
-        <View style={styles.bottomDivider} />
-        <View style={styles.bottomItem}>
-          <Text style={styles.bottomValue}>{elapsedTime}</Text>
-          <Text style={styles.bottomLabel}>時間</Text>
-        </View>
-        <View style={styles.bottomDivider} />
-        <View style={styles.bottomItem}>
-          <Text style={styles.bottomValue}>{currentTime}</Text>
-          <Text style={styles.bottomLabel}>現在</Text>
-        </View>
-      </View>
+      )}
 
       {/* 提示文字 */}
       <Text style={styles.tapHint}>點擊任意處返回標準模式</Text>
