@@ -23,6 +23,12 @@ export interface SimplifiedNavOverlayProps {
   directionIcon?: string;  // SF Symbol 名稱
   currentTime: string;     // HH:MM
   elapsedTime: string;     // MM:SS 或 HH:MM:SS
+  // 額外數據（新增欄位用）
+  grade?: number;          // 坡度 %
+  power?: number;          // 功率 W
+  avgSpeed?: number;       // 均速 km/h
+  calories?: number;       // 卡路里 kcal
+  pausedTime?: string;     // 暫停時間
   // 自訂顯示欄位（由設定頁面控制）
   fields?: SimplifiedModeFields;
 }
@@ -34,6 +40,11 @@ const DEFAULT_FIELDS: SimplifiedModeFields = {
   showCurrentTime: true,
   showRemaining: true,
   showDirection: true,
+  showGrade: false,
+  showPower: false,
+  showAvgSpeed: false,
+  showCalories: false,
+  showPausedTime: false,
 };
 
 export function SimplifiedNavOverlay({
@@ -46,6 +57,11 @@ export function SimplifiedNavOverlay({
   directionIcon,
   currentTime,
   elapsedTime,
+  grade,
+  power,
+  avgSpeed,
+  calories,
+  pausedTime,
   fields,
 }: SimplifiedNavOverlayProps) {
   if (!visible) return null;
@@ -57,6 +73,11 @@ export function SimplifiedNavOverlay({
   if (f.showDistance) bottomItems.push({ value: distance.toFixed(2), label: "公里" });
   if (f.showElapsed) bottomItems.push({ value: elapsedTime, label: "時間" });
   if (f.showCurrentTime) bottomItems.push({ value: currentTime, label: "現在" });
+  if (f.showGrade) bottomItems.push({ value: grade !== undefined ? `${grade > 0 ? "+" : ""}${grade.toFixed(1)}%` : "--", label: "坡度" });
+  if (f.showPower) bottomItems.push({ value: power !== undefined ? `${power}W` : "--", label: "功率" });
+  if (f.showAvgSpeed) bottomItems.push({ value: avgSpeed !== undefined && avgSpeed > 0 ? avgSpeed.toFixed(1) : "--", label: "均速" });
+  if (f.showCalories) bottomItems.push({ value: calories !== undefined ? `${calories}` : "--", label: "kcal" });
+  if (f.showPausedTime) bottomItems.push({ value: pausedTime ?? "--", label: "暫停" });
 
   return (
     <Pressable style={styles.overlay} onPress={onDismiss}>

@@ -13,7 +13,7 @@ export interface NormalModeFields {
   showPausedTime: boolean; // 暫停時間
 }
 
-// 精簡導航模式可顯示的欄位
+// 精簡導航模式可顯示的欄位（與正常模式一致）
 export interface SimplifiedModeFields {
   showSpeed: boolean;        // 速度（主要大字）
   showDistance: boolean;     // 距離
@@ -21,6 +21,11 @@ export interface SimplifiedModeFields {
   showCurrentTime: boolean;  // 現在時間
   showRemaining: boolean;    // 剩餘距離（導航中）
   showDirection: boolean;    // 方向指引
+  showGrade: boolean;        // 坡度
+  showPower: boolean;        // 功率
+  showAvgSpeed: boolean;     // 均速
+  showCalories: boolean;     // 卡路里
+  showPausedTime: boolean;   // 暫停時間
 }
 
 // 儀表板欄位 key 型別
@@ -92,6 +97,11 @@ const DEFAULT_SIMPLIFIED_FIELDS: SimplifiedModeFields = {
   showCurrentTime: true,
   showRemaining: true,
   showDirection: true,
+  showGrade: false,
+  showPower: false,
+  showAvgSpeed: false,
+  showCalories: false,
+  showPausedTime: false,
 };
 
 const DEFAULT_SETTINGS: AppSettings = {

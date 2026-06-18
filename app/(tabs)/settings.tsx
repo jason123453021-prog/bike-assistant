@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -9,19 +9,29 @@ import {
   TextInput,
   Alert,
   Modal,
+  PanResponder,
+  Animated,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from "react-native";
+
+// 啟用 Android LayoutAnimation
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import Slider from "@react-native-community/slider";
 import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
-import { useSettings } from "@/lib/settings-context";
+import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useAuth } from "@/hooks/use-auth";
 import { startOAuthLogin } from "@/constants/oauth";
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const { settings, updateSettings, updateNormalFields, updateSimplifiedFields } = useSettings();
+  const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder } = useSettings();
   const { user, isAuthenticated, logout } = useAuth();
   const [editModal, setEditModal] = useState<{
     visible: boolean;
@@ -31,6 +41,70 @@ export default function SettingsScreen() {
     unit: string;
     isNumber: boolean;
   }>({ visible: false, key: "", label: "", value: "", unit: "", isNumber: true });
+
+  // 拖曳排序狀態
+  const [dragOrder, setDragOrder] = useState<NormalFieldKey[]>(
+    settings.normalModeFieldOrder ?? DEFAULT_FIELD_ORDER
+  );
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const dragY = useRef(new Animated.Value(0)).current;
+  const dragStartY = useRef(0);
+  const ITEM_H = 52; // 每列高度
+
+  // 同步 settings 變化到 dragOrder
+  React.useEffect(() => {
+    setDragOrder(settings.normalModeFieldOrder ?? DEFAULT_FIELD_ORDER);
+  }, [settings.normalModeFieldOrder]);
+
+  const FIELD_LABELS: Record<NormalFieldKey, string> = {
+    showElapsed: "騎乘時間",
+    showSpeed: "速度",
+    showDistance: "距離",
+    showGrade: "坡度",
+    showPower: "功率",
+    showAvgSpeed: "均速",
+    showCalories: "卡路里",
+    showPausedTime: "暫停時間",
+  };
+
+  const makeDragResponder = (idx: number) =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        dragStartY.current = e.nativeEvent.pageY;
+        dragY.setValue(0);
+        setDraggingIdx(idx);
+        setHoverIdx(idx);
+      },
+      onPanResponderMove: (e) => {
+        const dy = e.nativeEvent.pageY - dragStartY.current;
+        dragY.setValue(dy);
+        const newIdx = Math.max(0, Math.min(dragOrder.length - 1, idx + Math.round(dy / ITEM_H)));
+        setHoverIdx(newIdx);
+      },
+      onPanResponderRelease: (e) => {
+        const dy = e.nativeEvent.pageY - dragStartY.current;
+        const newIdx = Math.max(0, Math.min(dragOrder.length - 1, idx + Math.round(dy / ITEM_H)));
+        if (newIdx !== idx) {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          const next = [...dragOrder];
+          const [moved] = next.splice(idx, 1);
+          next.splice(newIdx, 0, moved);
+          setDragOrder(next);
+          updateFieldOrder(next);
+        }
+        setDraggingIdx(null);
+        setHoverIdx(null);
+        dragY.setValue(0);
+      },
+      onPanResponderTerminate: () => {
+        setDraggingIdx(null);
+        setHoverIdx(null);
+        dragY.setValue(0);
+      },
+    });
 
   const openEdit = (key: string, label: string, value: number, unit: string) => {
     setEditModal({ visible: true, key, label, value: String(value), unit, isNumber: true });
@@ -330,32 +404,46 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        {/* ── 正常導航模式欄位 ── */}
+        {/* ── 導航儀表板欄位（拖曳排序 + 開關） ── */}
         <SectionHeader title="導航儀表板欄位" colors={colors} />
+        <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8, paddingHorizontal: 4 }}>
+          拖曳右側☰按鈕可調整顯示順序，前 6 格在收縮面板顯示
+        </Text>
         <View style={[styles.section, { borderColor: colors.border }]}>
-          {([
-            { key: "showElapsed", label: "騎乘時間" },
-            { key: "showSpeed",   label: "速度" },
-            { key: "showDistance",label: "距離" },
-            { key: "showGrade",   label: "坡度" },
-            { key: "showPower",   label: "功率" },
-            { key: "showAvgSpeed",label: "均速" },
-            { key: "showCalories",label: "卡路里" },
-            { key: "showPausedTime",label: "暫停時間" },
-          ] as { key: keyof typeof settings.normalModeFields; label: string }[]).map((item, idx, arr) => (
-            <React.Fragment key={item.key}>
-              <View style={styles.row}>
-                <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>{item.label}</Text>
-                <Switch
-                  value={settings.normalModeFields?.[item.key] ?? true}
-                  onValueChange={(v) => updateNormalFields({ [item.key]: v })}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor="#fff"
-                />
-              </View>
-              {idx < arr.length - 1 && <Divider colors={colors} />}
-            </React.Fragment>
-          ))}
+          {dragOrder.map((key, idx) => {
+            const isDragging = draggingIdx === idx;
+            const isHover = hoverIdx === idx && draggingIdx !== null && draggingIdx !== idx;
+            const responder = makeDragResponder(idx);
+            return (
+              <React.Fragment key={key}>
+                <Animated.View
+                  style={[
+                    styles.row,
+                    isDragging && { backgroundColor: colors.surface, opacity: 0.85, zIndex: 10, elevation: 8 },
+                    isHover && { backgroundColor: colors.border + "40" },
+                  ]}
+                >
+                  <Switch
+                    value={settings.normalModeFields?.[key] ?? false}
+                    onValueChange={(v) => updateNormalFields({ [key]: v })}
+                    trackColor={{ false: "#767577", true: "#34C759" }}
+                    thumbColor="#fff"
+                    ios_backgroundColor="#767577"
+                  />
+                  <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1, marginLeft: 4 }]}>
+                    {FIELD_LABELS[key]}
+                  </Text>
+                  <Text style={{ color: colors.muted, fontSize: 11, marginRight: 4 }}>
+                    {idx < 6 ? `面板` : `展開`}
+                  </Text>
+                  <View {...responder.panHandlers} style={styles.dragHandle}>
+                    <Text style={{ color: colors.muted, fontSize: 20, lineHeight: 24 }}>☰</Text>
+                  </View>
+                </Animated.View>
+                {idx < dragOrder.length - 1 && <Divider colors={colors} />}
+              </React.Fragment>
+            );
+          })}
         </View>
 
         {/* ── 精簡導航模式欄位 ── */}
@@ -368,6 +456,11 @@ export default function SettingsScreen() {
             { key: "showDistance",    label: "距離" },
             { key: "showElapsed",     label: "騎乘時間" },
             { key: "showCurrentTime", label: "現在時間" },
+            { key: "showGrade",       label: "坡度" },
+            { key: "showPower",       label: "功率" },
+            { key: "showAvgSpeed",    label: "均速" },
+            { key: "showCalories",    label: "卡路里" },
+            { key: "showPausedTime",  label: "暫停時間" },
           ] as { key: keyof typeof settings.simplifiedModeFields; label: string }[]).map((item, idx, arr) => (
             <React.Fragment key={item.key}>
               <View style={styles.row}>
@@ -375,8 +468,9 @@ export default function SettingsScreen() {
                 <Switch
                   value={settings.simplifiedModeFields?.[item.key] ?? true}
                   onValueChange={(v) => updateSimplifiedFields({ [item.key]: v })}
-                  trackColor={{ false: colors.border, true: colors.primary }}
+                  trackColor={{ false: "#767577", true: "#34C759" }}
                   thumbColor="#fff"
+                  ios_backgroundColor="#767577"
                 />
               </View>
               {idx < arr.length - 1 && <Divider colors={colors} />}
@@ -486,9 +580,9 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: colors.border, true: colors.accent + "80" }}
-        thumbColor={value ? colors.accent : colors.muted}
-        ios_backgroundColor={colors.border}
+        trackColor={{ false: "#767577", true: "#34C759" }}
+        thumbColor="#fff"
+        ios_backgroundColor="#767577"
       />
     </View>
   );
@@ -608,4 +702,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   profileBadgeText: { fontSize: 11, fontWeight: "600" },
+  dragHandle: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
 });

@@ -41,7 +41,7 @@ import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 
 import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
-import { useSettings } from "@/lib/settings-context";
+import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
 import { type GpxPoint } from "@/lib/gpx-parser";
 import {
@@ -338,20 +338,18 @@ export default function MapScreen() {
 
   // ─── 底部面板滑桿 ─────────────────────────────────────────────────────────────
   const [panelExpanded, setPanelExpanded] = useState(false);
-  // ── 動態儀表板高度：依啟用欄位數計算，最多不超過螢幕三分之一 ──
-  const dashFieldCount = useMemo(() => {
+  // ── 儀表板欄位排序：依 normalModeFieldOrder 排序，只顯示已啟用的欄位 ──
+  const orderedEnabledFields = useMemo(() => {
     const f = settings.normalModeFields;
-    return [
-      f?.showElapsed ?? true,
-      f?.showSpeed ?? true,
-      f?.showDistance ?? true,
-      f?.showGrade ?? true,
-      f?.showPower ?? true,
-      f?.showAvgSpeed ?? true,
-      f?.showCalories ?? false,
-      f?.showPausedTime ?? false,
-    ].filter(Boolean).length;
-  }, [settings.normalModeFields]);
+    const order: NormalFieldKey[] = settings.normalModeFieldOrder ?? DEFAULT_FIELD_ORDER;
+    return order.filter((key) => f?.[key] ?? false);
+  }, [settings.normalModeFields, settings.normalModeFieldOrder]);
+
+  // 前6格顯示在收縮面板，第7格以上移至展開區
+  const DASH_PANEL_MAX = 6;
+  const dashPanelFields = useMemo(() => orderedEnabledFields.slice(0, DASH_PANEL_MAX), [orderedEnabledFields]);
+  const dashOverflowFields = useMemo(() => orderedEnabledFields.slice(DASH_PANEL_MAX), [orderedEnabledFields]);
+  const dashFieldCount = dashPanelFields.length;
 
   // 每行3格，每格約60px；最少1行，最多不超過 SCREEN_H/3
   const CELL_H = 60;
@@ -1441,37 +1439,24 @@ export default function MapScreen() {
           )}
         </View>
 
-        {/* ── 儀表板（依設定動態顯示欄位） ── */}
+        {/* ── 儀表板（依排序動態顯示，前6格在收縮面板） ── */}
         <View style={styles.sixGrid}>
-          {(settings.normalModeFields?.showElapsed ?? true) && (
-            <BigMetric label="騎乘時間" value={formatDuration(state.elapsed)} unit="" wide />
-          )}
-          {(settings.normalModeFields?.showSpeed ?? true) && (
-            <BigMetric label="速度" value={state.currentSpeed > 0 ? state.currentSpeed.toFixed(1) : "--"} unit="km/h" highlight />
-          )}
-          {(settings.normalModeFields?.showDistance ?? true) && (
-            <BigMetric label="距離" value={(state.distance / 1000).toFixed(2)} unit="km" />
-          )}
-          {(settings.normalModeFields?.showGrade ?? true) && (
-            <BigMetric label="坡度" value={isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"} unit="%" warn={currentGrade > 5} />
-          )}
-          {(settings.normalModeFields?.showPower ?? true) && (
-            <BigMetric label="功率" value={`${state.currentPower}`} unit="W" accent />
-          )}
-          {(settings.normalModeFields?.showAvgSpeed ?? true) && (
-            <BigMetric label="均速" value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"} unit="km/h" />
-          )}
-          {(settings.normalModeFields?.showCalories ?? false) && (
-            <BigMetric label="卡路里" value={`${Math.round(state.calories)}`} unit="kcal" />
-          )}
-          {(settings.normalModeFields?.showPausedTime ?? false) && (
-            <BigMetric label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" />
-          )}
+          {dashPanelFields.map((key) => (
+            <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} />
+          ))}
         </View>
 
         {/* ── 展開後：總爬升 + 進度條 ── */}
         {panelExpanded && (
           <View style={styles.expandedSection}>
+            {/* 超出6格的儀表板欄位（上拉展開後顯示） */}
+            {dashOverflowFields.length > 0 && (
+              <View style={[styles.sixGrid, { marginBottom: 8 }]}>
+                {dashOverflowFields.map((key) => (
+                  <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} />
+                ))}
+              </View>
+            )}
             {/* 總爬升資訊列 */}
             <View style={styles.ascentRow}>
               <View style={styles.ascentItem}>
@@ -1667,6 +1652,11 @@ export default function MapScreen() {
         direction={navInstruction || undefined}
         currentTime={new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false })}
         elapsedTime={formatDuration(state.elapsed ?? 0)}
+        grade={currentGrade}
+        power={state.currentPower}
+        avgSpeed={avgSpeed}
+        calories={Math.round(state.calories)}
+        pausedTime={formatDuration(state.totalPausedSec ?? 0)}
         fields={settings.simplifiedModeFields}
       />
 
@@ -1732,6 +1722,36 @@ export default function MapScreen() {
 }
 
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
+
+// DashMetric: 依 fieldKey 渲染對應的儀表板欄位
+function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed }: {
+  fieldKey: NormalFieldKey;
+  state: any;
+  isActive: boolean;
+  currentGrade: number;
+  avgSpeed: number;
+}) {
+  switch (fieldKey) {
+    case "showElapsed":
+      return <BigMetric label="騎乘時間" value={formatDuration(state.elapsed)} unit="" />;
+    case "showSpeed":
+      return <BigMetric label="速度" value={state.currentSpeed > 0 ? state.currentSpeed.toFixed(1) : "--"} unit="km/h" highlight />;
+    case "showDistance":
+      return <BigMetric label="距離" value={(state.distance / 1000).toFixed(2)} unit="km" />;
+    case "showGrade":
+      return <BigMetric label="坡度" value={isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"} unit="%" warn={currentGrade > 5} />;
+    case "showPower":
+      return <BigMetric label="功率" value={`${state.currentPower}`} unit="W" accent />;
+    case "showAvgSpeed":
+      return <BigMetric label="均速" value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"} unit="km/h" />;
+    case "showCalories":
+      return <BigMetric label="卡路里" value={`${Math.round(state.calories)}`} unit="kcal" />;
+    case "showPausedTime":
+      return <BigMetric label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" />;
+    default:
+      return null;
+  }
+}
 
 function BigMetric({ label, value, unit, accent, highlight, warn, wide }: {
   label: string;
