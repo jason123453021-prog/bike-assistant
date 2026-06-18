@@ -477,7 +477,18 @@ export default function SettingsScreen() {
                     ]}>☰</Text>
                   </View>
                 </Animated.View>
-                {idx < dragOrder.length - 1 && <Divider colors={colors} />}
+                {idx < dragOrder.length - 1 && (
+                  idx === 5 ? (
+                    /* 面板區 / 展開區 分界線 */
+                    <View style={styles.panelDivider}>
+                      <View style={[styles.panelDividerLine, { borderColor: "#34C759" }]} />
+                      <Text style={styles.panelDividerLabel}>↑ 面板區  展開區 ↓</Text>
+                      <View style={[styles.panelDividerLine, { borderColor: "#34C759" }]} />
+                    </View>
+                  ) : (
+                    <Divider colors={colors} />
+                  )
+                )}
               </React.Fragment>
             );
           })}
@@ -753,5 +764,23 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  panelDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  panelDividerLine: {
+    flex: 1,
+    borderTopWidth: 1,
+    borderStyle: "dashed",
+  },
+  panelDividerLabel: {
+    fontSize: 10,
+    color: "#34C759",
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
 });
