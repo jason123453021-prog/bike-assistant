@@ -30,12 +30,28 @@ export interface SimplifiedModeFields {
 
 // 儀表板欄位 key 型別
 export type NormalFieldKey = keyof NormalModeFields;
+export type SimplifiedFieldKey = keyof SimplifiedModeFields;
 
 // 預設欄位排序（與 NormalModeFields key 對應）
 export const DEFAULT_FIELD_ORDER: NormalFieldKey[] = [
   "showElapsed",
   "showSpeed",
   "showDistance",
+  "showGrade",
+  "showPower",
+  "showAvgSpeed",
+  "showCalories",
+  "showPausedTime",
+];
+
+// 精簡模式欄位預設排序
+export const DEFAULT_SIMPLIFIED_FIELD_ORDER: SimplifiedFieldKey[] = [
+  "showDirection",
+  "showRemaining",
+  "showSpeed",
+  "showDistance",
+  "showElapsed",
+  "showCurrentTime",
   "showGrade",
   "showPower",
   "showAvgSpeed",
@@ -77,6 +93,8 @@ export interface AppSettings {
   simplifiedModeFields: SimplifiedModeFields;
   // 儀表板欄位排序（key 陣列，決定渲染順序）
   normalModeFieldOrder: NormalFieldKey[];
+  // 精簡模式欄位排序
+  simplifiedModeFieldOrder: SimplifiedFieldKey[];
 }
 
 const DEFAULT_NORMAL_FIELDS: NormalModeFields = {
@@ -128,6 +146,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   normalModeFields: DEFAULT_NORMAL_FIELDS,
   simplifiedModeFields: DEFAULT_SIMPLIFIED_FIELDS,
   normalModeFieldOrder: DEFAULT_FIELD_ORDER,
+  simplifiedModeFieldOrder: DEFAULT_SIMPLIFIED_FIELD_ORDER,
 };
 
 const SETTINGS_KEY = "@bike_settings";
@@ -138,6 +157,7 @@ interface SettingsContextValue {
   updateNormalFields: (partial: Partial<NormalModeFields>) => Promise<void>;
   updateSimplifiedFields: (partial: Partial<SimplifiedModeFields>) => Promise<void>;
   updateFieldOrder: (order: NormalFieldKey[]) => Promise<void>;
+  updateSimplifiedFieldOrder: (order: SimplifiedFieldKey[]) => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -155,12 +175,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           ...savedOrder.filter((k: NormalFieldKey) => DEFAULT_FIELD_ORDER.includes(k)),
           ...DEFAULT_FIELD_ORDER.filter((k) => !savedOrder.includes(k)),
         ];
+        const savedSimplifiedOrder: SimplifiedFieldKey[] = saved.simplifiedModeFieldOrder ?? [];
+        const mergedSimplifiedOrder = [
+          ...savedSimplifiedOrder.filter((k: SimplifiedFieldKey) => DEFAULT_SIMPLIFIED_FIELD_ORDER.includes(k)),
+          ...DEFAULT_SIMPLIFIED_FIELD_ORDER.filter((k) => !savedSimplifiedOrder.includes(k)),
+        ];
         setSettings({
           ...DEFAULT_SETTINGS,
           ...saved,
           normalModeFields: { ...DEFAULT_NORMAL_FIELDS, ...(saved.normalModeFields ?? {}) },
           simplifiedModeFields: { ...DEFAULT_SIMPLIFIED_FIELDS, ...(saved.simplifiedModeFields ?? {}) },
           normalModeFieldOrder: mergedOrder,
+          simplifiedModeFieldOrder: mergedSimplifiedOrder,
         });
       }
     });
@@ -196,8 +222,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   };
 
+  const updateSimplifiedFieldOrder = async (order: SimplifiedFieldKey[]) => {
+    const next = { ...settings, simplifiedModeFieldOrder: order };
+    setSettings(next);
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+  };
+
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder }}>
+    <SettingsContext.Provider value={{ settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder }}>
       {children}
     </SettingsContext.Provider>
   );

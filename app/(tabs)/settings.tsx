@@ -25,13 +25,13 @@ import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
-import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
+import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, type NormalFieldKey, type SimplifiedFieldKey } from "@/lib/settings-context";
 import { useAuth } from "@/hooks/use-auth";
 import { startOAuthLogin } from "@/constants/oauth";
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder } = useSettings();
+  const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder } = useSettings();
   const { user, isAuthenticated, logout } = useAuth();
   const [editModal, setEditModal] = useState<{
     visible: boolean;
@@ -56,6 +56,71 @@ export default function SettingsScreen() {
   React.useEffect(() => {
     setDragOrder(settings.normalModeFieldOrder ?? DEFAULT_FIELD_ORDER);
   }, [settings.normalModeFieldOrder]);
+
+  // 精簡模式拖曳排序狀態
+  const [simpDragOrder, setSimpDragOrder] = useState<SimplifiedFieldKey[]>(
+    settings.simplifiedModeFieldOrder ?? DEFAULT_SIMPLIFIED_FIELD_ORDER
+  );
+  const [simpDraggingIdx, setSimpDraggingIdx] = useState<number | null>(null);
+  const [simpHoverIdx, setSimpHoverIdx] = useState<number | null>(null);
+  const simpDragY = useRef(new Animated.Value(0)).current;
+  const simpDragStartY = useRef(0);
+
+  React.useEffect(() => {
+    setSimpDragOrder(settings.simplifiedModeFieldOrder ?? DEFAULT_SIMPLIFIED_FIELD_ORDER);
+  }, [settings.simplifiedModeFieldOrder]);
+
+  const SIMP_FIELD_LABELS: Record<SimplifiedFieldKey, string> = {
+    showDirection: "方向指引",
+    showRemaining: "剩餘距離",
+    showSpeed: "速度",
+    showDistance: "距離",
+    showElapsed: "騎乘時間",
+    showCurrentTime: "現在時間",
+    showGrade: "坡度",
+    showPower: "功率",
+    showAvgSpeed: "均速",
+    showCalories: "卡路里",
+    showPausedTime: "暫停時間",
+  };
+
+  const makeSimpDragResponder = (idx: number) =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        simpDragStartY.current = e.nativeEvent.pageY;
+        simpDragY.setValue(0);
+        setSimpDraggingIdx(idx);
+        setSimpHoverIdx(idx);
+      },
+      onPanResponderMove: (e) => {
+        const dy = e.nativeEvent.pageY - simpDragStartY.current;
+        simpDragY.setValue(dy);
+        const newIdx = Math.max(0, Math.min(simpDragOrder.length - 1, idx + Math.round(dy / ITEM_H)));
+        setSimpHoverIdx(newIdx);
+      },
+      onPanResponderRelease: (e) => {
+        const dy = e.nativeEvent.pageY - simpDragStartY.current;
+        const newIdx = Math.max(0, Math.min(simpDragOrder.length - 1, idx + Math.round(dy / ITEM_H)));
+        if (newIdx !== idx) {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          const next = [...simpDragOrder];
+          const [moved] = next.splice(idx, 1);
+          next.splice(newIdx, 0, moved);
+          setSimpDragOrder(next);
+          updateSimplifiedFieldOrder(next);
+        }
+        setSimpDraggingIdx(null);
+        setSimpHoverIdx(null);
+        simpDragY.setValue(0);
+      },
+      onPanResponderTerminate: () => {
+        setSimpDraggingIdx(null);
+        setSimpHoverIdx(null);
+        simpDragY.setValue(0);
+      },
+    });
 
   const FIELD_LABELS: Record<NormalFieldKey, string> = {
     showElapsed: "騎乘時間",
@@ -494,31 +559,35 @@ export default function SettingsScreen() {
           })}
         </View>
 
-        {/* ── 精簡導航模式欄位 ── */}
-        <SectionHeader title="精簡模式欄位" colors={colors} />
+        {/* ── 精簡導航模式欄位（拖曳排序 + 開關 + 上限限制） ── */}
         {(() => {
-          const SIMPLIFIED_FIELDS = [
-            { key: "showDirection",   label: "方向指引" },
-            { key: "showRemaining",   label: "剩餘距離" },
-            { key: "showSpeed",       label: "速度" },
-            { key: "showDistance",    label: "距離" },
-            { key: "showElapsed",     label: "騎乘時間" },
-            { key: "showCurrentTime", label: "現在時間" },
-            { key: "showGrade",       label: "坡度" },
-            { key: "showPower",       label: "功率" },
-            { key: "showAvgSpeed",    label: "均速" },
-            { key: "showCalories",    label: "卡路里" },
-            { key: "showPausedTime",  label: "暫停時間" },
-          ] as { key: keyof typeof settings.simplifiedModeFields; label: string }[];
           const SIMPLIFIED_MAX = 3;
-          const simplifiedEnabledCount = SIMPLIFIED_FIELDS.filter(
-            (f) => settings.simplifiedModeFields?.[f.key] ?? false
+          const simplifiedEnabledCount = simpDragOrder.filter(
+            (k) => settings.simplifiedModeFields?.[k] ?? false
           ).length;
           return (
             <>
+              {/* 標題 + 恢復預設按鈕 */}
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+                <SectionHeader title="精簡模式欄位" colors={colors} />
+                <Pressable
+                  onPress={() => {
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setSimpDragOrder(DEFAULT_SIMPLIFIED_FIELD_ORDER);
+                    updateSimplifiedFieldOrder(DEFAULT_SIMPLIFIED_FIELD_ORDER);
+                  }}
+                  style={({ pressed }) => ([
+                    styles.resetBtn,
+                    { borderColor: colors.border, backgroundColor: pressed ? colors.surface : "transparent" },
+                  ])}
+                >
+                  <Text style={{ fontSize: 12, color: colors.muted }}>恢復預設</Text>
+                </Pressable>
+              </View>
+              {/* 計數徽章 + 說明 */}
               <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, paddingHorizontal: 4 }}>
                 <Text style={{ fontSize: 11, color: colors.muted, flex: 1 }}>
-                  精簡模式底部最多顯示 3 個欄位
+                  拖曳右側☰可調整顯示順序，最多開啟 3 個欄位
                 </Text>
                 <Text style={[
                   { fontSize: 12, fontWeight: "700", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
@@ -530,13 +599,35 @@ export default function SettingsScreen() {
                 </Text>
               </View>
               <View style={[styles.section, { borderColor: colors.border }]}>
-                {SIMPLIFIED_FIELDS.map((item, idx, arr) => {
-                  const isOn = settings.simplifiedModeFields?.[item.key] ?? false;
+                {simpDragOrder.map((key, idx) => {
+                  const isOn = settings.simplifiedModeFields?.[key] ?? false;
                   const isDisabled = !isOn && simplifiedEnabledCount >= SIMPLIFIED_MAX;
+                  const isSimpDragging = simpDraggingIdx === idx;
+                  const isSimpHover = simpHoverIdx === idx && simpDraggingIdx !== null && simpDraggingIdx !== idx;
+                  const responder = makeSimpDragResponder(idx);
                   return (
-                    <React.Fragment key={item.key}>
-                      <View style={[styles.row, isDisabled && { opacity: 0.4 }]}>
-                        <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>{item.label}</Text>
+                    <React.Fragment key={key}>
+                      <Animated.View
+                        style={[
+                          styles.row,
+                          isDisabled && { opacity: 0.4 },
+                          isSimpDragging && {
+                            backgroundColor: colors.surface,
+                            opacity: 0.92,
+                            zIndex: 20,
+                            elevation: 12,
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.22,
+                            shadowRadius: 8,
+                            transform: [{ scale: 1.025 }],
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: "#34C759",
+                          },
+                          isSimpHover && { backgroundColor: colors.border + "55" },
+                        ]}
+                      >
                         <Switch
                           value={isOn}
                           disabled={isDisabled}
@@ -549,14 +640,23 @@ export default function SettingsScreen() {
                               );
                               return;
                             }
-                            updateSimplifiedFields({ [item.key]: v });
+                            updateSimplifiedFields({ [key]: v });
                           }}
                           trackColor={{ false: "#767577", true: "#34C759" }}
                           thumbColor="#fff"
                           ios_backgroundColor="#767577"
                         />
-                      </View>
-                      {idx < arr.length - 1 && <Divider colors={colors} />}
+                        <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1, marginLeft: 4 }]}>
+                          {SIMP_FIELD_LABELS[key]}
+                        </Text>
+                        <View {...responder.panHandlers} style={styles.dragHandle}>
+                          <Text style={[
+                            { fontSize: 20, lineHeight: 24 },
+                            isSimpDragging ? { color: "#34C759" } : { color: colors.muted },
+                          ]}>☰</Text>
+                        </View>
+                      </Animated.View>
+                      {idx < simpDragOrder.length - 1 && <Divider colors={colors} />}
                     </React.Fragment>
                   );
                 })}
