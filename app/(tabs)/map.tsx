@@ -964,11 +964,11 @@ export default function MapScreen() {
             }
           }}
         >
-          <IconSymbol
-            name={headingUp ? "arrow.up" : "compass.north"}
-            size={20}
-            color={headingUp ? "#34C759" : "#fff"}
-          />
+          {headingUp ? (
+            <IconSymbol name="arrow.up" size={20} color="#34C759" />
+          ) : (
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', lineHeight: 22 }}>N</Text>
+          )}
           <Text style={[styles.returnBtnLabel, { color: headingUp ? "#34C759" : "rgba(255,255,255,0.8)" }]}>
             {headingUp ? "車頭" : "指北"}
           </Text>

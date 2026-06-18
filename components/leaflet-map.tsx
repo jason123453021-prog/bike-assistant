@@ -120,33 +120,17 @@ var startMarker = null;
 var endMarker = null;
 var returnEndMarker = null;
 
-// 更新位置標記（車頭朝前模式時加入方向箭頭）
+// 更新位置標記（純蓝點，車頭朝前模式不顯示箭頭）
 function updatePosMarkerWithHeading(bearing) {
   if (!posMarker) return;
   var lat = posMarker.getLatLng().lat;
   var lon = posMarker.getLatLng().lng;
   map.removeLayer(posMarker);
   posMarker = null;
-  if (bearing !== null && bearing !== undefined) {
-    // 車頭朝前模式：顯示方向箭頭 + 蓝點
-    var arrowHtml = '<div style="position:relative;width:32px;height:32px;">' +
-      '<div style="position:absolute;top:0;left:50%;transform:translateX(-50%) rotate(' + bearing + 'deg);width:0;height:0;' +
-      'border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:16px solid #007AFF;' +
-      'filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5));"></div>' +
-      '<div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;' +
-      'background:#007AFF;border:2.5px solid #fff;box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>' +
-      '</div>';
-    posMarker = L.marker([lat, lon], {
-      icon: L.divIcon({ className: '', html: arrowHtml, iconSize: [32, 32], iconAnchor: [16, 24] }),
-      zIndexOffset: 1000,
-    }).addTo(map);
-  } else {
-    // 指北模式：僅顯示蓝點
-    posMarker = L.marker([lat, lon], {
-      icon: makeCircleIcon('#007AFF', 16, '#fff'),
-      zIndexOffset: 1000,
-    }).addTo(map);
-  }
+  posMarker = L.marker([lat, lon], {
+    icon: makeCircleIcon('#007AFF', 16, '#fff'),
+    zIndexOffset: 1000,
+  }).addTo(map);
 }
 
 // Custom dot icon
@@ -191,30 +175,17 @@ function handleMessage(data) {
           fillOpacity: 1,
           weight: 1,
         }).addTo(map);
-        // Position dot (with optional heading arrow)
+        // Position dot (always plain blue dot)
         if (posMarker) { map.removeLayer(posMarker); posMarker = null; }
+        posMarker = L.marker([lat, lon], {
+          icon: makeCircleIcon('#007AFF', 16, '#fff'),
+          zIndexOffset: 1000,
+        }).addTo(map);
+        // 車頭朝前模式：同步地圖方向
         if (headingUpMode && msg.heading !== undefined && msg.heading !== null) {
-          var hdg = msg.heading;
-          var arrowHtml2 = '<div style="position:relative;width:32px;height:32px;">' +
-            '<div style="position:absolute;top:0;left:50%;transform:translateX(-50%) rotate(' + hdg + 'deg);width:0;height:0;' +
-            'border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:16px solid #007AFF;' +
-            'filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5));"></div>' +
-            '<div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;' +
-            'background:#007AFF;border:2.5px solid #fff;box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>' +
-            '</div>';
-          posMarker = L.marker([lat, lon], {
-            icon: L.divIcon({ className: '', html: arrowHtml2, iconSize: [32, 32], iconAnchor: [16, 24] }),
-            zIndexOffset: 1000,
-          }).addTo(map);
-          // 車頭朝前模式：同步地圖方向
           if (typeof map.setBearing === 'function') {
-            map.setBearing(hdg);
+            map.setBearing(msg.heading);
           }
-        } else {
-          posMarker = L.marker([lat, lon], {
-            icon: makeCircleIcon('#007AFF', 16, '#fff'),
-            zIndexOffset: 1000,
-          }).addTo(map);
         }
         if (msg.follow) {
           map.setView([lat, lon], map.getZoom(), { animate: true, duration: 0.5 });
