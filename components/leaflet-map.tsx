@@ -64,16 +64,27 @@ const LEAFLET_HTML = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.7/dist/leaflet-rotate-src.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body, #map { width: 100%; height: 100%; background: #2c2c3e; }
-  .leaflet-container { background: #2c2c3e; }
+  html, body, #map { width: 100%; height: 100%; background: #f5f3ee; }
+  .leaflet-container { background: #f5f3ee; }
+  /* 車頭方向指示器 */
+  .heading-arrow {
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 18px solid #007AFF;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+    transform-origin: 50% 100%;
+  }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <script>
-// Init map
+// Init map (with leaflet-rotate plugin)
 var map = L.map('map', {
   zoomControl: false,
   attributionControl: false,
@@ -82,7 +93,13 @@ var map = L.map('map', {
   touchZoom: true,
   doubleClickZoom: true,
   scrollWheelZoom: false,
+  rotate: true,        // leaflet-rotate: enable bearing rotation
+  rotateControl: false, // hide built-in rotate control UI
+  bearing: 0,
 }).setView([25.0478, 121.5319], 14);
+
+var currentBearing = 0;
+var headingUpMode = false;
 
 // Tile layer: CartoDB Voyager (bright roads, good contrast for cycling)
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -102,6 +119,35 @@ var posAccMarker = null;
 var startMarker = null;
 var endMarker = null;
 var returnEndMarker = null;
+
+// 更新位置標記（車頭朝前模式時加入方向箭頭）
+function updatePosMarkerWithHeading(bearing) {
+  if (!posMarker) return;
+  var lat = posMarker.getLatLng().lat;
+  var lon = posMarker.getLatLng().lng;
+  map.removeLayer(posMarker);
+  posMarker = null;
+  if (bearing !== null && bearing !== undefined) {
+    // 車頭朝前模式：顯示方向箭頭 + 蓝點
+    var arrowHtml = '<div style="position:relative;width:32px;height:32px;">' +
+      '<div style="position:absolute;top:0;left:50%;transform:translateX(-50%) rotate(' + bearing + 'deg);width:0;height:0;' +
+      'border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:16px solid #007AFF;' +
+      'filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5));"></div>' +
+      '<div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;' +
+      'background:#007AFF;border:2.5px solid #fff;box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>' +
+      '</div>';
+    posMarker = L.marker([lat, lon], {
+      icon: L.divIcon({ className: '', html: arrowHtml, iconSize: [32, 32], iconAnchor: [16, 24] }),
+      zIndexOffset: 1000,
+    }).addTo(map);
+  } else {
+    // 指北模式：僅顯示蓝點
+    posMarker = L.marker([lat, lon], {
+      icon: makeCircleIcon('#007AFF', 16, '#fff'),
+      zIndexOffset: 1000,
+    }).addTo(map);
+  }
+}
 
 // Custom dot icon
 function makeDotIcon(color, size, border) {
@@ -145,12 +191,31 @@ function handleMessage(data) {
           fillOpacity: 1,
           weight: 1,
         }).addTo(map);
-        // Position dot
+        // Position dot (with optional heading arrow)
         if (posMarker) { map.removeLayer(posMarker); posMarker = null; }
-        posMarker = L.marker([lat, lon], {
-          icon: makeCircleIcon('#007AFF', 16, '#fff'),
-          zIndexOffset: 1000,
-        }).addTo(map);
+        if (headingUpMode && msg.heading !== undefined && msg.heading !== null) {
+          var hdg = msg.heading;
+          var arrowHtml2 = '<div style="position:relative;width:32px;height:32px;">' +
+            '<div style="position:absolute;top:0;left:50%;transform:translateX(-50%) rotate(' + hdg + 'deg);width:0;height:0;' +
+            'border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:16px solid #007AFF;' +
+            'filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5));"></div>' +
+            '<div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;' +
+            'background:#007AFF;border:2.5px solid #fff;box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>' +
+            '</div>';
+          posMarker = L.marker([lat, lon], {
+            icon: L.divIcon({ className: '', html: arrowHtml2, iconSize: [32, 32], iconAnchor: [16, 24] }),
+            zIndexOffset: 1000,
+          }).addTo(map);
+          // 車頭朝前模式：同步地圖方向
+          if (typeof map.setBearing === 'function') {
+            map.setBearing(hdg);
+          }
+        } else {
+          posMarker = L.marker([lat, lon], {
+            icon: makeCircleIcon('#007AFF', 16, '#fff'),
+            zIndexOffset: 1000,
+          }).addTo(map);
+        }
         if (msg.follow) {
           map.setView([lat, lon], map.getZoom(), { animate: true, duration: 0.5 });
         }
@@ -200,23 +265,23 @@ function handleMessage(data) {
         map.setView([msg.lat, msg.lon], msg.zoom || map.getZoom(), { animate: true, duration: 0.6 });
         break;
       case 'setBearing':
-        // Rotate map container to simulate heading-up mode
+        // Use leaflet-rotate plugin's native setBearing API
         var deg = msg.bearing || 0;
-        var container = map.getContainer();
+        headingUpMode = msg.headingUp;
+        currentBearing = deg;
         if (msg.headingUp) {
-          container.style.transform = 'rotate(' + (-deg) + 'deg)';
-          container.style.transformOrigin = '50% 50%';
-          // Counter-rotate markers so they stay upright
-          var allMarkers = document.querySelectorAll('.leaflet-marker-icon, .leaflet-marker-shadow');
-          for (var i = 0; i < allMarkers.length; i++) {
-            allMarkers[i].style.transform = (allMarkers[i].style.transform || '') + ' rotate(' + deg + 'deg)';
+          // Rotate the map so vehicle heading points up
+          if (typeof map.setBearing === 'function') {
+            map.setBearing(deg);
           }
+          // Update position marker with direction arrow
+          updatePosMarkerWithHeading(deg);
         } else {
-          container.style.transform = '';
-          var allMarkers2 = document.querySelectorAll('.leaflet-marker-icon, .leaflet-marker-shadow');
-          for (var j = 0; j < allMarkers2.length; j++) {
-            allMarkers2[j].style.transform = '';
+          // Reset to north-up
+          if (typeof map.setBearing === 'function') {
+            map.setBearing(0);
           }
+          updatePosMarkerWithHeading(null);
         }
         break;
       case 'fitToCoordinates':
@@ -315,6 +380,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             type: "setCurrentPos",
             lat: currentPos.lat,
             lon: currentPos.lon,
+            heading: currentPos.heading,
             follow: followUserRef.current,
           })
         );
