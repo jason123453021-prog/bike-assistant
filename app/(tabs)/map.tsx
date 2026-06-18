@@ -1221,17 +1221,7 @@ export default function MapScreen() {
       />
 
       {/* ── 頂部導航指令條 ── */}
-      {(isNavigating || navInstruction !== "") && !friendNavDest && (
-        <View style={[styles.navBar, { top: insets.top + 8 }]}>
-          <IconSymbol name="location.fill" size={16} color="#fff" />
-          <Text style={styles.navText} numberOfLines={1}>{navInstruction || "沿路線前進"}</Text>
-          {distToEnd !== null && (
-            <Text style={styles.navDist}>
-              {distToEnd < 1000 ? `${Math.round(distToEnd)} m` : `${(distToEnd / 1000).toFixed(1)} km`}
-            </Text>
-          )}
-        </View>
-      )}
+      {/* 黑色導航橫條已移除（導航資訊已透過偶離路線提示橫幅顯示） */}
 
       {/* ── 好友導航指令條 ── */}
       {friendNavDest && (
@@ -1309,7 +1299,7 @@ export default function MapScreen() {
               guidanceEnabledRef.current = next; // 同步更新 ref，讓非同步回調也能立即感知
               setGuidanceEnabled(next);
               if (!next) {
-                // 關閉指引：立即停止語音、清除所有偏離狀態
+                // 關閉指引：立即停止語音、清除所有偷離狀態（包含 returnBearing）
                 stopSpeech();
                 setIsOffRoute(false);
                 setReturnPolyline([]);
@@ -1319,6 +1309,10 @@ export default function MapScreen() {
                 setReturnSteps([]);
                 setCurrentReturnStepIdx(0);
                 lastRerouteRef.current = 0;
+              } else {
+                // 重新開啟指引：重置偷離計時器，讓偷離檢測立即重新執行
+                lastRerouteRef.current = 0;
+                routeFetchFailCountRef.current = 0;
               }
             }}
           >
