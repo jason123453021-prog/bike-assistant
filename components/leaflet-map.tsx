@@ -105,6 +105,7 @@ var map = L.map('map', {
   doubleClickZoom: true,
   scrollWheelZoom: false,
   rotate: true,        // leaflet-rotate: enable bearing rotation
+  touchRotate: true,    // leaflet-rotate: enable two-finger rotation gesture
   rotateControl: false, // hide built-in rotate control UI
   bearing: 0,
 }).setView([25.0478, 121.5319], 14);

@@ -1,87 +1,101 @@
 /**
- * 虛擬功率計算模組
- * 基於 GPS 速度、坡度、風阻、滚動阻力計算估算功率
- * 支援天氣連動空氣密度（温度修正）
+ * 虛擬功率計算模組 v2
+ * 完整物理模型：滾動阻力 + 空氣阻力 + 重力阻力 + 加速阻力
+ * 支援天氣連動空氣密度（溫度+濕度修正）
+ * 下坡時功率合理降低（重力分量為負，輸出最低為 0）
  */
-
 // 物理常數
 const RHO_STD = 1.225;   // 標準空氣密度 kg/m³（海平面 15°C）
 export const G = 9.81;   // 重力加速度 m/s²
-
-// 騎乘參數預設値
-const CDA = 0.32;        // 空氣阻力係數 × 正面面積 (m²) — 一般公路車姿勢
-const CRR = 0.004;       // 滚動阻力係數 — 公路車胎
-const DRIVETRAIN_LOSS = 0.97; // 傳動效率
-
+// 公路車騎乘姿勢預設值（下把姿勢）
+const CDA = 0.32;        // 空氣阻力係數 × 正面面積 m²（公路車下把姿勢）
+const CRR = 0.004;       // 滾動阻力係數（公路車胎，良好路面）
+const DRIVETRAIN_LOSS = 0.97; // 傳動效率（鏈條損耗約 3%）
+// 加速阻力：含旋轉質量修正（輪組等效質量 ≈ 總質量 × 1.05）
+const ROTATING_MASS_FACTOR = 1.05;
 /**
- * 依溫度計算空氣密度（理想氣體公式）
- * 溫度越高 → 空氣密度越低 → 空氣阻力越小
- * @param tempC 環境溫度 °C
- * @returns 空氣密度 kg/m³
+ * 依溫度與濕度計算空氣密度（考慮水蒸氣影響）
+ * 溫度越高 → 空氣密度越低；濕度越高 → 空氣密度略降
  */
-export function calcAirDensity(tempC: number): number {
-  // 公式：ρ = 1.225 × (288.15 / (273.15 + T))
-  return RHO_STD * (288.15 / (273.15 + tempC));
+export function calcAirDensity(tempC: number, humidityPct = 60): number {
+  // 飽和水蒸氣壓（Magnus 公式）
+  const Psat = 6.1078 * Math.pow(10, (7.5 * tempC) / (237.3 + tempC)) * 100; // Pa
+  const Pv = (humidityPct / 100) * Psat;
+  const Pd = 101325 - Pv; // 乾空氣分壓
+  const rho = (Pd * 0.028964 + Pv * 0.018016) / (8.314 * (273.15 + tempC));
+  return Math.max(0.9, Math.min(1.4, rho)); // 合理範圍限制
 }
 
 export interface PowerInput {
-  speedMs: number;       // 速度 m/s
-  gradePct: number;      // 坡度 % (正値=上坡)
-  windSpeedMs: number;   // 風速 m/s (逆風為正)
-  riderMassKg: number;   // 騎士體重 kg
-  bikeMassKg?: number;   // 自行車重量 kg (預設 8kg)
-  /** 空氣密度 kg/m³，預設 1.225（可由 calcAirDensity(tempC) 獲得） */
+  speedMs: number;          // 速度 m/s
+  prevSpeedMs?: number;     // 上一次速度 m/s（用於計算加速阻力）
+  intervalSec?: number;     // 採樣間隔秒數（預設 3s）
+  gradePct: number;         // 坡度 % (正值=上坡，負值=下坡)
+  windSpeedMs: number;      // 逆風分量 m/s (逆風為正，順風為負)
+  riderMassKg: number;      // 騎士體重 kg
+  bikeMassKg?: number;      // 自行車重量 kg (預設 8kg)
+  /** 空氣密度 kg/m³，預設 1.225（可由 calcAirDensity(tempC, humidityPct) 獲得） */
   airDensityKgM3?: number;
 }
 
 // 功率計算上限（超過此值視為 GPS 誤差，截斷）
-const MAX_POWER_W = 800;
+const MAX_POWER_W = 900;
 // 坡度限制（GPS 高度誤差可能造成瞬間極端坡度）
-const MAX_GRADE_PCT = 25;
+const MAX_GRADE_PCT = 28;
 
 export function calculatePower(input: PowerInput): number {
   const {
     speedMs,
+    prevSpeedMs,
+    intervalSec = 3,
     gradePct,
     windSpeedMs,
     riderMassKg,
     bikeMassKg = 8,
-    airDensityKgM3 = RHO_STD,  // 預設使用標準空氣密度
+    airDensityKgM3 = RHO_STD,
   } = input;
 
-  if (speedMs <= 0) return 0;
-  // 速度上限：超過 25 m/s（90 km/h）視為 GPS 誤差
-  if (speedMs > 25) return 0;
+  if (speedMs <= 0.3) return 0; // 幾乎靜止，功率為 0
+  if (speedMs > 25) return 0;   // GPS 誤差保護
 
   const totalMass = riderMassKg + bikeMassKg;
-  // 坡度限制：GPS 高度誤差可能造成瞬間極端坡度，限制在 ±25%
   const clampedGrade = Math.max(-MAX_GRADE_PCT, Math.min(MAX_GRADE_PCT, gradePct));
   const gradeDecimal = clampedGrade / 100;
+  const slopeAngle = Math.atan(gradeDecimal);
 
-  // 空氣阻力功率（使用天氣連動空氣密度）
+  // ── 1. 空氣阻力功率 ──────────────────────────────────────────────────────
+  // 相對風速 = 騎行速度 + 逆風分量（順風時為負）
   const vAir = speedMs + windSpeedMs;
-  const fAero = 0.5 * airDensityKgM3 * CDA * vAir * vAir;
-  const pAero = fAero * speedMs;
+  const fAero = 0.5 * airDensityKgM3 * CDA * vAir * Math.abs(vAir);
+  const pAero = Math.max(0, fAero * speedMs);
 
-  // 滾動阻力功率
-  const fRoll = CRR * totalMass * G * Math.cos(Math.atan(gradeDecimal));
+  // ── 2. 滾動阻力功率 ──────────────────────────────────────────────────────
+  const fRoll = CRR * totalMass * G * Math.cos(slopeAngle);
   const pRoll = fRoll * speedMs;
 
-  // 重力功率（爬坡）
-  const pGrav = totalMass * G * gradeDecimal * speedMs;
+  // ── 3. 重力阻力功率（下坡時為負值，騎士少踩踏）────────────────────────────
+  const pGrav = totalMass * G * Math.sin(slopeAngle) * speedMs;
 
-  // 總功率（考慮傳動損耗）
-  const totalPower = (pAero + pRoll + pGrav) / DRIVETRAIN_LOSS;
+  // ── 4. 加速阻力功率（含旋轉質量修正）────────────────────────────────────
+  let pAcc = 0;
+  if (prevSpeedMs !== undefined && intervalSec > 0) {
+    const accel = (speedMs - prevSpeedMs) / intervalSec;
+    const mEff = totalMass * ROTATING_MASS_FACTOR;
+    pAcc = mEff * accel * speedMs;
+  }
 
-  // 截斷異常高功率（GPS 誤差導致）
-  return Math.max(0, Math.min(MAX_POWER_W, Math.round(totalPower)));
+  // ── 總功率（考慮傳動損耗，下坡時輸出最低為 0）────────────────────────────
+  const rawPower = (pAero + pRoll + pGrav + pAcc) / DRIVETRAIN_LOSS;
+  return Math.max(0, Math.min(MAX_POWER_W, Math.round(rawPower)));
 }
 
 /**
  * 計算卡路里消耗（基於功率和時間）
- * 使用效率係數 ~25%（人體機械效率）
+ * 人體機械效率約 25%（肌肉代謝效率）
+ * 公式：kcal = (W × s) / (4184 × efficiency)
  */
 export function calculateCalories(powerWatts: number, durationSeconds: number): number {
+  if (powerWatts <= 0 || durationSeconds <= 0) return 0;
   const efficiency = 0.25;
   const joules = powerWatts * durationSeconds;
   const kcal = joules / (4184 * efficiency);

@@ -266,7 +266,12 @@ export default function MapScreen() {
   const weatherTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const windDataRef = useRef<{ speed: number; direction: number }>({ speed: 0, direction: 0 });
   const airDensityRef = useRef<number>(calcAirDensity(25));
+  const prevSpeedMsRef = useRef<number>(0); // 用於計算加速阻力
   const headingRef = useRef<number>(0);
+  // 車頭朝前精度改善：7 點循環平均（消除 GPS heading 抖動）
+  const headingWindowRef = useRef<number[]>([]);
+  // 上一個 GPS 位置（用於低速時計算方位角）
+  const prevGpsForBearingRef = useRef<{ lat: number; lon: number } | null>(null);
 
   // 騎乘狀態
   const [mapRideActive, setMapRideActive] = useState(false);
@@ -437,19 +442,46 @@ export default function MapScreen() {
         },
         (loc) => {
           if (!active) return;
-          const { latitude, longitude, altitude, heading, speed } = loc.coords;
-          const hdg = heading ?? 0;
+                    const { latitude, longitude, altitude, heading, speed } = loc.coords;
+          const speedKmhRaw = (speed ?? 0) * 3.6;
+
+          // ── 車頭朝前精度改善 ─────────────────────────────────────────────────────────────────────
+          // 策略：速度 > 5 km/h 且 GPS heading 有效時使用 GPS heading
+          //         速度 ≤ 5 km/h 時改用兩點間 bearing（低速 GPS heading 不準）
+          let rawHdg = heading ?? -1;
+          if (rawHdg < 0 || speedKmhRaw <= 5) {
+            // 低速或 heading 無效：用上一個 GPS 位置計算方位角
+            const prev = prevGpsForBearingRef.current;
+            if (prev) {
+              const d = haversine(prev.lat, prev.lon, latitude, longitude);
+              if (d >= 5) { // 至少移動 5m 才更新方位角
+                rawHdg = bearing(prev.lat, prev.lon, latitude, longitude);
+              } else {
+                rawHdg = headingRef.current; // 保持上一次的方向
+              }
+            } else {
+              rawHdg = headingRef.current;
+            }
+          }
+          // 更新 GPS 位置參考點
+          prevGpsForBearingRef.current = { lat: latitude, lon: longitude };
+          // 7 點循環平均：消除 GPS heading 抖動（角度卷繞處理）
+          headingWindowRef.current.push(rawHdg);
+          if (headingWindowRef.current.length > 7) headingWindowRef.current.shift();
+          // 角度平均：轉換為向量再平均，避免 350°/10° 平均出 180° 的問題
+          const sinSum = headingWindowRef.current.reduce((s, h) => s + Math.sin((h * Math.PI) / 180), 0);
+          const cosSum = headingWindowRef.current.reduce((s, h) => s + Math.cos((h * Math.PI) / 180), 0);
+          const hdg = ((Math.atan2(sinSum, cosSum) * 180) / Math.PI + 360) % 360;
           headingRef.current = hdg;
-
           setCurrentPos({ lat: latitude, lon: longitude, heading: hdg });
-
           if (followUser) {
             mapRef.current?.animateCamera(
               { center: { latitude, longitude }, zoom: 17 }
             );
           }
-          // 車頭朝前模式：每次位置更新時同步地圖方向
-          if (headingUp && hdg !== 0) {
+          // 車頭朝前模式：僅在騎乘中且速度足夠時更新地圖方向
+          const currentState0 = stateRef.current;
+          if (headingUp && hdg !== 0 && currentState0.status === "active" && speedKmhRaw >= 2) {
             mapRef.current?.setBearing(hdg, true);
           }
 
@@ -535,14 +567,18 @@ export default function MapScreen() {
           lastLocationRef.current = loc;
 
           const headwindMs = getHeadwindMs(headingRef.current, windDataRef.current.direction, windDataRef.current.speed * 3.6);
+          const currentSpeedMs = speed ?? 0;
           const rawPower = calculatePower({
-            speedMs: speed ?? 0,
+            speedMs: currentSpeedMs,
+            prevSpeedMs: prevSpeedMsRef.current,
+            intervalSec: LOCATION_INTERVAL_SEC,
             gradePct: grade,
             windSpeedMs: headwindMs,
             riderMassKg: settings.weight,
             bikeMassKg: settings.bikeWeight ?? 10,
             airDensityKgM3: airDensityRef.current,
           });
+          prevSpeedMsRef.current = currentSpeedMs;
           // 5 點滑動平均：平滑功率，消除 GPS 抖動造成的瞬間高峰
           powerWindowRef.current.push(rawPower);
           if (powerWindowRef.current.length > 5) powerWindowRef.current.shift();
@@ -567,6 +603,7 @@ export default function MapScreen() {
             temperatureC: weatherRef.current?.temperature ?? 25,
             humidityPct: weatherRef.current?.humidity ?? 60,
             weatherCode: weatherRef.current?.weatherCode ?? 1,
+            ageYears: settings.age ?? 32,
           });
           dispatch({
             type: "SWEAT_UPDATE",
@@ -860,7 +897,9 @@ export default function MapScreen() {
           await stopBackgroundLocationTracking();
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           await cancelRidingNotification();
-          // 結束騎乘時清除崩潰恢復快照
+          // 結束騎乘清空地圖軌跡
+          setLiveTrail([]);
+          // 結束騎乘清除崩潰恢復快照
           await clearSnapshot();
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新
           await saveRecord();

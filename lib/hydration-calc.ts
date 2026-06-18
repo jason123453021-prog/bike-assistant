@@ -32,6 +32,8 @@ export interface HydrationInput {
   humidityPct?: number;
   /** 天氣代碼（WMO），用於判斷日照強度 */
   weatherCode?: number;
+  /** 騎士年齡（用於模擬心率區間），預設 32 */
+  ageYears?: number;
 }
 
 export interface HydrationResult {
@@ -77,6 +79,51 @@ function solarFactor(weatherCode: number): number {
   return 0.95;                          // 雨天/霧天（輻射熱少）
 }
 
+// ─── 心率區間模擬（依年齡推算 MHR，由功率估算心率區間）────────────────────────
+/**
+ * 最大心率估算：MHR = 220 - 年齡（Haskell & Fox, 1970）
+ * 不同年齡有不同的心率區間上下限
+ */
+function calcMHR(ageYears: number): number {
+  return Math.max(160, 220 - ageYears);
+}
+/**
+ * 依功率估算心率區間（Zone 1-5）
+ * FTP 估算值 ≈ 體重 × 3.5 W/kg（一般業餘騎士）
+ * Zone 1 (恢復): < 55% MHR
+ * Zone 2 (耐力): 55-65% MHR
+ * Zone 3 (節奏): 65-75% MHR
+ * Zone 4 (乳酸閾值): 75-85% MHR
+ * Zone 5 (無氧): > 85% MHR
+ */
+function estimateHRZone(
+  powerW: number,
+  riderMassKg: number,
+  ageYears: number
+): { zone: number; hrBpm: number } {
+  const mhr = calcMHR(ageYears);
+  const restHR = 60;
+  const hrReserve = mhr - restHR;
+  const ftpEstimate = riderMassKg * 3.5;
+  const powerRatio = powerW > 0 ? powerW / ftpEstimate : 0;
+  let hrPct: number;
+  let zone: number;
+  if (powerRatio < 0.5)       { hrPct = 0.50 + powerRatio * 0.10; zone = 1; }
+  else if (powerRatio < 0.75) { hrPct = 0.55 + (powerRatio - 0.5) * 0.40; zone = 2; }
+  else if (powerRatio < 0.90) { hrPct = 0.65 + (powerRatio - 0.75) * 0.667; zone = 3; }
+  else if (powerRatio < 1.05) { hrPct = 0.75 + (powerRatio - 0.90) * 0.667; zone = 4; }
+  else                        { hrPct = Math.min(1.0, 0.85 + (powerRatio - 1.05) * 0.5); zone = 5; }
+  const hrBpm = Math.round(restHR + hrReserve * hrPct);
+  return { zone, hrBpm };
+}
+/**
+ * 心率區間汗液修正係數
+ * 高心率區間 → 心血管系統高負荷 → 更多出汗
+ */
+function hrZoneSweatFactor(zone: number): number {
+  const factors = [0.85, 1.0, 1.15, 1.35, 1.60];
+  return factors[Math.max(0, Math.min(4, zone - 1))];
+}
 // ─── 強度係數（基於功率 W 或速度）──────────────────────────────────────────────
 // 參考：休息~0.5 L/h, 輕鬆騎~0.8 L/h, 中等~1.2 L/h, 激烈~1.8 L/h, 極限~2.5 L/h
 function intensityFactor(powerW: number, speedKmh: number): { factor: number; label: string } {
@@ -111,16 +158,21 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
     temperatureC,
     humidityPct = 60,
     weatherCode = 1,
+    ageYears = 32,
   } = input;
 
   // 體表面積（標準人 BSA ≈ 1.7 m²）
   const bsa = calcBSA(heightCm, weightKg);
-  const bsaFactor = bsa / 1.7; // 相對標準人的修正
+  const bsaFactor = bsa / 1.7;
 
-  // 強度
+  // 強度係數（基於功率/速度）
   const { factor: intFactor, label: intensityLabel } = intensityFactor(powerW, speedKmh);
 
-  // 各修正係數
+  // 心率區間模擬（依年齡推算 MHR，由功率估算心率區間）
+  const { zone: hrZone } = estimateHRZone(powerW, weightKg, ageYears);
+  const hrFactor = hrZoneSweatFactor(hrZone);
+
+  // 各環境修正係數
   const tFactor = tempFactor(temperatureC);
   const hFactor = humidityFactor(humidityPct);
   const sFactor = solarFactor(weatherCode);
@@ -129,16 +181,15 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   // 基礎汗液流失率 L/h（標準人、中等強度、20°C、60%濕度）
   const BASE_RATE_LPH = 0.8;
 
-  // 最終汗液流失率 ml/h
+  // 最終汗液流失率 ml/h（整合心率區間修正）
   const sweatRatePerHour = Math.round(
-    BASE_RATE_LPH * 1000 * bsaFactor * intFactor * tFactor * hFactor * sFactor * aBonusFactor
+    BASE_RATE_LPH * 1000 * bsaFactor * intFactor * hrFactor * tFactor * hFactor * sFactor * aBonusFactor
   );
 
   // 本次間隔流失量 ml
   const sweatLossMl = (sweatRatePerHour / 3600) * intervalSec;
 
-  // 建議補水量：以每次流失量的 1.2 倍補充（補充流失 + 20% 緩衝）
-  // 最少 150ml，最多 500ml
+  // 建議補水量：最少 150ml，最多 500ml
   const recommendedRefillMl = Math.min(500, Math.max(150, Math.round(sweatRatePerHour * 0.25)));
 
   return {

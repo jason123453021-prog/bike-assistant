@@ -29,6 +29,7 @@ export interface RideRecord {
   route: LocationPoint[];
   totalSweatMl: number;   // 總汗液流失量 ml
   refillCount: number;    // 補水次數
+  totalPausedSec: number; // 總暫停時間（秒）
 }
 
 export interface RideState {
@@ -43,7 +44,8 @@ export interface RideState {
   avgPower: number;
   maxPower: number;
   totalAscent: number;
-  calories: number;
+  calories: number;         // 自上次補給後累計（觸發補給提醒用）
+  totalCalories: number;     // 全程總卡路里（不被補給重置）
   calorieProgress: number;  // 0-1
 
   // ─── 水分流失追蹤 ─────────────────────────────────────────────────────────
@@ -64,6 +66,10 @@ export interface RideState {
   powerHistory: number[];
   powerZones: number[];     // [z1, z2, z3, z4, z5] count
   records: RideRecord[];
+  /** 總暫停時間（秒） */
+  totalPausedSec: number;
+  /** 暫停開始時間戳（ms），用於計算本次暫停時間 */
+  pauseStartTime: number | null;
 }
 
 type RideAction =
@@ -118,6 +124,9 @@ const initialState: RideState = {
   powerHistory: [],
   powerZones: [0, 0, 0, 0, 0],
   records: [],
+  totalPausedSec: 0,
+  pauseStartTime: null,
+  totalCalories: 0,
 };
 
 function rideReducer(state: RideState, action: RideAction): RideState {
@@ -132,10 +141,23 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       };
 
     case "PAUSE":
-      return { ...state, status: "paused" };
+      return {
+        ...state,
+        status: "paused",
+        currentSpeed: 0,   // 暫停時速度歸零
+        currentPower: 0,   // 暫停時瓦數歸零
+        pauseStartTime: Date.now(),
+      };
 
-    case "RESUME":
-      return { ...state, status: "active" };
+    case "RESUME": {
+      const pausedMs = state.pauseStartTime ? Date.now() - state.pauseStartTime : 0;
+      return {
+        ...state,
+        status: "active",
+        totalPausedSec: state.totalPausedSec + Math.round(pausedMs / 1000),
+        pauseStartTime: null,
+      };
+    }
 
     case "STOP":
       return { ...state, status: "finished" };
@@ -156,6 +178,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       const newZones = [...state.powerZones];
       newZones[zone]++;
       const newCalories = state.calories + calories;
+      const newTotalCalories = state.totalCalories + calories;
 
       return {
         ...state,
@@ -170,6 +193,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
         maxPower: Math.max(state.maxPower, power),
         totalAscent: state.totalAscent + ascent,
         calories: newCalories,
+        totalCalories: newTotalCalories,
         distance: state.distance + (point.speed ?? 0) * 3,
         powerHistory: newPowerHistory,
         powerZones: newZones,
@@ -190,7 +214,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
     }
 
     case "CONSUME_CALORIES":
-      // 重置卡路里累計和進度（下次補給從零開始計算）
+      // 重置補給間卡路里累計（totalCalories 保留全程累計）
       return { ...state, calories: 0, calorieProgress: 0 };
 
     case "CONSUME_WATER":
@@ -287,13 +311,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       avgSpeed: state.avgSpeed,
       maxSpeed: state.maxSpeed,
       totalAscent: state.totalAscent,
-      calories: Math.round(state.calories),
+      calories: Math.round(state.totalCalories),  // 使用全程總卡路里（不被補給重置）
       avgPower: state.avgPower,
       maxPower: state.maxPower,
       powerZones: state.powerZones,
       route: decimateRoute(state.route),  // 抽樣壓縮，最多 500 點
       totalSweatMl: Math.round(state.totalSweatMl),
       refillCount: state.refillCount,
+      totalPausedSec: state.totalPausedSec,
     };
     dispatch({ type: "ADD_RECORD", record });
     const existing = await AsyncStorage.getItem(STORAGE_KEY);

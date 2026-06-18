@@ -26,6 +26,7 @@ export interface AppSettings {
   // Personal
   weight: number;       // kg 騎手體重
   height: number;       // cm
+  age: number;          // 騎手年齡（用於推算最大心率 MHR）
   ftp: number;          // Functional Threshold Power (watts)
   bikeWeight: number;   // kg 單車+裝備總重
   // Thresholds
@@ -77,6 +78,7 @@ const DEFAULT_SIMPLIFIED_FIELDS: SimplifiedModeFields = {
 const DEFAULT_SETTINGS: AppSettings = {
   weight: 70,
   height: 175,
+  age: 32,
   ftp: 200,
   bikeWeight: 10,
   calorieThreshold: 300,

@@ -98,7 +98,8 @@ export function RideSummaryModal({ visible, onClose }: RideSummaryModalProps) {
       `均速：${avgSpd} km/h`,
       `最高速：${state.maxSpeed.toFixed(1)} km/h`,
       `爬升：${Math.round(state.totalAscent)} m`,
-      `卡路里：${Math.round(state.calories)} kcal`,
+      `卡路里：${Math.round(state.totalCalories)} kcal`,
+      `暫停時間：${formatDuration(state.totalPausedSec)}`,
       `均功率：${state.avgPower} W`,
       `最大功率：${state.maxPower} W`,
     ].join("\n");
@@ -160,7 +161,8 @@ export function RideSummaryModal({ visible, onClose }: RideSummaryModalProps) {
               <StatCell label="均速" value={avgSpd} unit="km/h" colors={colors} />
               <StatCell label="最高速" value={state.maxSpeed.toFixed(1)} unit="km/h" colors={colors} />
               <StatCell label="爬升" value={`${Math.round(state.totalAscent)}`} unit="m" colors={colors} />
-              <StatCell label="卡路里" value={`${Math.round(state.calories)}`} unit="kcal" colors={colors} />
+              <StatCell label="卡路里" value={`${Math.round(state.totalCalories)}`} unit="kcal" colors={colors} />
+              <StatCell label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" colors={colors} />
               <StatCell label="均功率" value={`${state.avgPower}`} unit="W" colors={colors} accent />
               <StatCell label="最大功率" value={`${state.maxPower}`} unit="W" colors={colors} accent />
             </View>
