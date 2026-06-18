@@ -1658,6 +1658,7 @@ export default function MapScreen() {
         calories={Math.round(state.calories)}
         pausedTime={formatDuration(state.totalPausedSec ?? 0)}
         fields={settings.simplifiedModeFields}
+        fieldOrder={settings.simplifiedModeFieldOrder}
       />
 
       {/* ── 好友詳細卡片 ── */}

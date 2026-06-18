@@ -9,7 +9,7 @@ import {
   StatusBar,
 } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import type { SimplifiedModeFields } from "@/lib/settings-context";
+import type { SimplifiedModeFields, SimplifiedFieldKey } from "@/lib/settings-context";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -32,6 +32,8 @@ export interface SimplifiedNavOverlayProps {
   pausedTime?: string;     // 暫停時間
   // 自訂顯示欄位（由設定頁面控制）
   fields?: SimplifiedModeFields;
+  // 欄位顯示順序
+  fieldOrder?: SimplifiedFieldKey[];
 }
 
 const DEFAULT_FIELDS: SimplifiedModeFields = {
@@ -64,21 +66,35 @@ export function SimplifiedNavOverlay({
   calories,
   pausedTime,
   fields,
+  fieldOrder,
 }: SimplifiedNavOverlayProps) {
   if (!visible) return null;
 
   const f = fields ?? DEFAULT_FIELDS;
 
-  // 底部欄位（距離、時間、現在時間）
+  // 底部欄位：依 fieldOrder 排序，跳過 direction/remaining/speed（展示在其他區址）
+  const BOTTOM_KEY_MAP: Partial<Record<SimplifiedFieldKey, () => { value: string; label: string } | null>> = {
+    showDistance: () => f.showDistance ? { value: distance.toFixed(2), label: "公里" } : null,
+    showElapsed: () => f.showElapsed ? { value: elapsedTime, label: "時間" } : null,
+    showCurrentTime: () => f.showCurrentTime ? { value: currentTime, label: "現在" } : null,
+    showGrade: () => f.showGrade ? { value: grade !== undefined ? `${grade > 0 ? "+" : ""}${grade.toFixed(1)}%` : "--", label: "坡度" } : null,
+    showPower: () => f.showPower ? { value: power !== undefined ? `${power}W` : "--", label: "功率" } : null,
+    showAvgSpeed: () => f.showAvgSpeed ? { value: avgSpeed !== undefined && avgSpeed > 0 ? avgSpeed.toFixed(1) : "--", label: "均速" } : null,
+    showCalories: () => f.showCalories ? { value: calories !== undefined ? `${calories}` : "--", label: "kcal" } : null,
+    showPausedTime: () => f.showPausedTime ? { value: pausedTime ?? "--", label: "暫停" } : null,
+  };
+  const BOTTOM_KEYS: SimplifiedFieldKey[] = ["showDistance", "showElapsed", "showCurrentTime", "showGrade", "showPower", "showAvgSpeed", "showCalories", "showPausedTime"];
+  const orderedKeys = fieldOrder
+    ? [...fieldOrder.filter((k) => BOTTOM_KEYS.includes(k)), ...BOTTOM_KEYS.filter((k) => !fieldOrder.includes(k))]
+    : BOTTOM_KEYS;
   const bottomItems: { value: string; label: string }[] = [];
-  if (f.showDistance) bottomItems.push({ value: distance.toFixed(2), label: "公里" });
-  if (f.showElapsed) bottomItems.push({ value: elapsedTime, label: "時間" });
-  if (f.showCurrentTime) bottomItems.push({ value: currentTime, label: "現在" });
-  if (f.showGrade) bottomItems.push({ value: grade !== undefined ? `${grade > 0 ? "+" : ""}${grade.toFixed(1)}%` : "--", label: "坡度" });
-  if (f.showPower) bottomItems.push({ value: power !== undefined ? `${power}W` : "--", label: "功率" });
-  if (f.showAvgSpeed) bottomItems.push({ value: avgSpeed !== undefined && avgSpeed > 0 ? avgSpeed.toFixed(1) : "--", label: "均速" });
-  if (f.showCalories) bottomItems.push({ value: calories !== undefined ? `${calories}` : "--", label: "kcal" });
-  if (f.showPausedTime) bottomItems.push({ value: pausedTime ?? "--", label: "暫停" });
+  for (const key of orderedKeys) {
+    const fn = BOTTOM_KEY_MAP[key];
+    if (fn) {
+      const item = fn();
+      if (item) bottomItems.push(item);
+    }
+  }
 
   return (
     <Pressable style={styles.overlay} onPress={onDismiss}>

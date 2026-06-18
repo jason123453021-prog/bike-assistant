@@ -42,6 +42,13 @@ export default function SettingsScreen() {
     isNumber: boolean;
   }>({ visible: false, key: "", label: "", value: "", unit: "", isNumber: true });
 
+  // 各區塊折疊狀態（預設全部展開）
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   // 拖曳排序狀態
   const [dragOrder, setDragOrder] = useState<NormalFieldKey[]>(
     settings.normalModeFieldOrder ?? DEFAULT_FIELD_ORDER
@@ -191,8 +198,8 @@ export default function SettingsScreen() {
         <Text style={[styles.title, { color: colors.foreground }]}>設定</Text>
 
         {/* ── 個人資料 ── */}
-        <SectionHeader title="個人資料" colors={colors} />
-        <View style={[styles.section, { borderColor: colors.border }]}>
+        <SectionHeader title="個人資料" colors={colors} onToggle={() => toggleSection("personal")} collapsed={collapsedSections["personal"]} />
+        {!collapsedSections["personal"] && <View style={[styles.section, { borderColor: colors.border }]}>
           <NumberRow
             icon="person.fill"
             label="體重"
@@ -239,11 +246,11 @@ export default function SettingsScreen() {
             colors={colors}
             onPress={() => openEdit("ftp", "FTP", settings.ftp, "W")}
           />
-        </View>
+        </View>}
 
         {/* ── 補給閾值 ── */}
-        <SectionHeader title="補給閾值" colors={colors} />
-        <View style={[styles.section, { borderColor: colors.border }]}>
+        <SectionHeader title="補給閾值" colors={colors} onToggle={() => toggleSection("supply")} collapsed={collapsedSections["supply"]} />
+        {!collapsedSections["supply"] && <View style={[styles.section, { borderColor: colors.border }]}>
           <NumberRow
             icon="flame.fill"
             label="卡路里提醒閾值"
@@ -264,11 +271,11 @@ export default function SettingsScreen() {
             hint="每流失此量汗液即提醒補水"
             onPress={() => openEdit("waterThreshold", "汗液流失提醒閾值 (ml)", settings.waterThreshold, "ml")}
           />
-        </View>
+        </View>}
 
         {/* ── 回饋設定 ── */}
-        <SectionHeader title="回饋設定" colors={colors} />
-        <View style={[styles.section, { borderColor: colors.border }]}>
+        <SectionHeader title="回饋設定" colors={colors} onToggle={() => toggleSection("feedback")} collapsed={collapsedSections["feedback"]} />
+        {!collapsedSections["feedback"] && <View style={[styles.section, { borderColor: colors.border }]}>
           <ToggleRow
             icon="iphone.radiowaves.left.and.right"
             label="震動回饋"
@@ -300,11 +307,11 @@ export default function SettingsScreen() {
             colors={colors}
             onToggle={(v) => updateSettings({ notificationEnabled: v })}
           />
-                </View>
+        </View>}
 
         {/* ── 帳號與社交 ── */}
-        <SectionHeader title="帳號與好友" colors={colors} />
-        <View style={[styles.section, { borderColor: colors.border }]}>
+        <SectionHeader title="帳號與好友" colors={colors} onToggle={() => toggleSection("account")} collapsed={collapsedSections["account"]} />
+        {!collapsedSections["account"] && <View style={[styles.section, { borderColor: colors.border }]}>
           {isAuthenticated ? (
             <>
               {/* 個人資料卡片 */}
@@ -358,11 +365,11 @@ export default function SettingsScreen() {
               <IconSymbol name="chevron.right" size={16} color={colors.muted} />
             </Pressable>
           )}
-        </View>
+        </View>}
 
-        {/* ── 隔伍遙測 ── */}
-        <SectionHeader title="隊伍遙測" colors={colors} />
-        <View style={[styles.section, { borderColor: colors.border }]}>
+        {/* ── 隊伍遙測 ── */}
+        <SectionHeader title="隊伍遙測" colors={colors} onToggle={() => toggleSection("team")} collapsed={collapsedSections["team"]} />
+        {!collapsedSections["team"] && <View style={[styles.section, { borderColor: colors.border }]}>
           <ToggleRow
             icon="person.2.fill"
             label="開啟隊伍遙測"
@@ -386,11 +393,11 @@ export default function SettingsScreen() {
             colors={colors}
             onToggle={(v) => updateSettings({ showFriendDistance: v })}
           />
-        </View>
+        </View>}
 
         {/* ── 隱私設定 ── */}
-        <SectionHeader title="安全與隱私" colors={colors} />
-        <View style={[styles.section, { borderColor: colors.border }]}>
+        <SectionHeader title="安全與隱私" colors={colors} onToggle={() => toggleSection("privacy")} collapsed={collapsedSections["privacy"]} />
+        {!collapsedSections["privacy"] && <View style={[styles.section, { borderColor: colors.border }]}>
           <ToggleRow
             icon="eye.slash.fill"
             label="隱身模式"
@@ -406,11 +413,11 @@ export default function SettingsScreen() {
             colors={colors}
             onToggle={(v) => updateSettings({ shareLocation: v })}
           />
-        </View>
+        </View>}
 
         {/* ── 精簡導航模式 ── */}
-        <SectionHeader title="精簡導航模式" colors={colors} />
-        <View style={[styles.section, { borderColor: colors.border }]}>
+        <SectionHeader title="精簡導航模式" colors={colors} onToggle={() => toggleSection("simplified")} collapsed={collapsedSections["simplified"]} />
+        {!collapsedSections["simplified"] && <View style={[styles.section, { borderColor: colors.border }]}>
           <View style={styles.row}>
             <IconSymbol name="moon.fill" size={18} color={colors.muted} />
             <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>模式選擇</Text>
@@ -467,7 +474,7 @@ export default function SettingsScreen() {
               </View>
             </>
           )}
-        </View>
+        </View>}
 
         {/* ── 導航儀表板欄位（拖曳排序 + 開關） ── */}
         {/* 導航儀表板欄位標題 + 恢復預設按鈕 */}
@@ -715,9 +722,28 @@ export default function SettingsScreen() {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function SectionHeader({ title, colors }: { title: string; colors: any }) {
+function SectionHeader({
+  title, colors, onToggle, collapsed,
+}: {
+  title: string; colors: any;
+  onToggle?: () => void;
+  collapsed?: boolean;
+}) {
+  if (!onToggle) {
+    return <Text style={[styles.sectionHeader, { color: colors.muted }]}>{title}</Text>;
+  }
   return (
-    <Text style={[styles.sectionHeader, { color: colors.muted }]}>{title}</Text>
+    <Pressable
+      onPress={onToggle}
+      style={({ pressed }) => ([
+        { flexDirection: "row", alignItems: "center", paddingVertical: 2, opacity: pressed ? 0.7 : 1, flex: 1 },
+      ])}
+    >
+      <Text style={[styles.sectionHeader, { color: colors.muted, flex: 1, marginBottom: 0 }]}>{title}</Text>
+      <Text style={{ fontSize: 12, color: colors.muted, marginRight: 4 }}>
+        {collapsed ? "▶" : "▼"}
+      </Text>
+    </Pressable>
   );
 }
 
