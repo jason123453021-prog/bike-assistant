@@ -1202,7 +1202,7 @@ export default function MapScreen() {
           isAuthenticated && settings.teamTelemetryEnabled && teamQuery.data
             ? teamQuery.data.map((f: any) => ({
                 userId: f.userId,
-                name: f.displayName ?? f.email?.split('@')[0] ?? '好友',
+                name: f.name ?? f.email?.split('@')[0] ?? '好友',
                 latitude: f.latitude,
                 longitude: f.longitude,
                 speed: f.speed ?? 0,
@@ -1401,8 +1401,8 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* ── GPX 路線提示（無路線時） ── */}
-      {!gpxRoute && !isActive && (
+      {/* ── GPX 路線提示（無路線時，且無導航指令條顯示時） ── */}
+      {!gpxRoute && !isActive && !isNavigating && navInstruction === "" && !friendNavDest && (
         <View style={[styles.noRouteBadge, { top: insets.top + 8, left: 16, right: 72 }]}>
           <IconSymbol name="map.fill" size={13} color="rgba(255,255,255,0.5)" />
           <Text style={styles.noRouteText}>前往「路線」頁面匯入 GPX 路線</Text>
@@ -1625,31 +1625,7 @@ export default function MapScreen() {
         }}
       />
 
-      {/* ── 隊伍遙測橫幅（騎乘中、已登入、開啟隊伍遙測）── */}
-      {isActive && isAuthenticated && settings.teamTelemetryEnabled && teamQuery.data && teamQuery.data.length > 0 && (
-        <View style={[styles.teamBanner, { bottom: tabBarH + dynamicCollapsedH + 8 }]}>
-          {teamQuery.data.slice(0, 3).map((friend) => {
-            const distM = currentPos
-              ? Math.round(haversine(currentPos.lat, currentPos.lon, friend.latitude, friend.longitude))
-              : null;
-            const dwellInfo = (teamQuery.data as any[]).find?.((d: any) => d.userId === friend.userId);
-            return (
-              <View key={friend.userId} style={styles.teamMember}>
-                <View style={[styles.teamDot, { backgroundColor: friend.speed > 1 ? "#34C759" : "#FF9500" }]} />
-                <Text style={styles.teamName} numberOfLines={1}>{friend.name ?? "好友"}</Text>
-                {distM !== null && settings.showFriendDistance && (
-                  <Text style={styles.teamDist}>
-                    {distM < 1000 ? `${distM}m` : `${(distM / 1000).toFixed(1)}km`}
-                  </Text>
-                )}
-                {friend.speed > 0 && (
-                  <Text style={styles.teamSpeed}>{(friend.speed * 3.6).toFixed(0)}km/h</Text>
-                )}
-              </View>
-            );
-          })}
-        </View>
-      )}
+      {/* 隊伍遙測橫幅已移除（好友位置資訊已可透過點擊地圖標記查看） */}
 
       {/* ── 精簡導航模式── */}
       <SimplifiedNavOverlay
