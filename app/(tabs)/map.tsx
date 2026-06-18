@@ -252,6 +252,8 @@ export default function MapScreen() {
   const [currentGrade, setCurrentGrade] = useState(0);
   const prevAltRef = useRef<number | null>(null);
   const prevPosRef = useRef<{ lat: number; lon: number } | null>(null);
+  // 坡度平滑：7 點滑動平均，消除 GPS 高度抖動
+  const gradeWindowRef = useRef<number[]>([]);
 
   // 天氣
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -448,16 +450,27 @@ export default function MapScreen() {
             setLiveTrail((prev) => [...prev, { latitude, longitude }]);
           }
 
-          // 即時坡度
+          // 即時坡度：最小距離 10m、異常値過濾、7 點滑動平均
           if (prevPosRef.current && prevAltRef.current !== null && altitude !== null) {
             const d = haversine(prevPosRef.current.lat, prevPosRef.current.lon, latitude, longitude);
-            if (d > 2) {
-              const grade = ((altitude - prevAltRef.current) / d) * 100;
-              setCurrentGrade(Math.round(grade * 10) / 10);
+            if (d >= 10) {
+              const rawGrade = ((altitude - prevAltRef.current) / d) * 100;
+              // 過濾 GPS 异常値（超過 ±30% 視為誤差）
+              if (Math.abs(rawGrade) <= 30) {
+                gradeWindowRef.current.push(rawGrade);
+                if (gradeWindowRef.current.length > 7) gradeWindowRef.current.shift();
+                const smoothed = gradeWindowRef.current.reduce((a, b) => a + b, 0) / gradeWindowRef.current.length;
+                setCurrentGrade(Math.round(smoothed * 10) / 10);
+              }
+              // 更新參考點（僅在距離足夠時更新）
+              prevPosRef.current = { lat: latitude, lon: longitude };
+              if (altitude !== null) prevAltRef.current = altitude;
             }
+          } else {
+            // 初始化參考點
+            prevPosRef.current = { lat: latitude, lon: longitude };
+            if (altitude !== null) prevAltRef.current = altitude;
           }
-          prevPosRef.current = { lat: latitude, lon: longitude };
-          if (altitude !== null) prevAltRef.current = altitude;
 
           // GPX 導航
           if (isNavigating && gpxRoute && gpxRoute.points.length > 0) {
@@ -749,6 +762,7 @@ export default function MapScreen() {
     prevAltRef.current = null;
     prevPosRef.current = null;
     powerWindowRef.current = [];
+    gradeWindowRef.current = [];
     lowSpeedCountRef.current = 0;
     arrivedRef.current = false;
     setIsOffRoute(false);
