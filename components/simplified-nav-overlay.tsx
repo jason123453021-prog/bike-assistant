@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Pressable,
+  ScrollView,
   StyleSheet,
   Dimensions,
   StatusBar,
@@ -125,19 +126,30 @@ export function SimplifiedNavOverlay({
         <View style={styles.speedBlock} />
       )}
 
-      {/* 底部：距離 + 時間 + 當前時間（依設定動態顯示） */}
+      {/* 底部：距離 + 時間 + 當前時間（依設定動態顯示，超過3個橫向捲動） */}
       {bottomItems.length > 0 && (
-        <View style={styles.bottomRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.bottomRow,
+            bottomItems.length <= 3 && { width: "100%", justifyContent: "space-around" },
+          ]}
+          style={{ width: "100%" }}
+        >
           {bottomItems.map((item, idx) => (
             <React.Fragment key={item.label}>
               {idx > 0 && <View style={styles.bottomDivider} />}
-              <View style={styles.bottomItem}>
+              <View style={[
+                styles.bottomItem,
+                bottomItems.length > 3 && { minWidth: SCREEN_W / 3.5 },
+              ]}>
                 <Text style={styles.bottomValue}>{item.value}</Text>
                 <Text style={styles.bottomLabel}>{item.label}</Text>
               </View>
             </React.Fragment>
           ))}
-        </View>
+        </ScrollView>
       )}
 
       {/* 提示文字 */}
@@ -217,8 +229,7 @@ const styles = StyleSheet.create({
   bottomRow: {
     flexDirection: "row",
     alignItems: "center",
-    width: "100%",
-    justifyContent: "space-around",
+    paddingHorizontal: 8,
   },
   bottomItem: {
     alignItems: "center",

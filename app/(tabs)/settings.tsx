@@ -405,7 +405,23 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── 導航儀表板欄位（拖曳排序 + 開關） ── */}
-        <SectionHeader title="導航儀表板欄位" colors={colors} />
+        {/* 導航儀表板欄位標題 + 恢復預設按鈕 */}
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+          <SectionHeader title="導航儀表板欄位" colors={colors} />
+          <Pressable
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setDragOrder(DEFAULT_FIELD_ORDER);
+              updateFieldOrder(DEFAULT_FIELD_ORDER);
+            }}
+            style={({ pressed }) => ([
+              styles.resetBtn,
+              { borderColor: colors.border, backgroundColor: pressed ? colors.surface : "transparent" },
+            ])}
+          >
+            <Text style={{ fontSize: 12, color: colors.muted }}>恢復預設</Text>
+          </Pressable>
+        </View>
         <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8, paddingHorizontal: 4 }}>
           拖曳右側☰按鈕可調整顯示順序，前 6 格在收縮面板顯示
         </Text>
@@ -419,8 +435,21 @@ export default function SettingsScreen() {
                 <Animated.View
                   style={[
                     styles.row,
-                    isDragging && { backgroundColor: colors.surface, opacity: 0.85, zIndex: 10, elevation: 8 },
-                    isHover && { backgroundColor: colors.border + "40" },
+                    isDragging && {
+                      backgroundColor: colors.surface,
+                      opacity: 0.92,
+                      zIndex: 20,
+                      elevation: 12,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.22,
+                      shadowRadius: 8,
+                      transform: [{ scale: 1.025 }],
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: "#34C759",
+                    },
+                    isHover && { backgroundColor: colors.border + "55" },
                   ]}
                 >
                   <Switch
@@ -433,11 +462,19 @@ export default function SettingsScreen() {
                   <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1, marginLeft: 4 }]}>
                     {FIELD_LABELS[key]}
                   </Text>
-                  <Text style={{ color: colors.muted, fontSize: 11, marginRight: 4 }}>
-                    {idx < 6 ? `面板` : `展開`}
+                  <Text style={[
+                    { fontSize: 11, marginRight: 4 },
+                    idx < 6
+                      ? { color: "#34C759", fontWeight: "600" }
+                      : { color: colors.muted },
+                  ]}>
+                    {idx < 6 ? "面板" : "展開"}
                   </Text>
                   <View {...responder.panHandlers} style={styles.dragHandle}>
-                    <Text style={{ color: colors.muted, fontSize: 20, lineHeight: 24 }}>☰</Text>
+                    <Text style={[
+                      { fontSize: 20, lineHeight: 24 },
+                      isDragging ? { color: "#34C759" } : { color: colors.muted },
+                    ]}>☰</Text>
                   </View>
                 </Animated.View>
                 {idx < dragOrder.length - 1 && <Divider colors={colors} />}
@@ -708,5 +745,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 8,
+  },
+  resetBtn: {
+    marginLeft: "auto",
+    marginTop: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
   },
 });
