@@ -1,16 +1,15 @@
 import * as Linking from "expo-linking";
 import * as ReactNative from "react-native";
 
-// Extract scheme from bundle ID (last segment timestamp, prefixed with "manus")
-// e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
-const bundleId = "com.app.bike_assistant";
-const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
-const schemeFromBundleId = `manus${timestamp}`;
+// Deep link scheme must match app.config.ts `scheme` exactly
+// app.config.ts: scheme = "manus20260617"
+const schemeFromBundleId = "manus20260617";
 
 const env = {
-  portal: process.env.EXPO_PUBLIC_OAUTH_PORTAL_URL ?? "",
-  server: process.env.EXPO_PUBLIC_OAUTH_SERVER_URL ?? "",
-  appId: process.env.EXPO_PUBLIC_APP_ID ?? "",
+  // Manus platform injects these as VITE_ vars; EXPO_PUBLIC_ is the fallback for local dev
+  portal: process.env.EXPO_PUBLIC_OAUTH_PORTAL_URL ?? process.env.VITE_OAUTH_PORTAL_URL ?? "",
+  server: process.env.EXPO_PUBLIC_OAUTH_SERVER_URL ?? process.env.OAUTH_SERVER_URL ?? "",
+  appId: process.env.EXPO_PUBLIC_APP_ID ?? process.env.VITE_APP_ID ?? "",
   ownerId: process.env.EXPO_PUBLIC_OWNER_OPEN_ID ?? "",
   ownerName: process.env.EXPO_PUBLIC_OWNER_NAME ?? "",
   apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? "",
