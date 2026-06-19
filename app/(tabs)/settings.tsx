@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  ActivityIndicator,
 } from "react-native";
 
 // 啟用 Android LayoutAnimation
@@ -36,27 +37,53 @@ export default function SettingsScreen() {
   const { user, isAuthenticated, logout } = useAuth();
   const deleteAccountMutation = trpc.auth.deleteAccount.useMutation();
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      "永久刪除帳號",
-      "此操作無法復原。您的帳號、好友關係及所有伺服器資料將被永久刪除。本機騎乘記錄不受影響。\n\n確定要刪除帳號嗎？",
-      [
-        { text: "取消", style: "cancel" },
-        {
-          text: "永久刪除",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteAccountMutation.mutateAsync();
-              logout();
-            } catch {
-              Alert.alert("刪除失敗", "請稍後再試，或聯絡開發者。");
-            }
-          },
-        },
-      ]
-    );
-  };
+  // ── 刪除帳號防呆 Modal 狀態 ──
+  const [deleteModal, setDeleteModal] = useState<{
+    step: "confirm1" | "confirm2" | "loading" | "success" | "error";
+    visible: boolean;
+    confirmInput: string;
+    errorMsg: string;
+  }>({
+    step: "confirm1",
+    visible: false,
+    confirmInput: "",
+    errorMsg: "",
+  });
+  const CONFIRM_KEYWORD = "刪除帳號";
+
+  const openDeleteModal = useCallback(() => {
+    setDeleteModal({ step: "confirm1", visible: true, confirmInput: "", errorMsg: "" });
+  }, []);
+
+  const closeDeleteModal = useCallback(() => {
+    setDeleteModal((prev) => ({ ...prev, visible: false, confirmInput: "", errorMsg: "" }));
+  }, []);
+
+  const handleDeleteAccount = openDeleteModal;
+
+  const proceedToConfirm2 = useCallback(() => {
+    setDeleteModal((prev) => ({ ...prev, step: "confirm2", confirmInput: "", errorMsg: "" }));
+  }, []);
+
+  const executeDelete = useCallback(async () => {
+    const { confirmInput } = deleteModal;
+    if (confirmInput.trim() !== CONFIRM_KEYWORD) {
+      setDeleteModal((prev) => ({ ...prev, errorMsg: `請輸入「${CONFIRM_KEYWORD}」以確認` }));
+      return;
+    }
+    setDeleteModal((prev) => ({ ...prev, step: "loading" }));
+    try {
+      await deleteAccountMutation.mutateAsync();
+      setDeleteModal((prev) => ({ ...prev, step: "success" }));
+      // 2 秒後自動關閉並登出
+      setTimeout(() => {
+        closeDeleteModal();
+        logout();
+      }, 2000);
+    } catch {
+      setDeleteModal((prev) => ({ ...prev, step: "error", errorMsg: "刪除失敗，請稍後再試或聯絡開發者。" }));
+    }
+  }, [deleteModal, deleteAccountMutation, logout, closeDeleteModal]);
   const [editModal, setEditModal] = useState<{
     visible: boolean;
     key: string;
@@ -762,6 +789,139 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 刪除帳號防呆 Modal */}
+      <Modal
+        visible={deleteModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeDeleteModal}
+      >
+        <View style={styles.editOverlay}>
+          <View style={[styles.editCard, { backgroundColor: colors.surface, borderColor: colors.border, maxWidth: 340 }]}>
+
+            {/* Step 1: 第一次確認 */}
+            {deleteModal.step === "confirm1" && (
+              <>
+                <View style={{ alignItems: "center", marginBottom: 12 }}>
+                  <View style={[styles.deleteIconWrap, { backgroundColor: colors.error + "18" }]}>
+                    <IconSymbol name="trash.fill" size={32} color={colors.error} />
+                  </View>
+                </View>
+                <Text style={[styles.editTitle, { color: colors.error, textAlign: "center" }]}>刪除帳號</Text>
+                <Text style={[styles.deleteWarningText, { color: colors.muted }]}>
+                  此操作無法復原。以下資料將被永久刪除：
+                </Text>
+                <View style={[styles.deleteInfoBox, { backgroundColor: colors.error + "0D", borderColor: colors.error + "30" }]}>
+                  <Text style={[styles.deleteInfoItem, { color: colors.foreground }]}>• 帳號資料（姓名、Email）</Text>
+                  <Text style={[styles.deleteInfoItem, { color: colors.foreground }]}>• 好友關係記錄</Text>
+                  <Text style={[styles.deleteInfoItem, { color: colors.foreground }]}>• 伺服器上的位置分享資料</Text>
+                  <Text style={[styles.deleteInfoItem, { color: colors.muted, marginTop: 6, fontSize: 12 }]}>⚠️ 本機騎乘記錄不受影響</Text>
+                </View>
+                <View style={styles.editBtnRow}>
+                  <Pressable
+                    style={({ pressed }) => [styles.editCancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+                    onPress={closeDeleteModal}
+                  >
+                    <Text style={[styles.editCancelText, { color: colors.muted }]}>取消</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.deleteConfirmBtn, { backgroundColor: colors.error, opacity: pressed ? 0.85 : 1 }]}
+                    onPress={proceedToConfirm2}
+                  >
+                    <Text style={styles.deleteConfirmText}>下一步</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+
+            {/* Step 2: 輸入確認文字 */}
+            {deleteModal.step === "confirm2" && (
+              <>
+                <Text style={[styles.editTitle, { color: colors.error, textAlign: "center" }]}>最後確認</Text>
+                <Text style={[styles.deleteWarningText, { color: colors.muted }]}>
+                  請在下方輸入「刪除帳號」以確認此不可復原的操作：
+                </Text>
+                <View style={[styles.editInputRow, { borderColor: deleteModal.errorMsg ? colors.error : colors.border, marginBottom: 4 }]}>
+                  <TextInput
+                    style={[styles.editInput, { color: colors.foreground, fontSize: 18, fontWeight: "600" }]}
+                    value={deleteModal.confirmInput}
+                    onChangeText={(v) => setDeleteModal((prev) => ({ ...prev, confirmInput: v, errorMsg: "" }))}
+                    placeholder="刪除帳號"
+                    placeholderTextColor={colors.muted}
+                    autoFocus
+                    returnKeyType="done"
+                    onSubmitEditing={executeDelete}
+                  />
+                </View>
+                {deleteModal.errorMsg ? (
+                  <Text style={[styles.deleteErrorText, { color: colors.error }]}>{deleteModal.errorMsg}</Text>
+                ) : null}
+                <View style={[styles.editBtnRow, { marginTop: 12 }]}>
+                  <Pressable
+                    style={({ pressed }) => [styles.editCancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+                    onPress={() => setDeleteModal((prev) => ({ ...prev, step: "confirm1", errorMsg: "" }))}
+                  >
+                    <Text style={[styles.editCancelText, { color: colors.muted }]}>返回</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.deleteConfirmBtn,
+                      {
+                        backgroundColor: deleteModal.confirmInput.trim() === CONFIRM_KEYWORD ? colors.error : colors.border,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                    onPress={executeDelete}
+                  >
+                    <Text style={styles.deleteConfirmText}>永久刪除</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+
+            {/* Step 3: 載入中 */}
+            {deleteModal.step === "loading" && (
+              <View style={{ alignItems: "center", paddingVertical: 24, gap: 16 }}>
+                <ActivityIndicator size="large" color={colors.error} />
+                <Text style={[styles.deleteStatusText, { color: colors.foreground }]}>正在刪除帳號資料…</Text>
+                <Text style={[{ fontSize: 12, color: colors.muted }]}>請勿關閉應用程式</Text>
+              </View>
+            )}
+
+            {/* Step 4: 成功 */}
+            {deleteModal.step === "success" && (
+              <View style={{ alignItems: "center", paddingVertical: 24, gap: 12 }}>
+                <View style={[styles.deleteIconWrap, { backgroundColor: colors.success + "20" }]}>
+                  <IconSymbol name="checkmark.circle.fill" size={40} color={colors.success} />
+                </View>
+                <Text style={[styles.deleteStatusText, { color: colors.success }]}>帳號已成功刪除</Text>
+                <Text style={[{ fontSize: 13, color: colors.muted, textAlign: "center" }]}>所有伺服器資料已清除，即將登出…</Text>
+              </View>
+            )}
+
+            {/* Step 5: 失敗 */}
+            {deleteModal.step === "error" && (
+              <>
+                <View style={{ alignItems: "center", marginBottom: 12 }}>
+                  <View style={[styles.deleteIconWrap, { backgroundColor: colors.error + "18" }]}>
+                    <IconSymbol name="exclamationmark.triangle.fill" size={36} color={colors.error} />
+                  </View>
+                </View>
+                <Text style={[styles.editTitle, { color: colors.error, textAlign: "center" }]}>刪除失敗</Text>
+                <Text style={[styles.deleteWarningText, { color: colors.muted, textAlign: "center" }]}>{deleteModal.errorMsg}</Text>
+                <Pressable
+                  style={({ pressed }) => [styles.editCancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1, marginTop: 8 }]}
+                  onPress={closeDeleteModal}
+                >
+                  <Text style={[styles.editCancelText, { color: colors.muted }]}>關閉</Text>
+                </Pressable>
+              </>
+            )}
+
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -993,5 +1153,50 @@ const styles = StyleSheet.create({
     color: "#34C759",
     fontWeight: "600",
     letterSpacing: 0.5,
+  },
+  // Delete Account Modal
+  deleteIconWrap: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteWarningText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  deleteInfoBox: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 16,
+    gap: 4,
+  },
+  deleteInfoItem: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  deleteConfirmBtn: {
+    flex: 2,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  deleteConfirmText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  deleteErrorText: {
+    fontSize: 13,
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  deleteStatusText: {
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
   },
 });
