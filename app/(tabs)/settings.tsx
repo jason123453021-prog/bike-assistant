@@ -30,6 +30,7 @@ import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, type 
 import { useAuth } from "@/hooks/use-auth";
 import { startOAuthLogin } from "@/constants/oauth";
 import { trpc } from "@/lib/trpc";
+import Constants from "expo-constants";
 
 export default function SettingsScreen() {
   const colors = useColors();
@@ -756,7 +757,12 @@ export default function SettingsScreen() {
           );
         })()}
 
-        <View style={{ height: 20 }} />
+        {/* 版本號 */}
+        <View style={{ alignItems: "center", paddingVertical: 20, paddingBottom: 8 }}>
+          <Text style={{ fontSize: 12, color: colors.muted }}>
+            單車助手 v{Constants.expoConfig?.version ?? "1.0.1"}
+          </Text>
+        </View>
       </ScrollView>
 
       {/* Edit Modal */}
