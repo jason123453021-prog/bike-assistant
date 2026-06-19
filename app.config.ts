@@ -1,9 +1,8 @@
 import "./scripts/load-env.js";
 import type { ExpoConfig } from "expo/config";
 
-const rawBundleId = "space.manus.bike.assistant.t20260617";
-const bundleId = rawBundleId;
-const schemeFromBundleId = "manus20260617";
+const bundleId = "com.jason123453021.bikeassistant";
+const schemeFromBundleId = "bikeassistant";
 
 const env = {
   appName: "單車助手",
