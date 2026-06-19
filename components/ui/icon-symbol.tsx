@@ -71,6 +71,9 @@ const MAPPING = {
   "chart.bar.fill":                        "bar-chart",
   "moon.stars.fill":                       "bedtime",
   "sun.max.fill":                          "wb-sunny",
+  // Privacy & account
+  "doc.text.fill":                         "article",
+  "trash.fill":                            "delete",
 } as IconMapping;
 
 export function IconSymbol({

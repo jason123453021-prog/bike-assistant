@@ -12,6 +12,8 @@ const env = {
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
+  // 隱私政策公開 URL（Google Play 上架必填）
+  privacyPolicyUrl: "https://bikeassist-bdbkimdc.manus.space/privacy",
 };
 
 const config: ExpoConfig = {
@@ -28,6 +30,13 @@ const config: ExpoConfig = {
     bundleIdentifier: env.iosBundleId,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // iOS 位置權限說明（App Store 審查必填）
+      NSLocationWhenInUseUsageDescription:
+        "單車助手需要存取您的位置，以提供 GPS 導航、騎乘路線追蹤及好友位置共享功能。",
+      NSLocationAlwaysAndWhenInUseUsageDescription:
+        "單車助手需要在背景存取您的位置，以便在螢幕關閉時持續追蹤騎乘路線並更新通知欄資訊。",
+      NSLocationAlwaysUsageDescription:
+        "單車助手需要在背景存取您的位置，以便在螢幕關閉時持續追蹤騎乘路線並更新通知欄資訊。",
     },
   },
   android: {
@@ -40,16 +49,27 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
+    // Google Play 資料安全表單所需的隱私政策 URL：
+    // https://bikeassist-bdbkimdc.manus.space/privacy
     permissions: [
-      "POST_NOTIFICATIONS",
-      "ACCESS_FINE_LOCATION",
-      "ACCESS_COARSE_LOCATION",
-      "ACCESS_BACKGROUND_LOCATION",
-      "FOREGROUND_SERVICE",
-      "FOREGROUND_SERVICE_LOCATION",
-      "VIBRATE",
-      "WAKE_LOCK",
-      "RECEIVE_BOOT_COMPLETED",
+      // 精確 GPS 位置：提供導航、速度計算、路線追蹤
+      "android.permission.ACCESS_FINE_LOCATION",
+      // 概略位置：作為精確位置的備用
+      "android.permission.ACCESS_COARSE_LOCATION",
+      // 背景位置：騎乘中螢幕關閉時持續追蹤路線
+      "android.permission.ACCESS_BACKGROUND_LOCATION",
+      // 前台服務：顯示騎乘中的持續通知（速度、距離、時間）
+      "android.permission.FOREGROUND_SERVICE",
+      // 前台服務位置類型：Android 14+ 必填
+      "android.permission.FOREGROUND_SERVICE_LOCATION",
+      // 推播通知：騎乘提醒、補給提醒
+      "android.permission.POST_NOTIFICATIONS",
+      // 震動：觸覺回饋
+      "android.permission.VIBRATE",
+      // 喚醒鎖：防止 GPS 追蹤被系統中斷
+      "android.permission.WAKE_LOCK",
+      // 開機自啟：恢復背景服務
+      "android.permission.RECEIVE_BOOT_COMPLETED",
     ],
     intentFilters: [
       {
@@ -70,7 +90,10 @@ const config: ExpoConfig = {
     [
       "expo-location",
       {
-        locationAlwaysAndWhenInUsePermission: "單車助手需要位置權限以追蹤您的騎乘路線",
+        locationAlwaysAndWhenInUsePermission:
+          "單車助手需要位置權限以追蹤您的騎乘路線、提供 GPS 導航及好友位置共享功能。",
+        locationWhenInUsePermission:
+          "單車助手需要位置權限以追蹤您的騎乘路線及提供 GPS 導航功能。",
         isAndroidBackgroundLocationEnabled: true,
         isAndroidForegroundServiceEnabled: true,
       },
@@ -78,7 +101,7 @@ const config: ExpoConfig = {
     [
       "expo-audio",
       {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
+        microphonePermission: "單車助手需要麥克風權限以支援語音功能。",
       },
     ],
     [

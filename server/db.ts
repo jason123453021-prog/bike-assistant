@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, friendships, locationShares, dwellEvents } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -87,6 +87,27 @@ export async function getUserByOpenId(openId: string) {
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * 刪除使用者帳號及所有相關資料（符合 Google Play 帳號刪除政策要求）
+ * 刪除順序：停留事件 → 位置分享 → 好友關係 → 使用者帳號
+ */
+export async function deleteUserById(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  // 刪除停留事件
+  await db.delete(dwellEvents).where(eq(dwellEvents.userId, userId));
+  // 刪除位置分享記錄
+  await db.delete(locationShares).where(eq(locationShares.userId, userId));
+  // 刪除好友關係（雙向）
+  await db
+    .delete(friendships)
+    .where(or(eq(friendships.requesterId, userId), eq(friendships.receiverId, userId)));
+  // 最後刪除使用者帳號
+  await db.delete(users).where(eq(users.id, userId));
 }
 
 // TODO: add feature queries here as your schema grows.

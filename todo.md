@@ -90,3 +90,14 @@
 - [x] 偏離時實作逐步轉彎導航（OSRM steps 解析，顯示轉彎指令與距離）
 - [x] 騎乘中地圖顯示綠色即時軌跡（GPX 導航與自由騎乘均顯示）
 - [x] 補給 Modal 分別管理卡路里/水分，支援兩種通知重疊顯示，按下各自「已補充」才歸零
+
+## Google Play 上架合規（2026-06）
+- [x] 建立隱私政策頁面（app/privacy.tsx）
+- [x] 後端帳號刪除 API（server/routers.ts deleteAccount mutation）
+- [x] server/db.ts 加入 deleteUserById 函式
+- [x] 設定頁面加入「刪除帳號」按鈕（帳號與好友區塊）
+- [x] 設定頁面加入「隱私政策」連結（安全與隱私區塊）
+- [x] icon-symbol.tsx 加入 doc.text.fill、trash.fill 映射
+- [x] app.config.ts 更新權限宣告（背景位置、前台服務等）
+- [x] app.config.ts 加入 expo-location 插件與位置權限說明文字
+- [x] 建立 google-play-compliance.md（Store Listing 文字、資料安全聲明、內容分級）

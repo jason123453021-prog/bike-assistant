@@ -28,11 +28,35 @@ import { useColors } from "@/hooks/use-colors";
 import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, type NormalFieldKey, type SimplifiedFieldKey } from "@/lib/settings-context";
 import { useAuth } from "@/hooks/use-auth";
 import { startOAuthLogin } from "@/constants/oauth";
+import { trpc } from "@/lib/trpc";
 
 export default function SettingsScreen() {
   const colors = useColors();
   const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder } = useSettings();
   const { user, isAuthenticated, logout } = useAuth();
+  const deleteAccountMutation = trpc.auth.deleteAccount.useMutation();
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "永久刪除帳號",
+      "此操作無法復原。您的帳號、好友關係及所有伺服器資料將被永久刪除。本機騎乘記錄不受影響。\n\n確定要刪除帳號嗎？",
+      [
+        { text: "取消", style: "cancel" },
+        {
+          text: "永久刪除",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteAccountMutation.mutateAsync();
+              logout();
+            } catch {
+              Alert.alert("刪除失敗", "請稍後再試，或聯絡開發者。");
+            }
+          },
+        },
+      ]
+    );
+  };
   const [editModal, setEditModal] = useState<{
     visible: boolean;
     key: string;
@@ -351,6 +375,17 @@ export default function SettingsScreen() {
                 <IconSymbol name="arrow.left" size={18} color={colors.error} />
                 <Text style={[styles.rowLabel, { color: colors.error }]}>登出帳號</Text>
               </Pressable>
+              <Divider colors={colors} />
+              <Pressable
+                style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
+                onPress={handleDeleteAccount}
+              >
+                <IconSymbol name="trash.fill" size={18} color={colors.error} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowLabel, { color: colors.error }]}>刪除帳號</Text>
+                  <Text style={[styles.rowHint, { color: colors.muted }]}>永久刪除帳號及所有伺服器資料</Text>
+                </View>
+              </Pressable>
             </>
           ) : (
             <Pressable
@@ -413,6 +448,17 @@ export default function SettingsScreen() {
             colors={colors}
             onToggle={(v) => updateSettings({ shareLocation: v })}
           />
+          <Divider colors={colors} />
+          <Pressable
+            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
+            onPress={() => router.push("/privacy" as any)}
+          >
+            <IconSymbol name="doc.text.fill" size={18} color={colors.muted} />
+            <Text style={[styles.rowLabel, { color: colors.foreground }]}>隱私政策</Text>
+            <View style={styles.rowRight}>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </View>
+          </Pressable>
         </View>}
 
         {/* ── 精簡導航模式 ── */}
