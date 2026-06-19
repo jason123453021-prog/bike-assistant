@@ -178,12 +178,14 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   const sFactor = solarFactor(weatherCode);
   const aBonusFactor = 1 + ascentBonus(ascentPerInterval, intervalSec);
 
-  // 基礎汗液流失率 L/h（標準人、中等強度、20°C、60%濕度）
-  const BASE_RATE_LPH = 0.8;
+  // 基礎汗液流失率 L/h（標準人、Zone2 強度、20°C、60%濕度）
+  // 注意：intFactor 與 hrFactor 同樣基於功率推算，直接相乘會造成強度雙重計算
+  // 修正：只保留 hrFactor 作為強度代理，移除 intFactor
+  const BASE_RATE_LPH = 0.5; // 降低基礎率，避免高強度下失真
 
-  // 最終汗液流失率 ml/h（整合心率區間修正）
+  // 最終汗液流失率 ml/h（移除 intFactor，使用 hrFactor 作為強度代理）
   const sweatRatePerHour = Math.round(
-    BASE_RATE_LPH * 1000 * bsaFactor * intFactor * hrFactor * tFactor * hFactor * sFactor * aBonusFactor
+    BASE_RATE_LPH * 1000 * bsaFactor * hrFactor * tFactor * hFactor * sFactor * aBonusFactor
   );
 
   // 本次間隔流失量 ml

@@ -188,8 +188,9 @@ export default function RideDetailScreen() {
       `最高速：${record.maxSpeed.toFixed(1)} km/h`,
       `爬升：${Math.round(record.totalAscent)} m`,
       `卡路里：${record.calories} kcal`,
+      `暫停時間：${formatDuration(record.totalPausedSec ?? 0)}`,
       `均功率：${record.avgPower} W`,
-      `水分流失：${record.totalSweatMl} ml`,
+      `水分流失：${Math.round(record.totalSweatMl)} ml`,
     ].join("\n");
     await Share.share({ message: msg });
   }, [record]);
@@ -347,10 +348,11 @@ export default function RideDetailScreen() {
             <View style={styles.statsGrid}>
               <DetailCell label="均速" value={`${record.avgSpeed.toFixed(1)}`} unit="km/h" />
               <DetailCell label="最高速" value={`${record.maxSpeed.toFixed(1)}`} unit="km/h" />
-              <DetailCell label="爬升" value={`${Math.round(record.totalAscent)}`} unit="m" />
+              <DetailCell label="爆升" value={`${Math.round(record.totalAscent)}`} unit="m" />
+              <DetailCell label="暫停時間" value={formatDuration(record.totalPausedSec ?? 0)} unit="" />
               <DetailCell label="均功率" value={`${record.avgPower}`} unit="W" accent />
               <DetailCell label="最大功率" value={`${record.maxPower}`} unit="W" accent />
-              <DetailCell label="水分流失" value={`${record.totalSweatMl}`} unit="ml" color="#4FC3F7" />
+              <DetailCell label="水分流失" value={`${Math.round(record.totalSweatMl)}`} unit="ml" color="#4FC3F7" />
               <DetailCell label="補水次數" value={`${record.refillCount}`} unit="次" />
               <DetailCell label="GPS 點數" value={`${record.route.length}`} unit="點" />
             </View>
