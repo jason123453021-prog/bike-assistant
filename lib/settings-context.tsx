@@ -69,6 +69,7 @@ export interface AppSettings {
   // Thresholds
   calorieThreshold: number;   // kcal before reminder
   waterThreshold: number;     // ml before reminder
+  supplyReminderRepeatSec: number; // 0 = 不重複；>0 = 每幾秒重複語音提醒
   // Feedback
   vibrationEnabled: boolean;
   ttsEnabled: boolean;
@@ -130,6 +131,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   bikeWeight: 10,
   calorieThreshold: 300,
   waterThreshold: 500,
+  supplyReminderRepeatSec: 60,  // 預設 60 秒重複一次
   vibrationEnabled: true,
   ttsEnabled: true,
   soundEnabled: true,

@@ -164,10 +164,15 @@ export default function MapScreen() {
 
   useKeepAwake();
 
-  // Audio
+  // Audio — 使用混音模式，不中斷背景音樂（iOS: mixWithOthers；Android: duckOthers 僅短暫降低背景音量）
   const alertPlayer = useAudioPlayer(require("../../assets/sounds/alert.mp3"));
   useEffect(() => {
-    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      interruptionMode: "mixWithOthers",   // iOS: 與背景音樂混音，不中斷
+      interruptionModeAndroid: "duckOthers", // Android: 短暫降低背景音量後恢復
+      shouldPlayInBackground: false,
+    }).catch(() => {});
     return () => { alertPlayer.release(); };
   }, []);
 
@@ -288,6 +293,21 @@ export default function MapScreen() {
   const calorieReminderSentRef = useRef(false);
   const waterReminderSentRef = useRef(false);
   const notifPermRef = useRef(false);
+  // 重複提醒計時器
+  const supplyRepeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 追蹤尚未確認的補給類型（「稍後」只關閉 Modal，不清除此 ref）
+  const pendingCalorieRef = useRef(false);
+  const pendingWaterRef = useRef(false);
+
+  // 清除重複提醒計時器
+  const clearSupplyRepeatTimer = useCallback(() => {
+    if (supplyRepeatTimerRef.current) {
+      clearInterval(supplyRepeatTimerRef.current);
+      supplyRepeatTimerRef.current = null;
+    }
+    pendingCalorieRef.current = false;
+    pendingWaterRef.current = false;
+  }, []);
   const lastLocationRef = useRef<Location.LocationObject | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -429,8 +449,38 @@ export default function MapScreen() {
         try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
       }
       if (settings.notificationEnabled) showSupplyNotification(type);
+
+      // 記錄尚未確認的補給類型
+      if (type === "calorie") pendingCalorieRef.current = true;
+      else pendingWaterRef.current = true;
+
+      // 啟動重複提醒計時器（若已有則不重複啟動）
+      const repeatSec = settings.supplyReminderRepeatSec ?? 60;
+      if (repeatSec > 0 && !supplyRepeatTimerRef.current) {
+        supplyRepeatTimerRef.current = setInterval(() => {
+          // 使用 pendingRef 判斷（「稍後」關閉 Modal 不會清除此 ref）
+          const caloriePending = pendingCalorieRef.current;
+          const waterPending = pendingWaterRef.current;
+          if (!caloriePending && !waterPending) {
+            clearSupplyRepeatTimer();
+            return;
+          }
+          // 重新顯示 Modal
+          if (caloriePending) setCalorieAlert(true);
+          if (waterPending) setWaterAlert(true);
+          // 重複音效與語音
+          if (settings.ttsEnabled) {
+            if (caloriePending) speakSupplyReminder("calorie", true);
+            else speakSupplyReminder("water", true);
+          }
+          if (settings.vibrationEnabled) vibrateWarning();
+          if (settings.soundEnabled) {
+            try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+          }
+        }, repeatSec * 1000);
+      }
     },
-    [settings, alertPlayer]
+    [settings, alertPlayer, clearSupplyRepeatTimer]
   );
 
   // ─── 計時器 ──────────────────────────────────────────────────────────────────
@@ -939,6 +989,10 @@ export default function MapScreen() {
           await stopBackgroundLocationTracking();
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           await cancelRidingNotification();
+          // 結束騎乘清除補給重複提醒計時器
+          clearSupplyRepeatTimer();
+          setCalorieAlert(false);
+          setWaterAlert(false);
           // 結束騎乘清空地圖軌跡
           setLiveTrail([]);
           // 結束騎乘清除崩潰恢復快照
@@ -950,7 +1004,7 @@ export default function MapScreen() {
         },
       },
     ]);
-  }, [dispatch, saveRecord, clearSnapshot, settings.vibrationEnabled]);
+  }, [dispatch, saveRecord, clearSnapshot, settings.vibrationEnabled, clearSupplyRepeatTimer]);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {
@@ -1594,7 +1648,10 @@ export default function MapScreen() {
           dispatch({ type: "CONSUME_CALORIES" });
           calorieAnim.setValue(0);
           calorieReminderSentRef.current = false;
+          pendingCalorieRef.current = false; // 確認補給，清除待處理標記
           if (settings.vibrationEnabled) vibrateSuccess();
+          // 如果水分提醒也已確認，清除重複計時器
+          if (!pendingWaterRef.current) clearSupplyRepeatTimer();
         }}
         onConfirmWater={() => {
           setWaterAlert(false);
@@ -1602,11 +1659,15 @@ export default function MapScreen() {
           dispatch({ type: "CONSUME_WATER" });
           waterAnim.setValue(0);
           waterReminderSentRef.current = false;
+          pendingWaterRef.current = false; // 確認補給，清除待處理標記
           if (settings.vibrationEnabled) vibrateSuccess();
+          // 如果卡路里提醒也已確認，清除重複計時器
+          if (!pendingCalorieRef.current) clearSupplyRepeatTimer();
         }}
         onDismiss={() => {
           setCalorieAlert(false);
           setWaterAlert(false);
+          // 「稍後提醒」：不清除 pendingRef，重複計時器到期後會重新顯示 Modal
         }}
       />
 

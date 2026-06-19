@@ -33,6 +33,7 @@ const MAPPING = {
   "bicycle":                             "directions-bike",
   "person.fill":                         "person",
   "bell.fill":                           "notifications",
+  "bell.badge.fill":                     "notification-important",
   "speaker.wave.2.fill":                 "volume-up",
   "iphone.radiowaves.left.and.right":    "vibration",
   "moon.fill":                           "dark-mode",

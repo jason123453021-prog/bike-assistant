@@ -322,6 +322,17 @@ export default function SettingsScreen() {
             hint="每流失此量汗液即提醒補水"
             onPress={() => openEdit("waterThreshold", "汗液流失提醒閾值 (ml)", settings.waterThreshold, "ml")}
           />
+          <Divider colors={colors} />
+          <NumberRow
+            icon="bell.badge.fill"
+            label="未關閉時重複提醒間隔"
+            value={settings.supplyReminderRepeatSec}
+            unit="秒"
+            colors={colors}
+            iconColor={colors.primary}
+            hint={settings.supplyReminderRepeatSec === 0 ? "已停用重複提醒" : `每 ${settings.supplyReminderRepeatSec} 秒語音重複提醒一次`}
+            onPress={() => openEdit("supplyReminderRepeatSec", "重複提醒間隔（秒，0 = 停用）", settings.supplyReminderRepeatSec, "秒")}
+          />
         </View>}
 
         {/* ── 回饋設定 ── */}
