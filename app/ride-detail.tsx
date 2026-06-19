@@ -184,6 +184,8 @@ export default function RideDetailScreen() {
       `日期：${dateStr}`,
       `距離：${distKm} km`,
       `時間：${formatDuration(record.duration)}`,
+      `有效騎乘：${formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))}`,
+      `暫停時間：${formatDuration(record.totalPausedSec ?? 0)}`,
       `均速：${record.avgSpeed.toFixed(1)} km/h`,
       `最高速：${record.maxSpeed.toFixed(1)} km/h`,
       `爬升：${Math.round(record.totalAscent)} m`,
@@ -349,6 +351,12 @@ export default function RideDetailScreen() {
               <DetailCell label="均速" value={`${record.avgSpeed.toFixed(1)}`} unit="km/h" />
               <DetailCell label="最高速" value={`${record.maxSpeed.toFixed(1)}`} unit="km/h" />
               <DetailCell label="爆升" value={`${Math.round(record.totalAscent)}`} unit="m" />
+              <DetailCell
+                label="有效騎乘"
+                value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))}
+                unit=""
+                color="#4ADE80"
+              />
               <DetailCell label="暫停時間" value={formatDuration(record.totalPausedSec ?? 0)} unit="" />
               <DetailCell label="均功率" value={`${record.avgPower}`} unit="W" accent />
               <DetailCell label="最大功率" value={`${record.maxPower}`} unit="W" accent />
