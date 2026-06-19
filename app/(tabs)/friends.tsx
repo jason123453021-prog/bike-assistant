@@ -427,8 +427,8 @@ export default function FriendsScreen() {
                 style={({ pressed }) => [
                   styles.sortBtn,
                   {
-                    backgroundColor: sortMode === mode ? colors.primary : colors.surface,
-                    borderColor: colors.border,
+                    backgroundColor: sortMode === mode ? colors.primary : "transparent",
+                    borderColor: sortMode === mode ? colors.primary : colors.foreground + "55",
                     opacity: pressed ? 0.7 : 1,
                   },
                 ]}
@@ -436,7 +436,7 @@ export default function FriendsScreen() {
               >
                 <Text style={[
                   styles.sortBtnText,
-                  { color: sortMode === mode ? "#fff" : colors.muted },
+                  { color: sortMode === mode ? "#fff" : colors.foreground },
                 ]}>
                   {mode === "default" ? "預設" : mode === "online" ? "在線優先" : "距離近優先"}
                 </Text>
@@ -755,10 +755,10 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
   sortRow: { flexDirection: "row", gap: 8 },
   sortBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
-  sortBtnText: { fontSize: 12, fontWeight: "600" },
+  sortBtnText: { fontSize: 13, fontWeight: "600" },
 });
