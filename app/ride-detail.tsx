@@ -36,6 +36,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useRide, type RideRecord } from "@/lib/ride-context";
 import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power-calc";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useFavorites } from "@/lib/favorites-context";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const STORAGE_KEY = "@bike_records";
@@ -63,6 +64,8 @@ export default function RideDetailScreen() {
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, dispatch, updateRecordName } = useRide();
+  const { favorites, addFavorite, removeFavorite } = useFavorites();
+  const [isFavorited, setIsFavorited] = useState(false);
 
   // 找到對應記錄
   const record = useMemo<RideRecord | null>(
@@ -84,7 +87,17 @@ export default function RideDetailScreen() {
     setIsEditingName(false);
     const trimmed = nameInput.trim();
     await updateRecordName(record.id, trimmed);
-  }, [record, nameInput, updateRecordName]);
+    }, [record, nameInput, updateRecordName]);
+
+  // 檢查是否已加入最愛
+  useEffect(() => {
+    if (record) {
+      const isFav = favorites.some((f) => f.name === record.name);
+      setIsFavorited(isFav);
+    }
+  }, [record, favorites]);
+
+  // 加入/移除最愛 (generateGpxContent 定義後會設置)
 
   // 地圖 ref
   const mapRef = useRef<LeafletMapHandle>(null);
@@ -174,6 +187,87 @@ export default function RideDetailScreen() {
   }, [record]);
 
   // 分享
+  // GPX 匯出
+  const generateGpxContent = useCallback((record: RideRecord): string => {
+    if (!record.route || record.route.length === 0) return "";
+
+    const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Bike Assistant" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${record.name}</name>
+    <desc>騎乘記錄 - ${new Date(record.date).toISOString()}</desc>
+    <time>${new Date(record.date).toISOString()}</time>
+  </metadata>
+  <trk>
+    <name>${record.name}</name>
+    <trkseg>`;
+
+    const trkpts = record.route
+      .map(
+        (pt) =>
+          `      <trkpt lat="${pt.latitude}" lon="${pt.longitude}">
+        <ele>${pt.altitude ?? 0}</ele>
+        <time>${new Date(record.date + pt.timestamp * 1000).toISOString()}</time>
+      </trkpt>`
+      )
+      .join("\n");
+
+    const gpxFooter = `
+    </trkseg>
+  </trk>
+</gpx>`;
+
+    return gpxHeader + "\n" + trkpts + gpxFooter;
+  }, []);
+
+  const handleExportGpx = useCallback(async () => {
+    if (!record) return;
+    try {
+      const gpxContent = generateGpxContent(record);
+      if (!gpxContent) {
+        Alert.alert("錯誤", "沒有軌跡數據，無法匯出");
+        return;
+      }
+
+      // 使用 Share API 分享 GPX 檔案
+      const filename = `${record.name || "騎乘"}-${new Date(record.date).getTime()}.gpx`;
+      await Share.share({
+        message: `騎乘記錄: ${record.name}`,
+        title: filename,
+        url: `data:text/xml;base64,${Buffer.from(gpxContent).toString("base64")}`,
+      });
+    } catch (err) {
+      Alert.alert("錯誤", "匯出 GPX 失敗");
+    }
+  }, [record, generateGpxContent]);
+
+  // 加入/移除最愛
+  const handleToggleFavorite = useCallback(async () => {
+    if (!record) return;
+    try {
+      if (isFavorited) {
+        const fav = favorites.find((f) => f.name === record.name);
+        if (fav) {
+          await removeFavorite(fav.id);
+          setIsFavorited(false);
+        }
+      } else {
+        const gpxContent = generateGpxContent(record);
+        if (gpxContent) {
+          await addFavorite({
+            name: record.name,
+            gpxContent,
+            distance: record.distance / 1000,
+            estimatedTime: record.duration,
+          });
+          setIsFavorited(true);
+        }
+      }
+    } catch (err) {
+      Alert.alert("錯誤", isFavorited ? "移除最愛失敗" : "加入最愛失敗");
+    }
+  }, [record, isFavorited, favorites, addFavorite, removeFavorite, generateGpxContent]);
+
   const handleShare = useCallback(async () => {
     if (!record) return;
     const distKm = (record.distance / 1000).toFixed(2);
@@ -391,6 +485,24 @@ export default function RideDetailScreen() {
             >
               <IconSymbol name="square.and.arrow.up" size={16} color="#fff" />
               <Text style={styles.shareBtnText}>分享記錄</Text>
+            </Pressable>
+
+            {/* GPX 匯出按鈕 */}
+            <Pressable
+              style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.85 : 1 }]}
+              onPress={handleExportGpx}
+            >
+              <IconSymbol name="arrow.down.doc" size={16} color="#fff" />
+              <Text style={styles.shareBtnText}>匯出 GPX</Text>
+            </Pressable>
+
+            {/* 加入最愛按鈕 */}
+            <Pressable
+              style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.85 : 1, backgroundColor: isFavorited ? colors.primary : "rgba(255,255,255,0.2)" }]}
+              onPress={handleToggleFavorite}
+            >
+              <IconSymbol name={isFavorited ? "heart.fill" : "heart"} size={16} color="#fff" />
+              <Text style={styles.shareBtnText}>{isFavorited ? "已最愛" : "加入最愛"}</Text>
             </Pressable>
           </ScrollView>
         )}

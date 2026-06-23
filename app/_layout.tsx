@@ -22,6 +22,7 @@ import { RideProvider } from "@/lib/ride-context";
 import { GpxProvider } from "@/lib/gpx-context";
 import { SettingsProvider } from "@/lib/settings-context";
 import { FriendNavProvider } from "@/lib/friend-nav-context";
+import { FavoritesProvider } from "@/lib/favorites-context";
 import { setupNotifications } from "@/lib/feedback-service";
 // 必須在頂層引入以確保 TaskManager 任務被定義
 import "@/lib/background-location";
@@ -41,6 +42,7 @@ function InnerLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="ride-detail" options={{ headerShown: false, presentation: "fullScreenModal" }} />
+        <Stack.Screen name="favorites-list" options={{ headerShown: false, presentation: "fullScreenModal" }} />
         <Stack.Screen name="oauth/callback" />
         <Stack.Screen name="+not-found" />
       </Stack>
@@ -108,13 +110,15 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <SettingsProvider>
             <GpxProvider>
-              <FriendNavProvider>
-                <RideProvider>
-                  <ThemeProvider>
-                    <InnerLayout />
-                  </ThemeProvider>
-                </RideProvider>
-              </FriendNavProvider>
+              <FavoritesProvider>
+                <FriendNavProvider>
+                  <RideProvider>
+                    <ThemeProvider>
+                      <InnerLayout />
+                    </ThemeProvider>
+                  </RideProvider>
+                </FriendNavProvider>
+              </FavoritesProvider>
             </GpxProvider>
           </SettingsProvider>
         </QueryClientProvider>

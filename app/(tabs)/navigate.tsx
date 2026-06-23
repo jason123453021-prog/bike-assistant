@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { router } from "expo-router";
 import {
   View,
   Text,
@@ -290,6 +291,30 @@ export default function NavigateScreen() {
                 <IconSymbol name="chevron.right" size={18} color={colors.muted} />
               </>
             )}
+          </Pressable>
+
+          {/* 最愛路線按鈕 */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.importBtn,
+              { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+            ]}
+            onPress={() => router.push("/favorites-list")}
+          >
+            <>
+              <View style={[styles.importIconWrap, { backgroundColor: colors.primary + "15" }]}>
+                <IconSymbol name="heart.fill" size={24} color={colors.primary} />
+              </View>
+              <View style={styles.importTextWrap}>
+                <Text style={[styles.importTitle, { color: colors.foreground }]}>
+                  最愛路線
+                </Text>
+                <Text style={[styles.importSubtitle, { color: colors.muted }]}>
+                  快速套用常用路線
+                </Text>
+              </View>
+              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+            </>
           </Pressable>
 
           {/* Error */}

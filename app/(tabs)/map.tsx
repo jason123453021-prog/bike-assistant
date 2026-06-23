@@ -295,9 +295,15 @@ export default function MapScreen() {
   const notifPermRef = useRef(false);
   // 重複提醒計時器
   const supplyRepeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // 追蹤尚未確認的補給類型（「稍後」只關閉 Modal，不清除此 ref）
+    // 追蹤尚未確認的補給類型（「稍後」只關閉 Modal，不清除此 ref）
   const pendingCalorieRef = useRef(false);
   const pendingWaterRef = useRef(false);
+
+  // ── 自訂補給品追蹤 ──
+  // 記錄每個補給品上次觸發的時間（秒）或距離（公里）
+  const supplyItemsTrackerRef = useRef<Record<string, { lastTriggerTime: number; lastTriggerDistance: number; triggered: boolean }>>({});
+  // 自訂補給品提醒狀態
+  const [customSupplyAlerts, setCustomSupplyAlerts] = useState<Record<string, boolean>>({});
 
   // 清除重複提醒計時器
   const clearSupplyRepeatTimer = useCallback(() => {
@@ -481,6 +487,64 @@ export default function MapScreen() {
       }
     },
     [settings, alertPlayer, clearSupplyRepeatTimer]
+  );
+
+  // ─── 自訂補給品觸發邏輯 ────────────────────────────────────────────────────────
+  const triggerCustomSupplyReminder = useCallback(
+    async (supplyItem: any) => {
+      if (!supplyItem.enabled) return;
+
+      // 初始化追蹤器
+      if (!supplyItemsTrackerRef.current[supplyItem.id]) {
+        supplyItemsTrackerRef.current[supplyItem.id] = {
+          lastTriggerTime: 0,
+          lastTriggerDistance: 0,
+          triggered: false,
+        };
+      }
+
+      const tracker = supplyItemsTrackerRef.current[supplyItem.id];
+      const currentTime = stateRef.current.elapsed;
+      const currentDistance = stateRef.current.distance / 1000; // 轉換為公里
+
+      // 根據觸發方式檢查是否應該觸發
+      let shouldTrigger = false;
+      if (supplyItem.triggerType === "time") {
+        shouldTrigger = currentTime - tracker.lastTriggerTime >= supplyItem.triggerValue;
+      } else if (supplyItem.triggerType === "distance") {
+        shouldTrigger = currentDistance - tracker.lastTriggerDistance >= supplyItem.triggerValue;
+      }
+
+      if (!shouldTrigger) return;
+
+      // 根據重複模式決定是否顯示
+      if (supplyItem.repeatMode === "once" && tracker.triggered) {
+        return; // 只提醒一次，已觸發過則不再提醒
+      }
+      if (supplyItem.repeatMode === "off") {
+        return; // 不提醒
+      }
+
+      // 觸發提醒
+      setCustomSupplyAlerts((prev) => ({ ...prev, [supplyItem.id]: true }));
+      tracker.triggered = true;
+
+      // 更新觸發時間/距離
+      if (supplyItem.triggerType === "time") {
+        tracker.lastTriggerTime = currentTime;
+      } else {
+        tracker.lastTriggerDistance = currentDistance;
+      }
+
+      // 播放回饋
+      if (settings.vibrationEnabled) vibrateWarning();
+      if (settings.ttsEnabled) speak(`請補給 ${supplyItem.name}`);
+      if (settings.soundEnabled) {
+        try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+      }
+      if (settings.notificationEnabled) showSupplyNotification("calorie"); // 使用卡路里類型作為自訂補給品通知
+    },
+    [settings, alertPlayer]
   );
 
   // ─── 計時器 ──────────────────────────────────────────────────────────────────
@@ -719,6 +783,13 @@ export default function MapScreen() {
           if (waterPct >= 1 && !waterReminderSentRef.current) {
             waterReminderSentRef.current = true;
             triggerSupplyReminder("water", sweatResult.recommendedRefillMl);
+          }
+
+          // ── 自訂補給品觸發 ──
+          if (settings.supplyItems && settings.supplyItems.length > 0) {
+            for (const supplyItem of settings.supplyItems) {
+              triggerCustomSupplyReminder(supplyItem);
+            }
           }
 
           if (notifPermRef.current && settings.notificationEnabled && currentState.elapsed % 30 === 0) {
