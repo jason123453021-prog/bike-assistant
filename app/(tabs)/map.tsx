@@ -2176,6 +2176,33 @@ function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed, sensorD
       return <BigMetric label="累計爬升" value={state.totalAscent ? state.totalAscent.toFixed(0) : "0"} unit="m" />;
     case "showCurrentAltitude":
       return <BigMetric label="目前海拔" value={state.currentAltitude ? state.currentAltitude.toFixed(0) : "--"} unit="m" />;
+    case "showGradeDistribution":
+      // 計算坡度分布百分比
+      const totalDist = state.gradeDistribution.reduce((a: number, b: number) => a + b, 0);
+      const gradePcts = totalDist > 0
+        ? state.gradeDistribution.map((d: number) => ((d / totalDist) * 100).toFixed(0))
+        : ["0", "0", "0", "0", "0", "0"];
+      return (
+        <View style={styles.gradeDistributionContainer}>
+          <Text style={styles.gradeDistributionLabel}>坡度分布</Text>
+          <View style={styles.gradeDistributionBars}>
+            <View style={[styles.gradeBar, { width: `${Math.max(5, parseInt(gradePcts[0]))}%`, backgroundColor: "#34C759" }]} />
+            <View style={[styles.gradeBar, { width: `${Math.max(5, parseInt(gradePcts[1]))}%`, backgroundColor: "#FFD60A" }]} />
+            <View style={[styles.gradeBar, { width: `${Math.max(5, parseInt(gradePcts[2]))}%`, backgroundColor: "#FF9500" }]} />
+            <View style={[styles.gradeBar, { width: `${Math.max(5, parseInt(gradePcts[3]))}%`, backgroundColor: "#FF6B6B" }]} />
+            <View style={[styles.gradeBar, { width: `${Math.max(5, parseInt(gradePcts[4]))}%`, backgroundColor: "#FF453A" }]} />
+            <View style={[styles.gradeBar, { width: `${Math.max(5, parseInt(gradePcts[5]))}%`, backgroundColor: "#8B0000" }]} />
+          </View>
+          <View style={styles.gradeDistributionLabels}>
+            <Text style={styles.gradeDistributionLegend}>1-5%</Text>
+            <Text style={styles.gradeDistributionLegend}>6-10%</Text>
+            <Text style={styles.gradeDistributionLegend}>11-15%</Text>
+            <Text style={styles.gradeDistributionLegend}>16-20%</Text>
+            <Text style={styles.gradeDistributionLegend}>21-25%</Text>
+            <Text style={styles.gradeDistributionLegend}>26%+</Text>
+          </View>
+        </View>
+      );
     default:
       return null;
   }
@@ -2590,5 +2617,40 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 13,
     fontWeight: "600",
+  },
+  gradeDistributionContainer: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  gradeDistributionLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  gradeDistributionBars: {
+    flexDirection: "row",
+    height: 24,
+    gap: 2,
+    marginBottom: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  gradeBar: {
+    flex: 1,
+    borderRadius: 2,
+  },
+  gradeDistributionLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 2,
+  },
+  gradeDistributionLegend: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 9,
+    flex: 1,
+    textAlign: "center",
   },
 });

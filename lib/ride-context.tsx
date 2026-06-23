@@ -93,6 +93,12 @@ export interface RideState {
   totalPausedSec: number;
   /** 暫停開始時間戳（ms），用於計算本次暫停時間 */
   pauseStartTime: number | null;
+
+  // 坡度區間統計
+  /** 坡度區間距離統計 [1-5%, 6-10%, 11-15%, 16-20%, 21-25%, 26%+] */
+  gradeDistribution: number[];
+  /** 坡度區間爬升統計 [1-5%, 6-10%, 11-15%, 16-20%, 21-25%, 26%+] */
+  gradeAscentDistribution: number[];
 }
 
 type RideAction =
@@ -151,6 +157,8 @@ const initialState: RideState = {
   totalPausedSec: 0,
   pauseStartTime: null,
   totalCalories: 0,
+  gradeDistribution: [0, 0, 0, 0, 0, 0],
+  gradeAscentDistribution: [0, 0, 0, 0, 0, 0],
 };
 
 function rideReducer(state: RideState, action: RideAction): RideState {
@@ -214,6 +222,22 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       const newCalories = state.calories + calories;
       const newTotalCalories = state.totalCalories + calories;
 
+      // 坡度區間統計
+      const newGradeDistribution = [...state.gradeDistribution];
+      const newGradeAscentDistribution = [...state.gradeAscentDistribution];
+      const distance = (point.speed ?? 0) * 3; // 米
+      let gradeIndex = 5; // 預設為 26%+
+      if (ascent > 0 && distance > 0) {
+        const grade = (ascent / distance) * 100;
+        if (grade >= 1 && grade < 6) gradeIndex = 0;
+        else if (grade >= 6 && grade < 11) gradeIndex = 1;
+        else if (grade >= 11 && grade < 16) gradeIndex = 2;
+        else if (grade >= 16 && grade < 21) gradeIndex = 3;
+        else if (grade >= 21 && grade < 26) gradeIndex = 4;
+      }
+      newGradeDistribution[gradeIndex] += distance;
+      newGradeAscentDistribution[gradeIndex] += ascent;
+
       return {
         ...state,
         route: newRoute,
@@ -226,11 +250,14 @@ function rideReducer(state: RideState, action: RideAction): RideState {
         avgPower: Math.round(avgPower),
         maxPower: Math.max(state.maxPower, power),
         totalAscent: state.totalAscent + ascent,
+        currentAltitude: point.altitude ?? state.currentAltitude,
         calories: newCalories,
         totalCalories: newTotalCalories,
         distance: state.distance + (point.speed ?? 0) * 3,
         powerHistory: newPowerHistory,
         powerZones: newZones,
+        gradeDistribution: newGradeDistribution,
+        gradeAscentDistribution: newGradeAscentDistribution,
       };
     }
 

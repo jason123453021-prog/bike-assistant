@@ -379,6 +379,7 @@ export default function SettingsScreen() {
     showCadence: "踏頻",
     showTotalAscent: "累計爬升",
     showCurrentAltitude: "目前海拔",
+    showGradeDistribution: "坡度分布",
   };
 
   const makeDragResponder = (idx: number) =>

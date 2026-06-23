@@ -15,6 +15,7 @@ export interface NormalModeFields {
   showCadence: boolean;   // 踏頻
   showTotalAscent: boolean; // 累計爬升
   showCurrentAltitude: boolean; // 目前海拔
+  showGradeDistribution: boolean; // 坡度分布
 }
 
 // 精簡導航模式可顯示的欄位（與正常模式一致）
@@ -157,6 +158,7 @@ const DEFAULT_NORMAL_FIELDS: NormalModeFields = {
   showCadence: false,
   showTotalAscent: false,
   showCurrentAltitude: false,
+  showGradeDistribution: false,
 };
 
 const DEFAULT_SIMPLIFIED_FIELDS: SimplifiedModeFields = {
