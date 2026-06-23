@@ -68,7 +68,10 @@ export interface SupplyItem {
   id: string;                    // 唯一識別符
   name: string;                  // 補給品名稱（e.g., "運動飲料", "能量棒"）
   triggerType: "time" | "distance"; // 觸發方式：時間或距離
-  triggerValue: number;          // 觸發值（秒 or 公里）
+  triggerValue?: number;         // 觸發值（公里）- 距離觸發用
+  triggerHours?: number;         // 時（時間觸發用）
+  triggerMinutes?: number;       // 分（時間觸發用）
+  triggerSeconds?: number;       // 秒（時間觸發用）
   repeatMode: "once" | "every" | "off"; // 重複模式：只提醒一次/每次/不提醒
   enabled: boolean;              // 是否啟用
 }
@@ -76,14 +79,8 @@ export interface SupplyItem {
 // 效能模式型別
 export type PerformanceMode = 'battery-saver' | 'balanced' | 'performance';
 
-// 預設補給品樣板
-export const SUPPLY_ITEM_TEMPLATES = [
-  { name: "能量棒", triggerType: "time" as const, triggerValue: 600, repeatMode: "every" as const },
-  { name: "電解質飲料", triggerType: "time" as const, triggerValue: 900, repeatMode: "every" as const },
-  { name: "水", triggerType: "time" as const, triggerValue: 600, repeatMode: "every" as const },
-  { name: "鹿茶", triggerType: "distance" as const, triggerValue: 10, repeatMode: "every" as const },
-  { name: "膠原蛋白飲", triggerType: "time" as const, triggerValue: 1200, repeatMode: "every" as const },
-]
+// 預設補給品樣板已移除
+export const SUPPLY_ITEM_TEMPLATES = []
 
 export interface AppSettings {
   // Personal

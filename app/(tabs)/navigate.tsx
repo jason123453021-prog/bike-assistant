@@ -318,28 +318,7 @@ export default function NavigateScreen() {
           </Pressable>
 
           {/* GPX 匯入按鈕 */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.importBtn,
-              { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-            ]}
-            onPress={() => handleImportGpx()}
-          >
-            <>
-              <View style={[styles.importIconWrap, { backgroundColor: colors.primary + "15" }]}>
-                <IconSymbol name="arrow.down.doc" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.importTextWrap}>
-                <Text style={[styles.importTitle, { color: colors.foreground }]}>
-                  匯入 GPX
-                </Text>
-                <Text style={[styles.importSubtitle, { color: colors.muted }]}>
-                  從檔案匯入路線
-                </Text>
-              </View>
-              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-            </>
-          </Pressable>
+          {/* 匯入 GPX 按鈕已移除 */}
 
           {/* Error */}
           {error && (

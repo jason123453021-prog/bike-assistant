@@ -134,7 +134,10 @@ export default function SettingsScreen() {
     id: "",
     name: "",
     triggerType: "time",
-    triggerValue: 30,
+    triggerValue: 10,
+    triggerHours: 0,
+    triggerMinutes: 5,
+    triggerSeconds: 0,
     repeatMode: "every",
     enabled: true,
   });
@@ -148,7 +151,10 @@ export default function SettingsScreen() {
         id: Date.now().toString(),
         name: "",
         triggerType: "time",
-        triggerValue: 30,
+        triggerValue: 10,
+        triggerHours: 0,
+        triggerMinutes: 5,
+        triggerSeconds: 0,
         repeatMode: "every",
         enabled: true,
       });
@@ -649,39 +655,7 @@ export default function SettingsScreen() {
         {/* ── 自訂補給品清單 ── */}
         <SectionHeader title="自訂補給品" colors={colors} onToggle={() => toggleSection("customSupply")} collapsed={collapsedSections["customSupply"]} />
         {!collapsedSections["customSupply"] && <View style={[styles.section, { borderColor: colors.border }]}>
-          {/* 快速新延預設補給品 */}
-          {settings.supplyItems.length === 0 && (
-            <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
-              <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 8 }}>快速新延預設補給品</Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {SUPPLY_ITEM_TEMPLATES.map((template) => (
-                  <Pressable
-                    key={template.name}
-                    style={({ pressed }) => [{
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                      borderWidth: 1,
-                      borderRadius: 6,
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      opacity: pressed ? 0.7 : 1,
-                    }]}
-                    onPress={() => {
-                      const newItem = {
-                        id: Date.now().toString(),
-                        ...template,
-                        enabled: true,
-                      };
-                      addSupplyItem(newItem);
-                    }}
-                  >
-                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "500" }}>+ {template.name}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Divider colors={colors} />
-            </View>
-          )}
+          {/* 快速新延預設補給品已移除 */}
           {settings.supplyItems.length === 0 ? (
             <View style={{ padding: 16, alignItems: "center" }}>
               <Text style={{ color: colors.muted, fontSize: 14 }}>沒有自訂補給品</Text>
@@ -702,7 +676,7 @@ export default function SettingsScreen() {
                       >
                         <Text style={[styles.rowLabel, { color: colors.foreground }]}>{item.name}</Text>
                         <Text style={[styles.rowHint, { color: colors.muted, fontSize: 12 }]}>
-                          {item.triggerType === "time" ? `每 ${item.triggerValue} 秒` : `每 ${item.triggerValue} 公里`} • {item.repeatMode === "once" ? "只提醒一次" : item.repeatMode === "every" ? "每次提醒" : "不提醒"}
+                          {item.triggerType === "time" ? `每 ${item.triggerHours || 0}h ${item.triggerMinutes || 0}m ${item.triggerSeconds || 0}s` : `每 ${item.triggerValue} 公里`} • {item.repeatMode === "once" ? "只提醒一次" : item.repeatMode === "every" ? "每次提醒" : "不提醒"}
                         </Text>
                       </Pressable>
                     </View>
@@ -1402,26 +1376,81 @@ export default function SettingsScreen() {
               </View>
 
               {/* 觸發值 */}
-              <View style={{ marginBottom: 16 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                    觸發值
+              {supplyForm.triggerType === "time" ? (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>
+                    觸發時間
                   </Text>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
-                    {supplyForm.triggerValue} {supplyForm.triggerType === "time" ? "秒" : "公里"}
-                  </Text>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {/* 時 */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>時</Text>
+                      <TextInput
+                        style={[
+                          styles.textInput,
+                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, textAlign: "center" },
+                        ]}
+                        placeholder="0"
+                        placeholderTextColor={colors.muted}
+                        keyboardType="number-pad"
+                        value={String(supplyForm.triggerHours || 0)}
+                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerHours: Math.max(0, parseInt(text) || 0) })}
+                      />
+                    </View>
+                    {/* 分 */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>分</Text>
+                      <TextInput
+                        style={[
+                          styles.textInput,
+                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, textAlign: "center" },
+                        ]}
+                        placeholder="0"
+                        placeholderTextColor={colors.muted}
+                        keyboardType="number-pad"
+                        value={String(supplyForm.triggerMinutes || 0)}
+                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerMinutes: Math.max(0, Math.min(59, parseInt(text) || 0)) })}
+                      />
+                    </View>
+                    {/* 秒 */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>秒</Text>
+                      <TextInput
+                        style={[
+                          styles.textInput,
+                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, textAlign: "center" },
+                        ]}
+                        placeholder="0"
+                        placeholderTextColor={colors.muted}
+                        keyboardType="number-pad"
+                        value={String(supplyForm.triggerSeconds || 0)}
+                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerSeconds: Math.max(0, Math.min(59, parseInt(text) || 0)) })}
+                      />
+                    </View>
+                  </View>
                 </View>
-                <Slider
-                  style={{ width: "100%", height: 36 }}
-                  minimumValue={supplyForm.triggerType === "time" ? 10 : 1}
-                  maximumValue={supplyForm.triggerType === "time" ? 600 : 50}
-                  step={supplyForm.triggerType === "time" ? 10 : 1}
-                  value={supplyForm.triggerValue}
-                  onValueChange={(v) => setSupplyForm({ ...supplyForm, triggerValue: Math.round(v) })}
-                  minimumTrackTintColor={colors.primary}
-                  maximumTrackTintColor={colors.border}
-                />
-              </View>
+              ) : (
+                <View style={{ marginBottom: 16 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                      觸發值
+                    </Text>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
+                      {supplyForm.triggerValue} 公里
+                    </Text>
+                  </View>
+                  <Slider
+                    style={{ width: "100%", height: 36 }}
+                    minimumValue={1}
+                    maximumValue={50}
+                    step={1}
+                    value={supplyForm.triggerValue}
+                    onValueChange={(v) => setSupplyForm({ ...supplyForm, triggerValue: Math.round(v) })}
+                    minimumTrackTintColor={colors.primary}
+                    maximumTrackTintColor={colors.border}
+                  />
+                </View>
+              )}
 
               {/* 重複模式 */}
               <View style={{ marginBottom: 16 }}>
