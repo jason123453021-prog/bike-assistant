@@ -118,6 +118,12 @@ export default function RideDetailScreen() {
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [shareCardVisible, setShareCardVisible] = useState(false);
   
+  // 軌跡回放控制
+  const [isPlayingTrail, setIsPlayingTrail] = useState(false);
+  const [trailPlaybackSpeed, setTrailPlaybackSpeed] = useState(1);
+  const [trailPlaybackIndex, setTrailPlaybackIndex] = useState(0);
+  const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
   // 動態計算收縮面板高度（與導航頁面一致）
   const CELL_H = 60;
   const HEADER_H = 80;
@@ -152,11 +158,32 @@ export default function RideDetailScreen() {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
+      onStartShouldSetPanResponder: (_, gs) => {
+        // 只在拉桿區域（頂部 50px）允許拖動
+        return gs.y0 < 50;
+      },
+      onMoveShouldSetPanResponder: (_, gs) => {
+        return gs.y0 < 50 && Math.abs(gs.dy) > 5;
+      },
+      onPanResponderMove: (_, gs) => {
+        const newHeight = dynamicCollapsedH + (-gs.dy);
+        const clampedHeight = Math.max(dynamicCollapsedH, Math.min(PANEL_EXPANDED_H, newHeight));
+        panelAnim.setValue(clampedHeight);
+      },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy < -30) togglePanel(true);
-        else if (gs.dy > 30) togglePanel(false);
+        const currentHeight = (panelAnim as any)._value;
+        const midpoint = (dynamicCollapsedH + PANEL_EXPANDED_H) / 2;
+        const velocity = gs.vy;
+        
+        // 根據速度或位置決定展開或收縮
+        if (velocity < -0.5 || currentHeight > midpoint) {
+          togglePanel(true);
+        } else if (velocity > 0.5 || currentHeight < midpoint) {
+          togglePanel(false);
+        } else {
+          // 保持當前狀態
+          togglePanel(panelExpanded);
+        }
       },
     })
   ).current;
@@ -184,6 +211,48 @@ export default function RideDetailScreen() {
       }, 600);
     }
   }, [mapReady, polylineCoords]);
+  
+  // 軌跡回放邏輯
+  useEffect(() => {
+    if (!isPlayingTrail || polylineCoords.length === 0) {
+      if (playbackIntervalRef.current) {
+        clearInterval(playbackIntervalRef.current);
+        playbackIntervalRef.current = null;
+      }
+      return;
+    }
+    
+    const interval = setInterval(() => {
+      setTrailPlaybackIndex((prev) => {
+        const next = prev + 1;
+        if (next >= polylineCoords.length) {
+          setIsPlayingTrail(false);
+          return prev;
+        }
+        return next;
+      });
+    }, 100 / trailPlaybackSpeed);
+    
+    playbackIntervalRef.current = interval;
+    return () => {
+      if (playbackIntervalRef.current) {
+        clearInterval(playbackIntervalRef.current);
+      }
+    };
+  }, [isPlayingTrail, trailPlaybackSpeed, polylineCoords.length]);
+  
+  const handlePlayTrail = () => {
+    if (polylineCoords.length === 0) return;
+    if (trailPlaybackIndex >= polylineCoords.length - 1) {
+      setTrailPlaybackIndex(0);
+    }
+    setIsPlayingTrail(!isPlayingTrail);
+  };
+  
+  const handleResetTrail = () => {
+    setIsPlayingTrail(false);
+    setTrailPlaybackIndex(0);
+  };
 
   // 心率區間定義（5 個區間）
   const HR_ZONES = [
@@ -541,10 +610,9 @@ export default function RideDetailScreen() {
       {/* ── 底部面板 ── */}
       <Animated.View
         style={[styles.panel, { height: panelAnim, paddingBottom: insets.bottom + 8 }]}
-        {...panResponder.panHandlers}
       >
         {/* 拖拉把手 */}
-        <View style={styles.handleArea}>
+        <View style={styles.handleArea} {...panResponder.panHandlers}>
           <View style={styles.panelHandle} />
           <Text style={styles.dateText}>{dateStr}</Text>
         </View>
@@ -600,6 +668,49 @@ export default function RideDetailScreen() {
                       </View>
                     ))}
                   </View>
+                </View>
+              </View>
+            )}
+
+            {/* 軌跡回放控制 */}
+            {polylineCoords.length > 0 && (
+              <View style={styles.trailPlaybackSection}>
+                <Text style={styles.sectionTitle}>軌跡回放</Text>
+                <View style={styles.playbackControls}>
+                  <Pressable
+                    style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1 }]}
+                    onPress={handlePlayTrail}
+                  >
+                    <IconSymbol name={isPlayingTrail ? "pause.fill" : "play.fill"} size={20} color="#fff" />
+                    <Text style={styles.playbackBtnText}>{isPlayingTrail ? "暫停" : "播放"}</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1 }]}
+                    onPress={handleResetTrail}
+                  >
+                    <IconSymbol name="arrow.counterclockwise" size={20} color="#fff" />
+                    <Text style={styles.playbackBtnText}>重置</Text>
+                  </Pressable>
+                  <View style={styles.speedControl}>
+                    <Text style={styles.speedLabel}>速度: {trailPlaybackSpeed}x</Text>
+                    <View style={styles.speedButtons}>
+                      <Pressable
+                        style={({ pressed }) => [styles.speedBtn, { opacity: pressed ? 0.7 : 1 }]}
+                        onPress={() => setTrailPlaybackSpeed(Math.max(0.5, trailPlaybackSpeed - 0.5))}
+                      >
+                        <Text style={styles.speedBtnText}>-</Text>
+                      </Pressable>
+                      <Pressable
+                        style={({ pressed }) => [styles.speedBtn, { opacity: pressed ? 0.7 : 1 }]}
+                        onPress={() => setTrailPlaybackSpeed(Math.min(3, trailPlaybackSpeed + 0.5))}
+                      >
+                        <Text style={styles.speedBtnText}>+</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.playbackProgress}>
+                  <Text style={styles.progressText}>{trailPlaybackIndex} / {polylineCoords.length}</Text>
                 </View>
               </View>
             )}
@@ -960,5 +1071,72 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 12,
+  },
+  trailPlaybackSection: {
+    marginHorizontal: 12,
+    marginTop: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  playbackControls: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  playbackBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(0, 230, 118, 0.2)",
+  },
+  playbackBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  speedControl: {
+    flex: 1,
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  speedLabel: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.7)",
+  },
+  speedButtons: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  speedBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  speedBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  playbackProgress: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    alignItems: "center",
+  },
+  progressText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.6)",
   },
 });
