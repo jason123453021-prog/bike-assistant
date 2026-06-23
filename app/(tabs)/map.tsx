@@ -2064,6 +2064,8 @@ export default function MapScreen() {
         avgSpeed={avgSpeed}
         calories={Math.round(state.calories)}
         pausedTime={formatDuration(state.totalPausedSec ?? 0)}
+        totalAscent={state.totalAscent}
+        currentAltitude={state.currentAltitude}
         fields={settings.simplifiedModeFields}
         fieldOrder={settings.simplifiedModeFieldOrder}
       />
@@ -2170,6 +2172,10 @@ function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed, sensorD
       const displayCadence = sensorData?.smoothedCadence ?? sensorData?.cadence ?? null;
       const isCadenceSensor = displayCadence !== null && displayCadence !== undefined;
       return <BigMetric label={isCadenceSensor ? "踏頻 (感測器)" : "踏頻"} value={displayCadence !== null ? `${displayCadence}` : "--"} unit="rpm" />;
+    case "showTotalAscent":
+      return <BigMetric label="累計爬升" value={state.totalAscent ? state.totalAscent.toFixed(0) : "0"} unit="m" />;
+    case "showCurrentAltitude":
+      return <BigMetric label="目前海拔" value={state.currentAltitude ? state.currentAltitude.toFixed(0) : "--"} unit="m" />;
     default:
       return null;
   }

@@ -30,6 +30,8 @@ export interface SimplifiedNavOverlayProps {
   avgSpeed?: number;       // 均速 km/h
   calories?: number;       // 卡路里 kcal
   pausedTime?: string;     // 暫停時間
+  totalAscent?: number;    // 累計爬升 m
+  currentAltitude?: number; // 目前海拔 m
   // 自訂顯示欄位（由設定頁面控制）
   fields?: SimplifiedModeFields;
   // 欄位顯示順序
@@ -67,6 +69,8 @@ export function SimplifiedNavOverlay({
   avgSpeed,
   calories,
   pausedTime,
+  totalAscent,
+  currentAltitude,
   fields,
   fieldOrder,
 }: SimplifiedNavOverlayProps) {
@@ -84,8 +88,10 @@ export function SimplifiedNavOverlay({
     showAvgSpeed: () => f.showAvgSpeed ? { value: avgSpeed !== undefined && avgSpeed > 0 ? avgSpeed.toFixed(1) : "--", label: "均速" } : null,
     showCalories: () => f.showCalories ? { value: calories !== undefined ? `${calories}` : "--", label: "kcal" } : null,
     showPausedTime: () => f.showPausedTime ? { value: pausedTime ?? "--", label: "暫停" } : null,
+    showTotalAscent: () => f.showTotalAscent ? { value: totalAscent !== undefined ? `${totalAscent.toFixed(0)}` : "0", label: "m 爬升" } : null,
+    showCurrentAltitude: () => f.showCurrentAltitude ? { value: currentAltitude !== undefined ? `${currentAltitude.toFixed(0)}` : "--", label: "m 海拔" } : null,
   };
-  const BOTTOM_KEYS: SimplifiedFieldKey[] = ["showDistance", "showElapsed", "showCurrentTime", "showGrade", "showPower", "showAvgSpeed", "showCalories", "showPausedTime"];
+  const BOTTOM_KEYS: SimplifiedFieldKey[] = ["showDistance", "showElapsed", "showCurrentTime", "showGrade", "showPower", "showAvgSpeed", "showCalories", "showPausedTime", "showTotalAscent", "showCurrentAltitude"];
   const orderedKeys = fieldOrder
     ? [...fieldOrder.filter((k) => BOTTOM_KEYS.includes(k)), ...BOTTOM_KEYS.filter((k) => !fieldOrder.includes(k))]
     : BOTTOM_KEYS;

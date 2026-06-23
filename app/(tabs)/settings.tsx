@@ -1692,7 +1692,7 @@ export default function SettingsScreen() {
             </ScrollView>
 
             {/* 固定底部按鈕區域 */}
-            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
+            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, paddingBottom: 32, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
               <Pressable
                 style={({ pressed }) => ([
                   styles.editCancelBtn,

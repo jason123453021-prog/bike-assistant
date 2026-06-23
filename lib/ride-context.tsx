@@ -66,6 +66,7 @@ export interface RideState {
   avgPower: number;
   maxPower: number;
   totalAscent: number;
+  currentAltitude: number;  // 目前海拔 m
   calories: number;         // 自上次補給後累計（觸發補給提醒用）
   totalCalories: number;     // 全程總卡路里（不被補給重置）
   calorieProgress: number;  // 0-1
@@ -134,6 +135,7 @@ const initialState: RideState = {
   avgPower: 0,
   maxPower: 0,
   totalAscent: 0,
+  currentAltitude: 0,
   calories: 0,
   calorieProgress: 0,
   sweatSinceLastRefill: 0,
