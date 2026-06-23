@@ -37,6 +37,7 @@ import { useRide, type RideRecord, type RouteStats } from "@/lib/ride-context";
 import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power-calc";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFavorites } from "@/lib/favorites-context";
+import { ShareCardModal } from "@/components/share-card-modal";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const STORAGE_KEY = "@bike_records";
@@ -111,8 +112,9 @@ export default function RideDetailScreen() {
   // 地圖 ref
   const mapRef = useRef<LeafletMapHandle>(null);
 
-  // 底部面板
+  // 低部面板
   const [panelExpanded, setPanelExpanded] = useState(false);
+  const [shareCardVisible, setShareCardVisible] = useState(false);
   const panelAnim = useRef(new Animated.Value(PANEL_COLLAPSED_H)).current;
 
   const togglePanel = useCallback((expand: boolean) => {
@@ -514,6 +516,15 @@ export default function RideDetailScreen() {
               <Text style={styles.shareBtnText}>{isFavorited ? "已最愛" : "加入最愛"}</Text>
             </Pressable>
 
+            {/* 分享卡片按鈕 */}
+            <Pressable
+              style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.85 : 1, backgroundColor: "rgba(255,152,0,0.8)" }]}
+              onPress={() => setShareCardVisible(true)}
+            >
+              <IconSymbol name="paperplane.fill" size={16} color="#fff" />
+              <Text style={styles.shareBtnText}>分享卡片</Text>
+            </Pressable>
+
             {/* 路線統計面板 */}
             {routeStats && (
               <View style={[styles.statsPanel, { borderColor: colors.border }]}>
@@ -544,6 +555,13 @@ export default function RideDetailScreen() {
           </Pressable>
         )}
       </Animated.View>
+
+      {/* 分享卡片 Modal */}
+      <ShareCardModal
+        visible={shareCardVisible}
+        ride={record}
+        onClose={() => setShareCardVisible(false)}
+      />
     </View>
   );
 }

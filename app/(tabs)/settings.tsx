@@ -411,6 +411,138 @@ export default function SettingsScreen() {
           </View>
         </View>}
 
+        {/* ── 感測器配對 ── */}
+        <SectionHeader title="感測器配對" colors={colors} onToggle={() => toggleSection("sensors")} collapsed={collapsedSections["sensors"]} />
+        {!collapsedSections["sensors"] && <View style={[styles.section, { borderColor: colors.border }]}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
+            {/* 感測器清單 */}
+            <View style={{ gap: 8 }}>
+              {/* 心率帶 */}
+              <View style={{
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderWidth: 1,
+                borderRadius: 8,
+                padding: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+                  <View style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    backgroundColor: colors.primary + "20",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}>
+                    <Text style={{ fontSize: 20 }}>❤️</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>心率帶</Text>
+                    <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>未連接</Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    backgroundColor: colors.primary,
+                    opacity: pressed ? 0.8 : 1,
+                  }]}
+                  onPress={() => {}}
+                >
+                  <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600" }}>配對</Text>
+                </Pressable>
+              </View>
+
+              {/* 功率計 */}
+              <View style={{
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderWidth: 1,
+                borderRadius: 8,
+                padding: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+                  <View style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    backgroundColor: colors.primary + "20",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}>
+                    <Text style={{ fontSize: 20 }}>⚡</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>功率計</Text>
+                    <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>未連接</Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    backgroundColor: colors.primary,
+                    opacity: pressed ? 0.8 : 1,
+                  }]}
+                  onPress={() => {}}
+                >
+                  <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600" }}>配對</Text>
+                </Pressable>
+              </View>
+
+              {/* 踏頻器 */}
+              <View style={{
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderWidth: 1,
+                borderRadius: 8,
+                padding: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+                  <View style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    backgroundColor: colors.primary + "20",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}>
+                    <Text style={{ fontSize: 20 }}>🔄</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>踏頻器</Text>
+                    <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>未連接</Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    backgroundColor: colors.primary,
+                    opacity: pressed ? 0.8 : 1,
+                  }]}
+                  onPress={() => {}}
+                >
+                  <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600" }}>配對</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>}
+
         {/* ── 補給閾值 ── */}
         <SectionHeader title="補給閾值" colors={colors} onToggle={() => toggleSection("supply")} collapsed={collapsedSections["supply"]} />
         {!collapsedSections["supply"] && <View style={[styles.section, { borderColor: colors.border }]}>
