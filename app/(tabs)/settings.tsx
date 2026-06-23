@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,11 +17,11 @@ import {
   ActivityIndicator,
 } from "react-native";
 
+
 // 啟用 Android LayoutAnimation
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-import { useEffect } from "react";
 import Slider from "@react-native-community/slider";
 import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -29,6 +29,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, SUPPLY_ITEM_TEMPLATES, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
 import { SensorPairingModal } from "@/components/sensor-pairing-modal";
+
 import { useAuth } from "@/hooks/use-auth";
 import { startOAuthLogin } from "@/constants/oauth";
 import { trpc } from "@/lib/trpc";
@@ -42,6 +43,9 @@ export default function SettingsScreen() {
 
   // ── 感測器配對 Modal 狀態 ──
   const [sensorModalVisible, setSensorModalVisible] = useState(false);
+  const [bleScanning, setBleScanning] = useState(false);
+  const [bleDevices, setBleDevices] = useState<any[]>([]);
+  const [bleConnecting, setBleConnecting] = useState<string | null>(null);
   const [sensorStatus, setSensorStatus] = useState<{
     connectedCount: number;
     lastUpdateTimeStr: string;
@@ -66,6 +70,87 @@ export default function SettingsScreen() {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // BLE 掃描與連線
+  const handleBleScan = async () => {
+    setBleScanning(true);
+    try {
+      const { getSensorDataManager } = require('@/lib/sensor-data-manager');
+      const manager = getSensorDataManager();
+      await manager.startBleScanning();
+      
+      // 延遲 5 秒後取得掃描結果
+      setTimeout(() => {
+        const connectedDevices = manager.getBleConnectedDevices();
+        setBleDevices(connectedDevices);
+        setBleScanning(false);
+      }, 5000);
+    } catch (error) {
+      console.error('[Settings] BLE scan error:', error);
+      setBleScanning(false);
+      Alert.alert('掃描失敗', '無法掃描 BLE 設備');
+    }
+  };
+
+  const handleBleConnect = async (deviceId: string) => {
+    setBleConnecting(deviceId);
+    try {
+      const { getSensorDataManager } = require('@/lib/sensor-data-manager');
+      const manager = getSensorDataManager();
+      await manager.connectBleDevice(deviceId);
+      
+      // 更新設備列表
+      const updated = bleDevices.map((d) => (d.id === deviceId ? { ...d, isConnected: true } : d));
+      setBleDevices(updated);
+      Alert.alert('連接成功', '感測器已連接');
+    } catch (error) {
+      console.error('[Settings] BLE connect error:', error);
+      Alert.alert('連接失敗', '無法連接到感測器');
+    } finally {
+      setBleConnecting(null);
+    }
+  };
+
+  const handleBleDisconnect = async (deviceId: string) => {
+    try {
+      const { getSensorDataManager } = require('@/lib/sensor-data-manager');
+      const manager = getSensorDataManager();
+      await manager.disconnectBleDevice(deviceId);
+      
+      // 更新設備列表
+      const updated = bleDevices.map((d) => (d.id === deviceId ? { ...d, isConnected: false } : d));
+      setBleDevices(updated);
+    } catch (error) {
+      console.error('[Settings] BLE disconnect error:', error);
+      Alert.alert('斷開失敗', '無法斷開感測器');
+    }
+  };
+
+  const getSensorEmoji = (serviceType: string) => {
+    switch (serviceType) {
+      case 'heartRate':
+        return '❤️';
+      case 'power':
+        return '⚡';
+      case 'cadence':
+        return '🔄';
+      default:
+        return '📱';
+    }
+  };
+
+  const getSensorLabel = (serviceType: string) => {
+    switch (serviceType) {
+      case 'heartRate':
+        return '心率帶';
+      case 'power':
+        return '功率計';
+      case 'cadence':
+        return '踏頻器';
+      default:
+        return '未知設備';
+    }
+  };
 
   // ── 刪除帳號防呆 Modal 狀態 ──
   const [deleteModal, setDeleteModal] = useState<{
@@ -488,131 +573,107 @@ export default function SettingsScreen() {
               </View>
             </View>
 
-            {/* 感測器清單 */}
-            <View style={{ gap: 8 }}>
-              {/* 心率帶 */}
-              <View style={{
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                borderWidth: 1,
+            {/* BLE 掃描按鈕 */}
+            <Pressable
+              style={({ pressed }) => [{
+                backgroundColor: colors.primary,
                 borderRadius: 8,
-                padding: 12,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
-                  <View style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 8,
-                    backgroundColor: colors.primary + "20",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}>
-                    <Text style={{ fontSize: 20 }}>❤️</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>心率帶</Text>
-                    <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>未連接</Text>
-                  </View>
-                </View>
-                <Pressable
-                  style={({ pressed }) => [{
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                    backgroundColor: colors.primary,
-                    opacity: pressed ? 0.8 : 1,
-                  }]}
-                  onPress={() => setSensorModalVisible(true)}
-                >
-                  <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600" }}>配對</Text>
-                </Pressable>
-              </View>
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                opacity: pressed ? 0.8 : 1,
+              }]}
+              onPress={handleBleScan}
+              disabled={bleScanning}
+            >
+              {bleScanning ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Text style={{ fontSize: 16 }}>🔍</Text>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>掃描 BLE 設備</Text>
+                </>
+              )}
+            </Pressable>
 
-              {/* 功率計 */}
-              <View style={{
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                borderWidth: 1,
-                borderRadius: 8,
-                padding: 12,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
-                  <View style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 8,
-                    backgroundColor: colors.primary + "20",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}>
-                    <Text style={{ fontSize: 20 }}>⚡</Text>
+            {/* 已發現設備列表 */}
+            {bleDevices.length > 0 ? (
+              <View style={{ gap: 8 }}>
+                <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: '600' }}>已發現設備 ({bleDevices.length})</Text>
+                {bleDevices.map((device) => (
+                  <View
+                    key={device.id}
+                    style={{
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                      borderWidth: 1,
+                      borderRadius: 8,
+                      padding: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                      <View
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 8,
+                          backgroundColor: colors.primary + '20',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Text style={{ fontSize: 20 }}>{getSensorEmoji(device.serviceType)}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: '600' }}>
+                          {device.name || 'Unknown Device'}
+                        </Text>
+                        <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>
+                          {getSensorLabel(device.serviceType)} • RSSI: {device.rssi}dBm
+                        </Text>
+                        <Text style={{ color: device.isConnected ? colors.success : colors.muted, fontSize: 10, marginTop: 2 }}>
+                          {device.isConnected ? '✓ 已連接' : '未連接'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Pressable
+                      style={({ pressed }) => [{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 6,
+                        backgroundColor: device.isConnected ? colors.error : colors.primary,
+                        opacity: pressed || bleConnecting === device.id ? 0.8 : 1,
+                      }]}
+                      onPress={() => device.isConnected ? handleBleDisconnect(device.id) : handleBleConnect(device.id)}
+                      disabled={bleConnecting === device.id}
+                    >
+                      {bleConnecting === device.id ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>
+                          {device.isConnected ? '斷開' : '連接'}
+                        </Text>
+                      )}
+                    </Pressable>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>功率計</Text>
-                    <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>未連接</Text>
-                  </View>
-                </View>
-                <Pressable
-                  style={({ pressed }) => [{
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                    backgroundColor: colors.primary,
-                    opacity: pressed ? 0.8 : 1,
-                  }]}
-                  onPress={() => {}}
-                >
-                  <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600" }}>配對</Text>
-                </Pressable>
+                ))}
               </View>
-
-              {/* 踏頻器 */}
-              <View style={{
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                borderWidth: 1,
-                borderRadius: 8,
-                padding: 12,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
-                  <View style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 8,
-                    backgroundColor: colors.primary + "20",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}>
-                    <Text style={{ fontSize: 20 }}>🔄</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>踏頻器</Text>
-                    <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>未連接</Text>
-                  </View>
-                </View>
-                <Pressable
-                  style={({ pressed }) => [{
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                    backgroundColor: colors.primary,
-                    opacity: pressed ? 0.8 : 1,
-                  }]}
-                  onPress={() => {}}
-                >
-                  <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600" }}>配對</Text>
-                </Pressable>
+            ) : bleScanning ? (
+              <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                <ActivityIndicator color={colors.primary} size="large" />
+                <Text style={{ color: colors.muted, fontSize: 12, marginTop: 8 }}>掃描中...</Text>
               </View>
-            </View>
+            ) : (
+              <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                <Text style={{ color: colors.muted, fontSize: 12 }}>點擊「掃描 BLE 設備」開始搜尋</Text>
+              </View>
+            )}
           </View>
         </View>}
 
