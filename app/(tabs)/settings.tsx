@@ -1374,8 +1374,8 @@ export default function SettingsScreen() {
         animationType="fade"
         onRequestClose={closeSupplyModal}
       >
-        <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }]}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface, width: "100%", maxHeight: "80%", borderRadius: 16, maxWidth: 500 }]}>
+        <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end", alignItems: "center" }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface, width: "100%", borderRadius: 16, maxWidth: 500, maxHeight: "90%", borderTopLeftRadius: 20, borderTopRightRadius: 20 }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 {supplyModal.mode === "add" ? "新增補給品" : "編輯補給品"}
