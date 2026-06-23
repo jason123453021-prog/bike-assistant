@@ -508,6 +508,37 @@ export default function MapScreen() {
       if (type === "calorie") pendingCalorieRef.current = true;
       else pendingWaterRef.current = true;
 
+      // 單次提醒自動關閉功能
+      const autoDismissSeconds = type === "calorie" ? settings.calorieAutoDismissSeconds : settings.waterAutoDismissSeconds;
+      if (autoDismissSeconds && autoDismissSeconds > 0) {
+        setTimeout(() => {
+          if (type === "calorie") {
+            setCalorieAlert(false);
+            pendingCalorieRef.current = false;
+          } else {
+            setWaterAlert(false);
+            pendingWaterRef.current = false;
+          }
+        }, autoDismissSeconds * 1000);
+      }
+
+      // 未關閉時重複提醒功能
+      const repeatUntilDismissed = type === "calorie" ? settings.calorieRepeatUntilDismissed : settings.waterRepeatUntilDismissed;
+      if (repeatUntilDismissed) {
+        const repeatInterval = setInterval(() => {
+          const isPending = type === "calorie" ? pendingCalorieRef.current : pendingWaterRef.current;
+          if (isPending) {
+            if (settings.vibrationEnabled) vibrateWarning();
+            if (settings.ttsEnabled) speakSupplyReminder(type, true);
+            if (settings.soundEnabled) {
+              try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+            }
+          } else {
+            clearInterval(repeatInterval);
+          }
+        }, 5000);
+      }
+
       // 啟動重複提醒計時器（若已有則不重複啟動）
       const repeatSec = settings.supplyReminderRepeatSec ?? 60;
       if (repeatSec > 0 && !supplyRepeatTimerRef.current) {
@@ -894,13 +925,28 @@ export default function MapScreen() {
           Animated.timing(calorieAnim, { toValue: calPct, duration: 500, useNativeDriver: false }).start();
           Animated.timing(waterAnim, { toValue: waterPct, duration: 500, useNativeDriver: false }).start();
 
+          // 檢查下坡狀態
+          const isDownhill = currentState.currentSpeed > 25 && currentState.totalAscent <= lastAscentRef.current;
+          lastAscentRef.current = currentState.totalAscent;
+
+          // 卡路里提醒邏輯
           if (calPct >= 1 && !calorieReminderSentRef.current) {
-            calorieReminderSentRef.current = true;
-            triggerSupplyReminder("calorie");
+            if (settings.caloriePauseOnDownhill && isDownhill && !calorieAlert) {
+              // 下坡時暫停提醒但仍計數
+            } else {
+              calorieReminderSentRef.current = true;
+              triggerSupplyReminder("calorie");
+            }
           }
+
+          // 水分提醒邏輯
           if (waterPct >= 1 && !waterReminderSentRef.current) {
-            waterReminderSentRef.current = true;
-            triggerSupplyReminder("water", sweatResult.recommendedRefillMl);
+            if (settings.waterPauseOnDownhill && isDownhill && !waterAlert) {
+              // 下坡時暫停提醒但仍計數
+            } else {
+              waterReminderSentRef.current = true;
+              triggerSupplyReminder("water", sweatResult.recommendedRefillMl);
+            }
           }
 
           // ── 自訂補給品觸發 ──

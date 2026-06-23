@@ -99,6 +99,14 @@ export interface AppSettings {
   calorieThreshold: number;   // kcal before reminder
   waterThreshold: number;     // ml before reminder
   supplyReminderRepeatSec: number; // 0 = 不重複；>0 = 每幾秒重複語音提醒
+  // 卡路里高級設定
+  calorieRepeatUntilDismissed?: boolean; // 未關閉時重複提醒
+  calorieAutoDismissSeconds?: number;    // 自動關閉延遲（秒）
+  caloriePauseOnDownhill?: boolean;      // 長下坡暫停提醒
+  // 水分高級設定
+  waterRepeatUntilDismissed?: boolean;   // 未關閉時重複提醒
+  waterAutoDismissSeconds?: number;      // 自動關閉延遲（秒）
+  waterPauseOnDownhill?: boolean;        // 長下坡暫停提醒
   supplyItems: SupplyItem[];   // 自訂補給品清單
   // Feedback
   vibrationEnabled: boolean;
