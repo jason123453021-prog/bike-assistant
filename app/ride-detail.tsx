@@ -186,7 +186,7 @@ export default function RideDetailScreen() {
       `時間：${formatDuration(record.duration)}`,
       `有效騎乘：${formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))}`,
       `暫停時間：${formatDuration(record.totalPausedSec ?? 0)}`,
-      `均速：${record.avgSpeed.toFixed(1)} km/h`,
+      `均速：${((record.distance / 1000) / ((record.duration - (record.totalPausedSec ?? 0)) / 3600)).toFixed(1)} km/h`,
       `最高速：${record.maxSpeed.toFixed(1)} km/h`,
       `爬升：${Math.round(record.totalAscent)} m`,
       `卡路里：${record.calories} kcal`,
@@ -348,7 +348,7 @@ export default function RideDetailScreen() {
           >
             {/* 詳細數據格 */}
             <View style={styles.statsGrid}>
-              <DetailCell label="均速" value={`${record.avgSpeed.toFixed(1)}`} unit="km/h" />
+              <DetailCell label="均速" value={`${((record.distance / 1000) / ((record.duration - (record.totalPausedSec ?? 0)) / 3600)).toFixed(1)}`} unit="km/h" />
               <DetailCell label="最高速" value={`${record.maxSpeed.toFixed(1)}`} unit="km/h" />
               <DetailCell label="爆升" value={`${Math.round(record.totalAscent)}`} unit="m" />
               <DetailCell

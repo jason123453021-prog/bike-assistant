@@ -96,7 +96,10 @@ export function calculatePower(input: PowerInput): number {
  */
 export function calculateCalories(powerWatts: number, durationSeconds: number): number {
   if (powerWatts <= 0 || durationSeconds <= 0) return 0;
-  const efficiency = 0.25;
+  // 修正：效率係數從 0.25 改為 0.75（更保守的估計，避免卡路里異常高）
+  // 舊公式：kcal = (W × s) / (4184 × 0.25) = (W × s) / 1046
+  // 新公式：kcal = (W × s) / (4184 × 0.75) = (W × s) / 3138
+  const efficiency = 0.75;
   const joules = powerWatts * durationSeconds;
   const kcal = joules / (4184 * efficiency);
   return kcal;
