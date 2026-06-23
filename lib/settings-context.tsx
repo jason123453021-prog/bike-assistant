@@ -66,7 +66,7 @@ export const DEFAULT_SIMPLIFIED_FIELD_ORDER: SimplifiedFieldKey[] = [
 // 補給品項目型別
 export interface SupplyItem {
   id: string;                    // 唯一識別符
-  name: string;                  // 補給品名稱（e.g., "運動飲料", "能量棒"）
+  name: string;                  // 補給品名稱
   triggerType: "time" | "distance"; // 觸發方式：時間或距離
   triggerValue?: number;         // 觸發值（公里）- 距離觸發用
   triggerHours?: number;         // 時（時間觸發用）
@@ -74,6 +74,9 @@ export interface SupplyItem {
   triggerSeconds?: number;       // 秒（時間觸發用）
   repeatMode: "once" | "every" | "off"; // 重複模式：只提醒一次/每次/不提醒
   enabled: boolean;              // 是否啟用
+  repeatUntilDismissed?: boolean; // 未關閉時重複提醒
+  autoDismissSeconds?: number;   // 單次提醒自動關閉延遲（秒）
+  pauseOnDownhill?: boolean;     // 長下坡暫停提醒
 }
 
 // 效能模式型別
@@ -162,8 +165,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoPerformanceMode: true,
   calorieThreshold: 300,
   waterThreshold: 500,
-  supplyReminderRepeatSec: 60,  // 預設 60 秒重複一次
-  supplyItems: [],  // 初始空補給品清單
+  supplyReminderRepeatSec: 60,
+  supplyItems: [],
   vibrationEnabled: true,
   ttsEnabled: true,
   soundEnabled: true,

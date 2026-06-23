@@ -225,6 +225,9 @@ export default function SettingsScreen() {
     triggerSeconds: 0,
     repeatMode: "every",
     enabled: true,
+    repeatUntilDismissed: false,
+    autoDismissSeconds: 0,
+    pauseOnDownhill: false,
   });
 
   const openSupplyModal = (item?: SupplyItem) => {
@@ -242,6 +245,9 @@ export default function SettingsScreen() {
         triggerSeconds: 0,
         repeatMode: "every",
         enabled: true,
+        repeatUntilDismissed: false,
+        autoDismissSeconds: 0,
+        pauseOnDownhill: false,
       });
       setSupplyModal({ visible: true, mode: "add", item: null });
     }
@@ -1543,6 +1549,77 @@ export default function SettingsScreen() {
                       </Text>
                     </Pressable>
                   ))}
+                </View>
+              </View>
+
+              {/* 高級提醒功能 */}
+              <View style={{ marginBottom: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
+                  高級提醒功能
+                </Text>
+
+                {/* 未關閉時重複提醒 */}
+                <View style={{ marginBottom: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                      未關閉時重複提醒
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                      彈窗未確認時持續提醒
+                    </Text>
+                  </View>
+                  <Switch
+                    value={supplyForm.repeatUntilDismissed ?? false}
+                    onValueChange={(v) => setSupplyForm({ ...supplyForm, repeatUntilDismissed: v })}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                  />
+                </View>
+
+                {/* 單次提醒自動關閉 */}
+                <View style={{ marginBottom: 14 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                        單次提醒自動關閉
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                        彈窗自動關閉延遲
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
+                      {supplyForm.autoDismissSeconds ?? 0}秒
+                    </Text>
+                  </View>
+                  <Slider
+                    style={{ width: "100%", height: 36 }}
+                    minimumValue={0}
+                    maximumValue={30}
+                    step={1}
+                    value={supplyForm.autoDismissSeconds ?? 0}
+                    onValueChange={(v) => setSupplyForm({ ...supplyForm, autoDismissSeconds: Math.round(v) })}
+                    minimumTrackTintColor={colors.primary}
+                    maximumTrackTintColor={colors.border}
+                  />
+                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                    0秒 = 不自動關閉
+                  </Text>
+                </View>
+
+                {/* 長下坡暫停提醒 */}
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                      長下坡暫停提醒
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                      下坡時暫停提醒但仍計數
+                    </Text>
+                  </View>
+                  <Switch
+                    value={supplyForm.pauseOnDownhill ?? false}
+                    onValueChange={(v) => setSupplyForm({ ...supplyForm, pauseOnDownhill: v })}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                  />
                 </View>
               </View>
             </ScrollView>

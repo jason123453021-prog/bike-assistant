@@ -318,10 +318,12 @@ export default function MapScreen() {
     // 追蹤尚未確認的補給類型（「稍後」只關閉 Modal，不清除此 ref）
   const pendingCalorieRef = useRef(false);
   const pendingWaterRef = useRef(false);
+  const lastAscentRef = useRef(0); // 用於判斷下坡狀態
 
   // ── 自訂補給品追蹤 ──
   // 記錄每個補給品上次觸發的時間（秒）或距離（公里）
-  const supplyItemsTrackerRef = useRef<Record<string, { lastTriggerTime: number; lastTriggerDistance: number; triggered: boolean }>>({});
+  const supplyItemsTrackerRef = useRef<Record<string, any>>({});
+  // 追蹤器結構: { lastTriggerTime, lastTriggerDistance, triggered, dismissTimeoutId, repeatIntervalId }
   // 自訂補給品提醒狀態
   const [customSupplyAlerts, setCustomSupplyAlerts] = useState<Record<string, boolean>>({});
   const [activeSupplyAlerts, setActiveSupplyAlerts] = useState<string[]>([]);
@@ -346,10 +348,15 @@ export default function MapScreen() {
   const handleConfirmCustomSupply = useCallback((id: string, type: "time" | "distance") => {
     setCustomSupplyAlerts(prev => ({ ...prev, [id]: false }));
     setActiveSupplyAlerts(prev => prev.filter(alertId => alertId !== id));
+    const tracker = supplyItemsTrackerRef.current[id];
+    if (tracker?.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
+    if (tracker?.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
     supplyItemsTrackerRef.current[id] = {
       lastTriggerTime: type === "time" ? state.elapsed : supplyItemsTrackerRef.current[id]?.lastTriggerTime || 0,
       lastTriggerDistance: type === "distance" ? (state.distance / 1000) : supplyItemsTrackerRef.current[id]?.lastTriggerDistance || 0,
       triggered: false,
+      dismissTimeoutId: null,
+      repeatIntervalId: null,
     };
     speak(`已確認補給${settings.supplyItems.find(s => s.id === id)?.name}`, settings.ttsEnabled);
     vibrateLight();
@@ -541,12 +548,24 @@ export default function MapScreen() {
           lastTriggerTime: 0,
           lastTriggerDistance: 0,
           triggered: false,
+          dismissTimeoutId: null,
+          repeatIntervalId: null,
         };
       }
 
       const tracker = supplyItemsTrackerRef.current[supplyItem.id];
       const currentTime = stateRef.current.elapsed;
-      const currentDistance = stateRef.current.distance / 1000; // 轉換為公里
+      const currentDistance = stateRef.current.distance / 1000;
+
+      // 粗略判斷下坡：速度 > 25 km/h 且海拔不上升
+      const isDownhill = stateRef.current.currentSpeed > 25 && stateRef.current.totalAscent <= lastAscentRef.current;
+      // 更新最後海拔
+      lastAscentRef.current = stateRef.current.totalAscent;
+
+      if (supplyItem.pauseOnDownhill && isDownhill && !customSupplyAlerts[supplyItem.id]) {
+        // 下坡時暫停提醒但仍計數，不觸發提醒
+        return;
+      }
 
       // 根據觸發方式檢查是否應該觸發
       let shouldTrigger = false;
@@ -567,6 +586,11 @@ export default function MapScreen() {
       }
       if (supplyItem.repeatMode === "off") {
         return; // 不提醒
+      }
+
+      // 如果已經在提醒中且未關閉時重複提醒未啟用，則不再觸發
+      if (customSupplyAlerts[supplyItem.id] && !supplyItem.repeatUntilDismissed) {
+        return;
       }
 
       // 觸發提醒
@@ -592,7 +616,36 @@ export default function MapScreen() {
       if (settings.soundEnabled) {
         try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
       }
-      if (settings.notificationEnabled) showSupplyNotification("calorie"); // 使用卡路里類型作為自訂補給品通知
+      if (settings.notificationEnabled) showSupplyNotification("calorie");
+
+      // 單次提醒自動關閉功能
+      if (supplyItem.autoDismissSeconds && supplyItem.autoDismissSeconds > 0) {
+        if (tracker.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
+        tracker.dismissTimeoutId = setTimeout(() => {
+          setCustomSupplyAlerts((prev) => ({ ...prev, [supplyItem.id]: false }));
+          setActiveSupplyAlerts((prev) => prev.filter((id) => id !== supplyItem.id));
+          tracker.dismissTimeoutId = null;
+        }, supplyItem.autoDismissSeconds * 1000);
+      }
+
+      // 未關閉時重複提醒功能
+      if (supplyItem.repeatUntilDismissed) {
+        if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+        tracker.repeatIntervalId = setInterval(() => {
+          if (customSupplyAlerts[supplyItem.id]) {
+            if (settings.vibrationEnabled) vibrateWarning();
+            if (settings.ttsEnabled) speak(`請補給 ${supplyItem.name}`);
+            if (settings.soundEnabled) {
+              try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+            }
+          } else {
+            if (tracker.repeatIntervalId) {
+              clearInterval(tracker.repeatIntervalId);
+              tracker.repeatIntervalId = null;
+            }
+          }
+        }, 5000);
+      }
     },
     [settings, alertPlayer]
   );
