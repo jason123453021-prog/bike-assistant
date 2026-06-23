@@ -26,7 +26,7 @@ import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
-import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, type NormalFieldKey, type SimplifiedFieldKey } from "@/lib/settings-context";
+import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
 import { useAuth } from "@/hooks/use-auth";
 import { startOAuthLogin } from "@/constants/oauth";
 import { trpc } from "@/lib/trpc";
@@ -34,7 +34,7 @@ import Constants from "expo-constants";
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder } = useSettings();
+  const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
   const { user, isAuthenticated, logout } = useAuth();
   const deleteAccountMutation = trpc.auth.deleteAccount.useMutation();
 
@@ -93,6 +93,63 @@ export default function SettingsScreen() {
     unit: string;
     isNumber: boolean;
   }>({ visible: false, key: "", label: "", value: "", unit: "", isNumber: true });
+
+  // ── 補給品管理 Modal 狀態 ──
+  const [supplyModal, setSupplyModal] = useState<{
+    visible: boolean;
+    mode: "add" | "edit";
+    item: SupplyItem | null;
+  }>({ visible: false, mode: "add", item: null });
+
+  const [supplyForm, setSupplyForm] = useState<SupplyItem>({
+    id: "",
+    name: "",
+    triggerType: "time",
+    triggerValue: 30,
+    repeatMode: "every",
+    enabled: true,
+  });
+
+  const openSupplyModal = (item?: SupplyItem) => {
+    if (item) {
+      setSupplyForm(item);
+      setSupplyModal({ visible: true, mode: "edit", item });
+    } else {
+      setSupplyForm({
+        id: Date.now().toString(),
+        name: "",
+        triggerType: "time",
+        triggerValue: 30,
+        repeatMode: "every",
+        enabled: true,
+      });
+      setSupplyModal({ visible: true, mode: "add", item: null });
+    }
+  };
+
+  const closeSupplyModal = () => {
+    setSupplyModal({ visible: false, mode: "add", item: null });
+  };
+
+  const handleSaveSupply = async () => {
+    if (!supplyForm.name.trim()) {
+      Alert.alert("錯誤", "請輸入補給品名稱");
+      return;
+    }
+    if (supplyModal.mode === "add") {
+      await addSupplyItem(supplyForm);
+    } else if (supplyModal.item) {
+      await updateSupplyItem(supplyModal.item.id, supplyForm);
+    }
+    closeSupplyModal();
+  };
+
+  const handleDeleteSupply = async (id: string) => {
+    Alert.alert("刪除補給品", "確定要刪除此補給品嗎？", [
+      { text: "取消", style: "cancel" },
+      { text: "刪除", style: "destructive", onPress: () => deleteSupplyItem(id) },
+    ]);
+  };
 
   // 各區塊折疊狀態（預設全部展開）
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
@@ -334,6 +391,55 @@ export default function SettingsScreen() {
             hint={settings.supplyReminderRepeatSec === 0 ? "已停用重複提醒" : `每 ${settings.supplyReminderRepeatSec} 秒語音重複提醒一次`}
             onPress={() => openEdit("supplyReminderRepeatSec", "重複提醒間隔（秒，0 = 停用）", settings.supplyReminderRepeatSec, "秒")}
           />
+        </View>}
+
+        {/* ── 自訂補給品清單 ── */}
+        <SectionHeader title="自訂補給品" colors={colors} onToggle={() => toggleSection("customSupply")} collapsed={collapsedSections["customSupply"]} />
+        {!collapsedSections["customSupply"] && <View style={[styles.section, { borderColor: colors.border }]}>
+          {settings.supplyItems.length === 0 ? (
+            <View style={{ padding: 16, alignItems: "center" }}>
+              <Text style={{ color: colors.muted, fontSize: 14 }}>沒有自訂補給品</Text>
+            </View>
+          ) : (
+            settings.supplyItems.map((item, idx) => (
+              <View key={item.id}>
+                <View style={[styles.row, { paddingVertical: 12 }]}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <Switch
+                        value={item.enabled}
+                        onValueChange={(v) => updateSupplyItem(item.id, { enabled: v })}
+                      />
+                      <Pressable
+                        style={{ flex: 1 }}
+                        onPress={() => openSupplyModal(item)}
+                      >
+                        <Text style={[styles.rowLabel, { color: colors.foreground }]}>{item.name}</Text>
+                        <Text style={[styles.rowHint, { color: colors.muted, fontSize: 12 }]}>
+                          {item.triggerType === "time" ? `每 ${item.triggerValue} 秒` : `每 ${item.triggerValue} 公里`} • {item.repeatMode === "once" ? "只提醒一次" : item.repeatMode === "every" ? "每次提醒" : "不提醒"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                  <Pressable
+                    style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                    onPress={() => handleDeleteSupply(item.id)}
+                  >
+                    <IconSymbol name="trash.fill" size={18} color={colors.error} />
+                  </Pressable>
+                </View>
+                {idx < settings.supplyItems.length - 1 && <Divider colors={colors} />}
+              </View>
+            ))
+          )}
+          <Divider colors={colors} />
+          <Pressable
+            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
+            onPress={() => openSupplyModal()}
+          >
+            <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
+            <Text style={[styles.rowLabel, { color: colors.primary }]}>新增補給品</Text>
+          </Pressable>
         </View>}
 
         {/* ── 回饋設定 ── */}
@@ -939,6 +1045,156 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── 補給品管理 Modal ── */}
+      <Modal
+        visible={supplyModal.visible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeSupplyModal}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: colors.background + "99" }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                {supplyModal.mode === "add" ? "新增補給品" : "編輯補給品"}
+              </Text>
+              <Pressable onPress={closeSupplyModal}>
+                <IconSymbol name="xmark.circle.fill" size={24} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 12 }}>
+              {/* 補給品名稱 */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
+                  補給品名稱 *
+                </Text>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background },
+                  ]}
+                  placeholder="例如：運動飲料、能量棒"
+                  placeholderTextColor={colors.muted}
+                  value={supplyForm.name}
+                  onChangeText={(text) => setSupplyForm({ ...supplyForm, name: text })}
+                />
+              </View>
+
+              {/* 觸發方式 */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
+                  觸發方式
+                </Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {(["time", "distance"] as const).map((type) => (
+                    <Pressable
+                      key={type}
+                      style={({ pressed }) => ([
+                        styles.chipButton,
+                        {
+                          backgroundColor: supplyForm.triggerType === type ? colors.primary : colors.background,
+                          borderColor: supplyForm.triggerType === type ? colors.primary : colors.border,
+                          opacity: pressed ? 0.7 : 1,
+                        },
+                      ])}
+                      onPress={() => setSupplyForm({ ...supplyForm, triggerType: type })}
+                    >
+                      <Text
+                        style={{
+                          color: supplyForm.triggerType === type ? "#fff" : colors.foreground,
+                          fontWeight: "600",
+                          fontSize: 13,
+                        }}
+                      >
+                        {type === "time" ? "時間" : "距離"}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {/* 觸發值 */}
+              <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                    觸發值
+                  </Text>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
+                    {supplyForm.triggerValue} {supplyForm.triggerType === "time" ? "秒" : "公里"}
+                  </Text>
+                </View>
+                <Slider
+                  style={{ width: "100%", height: 36 }}
+                  minimumValue={supplyForm.triggerType === "time" ? 10 : 1}
+                  maximumValue={supplyForm.triggerType === "time" ? 600 : 50}
+                  step={supplyForm.triggerType === "time" ? 10 : 1}
+                  value={supplyForm.triggerValue}
+                  onValueChange={(v) => setSupplyForm({ ...supplyForm, triggerValue: Math.round(v) })}
+                  minimumTrackTintColor={colors.primary}
+                  maximumTrackTintColor={colors.border}
+                />
+              </View>
+
+              {/* 重複模式 */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
+                  重複模式
+                </Text>
+                <View style={{ gap: 8 }}>
+                  {(["once", "every", "off"] as const).map((mode) => (
+                    <Pressable
+                      key={mode}
+                      style={({ pressed }) => ([
+                        styles.modeButton,
+                        {
+                          backgroundColor: supplyForm.repeatMode === mode ? colors.primary : colors.background,
+                          borderColor: supplyForm.repeatMode === mode ? colors.primary : colors.border,
+                          opacity: pressed ? 0.7 : 1,
+                        },
+                      ])}
+                      onPress={() => setSupplyForm({ ...supplyForm, repeatMode: mode })}
+                    >
+                      <Text
+                        style={{
+                          color: supplyForm.repeatMode === mode ? "#fff" : colors.foreground,
+                          fontWeight: "600",
+                          fontSize: 14,
+                        }}
+                      >
+                        {mode === "once" ? "只提醒一次" : mode === "every" ? "每次提醒" : "不提醒"}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* 按鈕 */}
+            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 12 }}>
+              <Pressable
+                style={({ pressed }) => ([
+                  styles.editCancelBtn,
+                  { borderColor: colors.border, opacity: pressed ? 0.7 : 1, flex: 1 },
+                ])}
+                onPress={closeSupplyModal}
+              >
+                <Text style={[styles.editCancelText, { color: colors.muted }]}>取消</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => ([
+                  styles.editConfirmBtn,
+                  { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1, flex: 1 },
+                ])}
+                onPress={handleSaveSupply}
+              >
+                <Text style={[styles.editConfirmText, { color: "#fff" }]}>保存</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -1215,5 +1471,59 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     textAlign: "center",
+  },
+  chipButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  editConfirmBtn: {
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  editConfirmText: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "85%",
+    paddingTop: 0,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
   },
 });

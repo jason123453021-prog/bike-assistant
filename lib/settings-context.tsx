@@ -59,6 +59,16 @@ export const DEFAULT_SIMPLIFIED_FIELD_ORDER: SimplifiedFieldKey[] = [
   "showPausedTime",
 ];
 
+// 補給品項目型別
+export interface SupplyItem {
+  id: string;                    // 唯一識別符
+  name: string;                  // 補給品名稱（e.g., "運動飲料", "能量棒"）
+  triggerType: "time" | "distance"; // 觸發方式：時間或距離
+  triggerValue: number;          // 觸發值（秒 or 公里）
+  repeatMode: "once" | "every" | "off"; // 重複模式：只提醒一次/每次/不提醒
+  enabled: boolean;              // 是否啟用
+}
+
 export interface AppSettings {
   // Personal
   weight: number;       // kg 騎手體重
@@ -70,6 +80,7 @@ export interface AppSettings {
   calorieThreshold: number;   // kcal before reminder
   waterThreshold: number;     // ml before reminder
   supplyReminderRepeatSec: number; // 0 = 不重複；>0 = 每幾秒重複語音提醒
+  supplyItems: SupplyItem[];   // 自訂補給品清單
   // Feedback
   vibrationEnabled: boolean;
   ttsEnabled: boolean;
@@ -132,6 +143,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   calorieThreshold: 300,
   waterThreshold: 500,
   supplyReminderRepeatSec: 60,  // 預設 60 秒重複一次
+  supplyItems: [],  // 初始空補給品清單
   vibrationEnabled: true,
   ttsEnabled: true,
   soundEnabled: true,
@@ -160,6 +172,9 @@ interface SettingsContextValue {
   updateSimplifiedFields: (partial: Partial<SimplifiedModeFields>) => Promise<void>;
   updateFieldOrder: (order: NormalFieldKey[]) => Promise<void>;
   updateSimplifiedFieldOrder: (order: SimplifiedFieldKey[]) => Promise<void>;
+  addSupplyItem: (item: SupplyItem) => Promise<void>;
+  updateSupplyItem: (id: string, partial: Partial<SupplyItem>) => Promise<void>;
+  deleteSupplyItem: (id: string) => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -230,8 +245,37 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   };
 
+  const addSupplyItem = async (item: SupplyItem) => {
+    const next = {
+      ...settings,
+      supplyItems: [...settings.supplyItems, item],
+    };
+    setSettings(next);
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+  };
+
+  const updateSupplyItem = async (id: string, partial: Partial<SupplyItem>) => {
+    const next = {
+      ...settings,
+      supplyItems: settings.supplyItems.map((item) =>
+        item.id === id ? { ...item, ...partial } : item
+      ),
+    };
+    setSettings(next);
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+  };
+
+  const deleteSupplyItem = async (id: string) => {
+    const next = {
+      ...settings,
+      supplyItems: settings.supplyItems.filter((item) => item.id !== id),
+    };
+    setSettings(next);
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+  };
+
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder }}>
+    <SettingsContext.Provider value={{ settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem }}>
       {children}
     </SettingsContext.Provider>
   );
