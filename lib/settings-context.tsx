@@ -13,6 +13,8 @@ export interface NormalModeFields {
   showPausedTime: boolean; // 暫停時間
   showHeartRate: boolean; // 心率
   showCadence: boolean;   // 踏頻
+  showTotalAscent: boolean; // 累計爬升
+  showCurrentAltitude: boolean; // 目前海拔
 }
 
 // 精簡導航模式可顯示的欄位（與正常模式一致）
@@ -28,6 +30,8 @@ export interface SimplifiedModeFields {
   showAvgSpeed: boolean;     // 均速
   showCalories: boolean;     // 卡路里
   showPausedTime: boolean;   // 暫停時間
+  showTotalAscent: boolean;  // 累計爬升
+  showCurrentAltitude: boolean; // 目前海拔
 }
 
 // 儀表板欄位 key 型別
@@ -46,6 +50,8 @@ export const DEFAULT_FIELD_ORDER: NormalFieldKey[] = [
   "showPausedTime",
   "showHeartRate",
   "showCadence",
+  "showTotalAscent",
+  "showCurrentAltitude",
 ];
 
 // 精簡模式欄位預設排序
@@ -61,6 +67,8 @@ export const DEFAULT_SIMPLIFIED_FIELD_ORDER: SimplifiedFieldKey[] = [
   "showAvgSpeed",
   "showCalories",
   "showPausedTime",
+  "showTotalAscent",
+  "showCurrentAltitude",
 ];
 
 // 補給品項目型別
@@ -147,6 +155,8 @@ const DEFAULT_NORMAL_FIELDS: NormalModeFields = {
   showPausedTime: false,
   showHeartRate: false,
   showCadence: false,
+  showTotalAscent: false,
+  showCurrentAltitude: false,
 };
 
 const DEFAULT_SIMPLIFIED_FIELDS: SimplifiedModeFields = {
@@ -161,6 +171,8 @@ const DEFAULT_SIMPLIFIED_FIELDS: SimplifiedModeFields = {
   showAvgSpeed: false,
   showCalories: false,
   showPausedTime: false,
+  showTotalAscent: false,
+  showCurrentAltitude: false,
 };
 
 const DEFAULT_SETTINGS: AppSettings = {

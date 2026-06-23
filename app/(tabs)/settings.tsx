@@ -324,6 +324,8 @@ export default function SettingsScreen() {
     showAvgSpeed: "均速",
     showCalories: "卡路里",
     showPausedTime: "暫停時間",
+    showTotalAscent: "累計爬升",
+    showCurrentAltitude: "目前海拔",
   };
 
   const makeSimpDragResponder = (idx: number) =>
@@ -375,6 +377,8 @@ export default function SettingsScreen() {
     showPausedTime: "暫停時間",
     showHeartRate: "心率",
     showCadence: "踏頻",
+    showTotalAscent: "累計爬升",
+    showCurrentAltitude: "目前海拔",
   };
 
   const makeDragResponder = (idx: number) =>
@@ -1444,7 +1448,7 @@ export default function SettingsScreen() {
         onRequestClose={closeSupplyModal}
       >
         <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface, flex: 1, display: "flex", flexDirection: "column" }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 {supplyModal.mode === "add" ? "新增補給品" : "編輯補給品"}
@@ -1454,7 +1458,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20, paddingBottom: 100 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20 }} style={{ flex: 1 }}>
               {/* 補給品名稱 */}
               <View style={{ marginBottom: 24 }}>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
@@ -1687,8 +1691,8 @@ export default function SettingsScreen() {
               </View>
             </ScrollView>
 
-            {/* 按鈕 */}
-            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
+            {/* 固定底部按鈕區域 */}
+            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
               <Pressable
                 style={({ pressed }) => ([
                   styles.editCancelBtn,

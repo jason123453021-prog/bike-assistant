@@ -48,6 +48,8 @@ const DEFAULT_FIELDS: SimplifiedModeFields = {
   showAvgSpeed: false,
   showCalories: false,
   showPausedTime: false,
+  showTotalAscent: false,
+  showCurrentAltitude: false,
 };
 
 export function SimplifiedNavOverlay({
