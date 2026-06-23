@@ -137,6 +137,35 @@ export class SensorDataManager {
   }
 
   /**
+   * 獲取感測器狀態摘要
+   */
+  getSensorStatus() {
+    const connectedDevices = this.getConnectedDevices();
+    const lastUpdateTime = this.sensorData.lastUpdateTime;
+    const timeSinceLastUpdate = lastUpdateTime > 0 ? Date.now() - lastUpdateTime : null;
+    
+    return {
+      connectedCount: connectedDevices.length,
+      lastUpdateTime,
+      timeSinceLastUpdate,
+      isConnected: connectedDevices.length > 0,
+      lastUpdateTimeStr: lastUpdateTime > 0 ? new Date(lastUpdateTime).toLocaleTimeString() : '--',
+      signalQuality: this.calculateSignalQuality(timeSinceLastUpdate),
+    };
+  }
+
+  /**
+   * 計算信號質量（基於最後更新時間）
+   */
+  private calculateSignalQuality(timeSinceLastUpdate: number | null): 'excellent' | 'good' | 'poor' | 'disconnected' {
+    if (timeSinceLastUpdate === null) return 'disconnected';
+    if (timeSinceLastUpdate < 2000) return 'excellent';  // < 2 秒
+    if (timeSinceLastUpdate < 5000) return 'good';       // < 5 秒
+    if (timeSinceLastUpdate < 10000) return 'poor';      // < 10 秒
+    return 'disconnected';
+  }
+
+  /**
    * 重置數據（騎乘結束時調用）
    */
   resetData(): void {

@@ -21,6 +21,7 @@ import {
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+import { useEffect } from "react";
 import Slider from "@react-native-community/slider";
 import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -41,6 +42,30 @@ export default function SettingsScreen() {
 
   // ── 感測器配對 Modal 狀態 ──
   const [sensorModalVisible, setSensorModalVisible] = useState(false);
+  const [sensorStatus, setSensorStatus] = useState<{
+    connectedCount: number;
+    lastUpdateTimeStr: string;
+    signalQuality: 'excellent' | 'good' | 'poor' | 'disconnected';
+  }>({ connectedCount: 0, lastUpdateTimeStr: '--', signalQuality: 'disconnected' });
+
+  // 定時更新感測器狀態
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        const { getSensorDataManager } = require('@/lib/sensor-data-manager');
+        const manager = getSensorDataManager();
+        const status = manager.getSensorStatus();
+        setSensorStatus({
+          connectedCount: status.connectedCount,
+          lastUpdateTimeStr: status.lastUpdateTimeStr,
+          signalQuality: status.signalQuality,
+        });
+      } catch (err) {
+        // SensorDataManager 未初始化
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── 刪除帳號防呆 Modal 狀態 ──
   const [deleteModal, setDeleteModal] = useState<{
@@ -434,15 +459,25 @@ export default function SettingsScreen() {
               <View style={{ gap: 6 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <Text style={{ color: colors.muted, fontSize: 11 }}>已連接設備</Text>
-                  <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>0 個</Text>
+                  <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>{sensorStatus.connectedCount} 個</Text>
                 </View>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <Text style={{ color: colors.muted, fontSize: 11 }}>最後更新</Text>
-                  <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>--</Text>
+                  <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>{sensorStatus.lastUpdateTimeStr}</Text>
                 </View>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <Text style={{ color: colors.muted, fontSize: 11 }}>信號強度</Text>
-                  <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>--</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <View style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: sensorStatus.signalQuality === 'excellent' ? '#66BB6A' : sensorStatus.signalQuality === 'good' ? '#FDD835' : sensorStatus.signalQuality === 'poor' ? '#FB8C00' : '#999',
+                    }} />
+                    <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>
+                      {sensorStatus.signalQuality === 'excellent' ? '優秀' : sensorStatus.signalQuality === 'good' ? '良好' : sensorStatus.signalQuality === 'poor' ? '弱' : '未連接'}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
