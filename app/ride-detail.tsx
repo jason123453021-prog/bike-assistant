@@ -269,18 +269,18 @@ export default function RideDetailScreen() {
     };
   }, [trailPlaybackIndex, polylineCoords.length, record]);
   
-  const handlePlayTrail = () => {
-    if (polylineCoords.length === 0) return;
+  const handlePlayTrail = useCallback(() => {
+    if (!record || polylineCoords.length === 0) return;
     if (trailPlaybackIndex >= polylineCoords.length - 1) {
       setTrailPlaybackIndex(0);
     }
-    setIsPlayingTrail(!isPlayingTrail);
-  };
+    setIsPlayingTrail(prev => !prev);
+  }, [record, polylineCoords.length, trailPlaybackIndex]);
   
-  const handleResetTrail = () => {
+  const handleResetTrail = useCallback(() => {
     setIsPlayingTrail(false);
     setTrailPlaybackIndex(0);
-  };
+  }, []);
 
   // 心率區間定義（5 個區間）
   const HR_ZONES = [
@@ -512,19 +512,36 @@ export default function RideDetailScreen() {
     const distKm = (record.distance / 1000).toFixed(2);
     const date = new Date(record.date);
     const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    const movingTime = Math.max(0, record.duration - (record.totalPausedSec ?? 0));
+    const avgSpeedMoving = ((record.distance / 1000) / (movingTime / 3600)).toFixed(1);
     const msg = [
       `🚴 ${record.name}`,
       `日期：${dateStr}`,
+      ``,
+      `📊 核心數據`,
       `距離：${distKm} km`,
-      `時間：${formatDuration(record.duration)}`,
-      `有效騎乘：${formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))}`,
+      `總時間：${formatDuration(record.duration)}`,
+      `有效騎乘：${formatDuration(movingTime)}`,
       `暫停時間：${formatDuration(record.totalPausedSec ?? 0)}`,
-      `均速：${((record.distance / 1000) / ((record.duration - (record.totalPausedSec ?? 0)) / 3600)).toFixed(1)} km/h`,
+      ``,
+      `⚡ 速度與功率`,
+      `均速：${avgSpeedMoving} km/h`,
       `最高速：${record.maxSpeed.toFixed(1)} km/h`,
-      `爬升：${Math.round(record.totalAscent)} m`,
-      `卡路里：${record.calories} kcal`,
-      `暫停時間：${formatDuration(record.totalPausedSec ?? 0)}`,
       `均功率：${record.avgPower} W`,
+      `最大功率：${record.maxPower} W`,
+      ``,
+      `⛰️ 爬升與地形`,
+      `爬升：${Math.round(record.totalAscent)} m`,
+      `下降：${Math.round(record.totalDescent ?? 0)} m`,
+      `最高海拔：${Math.round(record.maxElevation ?? 0)} m`,
+      ``,
+      `❤️ 訓練數據`,
+      `平均心率：${record.avgHeartRate ?? 0} bpm`,
+      `最大心率：${record.maxHeartRate ?? 0} bpm`,
+      `平均踏頻：${record.avgCadence ?? 0} rpm`,
+      ``,
+      `🔥 身體數據`,
+      `卡路里：${record.calories} kcal`,
       `水分流失：${Math.round(record.totalSweatMl)} ml`,
     ].join("\n");
     await Share.share({ message: msg });
