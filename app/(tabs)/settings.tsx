@@ -251,6 +251,8 @@ export default function SettingsScreen() {
     showAvgSpeed: "均速",
     showCalories: "卡路里",
     showPausedTime: "暫停時間",
+    showHeartRate: "心率",
+    showCadence: "踏頻",
   };
 
   const makeDragResponder = (idx: number) =>

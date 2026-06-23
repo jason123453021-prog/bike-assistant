@@ -202,6 +202,13 @@ export default function MapScreen() {
     maxCadence: null as number | null,
   });
   const sensorUpdateIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 感測器統計數據（用於記錄保存）
+  const sensorStatsRef = useRef({
+    heartRateValues: [] as number[],
+    cadenceValues: [] as number[],
+    maxHeartRate: 0,
+    maxCadence: 0,
+  });
 
   // 自動暫停連續計數（需連續 3 次低速才暫停，避免 GPS 抖動誤觸發）
   const lowSpeedCountRef = useRef(0);
@@ -1048,6 +1055,13 @@ export default function MapScreen() {
       maxPower: null,
       maxCadence: null,
     });
+    // 清空感測器統計數據
+    sensorStatsRef.current = {
+      heartRateValues: [],
+      cadenceValues: [],
+      maxHeartRate: 0,
+      maxCadence: 0,
+    };
     // 啟動感測器數據更新迴圈（每 1 秒更新一次）
     if (sensorUpdateIntervalRef.current) clearInterval(sensorUpdateIntervalRef.current);
     sensorUpdateIntervalRef.current = setInterval(() => {
@@ -1060,6 +1074,15 @@ export default function MapScreen() {
         maxPower: data.maxPower,
         maxCadence: data.maxCadence,
       });
+      // 記錄感測器統計數據
+      if (data.heartRate !== null && data.heartRate !== undefined) {
+        sensorStatsRef.current.heartRateValues.push(data.heartRate);
+        sensorStatsRef.current.maxHeartRate = Math.max(sensorStatsRef.current.maxHeartRate, data.heartRate);
+      }
+      if (data.cadence !== null && data.cadence !== undefined) {
+        sensorStatsRef.current.cadenceValues.push(data.cadence);
+        sensorStatsRef.current.maxCadence = Math.max(sensorStatsRef.current.maxCadence, data.cadence);
+      }
     }, 1000);
 
     if (gpxRoute) {
@@ -1123,7 +1146,7 @@ export default function MapScreen() {
           // 結束騎乘清除崩潰恢復快照
           await clearSnapshot();
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新
-          await saveRecord();
+          await saveRecord(undefined, sensorStatsRef.current);
           setShowSummary(true);
           if (settings.vibrationEnabled) vibrateSuccess();
         },
@@ -1938,6 +1961,16 @@ function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed, sensorD
       return <BigMetric label="卡路里" value={`${Math.round(state.calories)}`} unit="kcal" />;
     case "showPausedTime":
       return <BigMetric label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" />;
+    case "showHeartRate":
+      // 優先顯示感測器心率，若無則顯示 "--"
+      const displayHR = sensorData?.heartRate ?? null;
+      const isHRSensor = sensorData?.heartRate !== null && sensorData?.heartRate !== undefined;
+      return <BigMetric label={isHRSensor ? "心率 (感測器)" : "心率"} value={displayHR !== null ? `${displayHR}` : "--"} unit="bpm" />;
+    case "showCadence":
+      // 優先顯示感測器踏頻，若無則顯示 "--"
+      const displayCadence = sensorData?.cadence ?? null;
+      const isCadenceSensor = sensorData?.cadence !== null && sensorData?.cadence !== undefined;
+      return <BigMetric label={isCadenceSensor ? "踏頻 (感測器)" : "踏頻"} value={displayCadence !== null ? `${displayCadence}` : "--"} unit="rpm" />;
     default:
       return null;
   }

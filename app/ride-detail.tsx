@@ -554,12 +554,13 @@ export default function RideDetailScreen() {
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>進階訓練數據</Text>
               <View style={styles.statsGrid}>
-                <DetailCell label="平均心率" value="--" unit="bpm" color="#EF4444" />
-                <DetailCell label="最大心率" value="--" unit="bpm" color="#EF4444" />
+                <DetailCell label="平均心率" value={record.avgHeartRate ? `${record.avgHeartRate}` : "--"} unit="bpm" color="#EF4444" />
+                <DetailCell label="最大心率" value={record.maxHeartRate ? `${record.maxHeartRate}` : "--"} unit="bpm" color="#EF4444" />
                 <DetailCell label="平均功率" value={`${record.avgPower}`} unit="W" accent />
                 <DetailCell label="最大功率" value={`${record.maxPower}`} unit="W" accent />
                 <DetailCell label="標準化功率" value="--" unit="W" accent />
-                <DetailCell label="平均踏頻" value="--" unit="rpm" />
+                <DetailCell label="平均踏頻" value={record.avgCadence ? `${record.avgCadence}` : "--"} unit="rpm" />
+                <DetailCell label="最大踏頻" value={record.maxCadence ? `${record.maxCadence}` : "--"} unit="rpm" />
               </View>
             </View>
 

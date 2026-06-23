@@ -11,6 +11,8 @@ export interface NormalModeFields {
   showAvgSpeed: boolean;  // 均速
   showCalories: boolean;  // 卡路里
   showPausedTime: boolean; // 暫停時間
+  showHeartRate: boolean; // 心率
+  showCadence: boolean;   // 踏頻
 }
 
 // 精簡導航模式可顯示的欄位（與正常模式一致）
@@ -42,6 +44,8 @@ export const DEFAULT_FIELD_ORDER: NormalFieldKey[] = [
   "showAvgSpeed",
   "showCalories",
   "showPausedTime",
+  "showHeartRate",
+  "showCadence",
 ];
 
 // 精簡模式欄位預設排序
@@ -133,6 +137,8 @@ const DEFAULT_NORMAL_FIELDS: NormalModeFields = {
   showAvgSpeed: true,
   showCalories: false,
   showPausedTime: false,
+  showHeartRate: false,
+  showCadence: false,
 };
 
 const DEFAULT_SIMPLIFIED_FIELDS: SimplifiedModeFields = {

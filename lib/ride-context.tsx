@@ -42,6 +42,10 @@ export interface RideRecord {
   totalSweatMl: number;   // 總汗液流失量 ml
   refillCount: number;    // 補水次數
   totalPausedSec: number; // 總暫停時間（秒）
+  avgHeartRate?: number;  // 平均心率 bpm（感測器）
+  maxHeartRate?: number;  // 最高心率 bpm（感測器）
+  avgCadence?: number;    // 平均踏頻 rpm（感測器）
+  maxCadence?: number;    // 最高踏頻 rpm（感測器）
 }
 
 export interface RideState {
@@ -268,7 +272,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
 interface RideContextValue {
   state: RideState;
   dispatch: React.Dispatch<RideAction>;
-  saveRecord: (name?: string) => Promise<void>;
+  saveRecord: (name?: string, sensorStats?: { heartRateValues: number[]; cadenceValues: number[]; maxHeartRate: number; maxCadence: number }) => Promise<void>;
   loadRecords: () => Promise<void>;
   updateRecordName: (id: string, name: string) => Promise<void>;
   /** 儲存騎乘進度快照（每 10 秒呼叫一次） */
@@ -313,9 +317,12 @@ function generateDefaultName(date: number): string {
 export function RideProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(rideReducer, initialState);
 
-  const saveRecord = useCallback(async (name?: string) => {
+  const saveRecord = useCallback(async (name?: string, sensorStats?: { heartRateValues: number[]; cadenceValues: number[]; maxHeartRate: number; maxCadence: number }) => {
     if (state.elapsed < 10) return;
     const now = Date.now();
+    // 計算感測器平均值
+    const avgHeartRate = sensorStats?.heartRateValues.length ? Math.round(sensorStats.heartRateValues.reduce((a, b) => a + b, 0) / sensorStats.heartRateValues.length) : undefined;
+    const avgCadence = sensorStats?.cadenceValues.length ? Math.round(sensorStats.cadenceValues.reduce((a, b) => a + b, 0) / sensorStats.cadenceValues.length) : undefined;
     const record: RideRecord = {
       id: now.toString(),
       date: now,
@@ -333,6 +340,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       totalSweatMl: Math.round(state.totalSweatMl),
       refillCount: state.refillCount,
       totalPausedSec: state.totalPausedSec,
+      // 感測器數據（可選）
+      avgHeartRate,
+      maxHeartRate: sensorStats?.maxHeartRate,
+      avgCadence,
+      maxCadence: sensorStats?.maxCadence,
     };
     dispatch({ type: "ADD_RECORD", record });
     const existing = await AsyncStorage.getItem(STORAGE_KEY);
