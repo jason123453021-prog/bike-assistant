@@ -167,6 +167,42 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                     <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10 }}>kcal</Text>
                   </View>
                 </View>
+
+                {/* 進階訓練數據 */}
+                {(shareCard.avgHeartRate || shareCard.avgPower || shareCard.avgCadence) && (
+                  <View style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.2)", paddingTop: 12 }}>
+                    <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, fontWeight: "600", marginBottom: 8 }}>進階數據</Text>
+                    <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
+                      {shareCard.avgHeartRate && (
+                        <View style={{ alignItems: "center" }}>
+                          <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>平均心率</Text>
+                          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold", marginTop: 2 }}>
+                            {Math.round(shareCard.avgHeartRate)}
+                          </Text>
+                          <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10 }}>bpm</Text>
+                        </View>
+                      )}
+                      {shareCard.avgPower && (
+                        <View style={{ alignItems: "center" }}>
+                          <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>平均功率</Text>
+                          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold", marginTop: 2 }}>
+                            {Math.round(shareCard.avgPower)}
+                          </Text>
+                          <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10 }}>W</Text>
+                        </View>
+                      )}
+                      {shareCard.avgCadence && (
+                        <View style={{ alignItems: "center" }}>
+                          <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>平均踏頻</Text>
+                          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold", marginTop: 2 }}>
+                            {Math.round(shareCard.avgCadence)}
+                          </Text>
+                          <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10 }}>rpm</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
               </View>
 
               {/* 騎乘等級 */}

@@ -264,15 +264,42 @@ export default function RideDetailScreen() {
   const generateGpxContent = useCallback((record: RideRecord): string => {
     if (!record.route || record.route.length === 0) return "";
 
+    const distanceKm = (record.distance / 1000).toFixed(2);
+    const durationHours = Math.floor(record.duration / 3600);
+    const durationMinutes = Math.floor((record.duration % 3600) / 60);
+    const durationStr = `${durationHours}:${String(durationMinutes).padStart(2, "0")}`;
+    const minLat = Math.min(...record.route.map(p => p.latitude));
+    const maxLat = Math.max(...record.route.map(p => p.latitude));
+    const minLon = Math.min(...record.route.map(p => p.longitude));
+    const maxLon = Math.max(...record.route.map(p => p.longitude));
+
     const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Bike Assistant" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
     <name>${record.name}</name>
     <desc>騎乘記錄 - ${new Date(record.date).toISOString()}</desc>
     <time>${new Date(record.date).toISOString()}</time>
+    <author>Bike Assistant</author>
+    <bounds minlat="${minLat}" minlon="${minLon}" maxlat="${maxLat}" maxlon="${maxLon}"/>
   </metadata>
   <trk>
     <name>${record.name}</name>
+    <desc>騎乘統計: 距離 ${distanceKm}km | 時間 ${durationStr} | 平均速度 ${record.avgSpeed.toFixed(1)}km/h | 最高速度 ${record.maxSpeed.toFixed(1)}km/h | 爆升 ${record.totalAscent}m | 平均功率 ${Math.round(record.avgPower)}W | 最大功率 ${Math.round(record.maxPower)}W | 消費熱量 ${Math.round(record.calories)}kcal</desc>
+    <extensions>
+      <distance>${distanceKm}</distance>
+      <duration>${record.duration}</duration>
+      <avgSpeed>${record.avgSpeed.toFixed(1)}</avgSpeed>
+      <maxSpeed>${record.maxSpeed.toFixed(1)}</maxSpeed>
+      <totalAscent>${record.totalAscent}</totalAscent>
+      <totalDescent>${record.totalDescent || 0}</totalDescent>
+      <calories>${Math.round(record.calories)}</calories>
+      <avgPower>${Math.round(record.avgPower)}</avgPower>
+      <maxPower>${Math.round(record.maxPower)}</maxPower>
+      <avgHeartRate>${Math.round(record.avgHeartRate || 0)}</avgHeartRate>
+      <maxHeartRate>${Math.round(record.maxHeartRate || 0)}</maxHeartRate>
+      <avgCadence>${Math.round(record.avgCadence || 0)}</avgCadence>
+      <maxCadence>${Math.round(record.maxCadence || 0)}</maxCadence>
+    </extensions>
     <trkseg>`;
 
     const trkpts = record.route

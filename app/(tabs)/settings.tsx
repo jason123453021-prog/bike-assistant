@@ -1826,12 +1826,14 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: "flex-end",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 20,
     maxHeight: "85%",
+    maxWidth: "90%",
+    width: "90%",
     paddingTop: 0,
   },
   modalHeader: {

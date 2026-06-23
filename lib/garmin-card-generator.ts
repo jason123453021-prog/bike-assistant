@@ -16,6 +16,20 @@ export interface ShareCard {
   date: string;
   routeName: string;
   emoji: string;
+  // 核心數據
+  movingTime?: number;     // 移動時間（秒）
+  totalDescent?: number;   // 總下降高度（m）
+  maxElevation?: number;   // 最大海拔（m）
+  // 進階訓練數據
+  avgHeartRate?: number;   // 平均心率（bpm）
+  maxHeartRate?: number;   // 最大心率（bpm）
+  avgCadence?: number;     // 平均踏頻（rpm）
+  maxCadence?: number;     // 最大踏頻（rpm）
+  avgPower?: number;       // 平均功率（W）
+  maxPower?: number;       // 最大功率（W）
+  normalizedPower?: number;// 標準化功率（W）
+  intensityFactor?: number;// 強度係數（IF）
+  tss?: number;            // 訓練壓力分數（TSS）
 }
 
 /**
@@ -66,6 +80,18 @@ export function generateShareCard(ride: RideRecord): ShareCard {
     date: dateStr,
     routeName: ride.name || "未命名路線",
     emoji: getActivityEmoji(ride.avgSpeed, ride.totalAscent, ride.distance / 1000),
+    movingTime: ride.movingTime,
+    totalDescent: ride.totalDescent,
+    maxElevation: ride.maxElevation,
+    avgHeartRate: ride.avgHeartRate,
+    maxHeartRate: ride.maxHeartRate,
+    avgCadence: ride.avgCadence,
+    maxCadence: ride.maxCadence,
+    avgPower: ride.avgPower,
+    maxPower: ride.maxPower,
+    normalizedPower: ride.normalizedPower,
+    intensityFactor: ride.intensityFactor,
+    tss: ride.tss,
   };
 }
 

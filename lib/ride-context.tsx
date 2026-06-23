@@ -34,14 +34,20 @@ export interface RideRecord {
   avgSpeed: number;       // km/h
   maxSpeed: number;       // km/h
   totalAscent: number;    // meters
+  totalDescent?: number;  // 總下降高度 meters
+  maxElevation?: number;  // 最大海拔 meters
+  movingTime?: number;    // 移動時間 seconds
   calories: number;
   avgPower: number;       // watts
   maxPower: number;       // watts
+  normalizedPower?: number; // 標準化功率 watts
+  intensityFactor?: number; // 強度係數 IF
+  tss?: number;           // 訓練壓力分數 TSS
   powerZones: number[];   // [z1, z2, z3, z4, z5] percentage
   route: LocationPoint[];
   totalSweatMl: number;   // 總汗液流失量 ml
   refillCount: number;    // 補水次數
-  totalPausedSec: number; // 總暫停時間（秒）
+  totalPausedSec: number; // 總暂停時間（秒）
   avgHeartRate?: number;  // 平均心率 bpm（感測器）
   maxHeartRate?: number;  // 最高心率 bpm（感測器）
   avgCadence?: number;    // 平均踏頻 rpm（感測器）
