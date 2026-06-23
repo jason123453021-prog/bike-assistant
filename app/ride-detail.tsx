@@ -738,7 +738,17 @@ export default function RideDetailScreen() {
                   </View>
                 </View>
                 <View style={styles.playbackProgress}>
-                  <Text style={styles.progressText}>{trailPlaybackIndex} / {polylineCoords.length}</Text>
+                  <View style={styles.progressBar}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${(trailPlaybackIndex / polylineCoords.length) * 100}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.progressText}>
+                    {trailPlaybackIndex} / {polylineCoords.length} ({Math.round((trailPlaybackIndex / polylineCoords.length) * 100)}%)
+                  </Text>
                 </View>
               </View>
             )}
@@ -1162,6 +1172,19 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "rgba(255,255,255,0.05)",
     alignItems: "center",
+    gap: 8,
+  },
+  progressBar: {
+    width: "100%",
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#00E676",
+    borderRadius: 3,
   },
   progressText: {
     fontSize: 12,

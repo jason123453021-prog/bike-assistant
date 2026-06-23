@@ -23,6 +23,8 @@ export interface SupplyModalProps {
   onConfirmWater: () => void;
   /** 按下「稍後」（關閉但不重置） */
   onDismiss: () => void;
+  /** 自訂補給品提醒清單（優先級排序） */
+  customSupplyAlerts?: Array<{ id: string; name: string; onConfirm: () => void }>;
 }
 
 export function SupplyModal({
@@ -32,9 +34,10 @@ export function SupplyModal({
   onConfirmCalorie,
   onConfirmWater,
   onDismiss,
+  customSupplyAlerts = [],
 }: SupplyModalProps) {
   const colors = useColors();
-  const visible = calorieAlert || waterAlert;
+  const visible = calorieAlert || waterAlert || customSupplyAlerts.length > 0;
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
@@ -135,6 +138,29 @@ export function SupplyModal({
               </Pressable>
             </View>
           )}
+
+          {/* 自訂補給品提醒區塊 */}
+          {customSupplyAlerts.map((alert) => (
+            <View key={alert.id} style={[styles.alertBlock, { borderColor: "#9C27B0" + "40", backgroundColor: "#9C27B0" + "10" }]}>
+              <View style={styles.alertBlockHeader}>
+                <View style={[styles.alertIconWrap, { backgroundColor: "#9C27B0" + "20" }]}>
+                  <IconSymbol name="star.fill" size={28} color="#9C27B0" />
+                </View>
+                <View style={styles.alertBlockText}>
+                  <Text style={[styles.alertBlockTitle, { color: "#9C27B0" }]}>{alert.name}</Text>
+                  <Text style={[styles.alertBlockSub, { color: colors.muted }]}>
+                    是時候補充 {alert.name} 了
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                style={({ pressed }) => [styles.confirmBtn, { backgroundColor: "#9C27B0", opacity: pressed ? 0.8 : 1 }]}
+                onPress={alert.onConfirm}
+              >
+                <Text style={styles.confirmText}>✓ 已補充</Text>
+              </Pressable>
+            </View>
+          ))}
 
           {/* 稍後按鈕 */}
           <Pressable

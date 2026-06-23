@@ -1896,6 +1896,14 @@ export default function MapScreen() {
         calorieAlert={calorieAlert}
         waterAlert={waterAlert}
         recommendedMl={supplyRecommendedMl}
+        customSupplyAlerts={sortedActiveAlerts.map(id => {
+          const item = settings.supplyItems.find(i => i.id === id);
+          return {
+            id,
+            name: item?.name || 'Unknown',
+            onConfirm: () => handleConfirmCustomSupply(id, item?.triggerType || 'time'),
+          };
+        })}
         onConfirmCalorie={() => {
           setCalorieAlert(false);
           dispatch({ type: "CONSUME_CALORIES" });
