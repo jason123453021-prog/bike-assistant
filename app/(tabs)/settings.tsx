@@ -1375,7 +1375,7 @@ export default function SettingsScreen() {
         onRequestClose={closeSupplyModal}
       >
         <View style={[styles.modalOverlay, { backgroundColor: colors.background + "99" }]}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface, maxHeight: "95%", maxWidth: "95%" }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 {supplyModal.mode === "add" ? "新增補給品" : "編輯補給品"}
@@ -1385,16 +1385,16 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            <ScrollView style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 12 }}>
+            <ScrollView style={{ flex: 1, paddingHorizontal: 20, paddingVertical: 16 }}>
               {/* 補給品名稱 */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>
                   補給品名稱 *
                 </Text>
                 <TextInput
                   style={[
                     styles.textInput,
-                    { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background },
+                    { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 16, paddingVertical: 14 },
                   ]}
                   placeholder="例如：運動飲料、能量棒"
                   placeholderTextColor={colors.muted}
@@ -1404,11 +1404,11 @@ export default function SettingsScreen() {
               </View>
 
               {/* 觸發方式 */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>
                   觸發方式
                 </Text>
-                <View style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ flexDirection: "row", gap: 10 }}>
                   {(["time", "distance"] as const).map((type) => (
                     <Pressable
                       key={type}
@@ -1438,54 +1438,54 @@ export default function SettingsScreen() {
 
               {/* 觸發值 */}
               {supplyForm.triggerType === "time" ? (
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 10 }}>
                     觸發時間
                   </Text>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View style={{ flexDirection: "row", gap: 12 }}>
                     {/* 時 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>時</Text>
+                      <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6, fontWeight: "500" }}>時</Text>
                       <TextInput
                         style={[
                           styles.textInput,
-                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, textAlign: "center" },
+                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 16, paddingVertical: 14, textAlign: "center" },
                         ]}
                         placeholder="0"
                         placeholderTextColor={colors.muted}
                         keyboardType="number-pad"
-                        value={String(supplyForm.triggerHours || 0)}
-                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerHours: Math.max(0, parseInt(text) || 0) })}
+                        value={String(supplyForm.triggerHours)}
+                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerHours: parseInt(text) || 0 })}
                       />
                     </View>
                     {/* 分 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>分</Text>
+                      <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6, fontWeight: "500" }}>分</Text>
                       <TextInput
                         style={[
                           styles.textInput,
-                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, textAlign: "center" },
+                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 16, paddingVertical: 14, textAlign: "center" },
                         ]}
                         placeholder="0"
                         placeholderTextColor={colors.muted}
                         keyboardType="number-pad"
-                        value={String(supplyForm.triggerMinutes || 0)}
-                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerMinutes: Math.max(0, Math.min(59, parseInt(text) || 0)) })}
+                        value={String(supplyForm.triggerMinutes)}
+                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerMinutes: parseInt(text) || 0 })}
                       />
                     </View>
                     {/* 秒 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>秒</Text>
+                      <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6, fontWeight: "500" }}>秒</Text>
                       <TextInput
                         style={[
                           styles.textInput,
-                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, textAlign: "center" },
+                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 16, paddingVertical: 14, textAlign: "center" },
                         ]}
                         placeholder="0"
                         placeholderTextColor={colors.muted}
                         keyboardType="number-pad"
-                        value={String(supplyForm.triggerSeconds || 0)}
-                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerSeconds: Math.max(0, Math.min(59, parseInt(text) || 0)) })}
+                        value={String(supplyForm.triggerSeconds)}
+                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerSeconds: parseInt(text) || 0 })}
                       />
                     </View>
                   </View>

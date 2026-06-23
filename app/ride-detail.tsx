@@ -117,16 +117,38 @@ export default function RideDetailScreen() {
   // 低部面板
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [shareCardVisible, setShareCardVisible] = useState(false);
-  const panelAnim = useRef(new Animated.Value(PANEL_COLLAPSED_H)).current;
+  
+  // 動態計算收縮面板高度（與導航頁面一致）
+  const CELL_H = 60;
+  const HEADER_H = 80;
+  const CTRL_H = 64;
+  const dynamicCollapsedH = Math.min(
+    HEADER_H + CTRL_H,
+    PANEL_COLLAPSED_H
+  );
+  
+  const panelAnim = useRef(new Animated.Value(dynamicCollapsedH)).current;
+  const prevCollapsedH = useRef(dynamicCollapsedH);
+
+  useEffect(() => {
+    if (!panelExpanded && dynamicCollapsedH !== prevCollapsedH.current) {
+      prevCollapsedH.current = dynamicCollapsedH;
+      Animated.timing(panelAnim, {
+        toValue: dynamicCollapsedH,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [dynamicCollapsedH, panelExpanded, panelAnim]);
 
   const togglePanel = useCallback((expand: boolean) => {
     setPanelExpanded(expand);
     Animated.timing(panelAnim, {
-      toValue: expand ? PANEL_EXPANDED_H : PANEL_COLLAPSED_H,
+      toValue: expand ? PANEL_EXPANDED_H : dynamicCollapsedH,
       duration: 280,
       useNativeDriver: false,
     }).start();
-  }, [panelAnim]);
+  }, [panelAnim, dynamicCollapsedH]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -519,9 +541,10 @@ export default function RideDetailScreen() {
       {/* ── 底部面板 ── */}
       <Animated.View
         style={[styles.panel, { height: panelAnim, paddingBottom: insets.bottom + 8 }]}
+        {...panResponder.panHandlers}
       >
         {/* 拖拉把手 */}
-        <View {...panResponder.panHandlers} style={styles.handleArea}>
+        <View style={styles.handleArea}>
           <View style={styles.panelHandle} />
           <Text style={styles.dateText}>{dateStr}</Text>
         </View>
@@ -560,24 +583,7 @@ export default function RideDetailScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 20 }}
           >
-            {/* 詳細數據格 */}
-            <View style={styles.statsGrid}>
-              <DetailCell label="均速" value={`${((record.distance / 1000) / ((record.duration - (record.totalPausedSec ?? 0)) / 3600)).toFixed(1)}`} unit="km/h" />
-              <DetailCell label="最高速" value={`${record.maxSpeed.toFixed(1)}`} unit="km/h" />
-              <DetailCell label="爆升" value={`${Math.round(record.totalAscent)}`} unit="m" />
-              <DetailCell
-                label="有效騎乘"
-                value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))}
-                unit=""
-                color="#4ADE80"
-              />
-              <DetailCell label="暫停時間" value={formatDuration(record.totalPausedSec ?? 0)} unit="" />
-              <DetailCell label="均功率" value={`${record.avgPower}`} unit="W" accent />
-              <DetailCell label="最大功率" value={`${record.maxPower}`} unit="W" accent />
-              <DetailCell label="水分流失" value={`${Math.round(record.totalSweatMl)}`} unit="ml" color="#4FC3F7" />
-              <DetailCell label="補水次數" value={`${record.refillCount}`} unit="次" />
-              <DetailCell label="GPS 點數" value={`${record.route.length}`} unit="點" />
-            </View>
+
 
             {/* 功率分布 */}
             {totalZones > 0 && (
@@ -666,7 +672,9 @@ export default function RideDetailScreen() {
                 <DetailCell label="移動時間" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" />
                 <DetailCell label="平均速度" value={`${((record.distance / 1000) / ((record.duration - (record.totalPausedSec ?? 0)) / 3600)).toFixed(1)}`} unit="km/h" />
                 <DetailCell label="最高速度" value={`${record.maxSpeed.toFixed(1)}`} unit="km/h" />
-                <DetailCell label="消耗熱量" value={`${Math.round(record.calories)}`} unit="kcal" />
+                <DetailCell label="消誨熱量" value={`${Math.round(record.calories)}`} unit="kcal" />
+                <DetailCell label="有效騎乘" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" color="#4ADE80" />
+                <DetailCell label="暫停時間" value={formatDuration(record.totalPausedSec ?? 0)} unit="" />
               </View>
             </View>
 
@@ -704,6 +712,13 @@ export default function RideDetailScreen() {
                 <DetailCell label="訓練壓力分數" value="--" unit="" color="#9C27B0" />
                 <DetailCell label="強度係數" value="--" unit="" />
                 <DetailCell label="訓練效果" value="--" unit="" color="#00E676" />
+              </View>
+            </View>
+
+            {/* 补給品記錄面板 */}
+            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>补給品記錄</Text>
+              <View style={styles.statsGrid}>
                 <DetailCell label="水分流失" value={`${Math.round(record.totalSweatMl)}`} unit="ml" color="#4FC3F7" />
                 <DetailCell label="補水次數" value={`${record.refillCount}`} unit="次" />
                 <DetailCell label="GPS 點數" value={`${record.route.length}`} unit="點" />
