@@ -61,6 +61,7 @@ import {
   requestNotificationPermission,
   stopSpeech,
 } from "@/lib/feedback-service";
+import { getSensorDataManager } from "@/lib/sensor-data-manager";
 import {
   calculatePower,
   calculateCalories,
@@ -189,6 +190,18 @@ export default function MapScreen() {
 
   // 功率平滑：5 點滑動平均
   const powerWindowRef = useRef<number[]>([]);
+
+  // 感測器數據管理
+  const sensorManagerRef = useRef(getSensorDataManager());
+  const [sensorData, setSensorData] = useState({
+    heartRate: null as number | null,
+    power: null as number | null,
+    cadence: null as number | null,
+    maxHeartRate: null as number | null,
+    maxPower: null as number | null,
+    maxCadence: null as number | null,
+  });
+  const sensorUpdateIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 自動暫停連續計數（需連續 3 次低速才暫停，避免 GPS 抖動誤觸發）
   const lowSpeedCountRef = useRef(0);
@@ -735,12 +748,19 @@ export default function MapScreen() {
             airDensityKgM3: airDensityRef.current,
           });
           prevSpeedMsRef.current = currentSpeedMs;
-          // 5 點滑動平均：平滑功率，消除 GPS 抖動造成的瞬間高峰
-          powerWindowRef.current.push(rawPower);
-          if (powerWindowRef.current.length > 5) powerWindowRef.current.shift();
-          const power = Math.round(
-            powerWindowRef.current.reduce((a, b) => a + b, 0) / powerWindowRef.current.length
-          );
+          // 優先使用感測器功率，若無則使用計算功率
+          let power = sensorData.power ?? rawPower;
+          // 若使用計算功率，則進行 5 點滑動平均平滑
+          if (sensorData.power === null) {
+            powerWindowRef.current.push(rawPower);
+            if (powerWindowRef.current.length > 5) powerWindowRef.current.shift();
+            power = Math.round(
+              powerWindowRef.current.reduce((a, b) => a + b, 0) / powerWindowRef.current.length
+            );
+          } else {
+            // 使用感測器功率時，清空計算功率緩衝
+            powerWindowRef.current = [];
+          }
           const calIncrement = calculateCalories(power, LOCATION_INTERVAL_SEC);
 
           dispatch({
@@ -1019,6 +1039,29 @@ export default function MapScreen() {
     setMapRideActive(true);
     setFollowUser(true);
 
+    // 感測器初始化
+    setSensorData({
+      heartRate: null,
+      power: null,
+      cadence: null,
+      maxHeartRate: null,
+      maxPower: null,
+      maxCadence: null,
+    });
+    // 啟動感測器數據更新迴圈（每 1 秒更新一次）
+    if (sensorUpdateIntervalRef.current) clearInterval(sensorUpdateIntervalRef.current);
+    sensorUpdateIntervalRef.current = setInterval(() => {
+      const data = sensorManagerRef.current.getSensorData();
+      setSensorData({
+        heartRate: data.heartRate,
+        power: data.power,
+        cadence: data.cadence,
+        maxHeartRate: data.maxHeartRate,
+        maxPower: data.maxPower,
+        maxCadence: data.maxCadence,
+      });
+    }, 1000);
+
     if (gpxRoute) {
       setIsNavigating(true);
       setNavInstruction("導航已啟動");
@@ -1059,6 +1102,17 @@ export default function MapScreen() {
           locationSubRef.current = null;
           await stopBackgroundLocationTracking();
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
+          // 結束騎乘清除感測器更新迴圈
+          if (sensorUpdateIntervalRef.current) clearInterval(sensorUpdateIntervalRef.current);
+          sensorUpdateIntervalRef.current = null;
+          setSensorData({
+            heartRate: null,
+            power: null,
+            cadence: null,
+            maxHeartRate: null,
+            maxPower: null,
+            maxCadence: null,
+          });
           await cancelRidingNotification();
           // 結束騎乘清除補給重複提醒計時器
           clearSupplyRepeatTimer();
@@ -1577,7 +1631,7 @@ export default function MapScreen() {
         {/* ── 儀表板（依排序動態顯示，前6格在收縮面板） ── */}
         <View style={styles.sixGrid}>
           {dashPanelFields.map((key) => (
-            <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} />
+            <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} sensorData={sensorData} />
           ))}
         </View>
 
@@ -1588,7 +1642,7 @@ export default function MapScreen() {
             {dashOverflowFields.length > 0 && (
               <View style={[styles.sixGrid, { marginBottom: 8 }]}>
                 {dashOverflowFields.map((key) => (
-                  <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} />
+                  <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} sensorData={sensorData} />
                 ))}
               </View>
             )}
@@ -1784,7 +1838,7 @@ export default function MapScreen() {
         currentTime={new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false })}
         elapsedTime={formatDuration(state.elapsed ?? 0)}
         grade={currentGrade}
-        power={state.currentPower}
+        power={sensorData.power ?? state.currentPower}
         avgSpeed={avgSpeed}
         calories={Math.round(state.calories)}
         pausedTime={formatDuration(state.totalPausedSec ?? 0)}
@@ -1856,12 +1910,13 @@ export default function MapScreen() {
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
 // DashMetric: 依 fieldKey 渲染對應的儀表板欄位
-function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed }: {
+function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed, sensorData }: {
   fieldKey: NormalFieldKey;
   state: any;
   isActive: boolean;
   currentGrade: number;
   avgSpeed: number;
+  sensorData?: any;
 }) {
   switch (fieldKey) {
     case "showElapsed":
@@ -1873,7 +1928,10 @@ function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed }: {
     case "showGrade":
       return <BigMetric label="坡度" value={isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"} unit="%" warn={currentGrade > 5} />;
     case "showPower":
-      return <BigMetric label="功率" value={`${state.currentPower}`} unit="W" accent />;
+      // 優先顯示感測器功率，若無則顯示計算功率
+      const displayPower = sensorData.power ?? state.currentPower;
+      const isSensorPower = sensorData.power !== null && sensorData.power !== undefined;
+      return <BigMetric label={isSensorPower ? "功率 (感測器)" : "功率"} value={`${displayPower}`} unit="W" accent />;
     case "showAvgSpeed":
       return <BigMetric label="均速" value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"} unit="km/h" />;
     case "showCalories":
