@@ -241,6 +241,34 @@ export default function RideDetailScreen() {
     };
   }, [isPlayingTrail, trailPlaybackSpeed, polylineCoords.length]);
   
+  // 地圖自動跟隨回放位置
+  useEffect(() => {
+    if (trailPlaybackIndex > 0 && trailPlaybackIndex < polylineCoords.length && mapRef.current) {
+      const currentCoord = polylineCoords[trailPlaybackIndex];
+      (mapRef.current as any).setView([currentCoord.latitude, currentCoord.longitude], 15, { animate: true, duration: 0.3 });
+    }
+  }, [trailPlaybackIndex, polylineCoords]);
+  
+  // 計算當前回放位置的數據
+  const currentPlaybackData = useMemo(() => {
+    if (trailPlaybackIndex === 0 || !record) {
+      return { distance: 0, time: 0, speed: 0, heartRate: 0, power: 0 };
+    }
+    const totalDistance = record.distance || 0;
+    const totalDuration = record.duration || 0;
+    const avgSpeed = record.avgSpeed || 0;
+    const avgHeartRate = record.avgHeartRate || 0;
+    const avgPower = record.avgPower || 0;
+    
+    return {
+      distance: (totalDistance * trailPlaybackIndex) / polylineCoords.length,
+      time: (totalDuration * trailPlaybackIndex) / polylineCoords.length,
+      speed: avgSpeed,
+      heartRate: avgHeartRate,
+      power: avgPower,
+    };
+  }, [trailPlaybackIndex, polylineCoords.length, record]);
+  
   const handlePlayTrail = () => {
     if (polylineCoords.length === 0) return;
     if (trailPlaybackIndex >= polylineCoords.length - 1) {

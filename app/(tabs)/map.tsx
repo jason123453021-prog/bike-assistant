@@ -324,6 +324,7 @@ export default function MapScreen() {
   const supplyItemsTrackerRef = useRef<Record<string, { lastTriggerTime: number; lastTriggerDistance: number; triggered: boolean }>>({});
   // 自訂補給品提醒狀態
   const [customSupplyAlerts, setCustomSupplyAlerts] = useState<Record<string, boolean>>({});
+  const [activeSupplyAlerts, setActiveSupplyAlerts] = useState<string[]>([]);
 
   // 清除重複提醒計時器
   const clearSupplyRepeatTimer = useCallback(() => {
@@ -344,6 +345,7 @@ export default function MapScreen() {
 
   const handleConfirmCustomSupply = useCallback((id: string, type: "time" | "distance") => {
     setCustomSupplyAlerts(prev => ({ ...prev, [id]: false }));
+    setActiveSupplyAlerts(prev => prev.filter(alertId => alertId !== id));
     supplyItemsTrackerRef.current[id] = {
       lastTriggerTime: type === "time" ? state.elapsed : supplyItemsTrackerRef.current[id]?.lastTriggerTime || 0,
       lastTriggerDistance: type === "distance" ? (state.distance / 1000) : supplyItemsTrackerRef.current[id]?.lastTriggerDistance || 0,
@@ -353,6 +355,14 @@ export default function MapScreen() {
     vibrateLight();
   }, [state.elapsed, state.distance, settings.supplyItems, settings.ttsEnabled]);
 
+  const sortedActiveAlerts = useMemo(() => {
+    return activeSupplyAlerts.sort((a, b) => {
+      const indexA = settings.supplyItems.findIndex(item => item.id === a);
+      const indexB = settings.supplyItems.findIndex(item => item.id === b);
+      return indexA - indexB;
+    });
+  }, [activeSupplyAlerts, settings.supplyItems]);
+  
   const { user, isAuthenticated } = useAuth();
   const { pendingNav, clearFriendNav } = useFriendNav();
 
@@ -561,6 +571,12 @@ export default function MapScreen() {
 
       // 觸發提醒
       setCustomSupplyAlerts((prev) => ({ ...prev, [supplyItem.id]: true }));
+      setActiveSupplyAlerts((prev) => {
+        if (!prev.includes(supplyItem.id)) {
+          return [...prev, supplyItem.id];
+        }
+        return prev;
+      });
       tracker.triggered = true;
 
       // 更新觸發時間/距離
