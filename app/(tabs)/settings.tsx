@@ -27,6 +27,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, SUPPLY_ITEM_TEMPLATES, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
+import { SensorPairingModal } from "@/components/sensor-pairing-modal";
 import { useAuth } from "@/hooks/use-auth";
 import { startOAuthLogin } from "@/constants/oauth";
 import { trpc } from "@/lib/trpc";
@@ -37,6 +38,9 @@ export default function SettingsScreen() {
   const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
   const { user, isAuthenticated, logout } = useAuth();
   const deleteAccountMutation = trpc.auth.deleteAccount.useMutation();
+
+  // ── 感測器配對 Modal 狀態 ──
+  const [sensorModalVisible, setSensorModalVisible] = useState(false);
 
   // ── 刪除帳號防呆 Modal 狀態 ──
   const [deleteModal, setDeleteModal] = useState<{
@@ -452,7 +456,7 @@ export default function SettingsScreen() {
                     backgroundColor: colors.primary,
                     opacity: pressed ? 0.8 : 1,
                   }]}
-                  onPress={() => {}}
+                  onPress={() => setSensorModalVisible(true)}
                 >
                   <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600" }}>配對</Text>
                 </Pressable>
@@ -1414,6 +1418,11 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+      {/* 感測器配對 Modal */}
+      <SensorPairingModal
+        visible={sensorModalVisible}
+        onClose={() => setSensorModalVisible(false)}
+      />
     </ScreenContainer>
   );
 }
