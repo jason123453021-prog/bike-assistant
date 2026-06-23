@@ -4,6 +4,8 @@
  */
 
 import { BluetoothSensorManager, SensorData, SensorType } from './bluetooth-sensor';
+import { bleIntegration, type BleIntegration } from './ble-integration';
+import { type HeartRateData, type PowerData, type CadenceData } from './ble-manager';
 
 export interface RealTimeSensorData {
   heartRate: number | null;
@@ -20,6 +22,7 @@ export interface RealTimeSensorData {
 
 export class SensorDataManager {
   private bluetoothManager: BluetoothSensorManager;
+  private bleIntegration: BleIntegration = bleIntegration;
   private sensorData: RealTimeSensorData = {
     heartRate: null,
     maxHeartRate: null,
@@ -45,6 +48,14 @@ export class SensorDataManager {
    * 初始化感測器數據監聽
    */
   async initialize(): Promise<void> {
+    // 初始化 BLE 整合層
+    try {
+      this.setupBleListeners();
+      console.log('[SensorDataManager] BLE integration initialized');
+    } catch (error) {
+      console.error('[SensorDataManager] BLE initialization failed:', error);
+    }
+
     // 掃描設備
     await this.bluetoothManager.scanDevices();
 
@@ -102,17 +113,80 @@ export class SensorDataManager {
   }
 
   /**
-   * 連接感測器
+   * 設定 BLE 事件監聽器
    */
-  async connectSensor(deviceId: string): Promise<boolean> {
-    return await this.bluetoothManager.connectDevice(deviceId);
+  private setupBleListeners(): void {
+    // 監聽心率更新
+    this.bleIntegration.on('onHeartRateUpdate', (data: HeartRateData) => {
+      this.sensorData.heartRate = data.heartRate;
+      if (!this.sensorData.maxHeartRate || data.heartRate > this.sensorData.maxHeartRate) {
+        this.sensorData.maxHeartRate = data.heartRate;
+      }
+      // 計算平滑心率
+      this.heartRateBuffer.push(data.heartRate);
+      if (this.heartRateBuffer.length > this.BUFFER_SIZE) {
+        this.heartRateBuffer.shift();
+      }
+      const avg = this.heartRateBuffer.reduce((a, b) => a + b, 0) / this.heartRateBuffer.length;
+      this.sensorData.smoothedHeartRate = Math.round(avg);
+      this.sensorData.lastUpdateTime = Date.now();
+    });
+
+    // 監聽功率更新
+    this.bleIntegration.on('onPowerUpdate', (data: PowerData) => {
+      this.sensorData.power = data.power;
+      if (!this.sensorData.maxPower || data.power > this.sensorData.maxPower) {
+        this.sensorData.maxPower = data.power;
+      }
+      // 踏頻也可能從功率計獲得
+      if (data.cadence > 0) {
+        this.sensorData.cadence = data.cadence;
+        if (!this.sensorData.maxCadence || data.cadence > this.sensorData.maxCadence) {
+          this.sensorData.maxCadence = data.cadence;
+        }
+      }
+      this.sensorData.lastUpdateTime = Date.now();
+    });
+
+    // 監聽踏頻更新
+    this.bleIntegration.on('onCadenceUpdate', (data: CadenceData) => {
+      this.sensorData.cadence = data.cadence;
+      if (!this.sensorData.maxCadence || data.cadence > this.sensorData.maxCadence) {
+        this.sensorData.maxCadence = data.cadence;
+      }
+      // 計算平滑踏頻
+      this.cadenceBuffer.push(data.cadence);
+      if (this.cadenceBuffer.length > this.BUFFER_SIZE) {
+        this.cadenceBuffer.shift();
+      }
+      const avg = this.cadenceBuffer.reduce((a, b) => a + b, 0) / this.cadenceBuffer.length;
+      this.sensorData.smoothedCadence = Math.round(avg);
+      this.sensorData.lastUpdateTime = Date.now();
+    });
   }
 
   /**
-   * 斷開感測器
+   * 連接感測器（舊 API，保留向後相容）
+   */
+  async connectSensor(deviceId: string): Promise<boolean> {
+    try {
+      await this.connectBleDevice(deviceId);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * 斷開感測器（舊 API，保留向後相容）
    */
   async disconnectSensor(deviceId: string): Promise<boolean> {
-    return await this.bluetoothManager.disconnectDevice(deviceId);
+    try {
+      await this.disconnectBleDevice(deviceId);
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   /**
@@ -186,12 +260,64 @@ export class SensorDataManager {
   }
 
   /**
+   * 開始掃描 BLE 設備
+   */
+  async startBleScanning(): Promise<void> {
+    try {
+      await this.bleIntegration.startScanning();
+    } catch (error) {
+      console.error('[SensorDataManager] BLE scanning failed:', error);
+    }
+  }
+
+  /**
+   * 停止掃描 BLE 設備
+   */
+  async stopBleScanning(): Promise<void> {
+    try {
+      await this.bleIntegration.stopScanning();
+    } catch (error) {
+      console.error('[SensorDataManager] BLE stop scanning failed:', error);
+    }
+  }
+
+  /**
+   * 連接 BLE 設備
+   */
+  async connectBleDevice(deviceId: string): Promise<void> {
+    try {
+      await this.bleIntegration.connectToDevice(deviceId);
+    } catch (error) {
+      console.error('[SensorDataManager] BLE connection failed:', error);
+    }
+  }
+
+  /**
+   * 斷開 BLE 設備
+   */
+  async disconnectBleDevice(deviceId: string): Promise<void> {
+    try {
+      await this.bleIntegration.disconnectDevice(deviceId);
+    } catch (error) {
+      console.error('[SensorDataManager] BLE disconnection failed:', error);
+    }
+  }
+
+  /**
+   * 獲取 BLE 連接設備列表
+   */
+  getBleConnectedDevices() {
+    return this.bleIntegration.getConnectedDevices();
+  }
+
+  /**
    * 清理資源
    */
   dispose(): void {
     this.unsubscribers.forEach((unsub) => unsub());
     this.unsubscribers = [];
     this.bluetoothManager.dispose();
+    this.bleIntegration.destroy();
   }
 }
 
