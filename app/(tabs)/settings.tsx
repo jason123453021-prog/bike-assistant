@@ -421,6 +421,32 @@ export default function SettingsScreen() {
         <SectionHeader title="感測器配對" colors={colors} onToggle={() => toggleSection("sensors")} collapsed={collapsedSections["sensors"]} />
         {!collapsedSections["sensors"] && <View style={[styles.section, { borderColor: colors.border }]}>
           <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
+            {/* 感測器狀態面板 */}
+            <View style={{
+              backgroundColor: colors.primary + "15",
+              borderColor: colors.primary + "40",
+              borderWidth: 1,
+              borderRadius: 8,
+              padding: 12,
+              gap: 8,
+            }}>
+              <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>感測器狀態</Text>
+              <View style={{ gap: 6 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ color: colors.muted, fontSize: 11 }}>已連接設備</Text>
+                  <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>0 個</Text>
+                </View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ color: colors.muted, fontSize: 11 }}>最後更新</Text>
+                  <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>--</Text>
+                </View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ color: colors.muted, fontSize: 11 }}>信號強度</Text>
+                  <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>--</Text>
+                </View>
+              </View>
+            </View>
+
             {/* 感測器清單 */}
             <View style={{ gap: 8 }}>
               {/* 心率帶 */}

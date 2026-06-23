@@ -161,6 +161,32 @@ export default function RideDetailScreen() {
     }
   }, [mapReady, polylineCoords]);
 
+  // 心率區間定義（5 個區間）
+  const HR_ZONES = [
+    { name: "恢復", min: 0, max: 0.6, color: "#4FC3F7" },      // 60% max
+    { name: "有氧基礎", min: 0.6, max: 0.7, color: "#66BB6A" }, // 60-70% max
+    { name: "有氧耐力", min: 0.7, max: 0.8, color: "#FDD835" }, // 70-80% max
+    { name: "乳酸閾值", min: 0.8, max: 0.9, color: "#FB8C00" }, // 80-90% max
+    { name: "最大強度", min: 0.9, max: 1.0, color: "#E53935" }  // 90-100% max
+  ];
+
+  // 計算心率區間分布（簡化版：基於平均心率估算）
+  const calculateHeartRateZones = useCallback(() => {
+    if (!record || !record.avgHeartRate || !record.maxHeartRate) return null;
+    const maxHR = record.maxHeartRate || 200;
+    const zones = [0, 0, 0, 0, 0];
+    // 簡化處理：根據平均心率估算分布
+    const avgPct = record.avgHeartRate / maxHR;
+    if (avgPct <= 0.6) zones[0] = 100;
+    else if (avgPct <= 0.7) { zones[0] = 50; zones[1] = 50; }
+    else if (avgPct <= 0.8) { zones[1] = 50; zones[2] = 50; }
+    else if (avgPct <= 0.9) { zones[2] = 50; zones[3] = 50; }
+    else { zones[3] = 50; zones[4] = 50; }
+    return zones;
+  }, [record]);
+
+  const heartRateZones = calculateHeartRateZones();
+
   // 功率分布圓餅圖
   const renderPie = useCallback(() => {
     if (!record) return null;
@@ -196,6 +222,42 @@ export default function RideDetailScreen() {
       </Svg>
     );
   }, [record]);
+
+  // 心率區間分布圓餅圖
+  const renderHeartRatePie = useCallback(() => {
+    if (!heartRateZones) return null;
+    const totalZones = heartRateZones.reduce((a, b) => a + b, 0);
+    if (totalZones === 0) return null;
+    const size = 100;
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = 38;
+    let startAngle = -Math.PI / 2;
+    const slices: { path: string; color: string }[] = [];
+
+    heartRateZones.forEach((val, i) => {
+      if (val === 0) return;
+      const pct = val / totalZones;
+      const angle = pct * 2 * Math.PI;
+      const endAngle = startAngle + angle;
+      const x1 = cx + r * Math.cos(startAngle);
+      const y1 = cy + r * Math.sin(startAngle);
+      const x2 = cx + r * Math.cos(endAngle);
+      const y2 = cy + r * Math.sin(endAngle);
+      const largeArc = angle > Math.PI ? 1 : 0;
+      slices.push({
+        path: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`,
+        color: HR_ZONES[i].color,
+      });
+      startAngle = endAngle;
+    });
+
+    return (
+      <Svg width={size} height={size}>
+        <G>{slices.map((s, i) => <Path key={i} d={s.path} fill={s.color} />)}</G>
+      </Svg>
+    );
+  }, [heartRateZones, HR_ZONES]);
 
   // 分享
   // GPX 匯出
@@ -483,6 +545,29 @@ export default function RideDetailScreen() {
                         <Text style={styles.zonePct}>{zonePcts[i]}%</Text>
                       </View>
                     ))}
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* 心率區間分布 */}
+            {heartRateZones && heartRateZones.reduce((a, b) => a + b, 0) > 0 && (
+              <View style={styles.zoneSection}>
+                <Text style={styles.sectionTitle}>心率區間分布</Text>
+                <View style={styles.zoneRow}>
+                  {renderHeartRatePie()}
+                  <View style={styles.zoneLegend}>
+                    {HR_ZONES.map((zone, i) => {
+                      const total = heartRateZones.reduce((a, b) => a + b, 0);
+                      const pct = total > 0 ? Math.round((heartRateZones[i] / total) * 100) : 0;
+                      return (
+                        <View key={i} style={styles.zoneLegendItem}>
+                          <View style={[styles.zoneDot, { backgroundColor: zone.color }]} />
+                          <Text style={styles.zoneName}>{zone.name}</Text>
+                          <Text style={styles.zonePct}>{pct}%</Text>
+                        </View>
+                      );
+                    })}
                   </View>
                 </View>
               </View>
