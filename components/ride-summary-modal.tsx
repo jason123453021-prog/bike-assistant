@@ -154,17 +154,37 @@ export function RideSummaryModal({ visible, onClose }: RideSummaryModalProps) {
               </Text>
             </View>
 
-            {/* Stats Grid */}
-            <View style={[styles.statsGrid, { borderColor: colors.border }]}>
-              <StatCell label="距離" value={distKm} unit="km" colors={colors} large />
-              <StatCell label="時間" value={formatDuration(state.elapsed)} unit="" colors={colors} large />
-              <StatCell label="均速" value={avgSpd} unit="km/h" colors={colors} />
-              <StatCell label="最高速" value={state.maxSpeed.toFixed(1)} unit="km/h" colors={colors} />
-              <StatCell label="爬升" value={`${Math.round(state.totalAscent)}`} unit="m" colors={colors} />
-              <StatCell label="卡路里" value={`${Math.round(state.totalCalories)}`} unit="kcal" colors={colors} />
-              <StatCell label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" colors={colors} />
-              <StatCell label="均功率" value={`${state.avgPower}`} unit="W" colors={colors} accent />
-              <StatCell label="最大功率" value={`${state.maxPower}`} unit="W" colors={colors} accent />
+            {/* 核心數據面板 */}
+            <View style={[styles.statsPanel, { borderColor: colors.border }]}>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>核心數據</Text>
+              <View style={styles.statsGrid}>
+                <StatCell label="距離" value={distKm} unit="km" colors={colors} />
+                <StatCell label="總時間" value={formatDuration(state.elapsed)} unit="" colors={colors} />
+                <StatCell label="移動時間" value={formatDuration(Math.max(0, state.elapsed - state.totalPausedSec))} unit="" colors={colors} />
+                <StatCell label="平均速度" value={((state.distance / 1000) / ((state.elapsed - state.totalPausedSec) / 3600)).toFixed(1)} unit="km/h" colors={colors} />
+                <StatCell label="最高速度" value={state.maxSpeed.toFixed(1)} unit="km/h" colors={colors} />
+                <StatCell label="消耗熱量" value={`${Math.round(state.totalCalories)}`} unit="kcal" colors={colors} />
+              </View>
+            </View>
+
+            {/* 爬升與地形數據面板 */}
+            <View style={[styles.statsPanel, { borderColor: colors.border }]}>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>爬升與地形</Text>
+              <View style={styles.statsGrid}>
+                <StatCell label="總爬升高度" value={`${Math.round(state.totalAscent)}`} unit="m" colors={colors} />
+                <StatCell label="總下降高度" value="0" unit="m" colors={colors} />
+                <StatCell label="最大海拔" value="0" unit="m" colors={colors} />
+              </View>
+            </View>
+
+            {/* 進階訓練數據面板 */}
+            <View style={[styles.statsPanel, { borderColor: colors.border }]}>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>進階訓練數據</Text>
+              <View style={styles.statsGrid}>
+                <StatCell label="平均功率" value={`${state.avgPower}`} unit="W" colors={colors} accent />
+                <StatCell label="最大功率" value={`${state.maxPower}`} unit="W" colors={colors} accent />
+                <StatCell label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" colors={colors} />
+              </View>
             </View>
 
             {/* Power Zone Chart */}
@@ -222,8 +242,8 @@ function StatCell({
   label: string; value: string; unit: string; colors: any; large?: boolean; accent?: boolean;
 }) {
   return (
-    <View style={[styles.statCell, { borderColor: colors.border }]}>
-      <Text style={[styles.statValue, { color: accent ? colors.accent : colors.foreground, fontSize: large ? 28 : 22 }]}>
+    <View style={[styles.statCell, { backgroundColor: accent ? `${colors.accent}15` : `${colors.foreground}08` }]}>
+      <Text style={[styles.statValue, { color: accent ? colors.accent : colors.foreground }]}>
         {value}
       </Text>
       <Text style={[styles.statUnit, { color: colors.muted }]}>{unit}</Text>
@@ -267,25 +287,28 @@ const styles = StyleSheet.create({
   nameHint: { fontSize: 11, marginTop: 2 },
 
   // Stats
+  statsPanel: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  panelTitle: { fontSize: 15, fontWeight: "600", marginBottom: 12 },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 16,
+    gap: 8,
   },
   statCell: {
-    width: "50%",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    width: "48%",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     alignItems: "center",
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
   },
-  statValue: { fontWeight: "600", letterSpacing: -0.5 },
-  statUnit: { fontSize: 11, marginTop: 2 },
-  statLabel: { fontSize: 12, marginTop: 4 },
+  statValue: { fontWeight: "600", letterSpacing: -0.5, fontSize: 18 },
+  statUnit: { fontSize: 10, marginTop: 2 },
+  statLabel: { fontSize: 11, marginTop: 4 },
 
   // Chart
   chartSection: {

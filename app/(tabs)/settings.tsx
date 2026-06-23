@@ -1385,16 +1385,16 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            <ScrollView style={{ flex: 1, paddingHorizontal: 20, paddingVertical: 16 }}>
+            <ScrollView style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 20 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
               {/* 補給品名稱 */}
-              <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>
+              <View style={{ marginBottom: 24 }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
                   補給品名稱 *
                 </Text>
                 <TextInput
                   style={[
                     styles.textInput,
-                    { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 16, paddingVertical: 14 },
+                    { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 17, paddingVertical: 16, paddingHorizontal: 16 },
                   ]}
                   placeholder="例如：運動飲料、能量棒"
                   placeholderTextColor={colors.muted}
@@ -1404,11 +1404,11 @@ export default function SettingsScreen() {
               </View>
 
               {/* 觸發方式 */}
-              <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>
+              <View style={{ marginBottom: 24 }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
                   觸發方式
                 </Text>
-                <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flexDirection: "row", gap: 12 }}>
                   {(["time", "distance"] as const).map((type) => (
                     <Pressable
                       key={type}
@@ -1426,7 +1426,7 @@ export default function SettingsScreen() {
                         style={{
                           color: supplyForm.triggerType === type ? "#fff" : colors.foreground,
                           fontWeight: "600",
-                          fontSize: 13,
+                          fontSize: 14,
                         }}
                       >
                         {type === "time" ? "時間" : "距離"}
@@ -1438,18 +1438,18 @@ export default function SettingsScreen() {
 
               {/* 觸發值 */}
               {supplyForm.triggerType === "time" ? (
-                <View style={{ marginBottom: 20 }}>
-                  <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 10 }}>
+                <View style={{ marginBottom: 24 }}>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
                     觸發時間
                   </Text>
-                  <View style={{ flexDirection: "row", gap: 12 }}>
+                  <View style={{ flexDirection: "row", gap: 14 }}>
                     {/* 時 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6, fontWeight: "500" }}>時</Text>
+                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8, fontWeight: "600" }}>時</Text>
                       <TextInput
                         style={[
                           styles.textInput,
-                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 16, paddingVertical: 14, textAlign: "center" },
+                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 18, paddingVertical: 16, textAlign: "center" },
                         ]}
                         placeholder="0"
                         placeholderTextColor={colors.muted}
@@ -1460,11 +1460,11 @@ export default function SettingsScreen() {
                     </View>
                     {/* 分 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6, fontWeight: "500" }}>分</Text>
+                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8, fontWeight: "600" }}>分</Text>
                       <TextInput
                         style={[
                           styles.textInput,
-                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 16, paddingVertical: 14, textAlign: "center" },
+                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 18, paddingVertical: 16, textAlign: "center" },
                         ]}
                         placeholder="0"
                         placeholderTextColor={colors.muted}
@@ -1475,11 +1475,11 @@ export default function SettingsScreen() {
                     </View>
                     {/* 秒 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6, fontWeight: "500" }}>秒</Text>
+                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8, fontWeight: "600" }}>秒</Text>
                       <TextInput
                         style={[
                           styles.textInput,
-                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 16, paddingVertical: 14, textAlign: "center" },
+                          { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 18, paddingVertical: 16, textAlign: "center" },
                         ]}
                         placeholder="0"
                         placeholderTextColor={colors.muted}
@@ -1887,14 +1887,14 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-end",
     alignItems: "center",
   },
   modalContent: {
-    borderRadius: 20,
-    maxHeight: "85%",
-    maxWidth: "90%",
-    width: "90%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    width: "100%",
+    maxHeight: "95%",
     paddingTop: 0,
   },
   modalHeader: {

@@ -193,6 +193,16 @@ function rideReducer(state: RideState, action: RideAction): RideState {
     case "LOCATION_UPDATE": {
       const { point, power, calories, ascent } = action;
       const newRoute = [...state.route, point];
+
+      // 軌跡點始終記錄
+      if (state.status === "paused") {
+        return {
+          ...state,
+          route: newRoute,
+        };
+      }
+
+      // 其他數據僅在 active 狀態下更新
       const speedKmh = (point.speed ?? 0) * 3.6;
       const newPowerHistory = [...state.powerHistory, power];
       const avgPower = newPowerHistory.reduce((a, b) => a + b, 0) / newPowerHistory.length;

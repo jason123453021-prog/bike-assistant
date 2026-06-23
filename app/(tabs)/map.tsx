@@ -739,7 +739,15 @@ export default function MapScreen() {
             handleNavigation(latitude, longitude, speed ?? 0);
           }
 
-          if (currentState.status !== "active") return;
+          // 軌跡點始終記錄，其他數據僅在 active 狀態下更新
+          if (currentState.status !== "active") {
+            dispatch({
+              type: "LOCATION_UPDATE",
+              point: { latitude, longitude, altitude: altitude ?? 0, speed: speed ?? 0, timestamp: Date.now() },
+              power: 0, calories: 0, ascent: 0,
+            });
+            return;
+          }
 
           // ─── 騎乘計算 ─────────────────────────────────────────────────────
           let grade = 0;
@@ -1168,8 +1176,7 @@ export default function MapScreen() {
           setWaterAlert(false);
           setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
           supplyItemsTrackerRef.current = {}; // 重置自訂補給品追蹤器
-          // 結束騎乘清空地圖軌跡
-          setLiveTrail([]);
+
           // 結束騎乘清除崩潰恢復快照
           await clearSnapshot();
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新
