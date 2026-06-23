@@ -13,6 +13,18 @@ export interface LocationPoint {
   timestamp: number;
 }
 
+// 路線統計資料
+export interface RouteStats {
+  name: string;           // 路線名稱
+  rideCount: number;      // 騎乘次數
+  avgSpeed: number;       // 平均速度 km/h
+  bestSpeed: number;      // 最佳速度 km/h
+  bestTime: number;       // 最佳時間 秒
+  totalDistance: number;  // 總距離 km
+  totalAscent: number;    // 總爬升 m
+  lastRideDate: number;   // 上次騎乘日期
+}
+
 export interface RideRecord {
   id: string;
   date: number;
@@ -265,6 +277,8 @@ interface RideContextValue {
   clearSnapshot: () => Promise<void>;
   /** 檢查是否有未完成的騎乘快照 */
   checkSnapshot: () => Promise<Partial<RideState> | null>;
+  /** 計算路線統計 */
+  getRouteStats: (routeName: string) => RouteStats | null;
 }
 
 const RideContext = createContext<RideContextValue | null>(null);
@@ -407,8 +421,33 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     } catch (_) { return null; }
   }, []);
 
+  // 計算路線統計
+  const getRouteStats = useCallback((routeName: string): RouteStats | null => {
+    const routeRecords = state.records.filter((r) => r.name === routeName);
+    if (routeRecords.length === 0) return null;
+
+    const rideCount = routeRecords.length;
+    const avgSpeed = routeRecords.reduce((sum, r) => sum + r.avgSpeed, 0) / rideCount;
+    const bestSpeed = Math.max(...routeRecords.map((r) => r.maxSpeed));
+    const bestTime = Math.min(...routeRecords.map((r) => r.duration));
+    const totalDistance = routeRecords.reduce((sum, r) => sum + r.distance / 1000, 0);
+    const totalAscent = routeRecords.reduce((sum, r) => sum + r.totalAscent, 0);
+    const lastRideDate = Math.max(...routeRecords.map((r) => r.date));
+
+    return {
+      name: routeName,
+      rideCount,
+      avgSpeed,
+      bestSpeed,
+      bestTime,
+      totalDistance,
+      totalAscent,
+      lastRideDate,
+    };
+  }, [state.records]);
+
   return (
-    <RideContext.Provider value={{ state, dispatch, saveRecord, loadRecords, updateRecordName, saveSnapshot, clearSnapshot, checkSnapshot }}>
+    <RideContext.Provider value={{ state, dispatch, saveRecord, loadRecords, updateRecordName, saveSnapshot, clearSnapshot, checkSnapshot, getRouteStats }}>
       {children}
     </RideContext.Provider>
   );

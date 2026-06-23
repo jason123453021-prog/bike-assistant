@@ -26,7 +26,7 @@ import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
-import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
+import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, SUPPLY_ITEM_TEMPLATES, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
 import { useAuth } from "@/hooks/use-auth";
 import { startOAuthLogin } from "@/constants/oauth";
 import { trpc } from "@/lib/trpc";
@@ -396,6 +396,39 @@ export default function SettingsScreen() {
         {/* ── 自訂補給品清單 ── */}
         <SectionHeader title="自訂補給品" colors={colors} onToggle={() => toggleSection("customSupply")} collapsed={collapsedSections["customSupply"]} />
         {!collapsedSections["customSupply"] && <View style={[styles.section, { borderColor: colors.border }]}>
+          {/* 快速新延預設補給品 */}
+          {settings.supplyItems.length === 0 && (
+            <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
+              <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 8 }}>快速新延預設補給品</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {SUPPLY_ITEM_TEMPLATES.map((template) => (
+                  <Pressable
+                    key={template.name}
+                    style={({ pressed }) => [{
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                      borderWidth: 1,
+                      borderRadius: 6,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      opacity: pressed ? 0.7 : 1,
+                    }]}
+                    onPress={() => {
+                      const newItem = {
+                        id: Date.now().toString(),
+                        ...template,
+                        enabled: true,
+                      };
+                      addSupplyItem(newItem);
+                    }}
+                  >
+                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "500" }}>+ {template.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Divider colors={colors} />
+            </View>
+          )}
           {settings.supplyItems.length === 0 ? (
             <View style={{ padding: 16, alignItems: "center" }}>
               <Text style={{ color: colors.muted, fontSize: 14 }}>沒有自訂補給品</Text>

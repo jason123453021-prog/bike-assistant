@@ -33,7 +33,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/use-colors";
-import { useRide, type RideRecord } from "@/lib/ride-context";
+import { useRide, type RideRecord, type RouteStats } from "@/lib/ride-context";
 import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power-calc";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFavorites } from "@/lib/favorites-context";
@@ -63,15 +63,24 @@ export default function RideDetailScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, dispatch, updateRecordName } = useRide();
+  const { state, dispatch, updateRecordName, getRouteStats } = useRide();
   const { favorites, addFavorite, removeFavorite } = useFavorites();
   const [isFavorited, setIsFavorited] = useState(false);
+  const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
 
   // 找到對應記錄
   const record = useMemo<RideRecord | null>(
     () => state.records.find((r) => r.id === id) ?? null,
     [state.records, id]
   );
+
+  // 計算路線統計
+  useEffect(() => {
+    if (record) {
+      const stats = getRouteStats(record.name);
+      setRouteStats(stats);
+    }
+  }, [record, getRouteStats]);
 
   // 路線命名
   const [isEditingName, setIsEditingName] = useState(false);
@@ -504,6 +513,21 @@ export default function RideDetailScreen() {
               <IconSymbol name={isFavorited ? "heart.fill" : "heart"} size={16} color="#fff" />
               <Text style={styles.shareBtnText}>{isFavorited ? "已最愛" : "加入最愛"}</Text>
             </Pressable>
+
+            {/* 路線統計面板 */}
+            {routeStats && (
+              <View style={[styles.statsPanel, { borderColor: colors.border }]}>
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>路線統計</Text>
+                <View style={styles.statsGrid}>
+                  <DetailCell label="騎乘次數" value={`${routeStats.rideCount}`} unit="次" />
+                  <DetailCell label="平均速度" value={`${routeStats.avgSpeed.toFixed(1)}`} unit="km/h" />
+                  <DetailCell label="最佳速度" value={`${routeStats.bestSpeed.toFixed(1)}`} unit="km/h" />
+                  <DetailCell label="最佳時間" value={formatDuration(routeStats.bestTime)} unit="" />
+                  <DetailCell label="總距離" value={`${routeStats.totalDistance.toFixed(1)}`} unit="km" />
+                  <DetailCell label="總爬升" value={`${Math.round(routeStats.totalAscent)}`} unit="m" />
+                </View>
+              </View>
+            )}
           </ScrollView>
         )}
 
@@ -700,10 +724,23 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingTop: 8,
   },
-  expandHintText: { color: "rgba(255,255,255,0.3)", fontSize: 11 },
-
+    expandHintText: { color: "rgba(255,255,255,0.3)", fontSize: 11 },
   errorState: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16 },
   errorText: { fontSize: 16 },
   backBtn: { paddingHorizontal: 20, paddingVertical: 10 },
   backBtnText: { fontSize: 16, fontWeight: "600" },
+  statsPanel: {
+    marginHorizontal: 12,
+    marginTop: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  panelTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
 });

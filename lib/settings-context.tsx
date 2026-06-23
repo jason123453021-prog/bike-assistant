@@ -69,6 +69,15 @@ export interface SupplyItem {
   enabled: boolean;              // 是否啟用
 }
 
+// 預設補給品樣板
+export const SUPPLY_ITEM_TEMPLATES = [
+  { name: "能量棒", triggerType: "time" as const, triggerValue: 600, repeatMode: "every" as const },
+  { name: "電解質飲料", triggerType: "time" as const, triggerValue: 900, repeatMode: "every" as const },
+  { name: "水", triggerType: "time" as const, triggerValue: 600, repeatMode: "every" as const },
+  { name: "鹿茶", triggerType: "distance" as const, triggerValue: 10, repeatMode: "every" as const },
+  { name: "膠原蛋白飲", triggerType: "time" as const, triggerValue: 1200, repeatMode: "every" as const },
+]
+
 export interface AppSettings {
   // Personal
   weight: number;       // kg 騎手體重
