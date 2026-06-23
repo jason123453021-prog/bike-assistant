@@ -1454,7 +1454,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20, paddingBottom: 30 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20, paddingBottom: 100 }}>
               {/* 補給品名稱 */}
               <View style={{ marginBottom: 24 }}>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
