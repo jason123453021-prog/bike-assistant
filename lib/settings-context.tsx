@@ -69,6 +69,9 @@ export interface SupplyItem {
   enabled: boolean;              // 是否啟用
 }
 
+// 效能模式型別
+export type PerformanceMode = 'battery-saver' | 'balanced' | 'performance';
+
 // 預設補給品樣板
 export const SUPPLY_ITEM_TEMPLATES = [
   { name: "能量棒", triggerType: "time" as const, triggerValue: 600, repeatMode: "every" as const },
@@ -84,7 +87,10 @@ export interface AppSettings {
   height: number;       // cm
   age: number;          // 騎手年齡（用於推算最大心率 MHR）
   ftp: number;          // Functional Threshold Power (watts)
-  bikeWeight: number;   // kg 單車+裝備總重
+  bikeWeight: number;   // kg 单軋+裝備總重
+  // 效能模式
+  performanceMode: PerformanceMode; // 效能模式（省電、平衡、性能）
+  autoPerformanceMode: boolean;      // 是否根據電量自動調整
   // Thresholds
   calorieThreshold: number;   // kcal before reminder
   waterThreshold: number;     // ml before reminder
@@ -149,6 +155,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   age: 32,
   ftp: 200,
   bikeWeight: 10,
+  performanceMode: 'balanced' as PerformanceMode,
+  autoPerformanceMode: true,
   calorieThreshold: 300,
   waterThreshold: 500,
   supplyReminderRepeatSec: 60,  // 預設 60 秒重複一次

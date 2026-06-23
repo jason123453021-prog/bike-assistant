@@ -357,6 +357,60 @@ export default function SettingsScreen() {
           />
         </View>}
 
+        {/* ── 效能模式 ── */}
+        <SectionHeader title="效能模式" colors={colors} onToggle={() => toggleSection("performance")} collapsed={collapsedSections["performance"]} />
+        {!collapsedSections["performance"] && <View style={[styles.section, { borderColor: colors.border }]}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
+            <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>效能模式</Text>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {(["battery-saver", "balanced", "performance"] as const).map((mode) => (
+                <Pressable
+                  key={mode}
+                  style={({ pressed }) => [{
+                    flex: 1,
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: 8,
+                    backgroundColor: settings.performanceMode === mode ? colors.primary : colors.surface,
+                    borderWidth: 1,
+                    borderColor: settings.performanceMode === mode ? colors.primary : colors.border,
+                    opacity: pressed ? 0.8 : 1,
+                  }]}
+                  onPress={() => updateSettings({ performanceMode: mode })}
+                >
+                  <Text style={{
+                    color: settings.performanceMode === mode ? "#fff" : colors.foreground,
+                    fontSize: 12,
+                    fontWeight: "600",
+                    textAlign: "center",
+                  }}>
+                    {mode === "battery-saver" ? "🔋 省電" : mode === "balanced" ? "⚖️ 平衡" : "⚡ 性能"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 8 }}>
+              <Pressable
+                style={({ pressed }) => [{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 4,
+                  backgroundColor: settings.autoPerformanceMode ? colors.primary : colors.surface,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: pressed ? 0.8 : 1,
+                }]}
+                onPress={() => updateSettings({ autoPerformanceMode: !settings.autoPerformanceMode })}
+              >
+                {settings.autoPerformanceMode && <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>✓</Text>}
+              </Pressable>
+              <Text style={{ color: colors.foreground, fontSize: 12 }}>根據電量自動調整模式</Text>
+            </View>
+          </View>
+        </View>}
+
         {/* ── 補給閾值 ── */}
         <SectionHeader title="補給閾值" colors={colors} onToggle={() => toggleSection("supply")} collapsed={collapsedSections["supply"]} />
         {!collapsedSections["supply"] && <View style={[styles.section, { borderColor: colors.border }]}>
