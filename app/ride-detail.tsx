@@ -218,7 +218,7 @@ export default function RideDetailScreen() {
         (pt) =>
           `      <trkpt lat="${pt.latitude}" lon="${pt.longitude}">
         <ele>${pt.altitude ?? 0}</ele>
-        <time>${new Date(record.date + pt.timestamp * 1000).toISOString()}</time>
+        <time>${new Date(record.date + (pt.timestamp || 0)).toISOString()}</time>
       </trkpt>`
       )
       .join("\n");
@@ -243,9 +243,8 @@ export default function RideDetailScreen() {
       // 使用 Share API 分享 GPX 檔案
       const filename = `${record.name || "騎乘"}-${new Date(record.date).getTime()}.gpx`;
       await Share.share({
-        message: `騎乘記錄: ${record.name}`,
+        message: gpxContent,
         title: filename,
-        url: `data:text/xml;base64,${Buffer.from(gpxContent).toString("base64")}`,
       });
     } catch (err) {
       Alert.alert("錯誤", "匯出 GPX 失敗");
@@ -525,9 +524,61 @@ export default function RideDetailScreen() {
               <Text style={styles.shareBtnText}>分享卡片</Text>
             </Pressable>
 
+            {/* 核心數據面板 */}
+            <View style={[styles.statsPanel, { borderColor: colors.border }]}>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>核心數據</Text>
+              <View style={styles.statsGrid}>
+                <DetailCell label="距離" value={`${(record.distance / 1000).toFixed(2)}`} unit="km" />
+                <DetailCell label="總時間" value={formatDuration(record.duration)} unit="" />
+                <DetailCell label="移動時間" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" />
+                <DetailCell label="平均速度" value={`${((record.distance / 1000) / ((record.duration - (record.totalPausedSec ?? 0)) / 3600)).toFixed(1)}`} unit="km/h" />
+                <DetailCell label="最高速度" value={`${record.maxSpeed.toFixed(1)}`} unit="km/h" />
+                <DetailCell label="消耗熱量" value={`${Math.round(record.calories)}`} unit="kcal" />
+              </View>
+            </View>
+
+            {/* 爬升與地形數據面板 */}
+            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>爬升與地形</Text>
+              <View style={styles.statsGrid}>
+                <DetailCell label="總爬升高度" value={`${Math.round(record.totalAscent)}`} unit="m" color="#F59E0B" />
+                <DetailCell label="總下降高度" value="0" unit="m" color="#4FC3F7" />
+                <DetailCell label="最大海拔" value="0" unit="m" />
+                <DetailCell label="最小海拔" value="0" unit="m" />
+                <DetailCell label="平均坡度" value="0.0" unit="%" />
+                <DetailCell label="最大坡度" value="0.0" unit="%" />
+              </View>
+            </View>
+
+            {/* 進階訓練數據面板 */}
+            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>進階訓練數據</Text>
+              <View style={styles.statsGrid}>
+                <DetailCell label="平均心率" value="--" unit="bpm" color="#EF4444" />
+                <DetailCell label="最大心率" value="--" unit="bpm" color="#EF4444" />
+                <DetailCell label="平均功率" value={`${record.avgPower}`} unit="W" accent />
+                <DetailCell label="最大功率" value={`${record.maxPower}`} unit="W" accent />
+                <DetailCell label="標準化功率" value="--" unit="W" accent />
+                <DetailCell label="平均踏頻" value="--" unit="rpm" />
+              </View>
+            </View>
+
+            {/* 表現指標面板 */}
+            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>表現指標</Text>
+              <View style={styles.statsGrid}>
+                <DetailCell label="訓練壓力分數" value="--" unit="" color="#9C27B0" />
+                <DetailCell label="強度係數" value="--" unit="" />
+                <DetailCell label="訓練效果" value="--" unit="" color="#00E676" />
+                <DetailCell label="水分流失" value={`${Math.round(record.totalSweatMl)}`} unit="ml" color="#4FC3F7" />
+                <DetailCell label="補水次數" value={`${record.refillCount}`} unit="次" />
+                <DetailCell label="GPS 點數" value={`${record.route.length}`} unit="點" />
+              </View>
+            </View>
+
             {/* 路線統計面板 */}
             {routeStats && (
-              <View style={[styles.statsPanel, { borderColor: colors.border }]}>
+              <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
                 <Text style={[styles.panelTitle, { color: colors.foreground }]}>路線統計</Text>
                 <View style={styles.statsGrid}>
                   <DetailCell label="騎乘次數" value={`${routeStats.rideCount}`} unit="次" />

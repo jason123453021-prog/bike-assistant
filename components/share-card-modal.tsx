@@ -83,7 +83,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
             {/* 卡片預覽 */}
             <View
               style={{
-                backgroundColor: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                backgroundColor: "#667eea",
                 borderRadius: 16,
                 padding: 24,
                 alignItems: "center",

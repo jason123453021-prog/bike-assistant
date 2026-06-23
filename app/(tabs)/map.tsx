@@ -1633,6 +1633,19 @@ export default function MapScreen() {
               </View>
             </View>
 
+            {/* 補給品計數 */}
+            {settings.supplyItems.length > 0 && (
+              <View style={[styles.progressSection, { marginTop: 10 }]}>
+                <View style={styles.progressHeader}>
+                  <View style={styles.progressLabelRow}>
+                    <IconSymbol name="bag.fill" size={13} color="#9C27B0" />
+                    <Text style={styles.progressLabel}>補給品</Text>
+                  </View>
+                  <Text style={styles.progressValue}>{settings.supplyItems.filter(s => s.enabled).length} / {settings.supplyItems.length}</Text>
+                </View>
+              </View>
+            )}
+
             {/* 水分進度條 */}
             <View style={[styles.progressSection, { marginTop: 10 }]}>
               <View style={styles.progressHeader}>
