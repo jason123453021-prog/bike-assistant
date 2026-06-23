@@ -1371,11 +1371,11 @@ export default function SettingsScreen() {
       <Modal
         visible={supplyModal.visible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={closeSupplyModal}
       >
-        <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end", alignItems: "center" }]}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface, width: "100%", borderRadius: 16, maxWidth: 500, maxHeight: "90%", borderTopLeftRadius: 20, borderTopRightRadius: 20 }]}>
+        <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 {supplyModal.mode === "add" ? "新增補給品" : "編輯補給品"}
@@ -1385,7 +1385,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            <ScrollView style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 20 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20, paddingBottom: 30 }}>
               {/* 補給品名稱 */}
               <View style={{ marginBottom: 24 }}>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
@@ -1548,7 +1548,7 @@ export default function SettingsScreen() {
             </ScrollView>
 
             {/* 按鈕 */}
-            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 12 }}>
+            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
               <Pressable
                 style={({ pressed }) => ([
                   styles.editCancelBtn,
@@ -1888,20 +1888,20 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
-    alignItems: "center",
+    backgroundColor: "transparent",
   },
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     width: "100%",
-    maxHeight: "95%",
-    paddingTop: 0,
+    maxHeight: "85%",
+    paddingTop: 16,
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
