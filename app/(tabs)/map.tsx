@@ -342,6 +342,17 @@ export default function MapScreen() {
   const calorieAnim = useRef(new Animated.Value(0)).current;
   const waterAnim = useRef(new Animated.Value(0)).current;
 
+  const handleConfirmCustomSupply = useCallback((id: string, type: "time" | "distance") => {
+    setCustomSupplyAlerts(prev => ({ ...prev, [id]: false }));
+    supplyItemsTrackerRef.current[id] = {
+      lastTriggerTime: type === "time" ? state.elapsed : supplyItemsTrackerRef.current[id]?.lastTriggerTime || 0,
+      lastTriggerDistance: type === "distance" ? (state.distance / 1000) : supplyItemsTrackerRef.current[id]?.lastTriggerDistance || 0,
+      triggered: false,
+    };
+    speak(`已確認補給${settings.supplyItems.find(s => s.id === id)?.name}`, settings.ttsEnabled);
+    vibrateLight();
+  }, [state.elapsed, state.distance, settings.supplyItems, settings.ttsEnabled]);
+
   const { user, isAuthenticated } = useAuth();
   const { pendingNav, clearFriendNav } = useFriendNav();
 
@@ -530,7 +541,10 @@ export default function MapScreen() {
       // 根據觸發方式檢查是否應該觸發
       let shouldTrigger = false;
       if (supplyItem.triggerType === "time") {
-        shouldTrigger = currentTime - tracker.lastTriggerTime >= supplyItem.triggerValue;
+        const targetSec = (supplyItem.triggerHours || 0) * 3600 + (supplyItem.triggerMinutes || 0) * 60 + (supplyItem.triggerSeconds || 0);
+        if (targetSec > 0) {
+          shouldTrigger = currentTime - tracker.lastTriggerTime >= targetSec;
+        }
       } else if (supplyItem.triggerType === "distance") {
         shouldTrigger = currentDistance - tracker.lastTriggerDistance >= supplyItem.triggerValue;
       }
@@ -1045,6 +1059,17 @@ export default function MapScreen() {
     setCurrentReturnStepIdx(0);
     setMapRideActive(true);
     setFollowUser(true);
+    setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
+
+    // 初始化自訂補給品追蹤器
+    supplyItemsTrackerRef.current = {};
+    settings.supplyItems.filter(s => s.enabled).forEach(item => {
+      supplyItemsTrackerRef.current[item.id] = {
+        lastTriggerTime: 0,
+        lastTriggerDistance: 0,
+        triggered: false,
+      };
+    });
 
     // 感測器初始化
     setSensorData({
@@ -1141,6 +1166,8 @@ export default function MapScreen() {
           clearSupplyRepeatTimer();
           setCalorieAlert(false);
           setWaterAlert(false);
+          setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
+          supplyItemsTrackerRef.current = {}; // 重置自訂補給品追蹤器
           // 結束騎乘清空地圖軌跡
           setLiveTrail([]);
           // 結束騎乘清除崩潰恢復快照
@@ -1710,18 +1737,60 @@ export default function MapScreen() {
               </View>
             </View>
 
-            {/* 補給品計數 */}
-            {settings.supplyItems.length > 0 && (
-              <View style={[styles.progressSection, { marginTop: 10 }]}>
-                <View style={styles.progressHeader}>
-                  <View style={styles.progressLabelRow}>
-                    <IconSymbol name="bag.fill" size={13} color="#9C27B0" />
-                    <Text style={styles.progressLabel}>補給品</Text>
+            {/* 自訂補給品進度條 */}
+            {settings.supplyItems.filter(s => s.enabled).map(item => {
+              const tracker = supplyItemsTrackerRef.current[item.id] || { lastTriggerTime: 0, lastTriggerDistance: 0, triggered: false };
+              let progress = 0;
+              let currentVal = 0;
+              let targetVal = 0;
+              let unit = "";
+              
+              if (item.triggerType === "time") {
+                const targetSec = (item.triggerHours || 0) * 3600 + (item.triggerMinutes || 0) * 60 + (item.triggerSeconds || 0);
+                if (targetSec > 0) {
+                  currentVal = state.elapsed - tracker.lastTriggerTime;
+                  targetVal = targetSec;
+                  progress = Math.min(1, currentVal / targetVal);
+                  unit = "分";
+                  currentVal = Math.floor(currentVal / 60);
+                  targetVal = Math.floor(targetVal / 60);
+                }
+              } else {
+                if (item.triggerValue && item.triggerValue > 0) {
+                  currentVal = (state.distance / 1000) - tracker.lastTriggerDistance;
+                  targetVal = item.triggerValue;
+                  progress = Math.min(1, currentVal / targetVal);
+                  unit = "km";
+                  currentVal = Number(currentVal.toFixed(1));
+                }
+              }
+              
+              const isAlerting = customSupplyAlerts[item.id];
+              const barColor = isAlerting ? "#EF4444" : "#9C27B0";
+              
+              return (
+                <View key={item.id} style={[styles.progressSection, { marginTop: 10 }]}>
+                  <View style={styles.progressHeader}>
+                    <View style={styles.progressLabelRow}>
+                      <IconSymbol name="bag.fill" size={13} color={barColor} />
+                      <Text style={styles.progressLabel}>{item.name}</Text>
+                    </View>
+                    <Text style={styles.progressValue}>{currentVal} / {targetVal} {unit}</Text>
                   </View>
-                  <Text style={styles.progressValue}>{settings.supplyItems.filter(s => s.enabled).length} / {settings.supplyItems.length}</Text>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: barColor }]} />
+                  </View>
+                  {isAlerting && (
+                    <Pressable 
+                      style={[styles.supplyConfirmBtn, { backgroundColor: barColor }]}
+                      onPress={() => handleConfirmCustomSupply(item.id, item.triggerType)}
+                    >
+                      <Text style={styles.supplyConfirmText}>確認已補給</Text>
+                    </Pressable>
+                  )}
                 </View>
-              </View>
-            )}
+              );
+            })}
 
             {/* 水分進度條 */}
             <View style={[styles.progressSection, { marginTop: 10 }]}>
@@ -2373,5 +2442,17 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "700",
+  },
+  supplyConfirmBtn: {
+    marginTop: 8,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  supplyConfirmText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });
