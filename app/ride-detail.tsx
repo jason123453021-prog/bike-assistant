@@ -26,6 +26,8 @@ import {
   TextInput,
   View,
 } from "react-native";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
 import Svg, { G, Path } from "react-native-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -329,13 +331,30 @@ export default function RideDetailScreen() {
         return;
       }
 
-      // 使用 Share API 分享 GPX 檔案
+      // 生成 .gpx 文件
       const filename = `${record.name || "騎乘"}-${new Date(record.date).getTime()}.gpx`;
-      await Share.share({
-        message: gpxContent,
-        title: filename,
+      const filepath = `${FileSystem.documentDirectory}${filename}`;
+
+      // 寫入 GPX 內容到文件
+      await FileSystem.writeAsStringAsync(filepath, gpxContent, {
+        encoding: FileSystem.EncodingType.UTF8,
       });
+
+      // 檢查是否支援分享
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        // 分享 GPX 文件
+        await Sharing.shareAsync(filepath, {
+          mimeType: "application/gpx+xml",
+          dialogTitle: "分享 GPX 文件",
+          UTI: "com.topografix.gpx",
+        });
+      } else {
+        // 如果不支援分享，顯示文件已保存的提示
+        Alert.alert("成功", `GPX 文件已保存：${filename}`);
+      }
     } catch (err) {
+      console.error('[RideDetail] GPX export error:', err);
       Alert.alert("錯誤", "匯出 GPX 失敗");
     }
   }, [record, generateGpxContent]);
@@ -349,6 +368,7 @@ export default function RideDetailScreen() {
         if (fav) {
           await removeFavorite(fav.id);
           setIsFavorited(false);
+          Alert.alert("成功", "已移除最愛");
         }
       } else {
         const gpxContent = generateGpxContent(record);
@@ -360,6 +380,7 @@ export default function RideDetailScreen() {
             estimatedTime: record.duration,
           });
           setIsFavorited(true);
+          Alert.alert("成功", "已加入最愛");
         }
       }
     } catch (err) {
