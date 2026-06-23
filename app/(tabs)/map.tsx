@@ -1962,14 +1962,14 @@ function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed, sensorD
     case "showPausedTime":
       return <BigMetric label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" />;
     case "showHeartRate":
-      // 優先顯示感測器心率，若無則顯示 "--"
-      const displayHR = sensorData?.heartRate ?? null;
-      const isHRSensor = sensorData?.heartRate !== null && sensorData?.heartRate !== undefined;
+      // 優先顯示平滑心率，若無則顯示 "--"
+      const displayHR = sensorData?.smoothedHeartRate ?? sensorData?.heartRate ?? null;
+      const isHRSensor = displayHR !== null && displayHR !== undefined;
       return <BigMetric label={isHRSensor ? "心率 (感測器)" : "心率"} value={displayHR !== null ? `${displayHR}` : "--"} unit="bpm" />;
     case "showCadence":
-      // 優先顯示感測器踏頻，若無則顯示 "--"
-      const displayCadence = sensorData?.cadence ?? null;
-      const isCadenceSensor = sensorData?.cadence !== null && sensorData?.cadence !== undefined;
+      // 優先顯示平滑踏頻，若無則顯示 "--"
+      const displayCadence = sensorData?.smoothedCadence ?? sensorData?.cadence ?? null;
+      const isCadenceSensor = displayCadence !== null && displayCadence !== undefined;
       return <BigMetric label={isCadenceSensor ? "踏頻 (感測器)" : "踏頻"} value={displayCadence !== null ? `${displayCadence}` : "--"} unit="rpm" />;
     default:
       return null;

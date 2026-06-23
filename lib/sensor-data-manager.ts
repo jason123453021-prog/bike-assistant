@@ -13,6 +13,9 @@ export interface RealTimeSensorData {
   cadence: number | null;
   maxCadence: number | null;
   lastUpdateTime: number;
+  // 平滑後的數據（移動平均）
+  smoothedHeartRate: number | null;
+  smoothedCadence: number | null;
 }
 
 export class SensorDataManager {
@@ -25,8 +28,14 @@ export class SensorDataManager {
     cadence: null,
     maxCadence: null,
     lastUpdateTime: 0,
+    smoothedHeartRate: null,
+    smoothedCadence: null,
   };
   private unsubscribers: (() => void)[] = [];
+  // 平滑缷池（移動平均，最多保留 5 個數據點）
+  private heartRateBuffer: number[] = [];
+  private cadenceBuffer: number[] = [];
+  private readonly BUFFER_SIZE = 5;
 
   constructor() {
     this.bluetoothManager = new BluetoothSensorManager();
@@ -47,6 +56,13 @@ export class SensorDataManager {
         if (!this.sensorData.maxHeartRate || data.value > this.sensorData.maxHeartRate) {
           this.sensorData.maxHeartRate = data.value;
         }
+        // 計算平滑心率（移動平均）
+        this.heartRateBuffer.push(data.value);
+        if (this.heartRateBuffer.length > this.BUFFER_SIZE) {
+          this.heartRateBuffer.shift();
+        }
+        const avg = this.heartRateBuffer.reduce((a, b) => a + b, 0) / this.heartRateBuffer.length;
+        this.sensorData.smoothedHeartRate = Math.round(avg);
         this.sensorData.lastUpdateTime = Date.now();
       }
     );
@@ -71,6 +87,13 @@ export class SensorDataManager {
         if (!this.sensorData.maxCadence || data.value > this.sensorData.maxCadence) {
           this.sensorData.maxCadence = data.value;
         }
+        // 計算平滑踏頻（移動平均）
+        this.cadenceBuffer.push(data.value);
+        if (this.cadenceBuffer.length > this.BUFFER_SIZE) {
+          this.cadenceBuffer.shift();
+        }
+        const avg = this.cadenceBuffer.reduce((a, b) => a + b, 0) / this.cadenceBuffer.length;
+        this.sensorData.smoothedCadence = Math.round(avg);
         this.sensorData.lastUpdateTime = Date.now();
       }
     );
@@ -125,7 +148,12 @@ export class SensorDataManager {
       cadence: null,
       maxCadence: null,
       lastUpdateTime: 0,
+      smoothedHeartRate: null,
+      smoothedCadence: null,
     };
+    // 清空平滑缷池
+    this.heartRateBuffer = [];
+    this.cadenceBuffer = [];
   }
 
   /**
