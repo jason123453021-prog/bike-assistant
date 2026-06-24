@@ -45,6 +45,8 @@ import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
+import { useI18n } from "@/lib/i18n-context";
+import { formatNumber, formatDistance, formatSpeed, formatCalories, formatWater, formatPower, formatHeartRate, formatCadence, formatElevation, formatGrade } from "@/lib/localization-format";
 import { type GpxPoint } from "@/lib/gpx-parser";
 import {
   speak,
@@ -159,6 +161,8 @@ const DARK_MAP_STYLE = [
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
+  const { language } = useI18n();
   const { state, dispatch, saveRecord, updateRecordName, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
   const { settings } = useSettings();
   const { sharedRoute, clearSharedRoute } = useGpx();
