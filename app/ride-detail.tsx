@@ -940,18 +940,24 @@ export default function RideDetailScreen() {
                   <View style={styles.speedControl}>
                     <Text style={styles.speedLabel}>速度: {trailPlaybackSpeed}x</Text>
                     <View style={styles.speedButtons}>
-                      <Pressable
-                        style={({ pressed }) => [styles.speedBtn, { opacity: pressed ? 0.7 : 1 }]}
-                        onPress={() => setTrailPlaybackSpeed(Math.max(0.5, trailPlaybackSpeed - 0.5))}
-                      >
-                        <Text style={styles.speedBtnText}>-</Text>
-                      </Pressable>
-                      <Pressable
-                        style={({ pressed }) => [styles.speedBtn, { opacity: pressed ? 0.7 : 1 }]}
-                        onPress={() => setTrailPlaybackSpeed(Math.min(3, trailPlaybackSpeed + 0.5))}
-                      >
-                        <Text style={styles.speedBtnText}>+</Text>
-                      </Pressable>
+                      {[0.5, 1, 2, 4].map((speed) => (
+                        <Pressable
+                          key={speed}
+                          style={({ pressed }) => [{
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            marginHorizontal: 2,
+                            borderRadius: 4,
+                            backgroundColor: trailPlaybackSpeed === speed ? colors.primary : colors.surface,
+                            opacity: pressed ? 0.7 : 1,
+                          }]}
+                          onPress={() => setTrailPlaybackSpeed(speed)}
+                        >
+                          <Text style={[styles.speedBtnText, { color: trailPlaybackSpeed === speed ? '#fff' : colors.foreground }]}>
+                            {speed}x
+                          </Text>
+                        </Pressable>
+                      ))}
                     </View>
                   </View>
                 </View>
@@ -968,19 +974,7 @@ export default function RideDetailScreen() {
                     {trailPlaybackIndex} / {polylineCoords.length} ({Math.round((trailPlaybackIndex / polylineCoords.length) * 100)}%)
                   </Text>
                 </View>
-                
-                {/* 速度曲線圖 */}
-                {speedCurveData.length > 0 && (
-                  <SpeedCurveChart
-                    data={speedCurveData}
-                    currentIndex={trailPlaybackIndex}
-                    markers={keyMarkers}
-                    onMarkerPress={handleMarkerPress}
-                    height={100}
-                    showPower={false}
-                    showHeartRate={false}
-                  />
-                )}
+
               </View>
             )}
 
