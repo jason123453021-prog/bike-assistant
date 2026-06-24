@@ -23,6 +23,7 @@ import { GpxProvider } from "@/lib/gpx-context";
 import { SettingsProvider } from "@/lib/settings-context";
 import { FriendNavProvider } from "@/lib/friend-nav-context";
 import { FavoritesProvider } from "@/lib/favorites-context";
+import { I18nProvider } from "@/lib/i18n-context";
 import { setupNotifications } from "@/lib/feedback-service";
 // 必須在頂層引入以確保 TaskManager 任務被定義
 import "@/lib/background-location";
@@ -106,23 +107,25 @@ export default function RootLayout() {
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>
-          <SettingsProvider>
-            <GpxProvider>
-              <FavoritesProvider>
-                <FriendNavProvider>
-                  <RideProvider>
-                    <ThemeProvider>
-                      <InnerLayout />
-                    </ThemeProvider>
-                  </RideProvider>
-                </FriendNavProvider>
-              </FavoritesProvider>
-            </GpxProvider>
-          </SettingsProvider>
-        </QueryClientProvider>
-      </trpc.Provider>
+      <I18nProvider>
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <QueryClientProvider client={queryClient}>
+            <SettingsProvider>
+              <GpxProvider>
+                <FavoritesProvider>
+                  <FriendNavProvider>
+                    <RideProvider>
+                      <ThemeProvider>
+                        <InnerLayout />
+                      </ThemeProvider>
+                    </RideProvider>
+                  </FriendNavProvider>
+                </FavoritesProvider>
+              </GpxProvider>
+            </SettingsProvider>
+          </QueryClientProvider>
+        </trpc.Provider>
+      </I18nProvider>
     </GestureHandlerRootView>
   );
 

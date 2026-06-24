@@ -86,7 +86,7 @@ export function SupplyModal({
 
           {/* 卡路里區塊 */}
           {calorieAlert && (
-            <View style={[styles.alertBlock, { borderColor: "#F59E0B" + "40", backgroundColor: "#F59E0B" + "10" }]}>
+            <View style={[styles.alertBlock, { borderColor: "#F59E0B" + "40", backgroundColor: colors.foreground === "#F5F5F5" ? "#F59E0B" + "15" : "#F59E0B" + "10" }]}>
               <View style={styles.alertBlockHeader}>
                 <View style={[styles.alertIconWrap, { backgroundColor: "#F59E0B" + "20" }]}>
                   <IconSymbol name="flame.fill" size={28} color="#F59E0B" />
@@ -109,7 +109,7 @@ export function SupplyModal({
 
           {/* 水分區塊 */}
           {waterAlert && (
-            <View style={[styles.alertBlock, { borderColor: "#4FC3F7" + "40", backgroundColor: "#4FC3F7" + "10" }]}>
+            <View style={[styles.alertBlock, { borderColor: "#4FC3F7" + "40", backgroundColor: colors.foreground === "#F5F5F5" ? "#4FC3F7" + "15" : "#4FC3F7" + "10" }]}>
               <View style={styles.alertBlockHeader}>
                 <View style={[styles.alertIconWrap, { backgroundColor: "#4FC3F7" + "20" }]}>
                   <IconSymbol name="drop.fill" size={28} color="#4FC3F7" />
@@ -141,7 +141,7 @@ export function SupplyModal({
 
           {/* 自訂補給品提醒區塊 */}
           {customSupplyAlerts.map((alert) => (
-            <View key={alert.id} style={[styles.alertBlock, { borderColor: "#9C27B0" + "40", backgroundColor: "#9C27B0" + "10" }]}>
+            <View key={alert.id} style={[styles.alertBlock, { borderColor: "#9C27B0" + "40", backgroundColor: colors.foreground === "#F5F5F5" ? "#9C27B0" + "15" : "#9C27B0" + "10" }]}>
               <View style={styles.alertBlockHeader}>
                 <View style={[styles.alertIconWrap, { backgroundColor: "#9C27B0" + "20" }]}>
                   <IconSymbol name="star.fill" size={28} color="#9C27B0" />
