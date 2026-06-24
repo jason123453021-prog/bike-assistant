@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { View, Text, Pressable } from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import { View, Text, Pressable, PanResponder, Animated } from "react-native";
 import Svg, { G, Path, Circle, Line, Defs, Pattern, Rect, Text as SvgText } from "react-native-svg";
 import { useColors } from "@/hooks/use-colors";
 
@@ -43,6 +43,43 @@ export function SpeedCurveChart({
   showHeartRate = false,
 }: SpeedCurveChartProps) {
   const colors = useColors();
+  const [interactiveIndex, setInteractiveIndex] = useState(currentIndex);
+  const svgContainerRef = useRef<View>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const panResponderRef = useRef<any>(null);
+
+  // 初始化手勢識別
+  React.useEffect(() => {
+    panResponderRef.current = PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (evt, gestureState) => Math.abs(gestureState.dx) > 5,
+      onPanResponderMove: (evt, { dx }) => {
+        if (containerWidth > 0 && data.length > 0) {
+          const ratio = dx / containerWidth;
+          const newIndex = Math.max(
+            0,
+            Math.min(
+              data.length - 1,
+              Math.round(ratio * data.length) + currentIndex
+            )
+          );
+          setInteractiveIndex(newIndex);
+        }
+      },
+      onPanResponderRelease: () => {
+        if (interactiveIndex !== currentIndex) {
+          const marker: KeyMarker = {
+            type: "maxSpeed",
+            index: interactiveIndex,
+            value: 0,
+            label: "快速導航",
+            color: colors.primary,
+          };
+          onMarkerPress?.(marker);
+        }
+      },
+    });
+  }, [data.length, currentIndex, containerWidth, interactiveIndex, onMarkerPress, colors.primary]);
 
   // 計算圖表數據
   const chartData = useMemo(() => {
@@ -78,8 +115,9 @@ export function SpeedCurveChart({
   const hrPath = showHeartRate ? generatePath(chartData.heartRates, chartData.maxHR, 0, height * 0.8) : "";
 
   // 計算當前位置指示器
-  const currentX = data.length > 0 ? (currentIndex / (data.length - 1 || 1)) * 100 : 0;
-  const currentSpeed = data.length > 0 && currentIndex < chartData.speeds.length ? chartData.speeds[currentIndex] : 0;
+  const displayIndex = interactiveIndex !== currentIndex ? interactiveIndex : currentIndex;
+  const currentX = data.length > 0 ? (displayIndex / (data.length - 1 || 1)) * 100 : 0;
+  const currentSpeed = data.length > 0 && displayIndex < chartData.speeds.length ? chartData.speeds[displayIndex] : 0;
   const currentY = chartData.maxSpeed > 0 ? height * 0.8 - (currentSpeed / chartData.maxSpeed) * height * 0.8 : height * 0.8;
 
   return (
@@ -91,6 +129,9 @@ export function SpeedCurveChart({
 
       {/* SVG 圖表 */}
       <View
+        ref={svgContainerRef}
+        onLayout={(evt) => setContainerWidth(evt.nativeEvent.layout.width)}
+        {...(panResponderRef.current ? panResponderRef.current.panHandlers : {})}
         style={{
           backgroundColor: colors.surface,
           borderRadius: 8,
