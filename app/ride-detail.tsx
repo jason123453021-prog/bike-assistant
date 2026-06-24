@@ -223,6 +223,8 @@ export default function RideDetailScreen() {
       return;
     }
     
+    // 降低更新頻率：從 100ms 提高到 200ms，減少抖動
+    const baseInterval = Math.max(200, 100 / trailPlaybackSpeed);
     const interval = setInterval(() => {
       setTrailPlaybackIndex((prev) => {
         const next = prev + 1;
@@ -232,7 +234,7 @@ export default function RideDetailScreen() {
         }
         return next;
       });
-    }, 100 / trailPlaybackSpeed);
+    }, baseInterval);
     
     playbackIntervalRef.current = interval;
     return () => {
@@ -279,9 +281,15 @@ export default function RideDetailScreen() {
     return { bearing, pitch };
   }, [trailPlaybackIndex, polylineCoords, record]);
   
-  // 地圖自動跟隨回放位置、更新標點顏色、方向旋轉和俯視角度
+  // 地圖自動跟隨回放位置、更新標點顏色、方向旋轉和俯視角度（優化：數據點採樣）
   useEffect(() => {
     if (trailPlaybackIndex > 0 && trailPlaybackIndex < polylineCoords.length && mapRef.current) {
+      // 採樣策略：每 2-3 個點更新一次相機，減少抖動
+      const samplingRate = Math.max(2, Math.ceil(polylineCoords.length / 500));
+      if (trailPlaybackIndex % samplingRate !== 0) {
+        return; // 跳過採樣點之間的更新
+      }
+      
       const currentCoord = polylineCoords[trailPlaybackIndex];
       const color = getPlaybackMarkerColor();
       const { bearing, pitch } = getPlaybackBearingAndPitch();
@@ -299,13 +307,14 @@ export default function RideDetailScreen() {
       // 根據坡度調整俯視角度
       mapRef.current.setPitch(pitch);
       
-      // 地圖中心跟隨
+      // 地圖中心跟隨（优化：动画時間与回放速度匹配）
+      const cameraDuration = Math.max(150, 100 / trailPlaybackSpeed);
       mapRef.current.animateCamera(
         {
           center: { latitude: currentCoord.latitude, longitude: currentCoord.longitude },
           zoom: 15,
         },
-        { duration: 300 }
+        { duration: cameraDuration }
       );
     }
   }, [trailPlaybackIndex, polylineCoords, getPlaybackMarkerColor, getPlaybackBearingAndPitch]);
