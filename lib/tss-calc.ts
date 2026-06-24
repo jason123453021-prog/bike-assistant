@@ -189,3 +189,183 @@ export function analyzeTraining(
     intensityLabel: getIntensityLabel(if_),
   };
 }
+
+
+/**
+ * 獲取恢復建議
+ * 基於訓練負荷等級推薦恢復時間
+ */
+export function getRecoveryRecommendation(trainingLoad: number): {
+  hours: number;
+  label: string;
+  description: string;
+} {
+  if (trainingLoad < 100) {
+    return {
+      hours: 12,
+      label: '輕度恢復',
+      description: '輕度訓練，12 小時恢復即可',
+    };
+  }
+  if (trainingLoad < 200) {
+    return {
+      hours: 24,
+      label: '適度恢復',
+      description: '適度訓練，需要 24 小時恢復',
+    };
+  }
+  if (trainingLoad < 300) {
+    return {
+      hours: 36,
+      label: '高度恢復',
+      description: '高度訓練，建議 36 小時充分恢復',
+    };
+  }
+  return {
+    hours: 48,
+    label: '完全恢復',
+    description: '過度訓練，需要 48 小時以上完全恢復',
+  };
+}
+
+/**
+ * FTP 自適應計算
+ * 根據歷史最大功率自動調整 FTP 估算值
+ * 公式：新 FTP = 歷史平均最大功率 × 0.75（FTP 通常為最大功率的 75%）
+ */
+export function calculateAdaptiveFTP(
+  maxPowerHistory: number[],
+  currentFtpW: number
+): {
+  newFtpW: number;
+  change: number;
+  recommendation: string;
+} {
+  if (maxPowerHistory.length === 0) {
+    return {
+      newFtpW: currentFtpW,
+      change: 0,
+      recommendation: '數據不足，無法調整',
+    };
+  }
+
+  // 計算歷史最大功率的平均值（取最高的 10% 作為代表）
+  const sortedMaxPower = [...maxPowerHistory].sort((a, b) => b - a);
+  const topPercentile = Math.ceil(maxPowerHistory.length * 0.1);
+  const topMaxPowers = sortedMaxPower.slice(0, Math.max(1, topPercentile));
+  const avgTopMaxPower = topMaxPowers.reduce((a, b) => a + b, 0) / topMaxPowers.length;
+
+  // 新 FTP = 平均最大功率 × 0.75
+  const newFtpW = Math.round(avgTopMaxPower * 0.75);
+  const change = newFtpW - currentFtpW;
+  const changePercent = Math.round((change / currentFtpW) * 100);
+
+  let recommendation = '';
+  if (Math.abs(change) < 5) {
+    recommendation = 'FTP 穩定，無需調整';
+  } else if (change > 0) {
+    recommendation = `FTP 上升 ${changePercent}%，訓練效果顯著，建議更新 FTP`;
+  } else {
+    recommendation = `FTP 下降 ${Math.abs(changePercent)}%，可能需要調整訓練強度`;
+  }
+
+  return {
+    newFtpW,
+    change,
+    recommendation,
+  };
+}
+
+/**
+ * 獲取周期訓練統計
+ * 計算指定時間範圍內的訓練統計
+ */
+export interface PeriodTrainingStats {
+  totalTSS: number;                 // 總 TSS
+  averageTSS: number;               // 平均 TSS
+  rideCount: number;                // 騎乘次數
+  totalDuration: number;            // 總時間（秒）
+  averageIntensity: number;         // 平均強度係數
+  trainingLoadLabel: string;        // 訓練負荷等級
+  intensityDistribution: {          // 強度分布
+    recovery: number;               // 恢復訓練比例
+    endurance: number;              // 耐力訓練比例
+    tempo: number;                  // 節奏訓練比例
+    threshold: number;              // 乳酸閾值訓練比例
+    anaerobic: number;              // 無氧訓練比例
+  };
+}
+
+/**
+ * 計算周期訓練統計
+ */
+export function calculatePeriodStats(
+  tssValues: number[],
+  ifValues: number[],
+  durationValues: number[]
+): PeriodTrainingStats {
+  if (tssValues.length === 0) {
+    return {
+      totalTSS: 0,
+      averageTSS: 0,
+      rideCount: 0,
+      totalDuration: 0,
+      averageIntensity: 0,
+      trainingLoadLabel: '無訓練',
+      intensityDistribution: {
+        recovery: 0,
+        endurance: 0,
+        tempo: 0,
+        threshold: 0,
+        anaerobic: 0,
+      },
+    };
+  }
+
+  const totalTSS = tssValues.reduce((a, b) => a + b, 0);
+  const averageTSS = totalTSS / tssValues.length;
+  const totalDuration = durationValues.reduce((a, b) => a + b, 0);
+  const averageIntensity = ifValues.reduce((a, b) => a + b, 0) / ifValues.length;
+
+  // 計算強度分布
+  const intensityDistribution = {
+    recovery: ifValues.filter((if_) => if_ < 0.75).length,
+    endurance: ifValues.filter((if_) => if_ >= 0.75 && if_ < 0.85).length,
+    tempo: ifValues.filter((if_) => if_ >= 0.85 && if_ < 1.0).length,
+    threshold: ifValues.filter((if_) => if_ >= 1.0 && if_ < 1.15).length,
+    anaerobic: ifValues.filter((if_) => if_ >= 1.15).length,
+  };
+
+  // 歸一化為百分比
+  const total = Object.values(intensityDistribution).reduce((a, b) => a + b, 0);
+  const normalized = {
+    recovery: Math.round((intensityDistribution.recovery / total) * 100),
+    endurance: Math.round((intensityDistribution.endurance / total) * 100),
+    tempo: Math.round((intensityDistribution.tempo / total) * 100),
+    threshold: Math.round((intensityDistribution.threshold / total) * 100),
+    anaerobic: Math.round((intensityDistribution.anaerobic / total) * 100),
+  };
+
+  // 計算訓練負荷等級
+  const totalLoad = tssValues.reduce((sum, tss) => sum + tss, 0);
+  let trainingLoadLabel = '';
+  if (totalLoad < 300) {
+    trainingLoadLabel = '輕度';
+  } else if (totalLoad < 600) {
+    trainingLoadLabel = '適度';
+  } else if (totalLoad < 900) {
+    trainingLoadLabel = '高度';
+  } else {
+    trainingLoadLabel = '過度';
+  }
+
+  return {
+    totalTSS,
+    averageTSS: Math.round(averageTSS * 10) / 10,
+    rideCount: tssValues.length,
+    totalDuration,
+    averageIntensity: Math.round(averageIntensity * 100) / 100,
+    trainingLoadLabel,
+    intensityDistribution: normalized,
+  };
+}

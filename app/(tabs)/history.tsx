@@ -15,6 +15,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useRide, type RideRecord } from "@/lib/ride-context";
 import { formatDuration } from "@/lib/power-calc";
+import { calculateWeeklyTrainingStats, calculateMonthlyTrainingStats } from "@/lib/activity-stats";
 
 const STORAGE_KEY = "@bike_records";
 
@@ -22,6 +23,11 @@ export default function HistoryScreen() {
   const colors = useColors();
   const { state, dispatch, loadRecords } = useRide();
   const [searchQuery, setSearchQuery] = useState("");
+  const [showStats, setShowStats] = useState(false);
+
+  // 計算周期訓練統計
+  const weeklyStats = useMemo(() => calculateWeeklyTrainingStats(state.records), [state.records]);
+  const monthlyStats = useMemo(() => calculateMonthlyTrainingStats(state.records), [state.records]);
 
   useEffect(() => {
     loadRecords();
@@ -161,6 +167,61 @@ export default function HistoryScreen() {
           )}
         </View>
 
+        {/* 周期訓練統計面板 */}
+        {state.records.length > 0 && (
+          <Pressable
+            onPress={() => setShowStats(!showStats)}
+            style={[styles.statsToggle, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <View style={styles.statsToggleContent}>
+              <Text style={[styles.statsToggleLabel, { color: colors.foreground }]}>📊 本周訓練負荷</Text>
+              <Text style={[styles.statsToggleValue, { color: colors.primary }]}>{weeklyStats.totalTSS.toFixed(0)} TSS</Text>
+            </View>
+            <IconSymbol name={showStats ? "chevron.up" : "chevron.down"} size={16} color={colors.muted} />
+          </Pressable>
+        )}
+
+        {/* 展開的訓練統計詳情 */}
+        {showStats && state.records.length > 0 && (
+          <View style={[styles.statsDetail, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.statsPeriod}>
+              <Text style={[styles.statsPeriodTitle, { color: colors.foreground }]}>本周訓練</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>總 TSS</Text>
+                  <Text style={[styles.statValue, { color: colors.primary }]}>{weeklyStats.totalTSS.toFixed(0)}</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>騎乘次數</Text>
+                  <Text style={[styles.statValue, { color: colors.foreground }]}>{weeklyStats.rideCount}</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>負荷等級</Text>
+                  <Text style={[styles.statValue, { color: colors.foreground }]}>{weeklyStats.trainingLoadLabel}</Text>
+                </View>
+              </View>
+            </View>
+            <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statsPeriod}>
+              <Text style={[styles.statsPeriodTitle, { color: colors.foreground }]}>本月訓練</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>總 TSS</Text>
+                  <Text style={[styles.statValue, { color: colors.primary }]}>{monthlyStats.totalTSS.toFixed(0)}</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>騎乘次數</Text>
+                  <Text style={[styles.statValue, { color: colors.foreground }]}>{monthlyStats.rideCount}</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>負荷等級</Text>
+                  <Text style={[styles.statValue, { color: colors.foreground }]}>{monthlyStats.trainingLoadLabel}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* 搜索欄 */}
         <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <IconSymbol name="magnifyingglass" size={16} color={colors.muted} />
@@ -293,4 +354,34 @@ const styles = StyleSheet.create({
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   emptyTitle: { fontSize: 18, fontWeight: "600" },
   emptySubtitle: { fontSize: 14, textAlign: "center", lineHeight: 22 },
+
+  statsToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  statsToggleContent: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+  statsToggleLabel: { fontSize: 14, fontWeight: "600" },
+  statsToggleValue: { fontSize: 14, fontWeight: "700" },
+
+  statsDetail: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  statsPeriod: { gap: 8 },
+  statsPeriodTitle: { fontSize: 13, fontWeight: "600" },
+  statItem: { alignItems: "center", gap: 4 },
+  statLabel: { fontSize: 11 },
+  statValue: { fontSize: 14, fontWeight: "600" },
+  statsDivider: { height: StyleSheet.hairlineWidth, marginVertical: 8 },
 });

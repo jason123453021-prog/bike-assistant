@@ -938,6 +938,18 @@ export default function RideDetailScreen() {
               </View>
             </View>
 
+            {/* 訓練負荷與恢復建議面板 */}
+            {record.tss && (
+              <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>訓練負荷與恢復</Text>
+                <View style={styles.statsGrid}>
+                  <DetailCell label="訓練負荷" value={`${Math.round(record.tss * 1.5)}`} unit="" color="#FF6F00" />
+                  <DetailCell label="負荷等級" value={record.tss > 300 ? "高" : record.tss > 150 ? "中" : "低"} unit="" />
+                  <DetailCell label="建議恢復" value={record.tss > 300 ? "36-48h" : record.tss > 150 ? "24h" : "12h"} unit="" />
+                </View>
+              </View>
+            )}
+
             {/* 补給品記錄面板 */}
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>补給品記錄</Text>

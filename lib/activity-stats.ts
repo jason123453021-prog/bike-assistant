@@ -206,3 +206,143 @@ export function generateRouteRankingSummary(rankings: RouteRanking[], limit: num
 
   return summary;
 }
+
+
+/**
+ * 周期訓練統計接口
+ */
+export interface PeriodTrainingStats {
+  totalTSS: number;                 // 總 TSS
+  averageTSS: number;               // 平均 TSS
+  rideCount: number;                // 騎乘次數
+  totalDuration: number;            // 總時間（秒）
+  averageIntensity: number;         // 平均強度係數
+  trainingLoadLabel: string;        // 訓練負荷等級
+  intensityDistribution: {          // 強度分布
+    recovery: number;               // 恢復訓練比例
+    endurance: number;              // 耐力訓練比例
+    tempo: number;                  // 節奏訓練比例
+    threshold: number;              // 乳酸閾值訓練比例
+    anaerobic: number;              // 無氧訓練比例
+  };
+}
+
+/**
+ * 計算周訓練統計
+ */
+export function calculateWeeklyTrainingStats(rides: RideRecord[]): PeriodTrainingStats {
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const filtered = rides.filter((r) => {
+    const rideDate = new Date(r.date);
+    return rideDate >= weekAgo && rideDate <= now;
+  });
+
+  return calculateTrainingStats(filtered);
+}
+
+/**
+ * 計算月訓練統計
+ */
+export function calculateMonthlyTrainingStats(rides: RideRecord[], month?: number, year?: number): PeriodTrainingStats {
+  const now = new Date();
+  const targetMonth = month ?? now.getMonth();
+  const targetYear = year ?? now.getFullYear();
+
+  const filtered = rides.filter((r) => {
+    const rideDate = new Date(r.date);
+    return rideDate.getMonth() === targetMonth && rideDate.getFullYear() === targetYear;
+  });
+
+  return calculateTrainingStats(filtered);
+}
+
+/**
+ * 計算年訓練統計
+ */
+export function calculateYearlyTrainingStats(rides: RideRecord[], year?: number): PeriodTrainingStats {
+  const now = new Date();
+  const targetYear = year ?? now.getFullYear();
+
+  const filtered = rides.filter((r) => {
+    const rideDate = new Date(r.date);
+    return rideDate.getFullYear() === targetYear;
+  });
+
+  return calculateTrainingStats(filtered);
+}
+
+/**
+ * 通用訓練統計計算
+ */
+function calculateTrainingStats(rides: RideRecord[]): PeriodTrainingStats {
+  if (rides.length === 0) {
+    return {
+      totalTSS: 0,
+      averageTSS: 0,
+      rideCount: 0,
+      totalDuration: 0,
+      averageIntensity: 0,
+      trainingLoadLabel: '無訓練',
+      intensityDistribution: {
+        recovery: 0,
+        endurance: 0,
+        tempo: 0,
+        threshold: 0,
+        anaerobic: 0,
+      },
+    };
+  }
+
+  // 提取 TSS 和強度係數
+  const tssValues = rides.map((r) => r.tss || 0);
+  const ifValues = rides.map((r) => r.intensityFactor || 0);
+  const durationValues = rides.map((r) => r.duration || 0);
+
+  const totalTSS = tssValues.reduce((a, b) => a + b, 0);
+  const averageTSS = totalTSS / tssValues.length;
+  const totalDuration = durationValues.reduce((a, b) => a + b, 0);
+  const averageIntensity = ifValues.reduce((a, b) => a + b, 0) / ifValues.length;
+
+  // 計算強度分布
+  const intensityDistribution = {
+    recovery: ifValues.filter((if_) => if_ < 0.75).length,
+    endurance: ifValues.filter((if_) => if_ >= 0.75 && if_ < 0.85).length,
+    tempo: ifValues.filter((if_) => if_ >= 0.85 && if_ < 1.0).length,
+    threshold: ifValues.filter((if_) => if_ >= 1.0 && if_ < 1.15).length,
+    anaerobic: ifValues.filter((if_) => if_ >= 1.15).length,
+  };
+
+  // 歸一化為百分比
+  const total = Object.values(intensityDistribution).reduce((a, b) => a + b, 0);
+  const normalized = {
+    recovery: total > 0 ? Math.round((intensityDistribution.recovery / total) * 100) : 0,
+    endurance: total > 0 ? Math.round((intensityDistribution.endurance / total) * 100) : 0,
+    tempo: total > 0 ? Math.round((intensityDistribution.tempo / total) * 100) : 0,
+    threshold: total > 0 ? Math.round((intensityDistribution.threshold / total) * 100) : 0,
+    anaerobic: total > 0 ? Math.round((intensityDistribution.anaerobic / total) * 100) : 0,
+  };
+
+  // 計算訓練負荷等級
+  let trainingLoadLabel = '';
+  if (totalTSS < 300) {
+    trainingLoadLabel = '輕度';
+  } else if (totalTSS < 600) {
+    trainingLoadLabel = '適度';
+  } else if (totalTSS < 900) {
+    trainingLoadLabel = '高度';
+  } else {
+    trainingLoadLabel = '過度';
+  }
+
+  return {
+    totalTSS: Math.round(totalTSS * 10) / 10,
+    averageTSS: Math.round(averageTSS * 10) / 10,
+    rideCount: rides.length,
+    totalDuration,
+    averageIntensity: Math.round(averageIntensity * 100) / 100,
+    trainingLoadLabel,
+    intensityDistribution: normalized,
+  };
+}
