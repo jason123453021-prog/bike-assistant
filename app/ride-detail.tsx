@@ -40,6 +40,7 @@ import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFavorites } from "@/lib/favorites-context";
 import { ShareCardModal } from "@/components/share-card-modal";
+import { SpeedCurveChart, type KeyMarker, type SpeedDataPoint } from "@/components/speed-curve-chart";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const STORAGE_KEY = "@bike_records";
@@ -372,6 +373,75 @@ export default function RideDetailScreen() {
   const getHeartRateZoneDisplay = (zone: any) => {
     return `${zone.name} (${zone.minBpm}-${zone.maxBpm} bpm)`;
   };
+  
+  // 計算速度曲線數據
+  const speedCurveData = useMemo(() => {
+    if (!record || !record.route) return [];
+    return record.route.map((point, idx) => ({
+      index: idx,
+      speed: point.speed ? point.speed * 3.6 : 0,
+      power: 0,
+      heartRate: record.avgHeartRate || 0,
+      timestamp: point.timestamp,
+    }));
+  }, [record]);
+  
+  // 計算關鍵點標記
+  const keyMarkers = useMemo(() => {
+    if (!record || speedCurveData.length === 0) return [];
+    
+    const markers: KeyMarker[] = [];
+    
+    if (record.maxSpeed > 0) {
+      const maxSpeedIdx = speedCurveData.reduce((maxIdx, curr, idx) => 
+        curr.speed > speedCurveData[maxIdx].speed ? idx : maxIdx, 0
+      );
+      markers.push({
+        type: "maxSpeed",
+        index: maxSpeedIdx,
+        value: record.maxSpeed,
+        label: `最高速 ${record.maxSpeed.toFixed(1)} km/h`,
+        color: "#EF4444",
+      });
+    }
+    
+    if (record.maxPower > 0) {
+      markers.push({
+        type: "maxPower",
+        index: Math.floor(speedCurveData.length * 0.5),
+        value: record.maxPower,
+        label: `最大功率 ${record.maxPower.toFixed(0)} W`,
+        color: "#FF9500",
+      });
+    }
+    
+    if (record.maxHeartRate && record.maxHeartRate > 0) {
+      markers.push({
+        type: "maxHeartRate",
+        index: Math.floor(speedCurveData.length * 0.7),
+        value: record.maxHeartRate,
+        label: `最高心率 ${record.maxHeartRate.toFixed(0)} bpm`,
+        color: "#FF453A",
+      });
+    }
+    
+    return markers;
+  }, [record, speedCurveData]);
+  
+  // 處理關鍵點點擊
+  const handleMarkerPress = useCallback((marker: KeyMarker) => {
+    setTrailPlaybackIndex(marker.index);
+    if (mapRef.current && polylineCoords[marker.index]) {
+      const coord = polylineCoords[marker.index];
+      mapRef.current.animateCamera(
+        {
+          center: { latitude: coord.latitude, longitude: coord.longitude },
+          zoom: 15,
+        },
+        { duration: 300 }
+      );
+    }
+  }, [polylineCoords]);
 
   // 功率分布圓餅圖
   const renderPie = useCallback(() => {
@@ -889,6 +959,19 @@ export default function RideDetailScreen() {
                     {trailPlaybackIndex} / {polylineCoords.length} ({Math.round((trailPlaybackIndex / polylineCoords.length) * 100)}%)
                   </Text>
                 </View>
+                
+                {/* 速度曲線圖 */}
+                {speedCurveData.length > 0 && (
+                  <SpeedCurveChart
+                    data={speedCurveData}
+                    currentIndex={trailPlaybackIndex}
+                    markers={keyMarkers}
+                    onMarkerPress={handleMarkerPress}
+                    height={100}
+                    showPower={false}
+                    showHeartRate={false}
+                  />
+                )}
               </View>
             )}
 
