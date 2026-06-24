@@ -41,6 +41,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFavorites } from "@/lib/favorites-context";
 import { ShareCardModal } from "@/components/share-card-modal";
 import { SpeedCurveChart, type KeyMarker, type SpeedDataPoint } from "@/components/speed-curve-chart";
+import { PlaybackStatsCard, type PlaybackStatsData } from "@/components/playback-stats-card";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const STORAGE_KEY = "@bike_records";
@@ -916,6 +917,20 @@ export default function RideDetailScreen() {
                   })}
                 </View>
               </View>
+            )}
+
+            {/* 軌跡回放統計卡片 */}
+            {isPlayingTrail && trailPlaybackIndex > 0 && trailPlaybackIndex < polylineCoords.length && record && (
+              <PlaybackStatsCard
+                data={{
+                  speed: (record.route?.[trailPlaybackIndex]?.speed || 0) * 3.6,
+                  heartRate: record.avgHeartRate || 0,
+                  power: record.avgPower || 0,
+                  altitude: record.route?.[trailPlaybackIndex]?.altitude || record.maxElevation || 0,
+                  distance: (trailPlaybackIndex / polylineCoords.length) * (record.distance / 1000),
+                  time: (trailPlaybackIndex / polylineCoords.length) * (record.duration || 0),
+                }}
+              />
             )}
 
             {/* 軌跡回放控制 */}

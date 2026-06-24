@@ -68,6 +68,8 @@ export interface LeafletMapHandle {
   setBearing: (bearing: number, headingUp: boolean) => void;
   setPitch: (pitch: number) => void; // 俯視角設定 (0-60 度)
   setPlaybackMarker: (lat: number, lon: number, color: string) => void; // 彩色回放標點
+  highlightPlayedTrail: (coords: LatLng[], color?: string) => void; // 高亮已走過的軌跡
+  addDirectionArrows: (coords: LatLng[], color?: string, interval?: number) => void; // 添加方向箭头
 }
 
 const LEAFLET_HTML = `<!DOCTYPE html>
@@ -333,6 +335,42 @@ function handleMessage(data) {
           zIndexOffset: 1000,
         }).addTo(map);
         break;
+      case 'highlightPlayedTrail':
+        var coords = msg.coords || [];
+        var color = msg.color || '#10B981';
+        if (highlightedTrailPolyline) { map.removeLayer(highlightedTrailPolyline); highlightedTrailPolyline = null; }
+        if (coords.length > 0) {
+          highlightedTrailPolyline = L.polyline(coords, {
+            color: color,
+            weight: 5,
+            opacity: 0.8,
+            lineCap: 'round',
+            lineJoin: 'round',
+            zIndexOffset: 500,
+          }).addTo(map);
+        }
+        break;
+      case 'addDirectionArrows':
+        var coords = msg.coords || [];
+        var color = msg.color || '#10B981';
+        var interval = msg.interval || 10;
+        if (arrowMarkers) {
+          arrowMarkers.forEach(function(marker) { map.removeLayer(marker); });
+          arrowMarkers = [];
+        }
+        for (var i = interval; i < coords.length; i += interval) {
+          var prev = coords[i - 1];
+          var curr = coords[i];
+          var bearing = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]) * 180 / Math.PI;
+          var arrowIcon = L.divIcon({
+            html: '<div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 10px solid ' + color + '; transform: rotate(' + bearing + 'deg);"></div>',
+            iconSize: [12, 10],
+            className: 'arrow-icon'
+          });
+          var arrowMarker = L.marker(curr, { icon: arrowIcon }).addTo(map);
+          arrowMarkers.push(arrowMarker);
+        }
+        break;
     }
   } catch(e) {}
 }
@@ -415,6 +453,20 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         if (!webViewRef.current) return;
         webViewRef.current.postMessage(
           JSON.stringify({ type: "setPlaybackMarker", lat, lon, color })
+        );
+      },
+      highlightPlayedTrail: (coords: LatLng[], color = '#10B981') => {
+        if (!webViewRef.current) return;
+        const mapped = coords.map((c) => [c.latitude, c.longitude]);
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "highlightPlayedTrail", coords: mapped, color })
+        );
+      },
+      addDirectionArrows: (coords: LatLng[], color = '#10B981', interval = 10) => {
+        if (!webViewRef.current) return;
+        const mapped = coords.map((c) => [c.latitude, c.longitude]);
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "addDirectionArrows", coords: mapped, color, interval })
         );
       },
     }));
