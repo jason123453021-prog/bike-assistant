@@ -52,6 +52,8 @@ export interface RideRecord {
   maxHeartRate?: number;  // 最高心率 bpm（感測器）
   avgCadence?: number;    // 平均踏頻 rpm（感測器）
   maxCadence?: number;    // 最高踏頻 rpm（感測器）
+  gradeDistribution?: number[];  // 坡度區間距離統計 [1-5%, 6-10%, 11-15%, 16-20%, 21-25%, 26%+]
+  gradeAscentDistribution?: number[];  // 坡度區間爬升統計 [1-5%, 6-10%, 11-15%, 16-20%, 21-25%, 26%+]
 }
 
 export interface RideState {

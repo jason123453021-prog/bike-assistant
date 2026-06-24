@@ -717,6 +717,63 @@ export default function RideDetailScreen() {
               </View>
             )}
 
+            {/* 坡度分布詳細統計 */}
+            {record && (record.gradeDistribution || [0, 0, 0, 0, 0, 0]).reduce((a: number, b: number) => a + b, 0) > 0 && (
+              <View style={styles.gradeDistributionSection}>
+                <Text style={styles.sectionTitle}>坡度分布統計</Text>
+                
+                {/* 距離分布表 */}
+                <View style={styles.tableContainer}>
+                  <Text style={styles.tableTitle}>距離分布</Text>
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>坡度</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>距離</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>百分比</Text>
+                  </View>
+                  {['1-5%', '6-10%', '11-15%', '16-20%', '21-25%', '26%+'].map((label, idx) => {
+                    const dist = (record.gradeDistribution?.[idx] || 0) / 1000;
+                    const totalDist = (record.gradeDistribution || [0, 0, 0, 0, 0, 0]).reduce((a: number, b: number) => a + b, 0);
+                    const pct = totalDist > 0 ? ((record.gradeDistribution?.[idx] || 0) / totalDist * 100).toFixed(1) : '0';
+                    const gradeColors = ['#34C759', '#FFD60A', '#FF9500', '#FF6B6B', '#FF453A', '#8B0000'];
+                    return (
+                      <View key={`dist-${idx}`} style={styles.tableRow}>
+                        <View style={[styles.gradeCell, { backgroundColor: gradeColors[idx] + '33' }]}>
+                          <Text style={[styles.gradeCellText, { color: gradeColors[idx] }]}>{label}</Text>
+                        </View>
+                        <Text style={[styles.tableCell, { flex: 1 }]}>{dist.toFixed(2)} km</Text>
+                        <Text style={[styles.tableCell, { flex: 1 }]}>{pct}%</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+                
+                {/* 爬升分布表 */}
+                <View style={styles.tableContainer}>
+                  <Text style={styles.tableTitle}>爬升分布</Text>
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>坡度</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>爬升</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>百分比</Text>
+                  </View>
+                  {['1-5%', '6-10%', '11-15%', '16-20%', '21-25%', '26%+'].map((label, idx) => {
+                    const ascent = (record.gradeAscentDistribution?.[idx] || 0);
+                    const totalAscent = (record.gradeAscentDistribution || [0, 0, 0, 0, 0, 0]).reduce((a: number, b: number) => a + b, 0);
+                    const pct = totalAscent > 0 ? (ascent / totalAscent * 100).toFixed(1) : '0';
+                    const gradeColors = ['#34C759', '#FFD60A', '#FF9500', '#FF6B6B', '#FF453A', '#8B0000'];
+                    return (
+                      <View key={`ascent-${idx}`} style={styles.tableRow}>
+                        <View style={[styles.gradeCell, { backgroundColor: gradeColors[idx] + '33' }]}>
+                          <Text style={[styles.gradeCellText, { color: gradeColors[idx] }]}>{label}</Text>
+                        </View>
+                        <Text style={[styles.tableCell, { flex: 1 }]}>{ascent.toFixed(0)} m</Text>
+                        <Text style={[styles.tableCell, { flex: 1 }]}>{pct}%</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
             {/* 軌跡回放控制 */}
             {polylineCoords.length > 0 && (
               <View style={styles.trailPlaybackSection}>
@@ -1206,5 +1263,55 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: 12,
     color: "rgba(255,255,255,0.6)",
+  },
+  gradeDistributionSection: {
+    marginTop: 16,
+    paddingHorizontal: 12,
+  },
+  tableContainer: {
+    marginBottom: 16,
+  },
+  tableTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.6)",
+    marginBottom: 8,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+    gap: 8,
+  },
+  tableHeaderCell: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.6)",
+  },
+  tableRow: {
+    flexDirection: "row",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+    gap: 8,
+    alignItems: "center",
+  },
+  gradeCell: {
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignItems: "center",
+  },
+  gradeCellText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  tableCell: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.8)",
   },
 });
