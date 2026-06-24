@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { View, Text, Pressable } from "react-native";
+import Svg, { G, Path, Circle, Line, Defs, Pattern, Rect, Text as SvgText } from "react-native-svg";
 import { useColors } from "@/hooks/use-colors";
 
 export interface SpeedDataPoint {
@@ -77,8 +78,9 @@ export function SpeedCurveChart({
   const hrPath = showHeartRate ? generatePath(chartData.heartRates, chartData.maxHR, 0, height * 0.8) : "";
 
   // 計算當前位置指示器
-  const currentX = (currentIndex / (data.length - 1 || 1)) * 100;
-  const currentY = height * 0.8 - (chartData.speeds[currentIndex] / chartData.maxSpeed) * height * 0.8;
+  const currentX = data.length > 0 ? (currentIndex / (data.length - 1 || 1)) * 100 : 0;
+  const currentSpeed = data.length > 0 && currentIndex < chartData.speeds.length ? chartData.speeds[currentIndex] : 0;
+  const currentY = chartData.maxSpeed > 0 ? height * 0.8 - (currentSpeed / chartData.maxSpeed) * height * 0.8 : height * 0.8;
 
   return (
     <View style={{ marginVertical: 8 }}>
@@ -97,42 +99,39 @@ export function SpeedCurveChart({
           height: height + 16,
         }}
       >
-        <svg
-          width="100%"
-          height={height}
-          viewBox={`0 0 100 ${height}`}
-          style={{ overflow: "visible" }}
-        >
+        <Svg width="100%" height={height} viewBox={`0 0 100 ${height}`}>
           {/* 背景網格 */}
-          <defs>
-            <pattern
+          <Defs>
+            <Pattern
               id="grid"
               width="20"
               height={height / 4}
               patternUnits="userSpaceOnUse"
             >
-              <path
+              <Path
                 d={`M 20 0 L 0 0 0 ${height / 4}`}
                 fill="none"
                 stroke={colors.border}
                 strokeWidth="0.5"
               />
-            </pattern>
-          </defs>
-          <rect width="100" height={height} fill={`url(#grid)`} />
+            </Pattern>
+          </Defs>
+          <Rect width="100" height={height} fill={`url(#grid)`} />
 
           {/* 速度曲線 */}
-          <path
-            d={speedPath}
-            fill="none"
-            stroke={colors.primary}
-            strokeWidth="1.5"
-            vectorEffect="non-scaling-stroke"
-          />
+          {speedPath && (
+            <Path
+              d={speedPath}
+              fill="none"
+              stroke={colors.primary}
+              strokeWidth="1.5"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
 
           {/* 功率曲線（可選） */}
           {showPower && powerPath && (
-            <path
+            <Path
               d={powerPath}
               fill="none"
               stroke="#FF9500"
@@ -144,7 +143,7 @@ export function SpeedCurveChart({
 
           {/* 心率曲線（可選） */}
           {showHeartRate && hrPath && (
-            <path
+            <Path
               d={hrPath}
               fill="none"
               stroke="#EF4444"
@@ -156,18 +155,19 @@ export function SpeedCurveChart({
 
           {/* 關鍵點標記 */}
           {markers.map((marker) => {
+            if (marker.index < 0 || marker.index >= data.length) return null;
             const markerX = (marker.index / (data.length - 1 || 1)) * 100;
             const markerValue = marker.type === "maxSpeed" 
-              ? chartData.speeds[marker.index]
+              ? chartData.speeds[marker.index] || 0
               : marker.type === "maxPower"
-              ? chartData.powers[marker.index]
-              : chartData.heartRates[marker.index];
-            const markerY = height * 0.8 - (markerValue / chartData.maxSpeed) * height * 0.8;
+              ? chartData.powers[marker.index] || 0
+              : chartData.heartRates[marker.index] || 0;
+            const markerY = chartData.maxSpeed > 0 ? height * 0.8 - (markerValue / chartData.maxSpeed) * height * 0.8 : height * 0.8;
 
             return (
-              <g key={`marker-${marker.type}`}>
+              <G key={`marker-${marker.type}`}>
                 {/* 標記圓點 */}
-                <circle
+                <Circle
                   cx={markerX}
                   cy={markerY}
                   r="2"
@@ -176,7 +176,7 @@ export function SpeedCurveChart({
                   strokeWidth="0.5"
                 />
                 {/* 標記標籤 */}
-                <text
+                <SvgText
                   x={markerX}
                   y={markerY - 6}
                   textAnchor="middle"
@@ -184,14 +184,14 @@ export function SpeedCurveChart({
                   fill={marker.color}
                   fontWeight="bold"
                 >
-                  {marker.label}
-                </text>
-              </g>
+                  {marker.label.substring(0, 4)}
+                </SvgText>
+              </G>
             );
           })}
 
           {/* 當前位置指示器 */}
-          <line
+          <Line
             x1={currentX}
             y1="0"
             x2={currentX}
@@ -201,7 +201,7 @@ export function SpeedCurveChart({
             strokeDasharray="2,2"
             opacity="0.5"
           />
-          <circle
+          <Circle
             cx={currentX}
             cy={currentY}
             r="2.5"
@@ -209,7 +209,7 @@ export function SpeedCurveChart({
             stroke="#fff"
             strokeWidth="1"
           />
-        </svg>
+        </Svg>
       </View>
 
       {/* 圖例 */}
