@@ -932,9 +932,9 @@ export default function RideDetailScreen() {
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>表現指標</Text>
               <View style={styles.statsGrid}>
-                <DetailCell label="訓練壓力分數" value="--" unit="" color="#9C27B0" />
-                <DetailCell label="強度係數" value="--" unit="" />
-                <DetailCell label="訓練效果" value="--" unit="" color="#00E676" />
+                <DetailCell label="訓練壓力分數" value={record.tss ? `${record.tss.toFixed(1)}` : "--"} unit="" color="#9C27B0" />
+                <DetailCell label="強度係數" value={record.intensityFactor ? `${record.intensityFactor.toFixed(2)}` : "--"} unit="" />
+                <DetailCell label="標準化功率" value={record.normalizedPower ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" />
               </View>
             </View>
 

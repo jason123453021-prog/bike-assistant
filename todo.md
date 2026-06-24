@@ -341,3 +341,10 @@
 ### 三. 驗證與文檔
 - [x] 創建公式文檔（docs/energy-hydration-formula.md）
 - [x] 記錄新舊公式對比與驗證例子
+
+
+## 訓練效果分析 - TSS 計算（v2.18）
+- [x] 分析 TSS 計算公式與騎乘數據需求
+- [x] 實現 TSS 計算函數（tss-calc.ts）
+- [x] 在 saveRecord 中計算並保存 TSS 數據
+- [x] 在騎乘詳細頁面顯示 TSS、強度係數、標準化功率

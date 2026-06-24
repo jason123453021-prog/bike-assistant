@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { analyzeTraining, estimateFTP } from "./tss-calc";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -375,6 +376,17 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     const avgCadence = sensorStats?.cadenceValues.length ? Math.round(sensorStats.cadenceValues.reduce((a, b) => a + b, 0) / sensorStats.cadenceValues.length) : undefined;
     // 重新計算均速，確保使用最終的 distance 和 elapsed 值
     const finalAvgSpeed = state.elapsed > 0 ? (state.distance / 1000) / (state.elapsed / 3600) : 0;
+    
+    // 計算訓練壓力分數（TSS）和訓練效果分析
+    // 假設用戶為中級騎士，根據體重估算 FTP（預設 70kg 体重）
+    const ftpW = estimateFTP(70, 'intermediate');
+    const trainingAnalysis = analyzeTraining(
+      state.elapsed,
+      state.avgPower,
+      state.maxPower,
+      ftpW
+    );
+    
     const record: RideRecord = {
       id: now.toString(),
       date: now,
@@ -400,6 +412,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       // 坡度分布數據
       gradeDistribution: state.gradeDistribution,
       gradeAscentDistribution: state.gradeAscentDistribution,
+      // 訓練效果分析
+      tss: trainingAnalysis.tss,
+      intensityFactor: trainingAnalysis.intensityFactor,
+      normalizedPower: trainingAnalysis.normalizedPower,
     };
     dispatch({ type: "ADD_RECORD", record });
     const existing = await AsyncStorage.getItem(STORAGE_KEY);
