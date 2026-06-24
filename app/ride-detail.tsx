@@ -245,7 +245,13 @@ export default function RideDetailScreen() {
   useEffect(() => {
     if (trailPlaybackIndex > 0 && trailPlaybackIndex < polylineCoords.length && mapRef.current) {
       const currentCoord = polylineCoords[trailPlaybackIndex];
-      (mapRef.current as any).setView([currentCoord.latitude, currentCoord.longitude], 15, { animate: true, duration: 0.3 });
+      mapRef.current.animateCamera(
+        {
+          center: { latitude: currentCoord.latitude, longitude: currentCoord.longitude },
+          zoom: 15,
+        },
+        { duration: 300 }
+      );
     }
   }, [trailPlaybackIndex, polylineCoords]);
   

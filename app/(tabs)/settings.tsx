@@ -16,6 +16,7 @@ import {
   UIManager,
   ActivityIndicator,
 } from "react-native";
+import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
 
 
 // 啟用 Android LayoutAnimation
@@ -37,6 +38,7 @@ import Constants from "expo-constants";
 
 export default function SettingsScreen() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
   const { user, isAuthenticated, logout } = useAuth();
   const deleteAccountMutation = trpc.auth.deleteAccount.useMutation();
@@ -1448,7 +1450,7 @@ export default function SettingsScreen() {
         animationType="slide"
         onRequestClose={closeSupplyModal}
       >
-        <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+        <SafeAreaView style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface, flex: 1, display: "flex", flexDirection: "column" }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -1693,7 +1695,7 @@ export default function SettingsScreen() {
             </ScrollView>
 
             {/* 固定底部按鈕區域 */}
-            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, paddingBottom: 32, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
+            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
               <Pressable
                 style={({ pressed }) => ([
                   styles.editCancelBtn,
@@ -1714,7 +1716,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
       {/* 感測器配對 Modal */}
       <SensorPairingModal
@@ -2041,6 +2043,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxHeight: "85%",
     paddingTop: 16,
+    paddingBottom: 0,
   },
   modalHeader: {
     flexDirection: "row",
