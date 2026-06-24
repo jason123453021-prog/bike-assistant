@@ -392,6 +392,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       maxHeartRate: sensorStats?.maxHeartRate,
       avgCadence,
       maxCadence: sensorStats?.maxCadence,
+      // 坡度分布數據
+      gradeDistribution: state.gradeDistribution,
+      gradeAscentDistribution: state.gradeAscentDistribution,
     };
     dispatch({ type: "ADD_RECORD", record });
     const existing = await AsyncStorage.getItem(STORAGE_KEY);
