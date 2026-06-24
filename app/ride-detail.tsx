@@ -854,10 +854,7 @@ export default function RideDetailScreen() {
                 maximumTrackTintColor="rgba(255,255,255,0.3)"
               />
             </View>
-            {/* 回放統計卡片 */}
-            {isPlayingTrail && currentPlaybackData && (
-              <PlaybackStatsCard data={{...currentPlaybackData, altitude: 0}} />
-            )}
+            {/* 回放統計卡片已移至下拉面板內 */}
           </View>
         )}
 
@@ -887,6 +884,11 @@ export default function RideDetailScreen() {
             color="#F59E0B"
           />
         </View>
+
+        {/* 回放統計卡片 - 移至下拉面板內 */}
+        {isPlayingTrail && currentPlaybackData && (
+          <PlaybackStatsCard data={{...currentPlaybackData, altitude: 0}} />
+        )}
 
         {/* 展開後的詳細內容 */}
         {panelExpanded && (

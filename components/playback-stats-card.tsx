@@ -59,10 +59,10 @@ export function PlaybackStatsCard({ data, timestamp }: PlaybackStatsCardProps) {
         </Text>
       )}
 
-      {/* 統計數據網格 */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8 }}>
+      {/* 統計數據網格 - 自適應欄位大小 */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8, flexWrap: 'wrap' }}>
         {/* 速度 */}
-        <View style={{ alignItems: 'center' }}>
+        <View style={{ alignItems: 'center', minWidth: '22%' }}>
           <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>速度</Text>
           <Text style={{ color: '#10B981', fontSize: 18, fontWeight: 'bold' }}>
             {data.speed.toFixed(1)}
@@ -71,7 +71,7 @@ export function PlaybackStatsCard({ data, timestamp }: PlaybackStatsCardProps) {
         </View>
 
         {/* 心率 */}
-        <View style={{ alignItems: 'center' }}>
+        <View style={{ alignItems: 'center', minWidth: '22%' }}>
           <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>心率</Text>
           <Text style={{ color: getHeartRateColor(data.heartRate), fontSize: 18, fontWeight: 'bold' }}>
             {Math.round(data.heartRate)}
@@ -80,7 +80,7 @@ export function PlaybackStatsCard({ data, timestamp }: PlaybackStatsCardProps) {
         </View>
 
         {/* 功率 */}
-        <View style={{ alignItems: 'center' }}>
+        <View style={{ alignItems: 'center', minWidth: '22%' }}>
           <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>功率</Text>
           <Text style={{ color: '#F59E0B', fontSize: 18, fontWeight: 'bold' }}>
             {Math.round(data.power)}
@@ -89,7 +89,7 @@ export function PlaybackStatsCard({ data, timestamp }: PlaybackStatsCardProps) {
         </View>
 
         {/* 海拔 */}
-        <View style={{ alignItems: 'center' }}>
+        <View style={{ alignItems: 'center', minWidth: '22%' }}>
           <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>海拔</Text>
           <Text style={{ color: '#8B5CF6', fontSize: 18, fontWeight: 'bold' }}>
             {Math.round(data.altitude)}
