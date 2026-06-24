@@ -30,6 +30,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, SUPPLY_ITEM_TEMPLATES, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
 import { SensorPairingModal } from "@/components/sensor-pairing-modal";
+import { useI18n } from "@/lib/i18n-context";
+import { getLanguageName } from "@/lib/i18n";
 
 import { useAuth } from "@/hooks/use-auth";
 import { startOAuthLogin } from "@/constants/oauth";
@@ -41,7 +43,9 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
   const { user, isAuthenticated, logout } = useAuth();
+  const { language, setLanguage, supportedLanguages } = useI18n();
   const deleteAccountMutation = trpc.auth.deleteAccount.useMutation();
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   // ── 感測器配對 Modal 狀態 ──
   const [sensorModalVisible, setSensorModalVisible] = useState(false);
@@ -875,6 +879,22 @@ export default function SettingsScreen() {
           />
         </View>}
 
+        {/* ── 語言設定 ── */}
+        <SectionHeader title="語言與地區" colors={colors} onToggle={() => toggleSection("language")} collapsed={collapsedSections["language"]} />
+        {!collapsedSections["language"] && <View style={[styles.section, { borderColor: colors.border }]}>
+          <Pressable
+            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
+            onPress={() => setLanguageModalVisible(true)}
+          >
+            <IconSymbol name="globe" size={18} color={colors.muted} />
+            <Text style={[styles.rowLabel, { color: colors.foreground }]}>語言</Text>
+            <View style={styles.rowRight}>
+              <Text style={[styles.rowValue, { color: colors.muted }]}>{getLanguageName(language)}</Text>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </View>
+          </Pressable>
+        </View>}
+
         {/* ── 帳號與社交 ── */}
         <SectionHeader title="帳號與好友" colors={colors} onToggle={() => toggleSection("account")} collapsed={collapsedSections["account"]} />
         {!collapsedSections["account"] && <View style={[styles.section, { borderColor: colors.border }]}>
@@ -1439,6 +1459,60 @@ export default function SettingsScreen() {
               </>
             )}
 
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── 語言選擇 Modal ── */}
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={styles.editOverlay}>
+          <View style={[styles.editCard, { backgroundColor: colors.surface, borderColor: colors.border, maxWidth: 280 }]}>
+            <Text style={[styles.editTitle, { color: colors.foreground }]}>選擇語言</Text>
+            <View style={{ gap: 8 }}>
+              {supportedLanguages.map((lang) => (
+                <Pressable
+                  key={lang}
+                  style={({ pressed }) => [{
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    backgroundColor: language === lang ? colors.accent + "22" : colors.surface,
+                    borderWidth: 1,
+                    borderColor: language === lang ? colors.accent : colors.border,
+                    opacity: pressed ? 0.7 : 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }]}
+                  onPress={() => {
+                    setLanguage(lang);
+                    setLanguageModalVisible(false);
+                  }}
+                >
+                  <Text style={[{
+                    fontSize: 16,
+                    fontWeight: language === lang ? '600' : '400',
+                    color: language === lang ? colors.accent : colors.foreground,
+                  }]}>
+                    {getLanguageName(lang)}
+                  </Text>
+                  {language === lang && (
+                    <IconSymbol name="checkmark" size={18} color={colors.accent} />
+                  )}
+                </Pressable>
+              ))}
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.editCancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1, marginTop: 16 }]}
+              onPress={() => setLanguageModalVisible(false)}
+            >
+              <Text style={[styles.editCancelText, { color: colors.muted }]}>取消</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>

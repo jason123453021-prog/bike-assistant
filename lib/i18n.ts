@@ -3,6 +3,16 @@
  * 支援繁體中文 (zh-TW)、簡體中文 (zh-CN)、英文 (en)
  */
 
+// 動態導入 expo-localization（避免編譯錯誤）
+let getLocales: (() => any) | null = null;
+try {
+  const localizationModule = require('expo-localization');
+  getLocales = localizationModule.getLocales;
+} catch (e) {
+  // 模組尚未安裝或在 web 環境中不可用
+  console.warn('[i18n] expo-localization not available:', e);
+}
+
 // 導入翻譯資源
 import zhTW from '../locales/zh-TW.json';
 import zhCN from '../locales/zh-CN.json';
@@ -23,12 +33,31 @@ const translations: Record<LanguageCode, TranslationResources> = {
 const SUPPORTED_LANGUAGES: LanguageCode[] = ['zh-TW', 'zh-CN', 'en'];
 
 /**
- * 獲取系統語言（暫時返回預設值，後續可整合 expo-localization）
+ * 獲取系統語言
  */
 export function getSystemLanguage(): LanguageCode {
-  // TODO: 整合 expo-localization 以自動偵測系統語言
-  // 目前返回預設繁體中文
-  return 'zh-TW';
+  try {
+    if (getLocales) {
+      const locales = getLocales();
+      if (locales && locales.length > 0) {
+        const locale = locales[0].languageTag;
+        
+        // 精確匹配
+        if (locale === 'zh-TW' || locale === 'zh-Hant') return 'zh-TW';
+        if (locale === 'zh-CN' || locale === 'zh-Hans') return 'zh-CN';
+        if (locale.startsWith('en')) return 'en';
+        
+        // 語言前綴匹配
+        const lang = locale.split('-')[0];
+        if (lang === 'zh') return 'zh-TW'; // 默認繁體
+        if (lang === 'en') return 'en';
+      }
+    }
+  } catch (error) {
+    console.warn('[i18n] Failed to detect system language:', error);
+  }
+  
+  return 'zh-TW'; // 默認繁體中文
 }
 
 /**
