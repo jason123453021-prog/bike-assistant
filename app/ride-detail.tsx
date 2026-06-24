@@ -241,10 +241,64 @@ export default function RideDetailScreen() {
     };
   }, [isPlayingTrail, trailPlaybackSpeed, polylineCoords.length]);
   
-  // 地圖自動跟隨回放位置
+  // 計算當前回放位置的顏色、方向和俯視角度
+  const getPlaybackMarkerColor = useCallback(() => {
+    if (!record || trailPlaybackIndex === 0) return '#007AFF';
+    const maxSpeed = record.maxSpeed || 20;
+    const speedPct = record.avgSpeed / maxSpeed;
+    if (speedPct < 0.33) return '#66BB6A'; // 綠色
+    if (speedPct < 0.66) return '#FDD835'; // 黃色
+    return '#EF4444'; // 紅色
+  }, [record, trailPlaybackIndex]);
+  
+  const getPlaybackBearingAndPitch = useCallback(() => {
+    if (trailPlaybackIndex === 0 || trailPlaybackIndex >= polylineCoords.length) {
+      return { bearing: 0, pitch: 0 };
+    }
+    const curr = polylineCoords[trailPlaybackIndex];
+    const prev = polylineCoords[Math.max(0, trailPlaybackIndex - 1)];
+    const dLat = curr.latitude - prev.latitude;
+    const dLon = curr.longitude - prev.longitude;
+    let bearing = Math.atan2(dLon, dLat) * (180 / Math.PI);
+    if (bearing < 0) bearing += 360;
+    
+    // 根據坡度計算俯視角度
+    let pitch = 0;
+    if (record && record.route && record.route[trailPlaybackIndex]) {
+      const currAlt = record.route[trailPlaybackIndex].altitude || 0;
+      const prevAlt = record.route[Math.max(0, trailPlaybackIndex - 1)]?.altitude || 0;
+      const altDiff = currAlt - prevAlt;
+      const distance = Math.sqrt(dLat * dLat + dLon * dLon) * 111000; // 轉換為米
+      if (distance > 0) {
+        const grade = (altDiff / distance) * 100;
+        pitch = Math.max(0, Math.min(45, Math.abs(grade) * 1.5));
+      }
+    }
+    
+    return { bearing, pitch };
+  }, [trailPlaybackIndex, polylineCoords, record]);
+  
+  // 地圖自動跟隨回放位置、更新標點顏色、方向旋轉和俯視角度
   useEffect(() => {
     if (trailPlaybackIndex > 0 && trailPlaybackIndex < polylineCoords.length && mapRef.current) {
       const currentCoord = polylineCoords[trailPlaybackIndex];
+      const color = getPlaybackMarkerColor();
+      const { bearing, pitch } = getPlaybackBearingAndPitch();
+      
+      // 更新彩色標點
+      mapRef.current.setPlaybackMarker(
+        currentCoord.latitude,
+        currentCoord.longitude,
+        color
+      );
+      
+      // 地圖隨行進方向轉動
+      mapRef.current.setBearing(bearing, true);
+      
+      // 根據坡度調整俯視角度
+      mapRef.current.setPitch(pitch);
+      
+      // 地圖中心跟隨
       mapRef.current.animateCamera(
         {
           center: { latitude: currentCoord.latitude, longitude: currentCoord.longitude },
@@ -253,7 +307,7 @@ export default function RideDetailScreen() {
         { duration: 300 }
       );
     }
-  }, [trailPlaybackIndex, polylineCoords]);
+  }, [trailPlaybackIndex, polylineCoords, getPlaybackMarkerColor, getPlaybackBearingAndPitch]);
   
   // 計算當前回放位置的數據
   const currentPlaybackData = useMemo(() => {

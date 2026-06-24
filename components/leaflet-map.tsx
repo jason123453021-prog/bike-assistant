@@ -67,6 +67,7 @@ export interface LeafletMapHandle {
   fitToCoordinates: (coords: LatLng[], opts?: { edgePadding?: { top: number; right: number; bottom: number; left: number }; animated?: boolean }) => void;
   setBearing: (bearing: number, headingUp: boolean) => void;
   setPitch: (pitch: number) => void; // 俯視角設定 (0-60 度)
+  setPlaybackMarker: (lat: number, lon: number, color: string) => void; // 彩色回放標點
 }
 
 const LEAFLET_HTML = `<!DOCTYPE html>
@@ -318,6 +319,20 @@ function handleMessage(data) {
       case 'setZoom':
         map.setZoom(msg.zoom);
         break;
+      case 'setPitch':
+        var pitch = msg.pitch || 0;
+        if (typeof map.setPitch === 'function') {
+          map.setPitch(pitch);
+        }
+        break;
+      case 'setPlaybackMarker':
+        var lat = msg.lat, lon = msg.lon, color = msg.color || '#007AFF';
+        if (posMarker) { map.removeLayer(posMarker); posMarker = null; }
+        posMarker = L.marker([lat, lon], {
+          icon: makeCircleIcon(color, 16, '#fff'),
+          zIndexOffset: 1000,
+        }).addTo(map);
+        break;
     }
   } catch(e) {}
 }
@@ -394,6 +409,12 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         if (!webViewRef.current) return;
         webViewRef.current.postMessage(
           JSON.stringify({ type: "setPitch", pitch: Math.max(0, Math.min(60, pitch)) })
+        );
+      },
+      setPlaybackMarker: (lat: number, lon: number, color: string) => {
+        if (!webViewRef.current) return;
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "setPlaybackMarker", lat, lon, color })
         );
       },
     }));
