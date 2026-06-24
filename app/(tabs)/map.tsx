@@ -902,7 +902,12 @@ export default function MapScreen() {
             // 使用感測器功率時，清空計算功率緩衝
             powerWindowRef.current = [];
           }
+          // 使用基於功率的卡路里計算（修正後的效率係數）
           const calIncrement = calculateCalories(power, LOCATION_INTERVAL_SEC);
+          
+          // 備選：基於 MET 的卡路里計算（更準確，但需要體重）
+          // const calIncrementMET = calculateCaloriesMET(speedKmh, settings.weight, LOCATION_INTERVAL_SEC, calcGrade(ascent, distanceM));
+          // 當前使用功率法，因為功率已包含所有物理因素
 
           // 計算真實 GPS 距離（米）
           let distanceM = 0;

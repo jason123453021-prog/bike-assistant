@@ -181,12 +181,18 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   // 基礎汗液流失率 L/h（標準人、Zone2 強度、20°C、60%濕度）
   // 注意：intFactor 與 hrFactor 同樣基於功率推算，直接相乘會造成強度雙重計算
   // 修正：只保留 hrFactor 作為強度代理，移除 intFactor
-  const BASE_RATE_LPH = 0.5; // 降低基礎率，避免高強度下失真
+  // 修正：基礎率從 0.5 L/h 降至 0.3 L/h（更符合實際騎乘流失）
+  const BASE_RATE_LPH = 0.3;
 
   // 最終汗液流失率 ml/h（移除 intFactor，使用 hrFactor 作為強度代理）
-  const sweatRatePerHour = Math.round(
+  let sweatRatePerHour = Math.round(
     BASE_RATE_LPH * 1000 * bsaFactor * hrFactor * tFactor * hFactor * sFactor * aBonusFactor
   );
+  
+  // 限制在合理範圍：100-1500 ml/h
+  // 最小值：100 ml/h（靜止或極低強度）
+  // 最大值：1500 ml/h（極限運動）
+  sweatRatePerHour = Math.max(100, Math.min(1500, sweatRatePerHour));
 
   // 本次間隔流失量 ml
   const sweatLossMl = (sweatRatePerHour / 3600) * intervalSec;

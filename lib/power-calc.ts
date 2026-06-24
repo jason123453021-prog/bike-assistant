@@ -96,12 +96,55 @@ export function calculatePower(input: PowerInput): number {
  */
 export function calculateCalories(powerWatts: number, durationSeconds: number): number {
   if (powerWatts <= 0 || durationSeconds <= 0) return 0;
-  // 修正：效率係數從 0.25 改為 0.75（更保守的估計，避免卡路里異常高）
-  // 舊公式：kcal = (W × s) / (4184 × 0.25) = (W × s) / 1046
-  // 新公式：kcal = (W × s) / (4184 × 0.75) = (W × s) / 3138
-  const efficiency = 0.75;
+  // 修正：效率係數為 0.25（正確的人體肌肉代謝效率）
+  // 公式：kcal = (W × s) / (4184 × 0.25) = (W × s) / 1046
+  const efficiency = 0.25;
   const joules = powerWatts * durationSeconds;
   const kcal = joules / (4184 * efficiency);
+  return kcal;
+}
+
+/**
+ * 基於速度估算 MET 值（騎乘專用）
+ * MET = 代謝當量（相對於靜息代謝率的倍數）
+ */
+function estimateMETFromSpeed(speedKmh: number, gradePct: number = 0): number {
+  let met = 4; // 基礎 MET
+  
+  // 根據速度估算 MET
+  if (speedKmh < 10) met = 4;
+  else if (speedKmh < 15) met = 6;
+  else if (speedKmh < 20) met = 8;
+  else if (speedKmh < 25) met = 12;
+  else if (speedKmh < 30) met = 16;
+  else met = 20;
+  
+  // 爬升修正（爬升時 MET 增加 20-50%）
+  if (gradePct > 2) {
+    const gradeBonus = 1 + Math.min(0.5, gradePct / 100 * 0.3);
+    met *= gradeBonus;
+  }
+  
+  return met;
+}
+
+/**
+ * 計算卡路里消耗（基於 MET 和體重）
+ * 公式：kcal = 體重(kg) × MET × 時間(小時)
+ * 此方法更準確，直接考慮體重和運動強度
+ */
+export function calculateCaloriesMET(
+  speedKmh: number,
+  weightKg: number,
+  durationSeconds: number,
+  gradePct: number = 0
+): number {
+  if (speedKmh <= 0 || durationSeconds <= 0 || weightKg <= 0) return 0;
+  
+  const met = estimateMETFromSpeed(speedKmh, gradePct);
+  const hours = durationSeconds / 3600;
+  const kcal = weightKg * met * hours;
+  
   return kcal;
 }
 
