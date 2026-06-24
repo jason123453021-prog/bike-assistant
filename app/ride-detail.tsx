@@ -555,7 +555,7 @@ export default function RideDetailScreen() {
   </metadata>
   <trk>
     <name>${record.name}</name>
-    <desc>騎乘統計: 距離 ${distanceKm}km | 時間 ${durationStr} | 平均速度 ${record.avgSpeed.toFixed(1)}km/h | 最高速度 ${record.maxSpeed.toFixed(1)}km/h | 爆升 ${record.totalAscent}m | 平均功率 ${Math.round(record.avgPower)}W | 最大功率 ${Math.round(record.maxPower)}W | 消費熱量 ${Math.round(record.calories)}kcal</desc>
+    <desc>騎乘統計: 距離 ${distanceKm}km | 時間 ${durationStr} | 平均速度 ${record.avgSpeed.toFixed(1)}km/h | 最高速度 ${record.maxSpeed.toFixed(1)}km/h | 爆升 ${record.totalAscent}m | 平均功率 ${Math.round(record.avgPower)}W | 最大功率 ${Math.round(record.maxPower)}W | 消耗熱量 ${Math.round(record.calories)}kcal</desc>
     <extensions>
       <distance>${distanceKm}</distance>
       <duration>${record.duration}</duration>
@@ -1129,7 +1129,7 @@ export default function RideDetailScreen() {
                 <DetailCell label="移動時間" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" />
                 <DetailCell label="平均速度" value={`${((record.distance / 1000) / ((record.duration - (record.totalPausedSec ?? 0)) / 3600)).toFixed(1)}`} unit="km/h" />
                 <DetailCell label="最高速度" value={`${record.maxSpeed.toFixed(1)}`} unit="km/h" />
-                <DetailCell label="消誨熱量" value={`${Math.round(record.calories)}`} unit="kcal" />
+                <DetailCell label="消耗熱量" value={`${Math.round(record.calories)}`} unit="kcal" />
                 <DetailCell label="有效騎乘" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" color="#4ADE80" />
                 <DetailCell label="暫停時間" value={formatDuration(record.totalPausedSec ?? 0)} unit="" />
               </View>

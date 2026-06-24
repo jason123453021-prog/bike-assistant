@@ -484,7 +484,7 @@ export default function SettingsScreen() {
           <Divider colors={colors} />
           <NumberRow
             icon="bolt.fill"
-            label="FTP（功能閨値功率）"
+            label="FTP（功能閾值功率）"
             value={settings.ftp}
             unit="W"
             colors={colors}

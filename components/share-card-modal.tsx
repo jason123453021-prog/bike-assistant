@@ -34,10 +34,10 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
     try {
       await Share.share({
         message: shareText,
-        title: "分享騎乘紀錄",
+        title: "分享騎乘記錄",
       });
     } catch (error) {
-      Alert.alert("分享失敗", "無法分享騎乘紀錄");
+      Alert.alert("分享失敗", "無法分享騎乘記錄");
     }
   };
 
