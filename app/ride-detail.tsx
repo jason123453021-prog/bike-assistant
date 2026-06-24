@@ -26,6 +26,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Slider from "@react-native-community/slider";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
@@ -812,6 +813,55 @@ export default function RideDetailScreen() {
         </View>
 
         {/* 摘要（距離 + 時間） */}
+        {/* 軌跡回放欄位（最上方） */}
+        {polylineCoords.length > 0 && (
+          <View style={styles.trailPlaybackSection}>
+            <Text style={styles.sectionTitle}>軌跡回放</Text>
+            <View style={styles.playbackControls}>
+              <Pressable
+                style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1 }]}
+                onPress={handlePlayTrail}
+              >
+                <IconSymbol name={isPlayingTrail ? "pause.fill" : "play.fill"} size={20} color="#fff" />
+                <Text style={styles.playbackBtnText}>{isPlayingTrail ? "暫停" : "播放"}</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1 }]}
+                onPress={handleResetTrail}
+              >
+                <IconSymbol name="arrow.counterclockwise" size={20} color="#fff" />
+                <Text style={styles.playbackBtnText}>重置</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1, backgroundColor: mapHeadingMode === 'heading' ? colors.primary : 'rgba(255,255,255,0.2)' }]}
+                onPress={() => setMapHeadingMode(mapHeadingMode === 'heading' ? 'north' : 'heading')}
+              >
+                <IconSymbol name={mapHeadingMode === 'heading' ? "arrow.up" : "compass"} size={20} color="#fff" />
+                <Text style={styles.playbackBtnText}>{mapHeadingMode === 'heading' ? '指北' : '指向'}</Text>
+              </Pressable>
+            </View>
+            {/* 回放速度滑桿 */}
+            <View style={styles.speedSliderContainer}>
+              <Text style={styles.speedSliderLabel}>速度：{trailPlaybackSpeed}x</Text>
+              <Slider
+                style={styles.speedSlider}
+                minimumValue={0.5}
+                maximumValue={4}
+                step={0.5}
+                value={trailPlaybackSpeed}
+                onValueChange={(value) => setTrailPlaybackSpeed(value)}
+                minimumTrackTintColor={colors.primary}
+                maximumTrackTintColor="rgba(255,255,255,0.3)"
+              />
+            </View>
+            {/* 回放統計卡片 */}
+            {isPlayingTrail && currentPlaybackData && (
+              <PlaybackStatsCard data={{...currentPlaybackData, altitude: 0}} />
+            )}
+          </View>
+        )}
+
+        {/* 摘要（距離 + 時間 + 卡洛里） */}
         <View style={styles.summaryRow}>
           <SummaryCell
             icon="location.fill"
@@ -1444,6 +1494,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#fff",
+  },
+  speedSliderContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  speedSliderLabel: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.7)",
+  },
+  speedSlider: {
+    width: "100%",
+    height: 30,
   },
   playbackProgress: {
     paddingHorizontal: 12,
