@@ -101,6 +101,10 @@ export interface AppSettings {
   age: number;          // 騎手年齡（用於推算最大心率 MHR）
   ftp: number;          // Functional Threshold Power (watts)
   bikeWeight: number;   // kg 单軋+裝備總重
+  // 心率區間校準
+  maxHeartRate?: number;      // 最大心率（自動偵測或手動設定）
+  restingHeartRate?: number;  // 靜息心率（自動估算或手動設定）
+  autoCalibrationEnabled?: boolean; // 是否啟用自動校準
   // 效能模式
   performanceMode: PerformanceMode; // 效能模式（省電、平衡、性能）
   autoPerformanceMode: boolean;      // 是否根據電量自動調整
@@ -183,6 +187,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   age: 32,
   ftp: 200,
   bikeWeight: 10,
+  maxHeartRate: 200,
+  restingHeartRate: 60,
+  autoCalibrationEnabled: true,
   performanceMode: 'balanced' as PerformanceMode,
   autoPerformanceMode: true,
   calorieThreshold: 300,

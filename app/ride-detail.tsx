@@ -288,13 +288,13 @@ export default function RideDetailScreen() {
     setTrailPlaybackIndex(0);
   }, []);
 
-  // 心率區間定義（5 個區間）
+  // 心率區間定義（5 個區間，包含 BPM 範圍）
   const HR_ZONES = [
-    { name: "恢復", min: 0, max: 0.6, color: "#4FC3F7" },      // 60% max
-    { name: "有氧基礎", min: 0.6, max: 0.7, color: "#66BB6A" }, // 60-70% max
-    { name: "有氧耐力", min: 0.7, max: 0.8, color: "#FDD835" }, // 70-80% max
-    { name: "乳酸閾值", min: 0.8, max: 0.9, color: "#FB8C00" }, // 80-90% max
-    { name: "最大強度", min: 0.9, max: 1.0, color: "#E53935" }  // 90-100% max
+    { name: "恢復", min: 0, max: 0.6, color: "#4FC3F7", minBpm: 60, maxBpm: 120 },
+    { name: "有氧基礎", min: 0.6, max: 0.7, color: "#66BB6A", minBpm: 120, maxBpm: 140 },
+    { name: "有氧耐力", min: 0.7, max: 0.8, color: "#FDD835", minBpm: 140, maxBpm: 160 },
+    { name: "乳酸閾值", min: 0.8, max: 0.9, color: "#FB8C00", minBpm: 160, maxBpm: 180 },
+    { name: "最大強度", min: 0.9, max: 1.0, color: "#E53935", minBpm: 180, maxBpm: 200 }
   ];
 
   // 計算心率區間分布（簡化版：基於平均心率估算）
@@ -313,6 +313,11 @@ export default function RideDetailScreen() {
   }, [record]);
 
   const heartRateZones = calculateHeartRateZones();
+  
+  // 心率區間顯示（包含 BPM 範圍）
+  const getHeartRateZoneDisplay = (zone: any) => {
+    return `${zone.name} (${zone.minBpm}-${zone.maxBpm} bpm)`;
+  };
 
   // 功率分布圓餅圖
   const renderPie = useCallback(() => {
