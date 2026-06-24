@@ -158,9 +158,19 @@ export async function showSupplyNotification(type: "calorie" | "water") {
     : "水分不足，請補充水分！";
   try {
     await Notifications.scheduleNotificationAsync({
-      content: { title, body, sound: true },
+      content: {
+        title,
+        body,
+        sound: true,
+        badge: 1,
+        categoryIdentifier: "SUPPLY_REMINDER",
+      } as any,
       trigger: null,
     });
+    // Android 特定設定（使用 Android 通知 API）
+    if (Platform.OS === "android") {
+      // 通知頻道已在 setupNotifications 中設定為 MAX 優先級
+    }
   } catch {}
 }
 

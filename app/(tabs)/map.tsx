@@ -187,6 +187,8 @@ export default function MapScreen() {
 
   // 地圖方向模式：true = 車頭朝前（heading-up），false = 指北（north-up）
   const [headingUp, setHeadingUp] = useState(false);
+  // 俯視角設定（0-60 度）
+  const [mapPitch, setMapPitch] = useState(0);
 
   // 功率平滑：5 點滑動平均
   const powerWindowRef = useRef<number[]>([]);
@@ -769,10 +771,20 @@ export default function MapScreen() {
               { center: { latitude, longitude }, zoom: 17 }
             );
           }
-          // 車頭朝前模式：僅在騎乘中且速度足夠時更新地圖方向
+          // 車頭朝前模式：僅在騎乘中且速度足夠時更新地圖方向和俯視角
           const currentState0 = stateRef.current;
           if (headingUp && hdg !== 0 && currentState0.status === "active" && speedKmhRaw >= 2) {
             mapRef.current?.setBearing(hdg, true);
+            // 根據速度動態設定俯視角（速度越快，俯視角越小）
+            const pitch = Math.max(0, Math.min(45, 45 - speedKmhRaw * 1.5));
+            if (Math.abs(pitch - mapPitch) > 2) {
+              setMapPitch(pitch);
+              mapRef.current?.setPitch(pitch);
+            }
+          } else if (headingUp && mapPitch > 0) {
+            // 速度不足或非車頭朝前模式時恢復上下俯視
+            setMapPitch(0);
+            mapRef.current?.setPitch(0);
           }
 
           const wd = windDataRef.current;
@@ -892,10 +904,20 @@ export default function MapScreen() {
           }
           const calIncrement = calculateCalories(power, LOCATION_INTERVAL_SEC);
 
+          // 計算真實 GPS 距離（米）
+          let distanceM = 0;
+          if (lastLocationRef.current) {
+            distanceM = haversineDistance(
+              lastLocationRef.current.coords.latitude,
+              lastLocationRef.current.coords.longitude,
+              latitude, longitude
+            );
+          }
+
           dispatch({
             type: "LOCATION_UPDATE",
             point: { latitude, longitude, altitude: altitude ?? 0, speed: speed ?? 0, timestamp: Date.now() },
-            power, calories: calIncrement, ascent,
+            power, calories: calIncrement, ascent, distanceM,
           });
 
           const sweatResult = calculateSweatLoss({

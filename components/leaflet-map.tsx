@@ -66,6 +66,7 @@ export interface LeafletMapHandle {
   animateCamera: (opts: { center: { latitude: number; longitude: number }; zoom?: number }, anim?: { duration: number }) => void;
   fitToCoordinates: (coords: LatLng[], opts?: { edgePadding?: { top: number; right: number; bottom: number; left: number }; animated?: boolean }) => void;
   setBearing: (bearing: number, headingUp: boolean) => void;
+  setPitch: (pitch: number) => void; // 俯視角設定 (0-60 度)
 }
 
 const LEAFLET_HTML = `<!DOCTYPE html>
@@ -387,6 +388,12 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             coords: mapped,
             padding: opts?.edgePadding,
           })
+        );
+      },
+      setPitch: (pitch: number) => {
+        if (!webViewRef.current) return;
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "setPitch", pitch: Math.max(0, Math.min(60, pitch)) })
         );
       },
     }));

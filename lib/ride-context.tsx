@@ -110,7 +110,7 @@ type RideAction =
   | { type: "STOP" }
   | { type: "RESET" }
   | { type: "TICK"; elapsed: number }
-  | { type: "LOCATION_UPDATE"; point: LocationPoint; power: number; calories: number; ascent: number }
+  | { type: "LOCATION_UPDATE"; point: LocationPoint; power: number; calories: number; ascent: number; distanceM?: number }
   | { type: "SWEAT_UPDATE"; sweatLossMl: number; sweatRatePerHour: number; intensityLabel: string }
   | { type: "CONSUME_CALORIES" }
   | { type: "CONSUME_WATER" }
@@ -203,7 +203,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       return { ...state, elapsed: action.elapsed };
 
     case "LOCATION_UPDATE": {
-      const { point, power, calories, ascent } = action;
+      const { point, power, calories, ascent, distanceM } = action;
       const newRoute = [...state.route, point];
 
       // 軌跡點始終記錄
@@ -224,21 +224,24 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       const newCalories = state.calories + calories;
       const newTotalCalories = state.totalCalories + calories;
 
-      // 坡度區間統計
+      // 坡度區間統計（使用真實 GPS 距離）
       const newGradeDistribution = [...state.gradeDistribution];
       const newGradeAscentDistribution = [...state.gradeAscentDistribution];
-      const distance = (point.speed ?? 0) * 3; // 米
-      let gradeIndex = 5; // 預設為 26%+
-      if (ascent > 0 && distance > 0) {
+      // 優先使用傳入的真實距離，其次使用速度推算
+      const distance = distanceM ?? (point.speed ?? 0) * 3; // 米
+      let gradeIndex = 0; // 預設為 1-5%（平坦路段）
+      if (distance > 0 && ascent > 0) {
         const grade = (ascent / distance) * 100;
         if (grade >= 1 && grade < 6) gradeIndex = 0;
         else if (grade >= 6 && grade < 11) gradeIndex = 1;
         else if (grade >= 11 && grade < 16) gradeIndex = 2;
         else if (grade >= 16 && grade < 21) gradeIndex = 3;
         else if (grade >= 21 && grade < 26) gradeIndex = 4;
+        else if (grade >= 26) gradeIndex = 5;
       }
+      // 當 ascent <= 0 時，gradeIndex 保持為 0（平坦或下坡）
       newGradeDistribution[gradeIndex] += distance;
-      newGradeAscentDistribution[gradeIndex] += ascent;
+      newGradeAscentDistribution[gradeIndex] += Math.max(0, ascent);
 
       return {
         ...state,
@@ -370,13 +373,15 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     // 計算感測器平均值
     const avgHeartRate = sensorStats?.heartRateValues.length ? Math.round(sensorStats.heartRateValues.reduce((a, b) => a + b, 0) / sensorStats.heartRateValues.length) : undefined;
     const avgCadence = sensorStats?.cadenceValues.length ? Math.round(sensorStats.cadenceValues.reduce((a, b) => a + b, 0) / sensorStats.cadenceValues.length) : undefined;
+    // 重新計算均速，確保使用最終的 distance 和 elapsed 值
+    const finalAvgSpeed = state.elapsed > 0 ? (state.distance / 1000) / (state.elapsed / 3600) : 0;
     const record: RideRecord = {
       id: now.toString(),
       date: now,
       name: (name && name.trim()) ? name.trim() : generateDefaultName(now),
       duration: state.elapsed,
       distance: state.distance,
-      avgSpeed: state.avgSpeed,
+      avgSpeed: finalAvgSpeed,
       maxSpeed: state.maxSpeed,
       totalAscent: state.totalAscent,
       calories: Math.round(state.totalCalories),  // 使用全程總卡路里（不被補給重置）

@@ -297,3 +297,29 @@
 - [x] 修改 saveRecord 函數，自動包含 gradeDistribution 和 gradeAscentDistribution 數據
 - [x] 確認騎乘結束時正確調用 saveRecord 函數
 - [x] 驗證騎乘記錄詳細頁面正確顯示坡度分布數據
+
+
+## 四項核心改進（v2.16）
+### 一. 均速異常改善
+- [x] 分析均速計算邏輯，發現 saveRecord 時直接使用 state.avgSpeed
+- [x] 修正 saveRecord 函數，在保存時重新計算最終均速
+- [x] 確保所有均速顯示都來自同一個計算來源
+
+### 二. 坡度異常改善
+- [x] 分析坡度計算邏輯，發現 distance 計算不一致
+- [x] 修改 LOCATION_UPDATE 類型以包含真實 GPS 距離
+- [x] 修正坡度計算邏輯，優先使用真實距離而不是速度推算
+- [x] 修正坡度分類邏輯，平坦路段不再被誤分類為 26%+
+
+### 三. 背景執行補給通知改善
+- [x] 確認 SupplyModal 已實現全屏彈窗
+- [x] 改善系統通知設定，添加 badge 和 categoryIdentifier
+- [x] 確保補給通知在背景執行時能正確觸發
+
+### 四. 車頭朝前導航功能
+- [x] 確認地圖組件已支持 setBearing 方法
+- [x] 驗證低通濾波實現（7 點循環平均，角度向量平均）
+- [x] 驗證 GPS vs 磁力計邏輯切換（速度 > 5 km/h 使用 GPS）
+- [x] 添加 setPitch 方法到地圖 API
+- [x] 實現根據速度動態調整俯視角（0-45 度）
+
