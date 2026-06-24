@@ -282,6 +282,9 @@ export default function RideDetailScreen() {
     return { bearing, pitch };
   }, [trailPlaybackIndex, polylineCoords, record]);
   
+  // 地圖方向模式狀態
+  const [mapHeadingMode, setMapHeadingMode] = useState<'heading' | 'north'>('heading');
+
   // 地圖自動跟隨回放位置、更新標點顏色、方向旋轉和俯視角度（優化：數據點採樣）
   useEffect(() => {
     if (trailPlaybackIndex > 0 && trailPlaybackIndex < polylineCoords.length && mapRef.current) {
@@ -302,14 +305,15 @@ export default function RideDetailScreen() {
         color
       );
       
-      // 地圖隨行進方向轉動
-      mapRef.current.setBearing(bearing, true);
+      // 根據方向模式設定是否旋轉地圖
+      const finalBearing = mapHeadingMode === 'heading' ? bearing : 0;
+      mapRef.current.setBearing(finalBearing, true);
       
       // 根據坡度調整俯視角度
       mapRef.current.setPitch(pitch);
       
-      // 地圖中心跟隨（优化：动画時間与回放速度匹配）
-      const cameraDuration = Math.max(150, 100 / trailPlaybackSpeed);
+      // 地圖中心跟隨（優化：動画時間与回放速度匹配，改進平滑性）
+      const cameraDuration = Math.max(200, 150 / trailPlaybackSpeed);
       mapRef.current.animateCamera(
         {
           center: { latitude: currentCoord.latitude, longitude: currentCoord.longitude },
@@ -318,7 +322,7 @@ export default function RideDetailScreen() {
         { duration: cameraDuration }
       );
     }
-  }, [trailPlaybackIndex, polylineCoords, getPlaybackMarkerColor, getPlaybackBearingAndPitch]);
+  }, [trailPlaybackIndex, polylineCoords, getPlaybackMarkerColor, getPlaybackBearingAndPitch, mapHeadingMode]);
   
   // 計算當前回放位置的數據
   const currentPlaybackData = useMemo(() => {
@@ -920,7 +924,7 @@ export default function RideDetailScreen() {
             )}
 
             {/* 軌跡回放統計卡片 */}
-            {isPlayingTrail && trailPlaybackIndex > 0 && trailPlaybackIndex < polylineCoords.length && record && (
+            {isPlayingTrail && record && (
               <PlaybackStatsCard
                 data={{
                   speed: (record.route?.[trailPlaybackIndex]?.speed || 0) * 3.6,
@@ -952,23 +956,35 @@ export default function RideDetailScreen() {
                     <IconSymbol name="arrow.counterclockwise" size={20} color="#fff" />
                     <Text style={styles.playbackBtnText}>重置</Text>
                   </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1, backgroundColor: mapHeadingMode === 'heading' ? colors.primary : 'rgba(255,255,255,0.2)' }]}
+                    onPress={() => setMapHeadingMode(mapHeadingMode === 'heading' ? 'north' : 'heading')}
+                  >
+                    <IconSymbol name={mapHeadingMode === 'heading' ? "arrow.up" : "compass"} size={20} color="#fff" />
+                    <Text style={styles.playbackBtnText}>{mapHeadingMode === 'heading' ? '指北' : '指向'}</Text>
+                  </Pressable>
                   <View style={styles.speedControl}>
-                    <Text style={styles.speedLabel}>速度: {trailPlaybackSpeed}x</Text>
+                    <View style={styles.speedLabelRow}>
+                      <Text style={styles.speedLabel}>速度</Text>
+                      <Text style={styles.speedValue}>{trailPlaybackSpeed}x</Text>
+                    </View>
                     <View style={styles.speedButtons}>
                       {[0.5, 1, 2, 4].map((speed) => (
                         <Pressable
                           key={speed}
                           style={({ pressed }) => [{
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
+                            flex: 1,
+                            paddingHorizontal: 4,
+                            paddingVertical: 6,
                             marginHorizontal: 2,
                             borderRadius: 4,
                             backgroundColor: trailPlaybackSpeed === speed ? colors.primary : colors.surface,
                             opacity: pressed ? 0.7 : 1,
+                            alignItems: 'center',
                           }]}
                           onPress={() => setTrailPlaybackSpeed(speed)}
                         >
-                          <Text style={[styles.speedBtnText, { color: trailPlaybackSpeed === speed ? '#fff' : colors.foreground }]}>
+                          <Text style={[styles.speedBtnText, { color: trailPlaybackSpeed === speed ? '#fff' : colors.foreground, fontSize: 12 }]}>
                             {speed}x
                           </Text>
                         </Pressable>
@@ -1400,6 +1416,17 @@ const styles = StyleSheet.create({
   speedLabel: {
     fontSize: 12,
     color: "rgba(255,255,255,0.7)",
+  },
+  speedLabelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  speedValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.9)",
   },
   speedButtons: {
     flexDirection: "row",
