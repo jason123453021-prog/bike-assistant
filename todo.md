@@ -472,3 +472,15 @@
 - [x] 全面檢查應用程式文本，修正錯字
 - [x] 驗證應用程式資訊完整性和圖片顯示正確性
 - [x] 測試驗證並保存檢查點
+
+
+## Android 優化與功能增強（v2.44+）
+- [x] 建立技術方案文檔（ANDROID_OPTIMIZATION_PLAN.md）
+- [x] 實施自動暫停狀態機（雙閾值滊後） - lib/auto-pause-fsm.ts
+- [x] 集成 GPS 與羅盤融合導航 - lib/heading-fusion.ts
+- [x] 實施加速度計感測器融合 - lib/accelerometer-fusion.ts
+- [x] 功耗管理與動態休眠 - lib/power-management.ts
+- [x] 統一優化管理器 - lib/android-optimization-manager.ts
+- [ ] Foreground Service 與背景權限實施
+- [ ] 情感化 UX 改進（Haptic + TTS）
+- [ ] 端到端測試與驗證
