@@ -492,4 +492,6 @@
 - [x] 實施 TTS 語音提示整合 - lib/emotional-ux.ts
 - [x] UI 調整 - 統計面板移至頂部（地圖上方）
 - [x] 統計面板半透明化設置 (rgba 75%)
+- [x] 集成 Foreground Service 到 map.tsx 驗證開始部分
+- [x] 集成情感化 UX 到自動暂停、恢複、低電量事件
 - [ ] 端到端測試與驗證

@@ -88,6 +88,8 @@ import { SimplifiedNavOverlay } from "@/components/simplified-nav-overlay";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
 import { useFriendNav } from "@/lib/friend-nav-context";
+import { ForegroundServiceManager } from "@/lib/foreground-service";
+import { EmotionalUXManager } from "@/lib/emotional-ux";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -807,6 +809,8 @@ export default function MapScreen() {
                 dispatch({ type: "LOCATION_UPDATE", point: { latitude, longitude, altitude: altitude ?? 0, speed: 0, timestamp: Date.now() }, power: 0, calories: 0, ascent: 0 });
                 if (settings.ttsEnabled) speakAutoPause(true);
                 if (settings.vibrationEnabled) vibrateMedium();
+                // 集成情感化 UX - 自動暫停反饋
+                EmotionalUXManager.onAutoPauseTriggered('speed').catch((error: any) => console.warn("Auto pause emotional UX failed:", error));
                 return;
               }
             } else {
@@ -815,6 +819,8 @@ export default function MapScreen() {
           } else if (currentState.status === "paused" && speedKmh >= AUTO_PAUSE_THRESHOLD) {
             lowSpeedCountRef.current = 0;
             dispatch({ type: "RESUME" });
+            // 集成情感化 UX - 自動恢復反饋
+            EmotionalUXManager.onRideResumed().catch((error: any) => console.warn("Auto resume emotional UX failed:", error));
             if (settings.ttsEnabled) speakAutoResume(true);
             return;
           }
@@ -1268,6 +1274,29 @@ export default function MapScreen() {
 
     await startBackgroundLocationTracking();
 
+    // 初始化並啟動 Foreground Service
+    try {
+      await ForegroundServiceManager.initialize({
+        accuracy: Location.Accuracy.High,
+        timeInterval: 1000,
+        distanceInterval: 5,
+      });
+      await ForegroundServiceManager.startLocationTracking();
+    } catch (error) {
+      console.warn('Foreground Service initialization failed:', error);
+    }
+
+    // 初始化情感化 UX
+    try {
+      await EmotionalUXManager.initialize({
+        hapticEnabled: true,
+        ttsEnabled: settings.ttsEnabled,
+        language: 'zh-TW',
+      });
+    } catch (error) {
+      console.warn('Emotional UX initialization failed:', error);
+    }
+
     const loc = await Location.getLastKnownPositionAsync();
     if (loc) updateWeather(loc.coords.latitude, loc.coords.longitude);
     weatherTimerRef.current = setInterval(async () => {
@@ -1450,6 +1479,10 @@ export default function MapScreen() {
           const level = await Battery.getBatteryLevelAsync();
           batteryLevel = Math.round(level * 100);
         }
+      // 集成情感化 UX - 低電量警告
+      if (batteryLevel > 0 && batteryLevel <= 20) {
+        EmotionalUXManager.onLowBatteryWarning(batteryLevel).catch((error: any) => console.warn("Low battery emotional UX failed:", error));
+      }
       } catch { /* 忽略電量讀取失敗 */ }
       updateLocationMutation.mutate({
         latitude: currentPos.lat,
