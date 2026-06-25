@@ -484,3 +484,12 @@
 - [ ] Foreground Service 與背景權限實施
 - [ ] 情感化 UX 改進（Haptic + TTS）
 - [ ] 端到端測試與驗證
+
+
+## Foreground Service 與情感化 UX（v2.49+）
+- [x] 實施 Foreground Service 與背景權限 - lib/foreground-service.ts
+- [x] 實施 Haptic 反饋整合 - lib/emotional-ux.ts
+- [x] 實施 TTS 語音提示整合 - lib/emotional-ux.ts
+- [x] UI 調整 - 統計面板移至頂部（地圖上方）
+- [x] 統計面板半透明化設置 (rgba 75%)
+- [ ] 端到端測試與驗證

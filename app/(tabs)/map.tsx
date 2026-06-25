@@ -2343,16 +2343,16 @@ const styles = StyleSheet.create({
   },
   noRouteText: { color: "rgba(255,255,255,0.5)", fontSize: 11 },
 
-  // 底部面板
+  // 頂部面板（統計面板移至頂部）
   panel: {
     position: "absolute",
-    bottom: 0, left: 0, right: 0,
-    backgroundColor: "#0d0d1a",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    top: 0, left: 0, right: 0,
+    backgroundColor: "rgba(13, 13, 26, 0.75)",
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.08)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
     overflow: "hidden",
   },
   handleArea: {
