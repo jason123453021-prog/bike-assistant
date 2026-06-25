@@ -2383,22 +2383,21 @@ const styles = StyleSheet.create({
   },
   noRouteText: { color: "rgba(255,255,255,0.5)", fontSize: 11 },
 
-  // 頂部面板（統計面板移至頂部）
+  // 底部面板（統計面板移至地圖下方）
   panel: {
     position: "absolute",
-    top: 0, left: 0, right: 0,
+    bottom: 0, left: 0, right: 0,
     backgroundColor: "rgba(13, 13, 26, 0.75)",
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
     overflow: "hidden",
   },
   handleArea: {
     alignItems: "center",
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingBottom: 8,
   },
   panelHandle: {
     width: 36, height: 4,
