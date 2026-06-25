@@ -1354,6 +1354,13 @@ export default function MapScreen() {
           await saveRecord(undefined, sensorStatsRef.current);
           setShowSummary(true);
           if (settings.vibrationEnabled) vibrateSuccess();
+          
+          // 集成情感化 UX - 騎乘完成反饋
+          try {
+            await EmotionalUXManager.onRideCompleted(state.elapsed, state.distance);
+          } catch (error) {
+            console.warn('Ride completed emotional UX failed:', error);
+          }
         },
       },
     ]);
