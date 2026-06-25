@@ -16,14 +16,11 @@ import { useColors } from "@/hooks/use-colors";
 import { useRide, type RideRecord } from "@/lib/ride-context";
 import { formatDuration } from "@/lib/power-calc";
 import { calculateWeeklyTrainingStats, calculateMonthlyTrainingStats } from "@/lib/activity-stats";
-import { useI18n } from "@/lib/i18n-context";
-import { formatNumber, formatDistance, formatSpeed, formatDateTime, formatDate } from "@/lib/localization-format";
 
 const STORAGE_KEY = "@bike_records";
 
 export default function HistoryScreen() {
   const colors = useColors();
-  const { language } = useI18n();
   const { state, dispatch, loadRecords } = useRide();
   const [searchQuery, setSearchQuery] = useState("");
   const [showStats, setShowStats] = useState(false);
@@ -80,9 +77,9 @@ export default function HistoryScreen() {
 
   const renderItem = ({ item }: { item: RideRecord }) => {
     const date = new Date(item.date);
-    const dateStr = formatDate(date, language);
+    const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
     const timeStr = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-    const distKm = formatDistance(item.distance / 1000, language).split(' ')[0];
+    const distKm = (item.distance / 1000).toFixed(2);
     const hasRoute = item.route && item.route.length > 1;
 
     return (
@@ -108,7 +105,7 @@ export default function HistoryScreen() {
         <View style={styles.statsRow}>
           <StatChip icon="location.fill" value={`${distKm} km`} color={colors.accent} />
           <StatChip icon="clock.fill" value={formatDuration(item.duration)} color={colors.muted} />
-          <StatChip icon="flame.fill" value={`${formatNumber(Math.round(item.calories), language, 0)} kcal`} color={colors.warning} />
+          <StatChip icon="flame.fill" value={`${item.calories} kcal`} color={colors.warning} />
         </View>
 
         {/* 底部操作列 */}
@@ -116,7 +113,7 @@ export default function HistoryScreen() {
           {/* 均速 */}
           <View style={styles.avgSpeedBox}>
             <Text style={[styles.avgSpeed, { color: colors.foreground }]}>
-              {formatSpeed(item.avgSpeed, language).split(' ')[0]}
+              {item.avgSpeed.toFixed(1)}
             </Text>
             <Text style={[styles.avgSpeedUnit, { color: colors.muted }]}>km/h 均速</Text>
           </View>

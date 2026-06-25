@@ -24,8 +24,6 @@ import { parseGpx, estimateRouteCalories, type GpxRoute } from "@/lib/gpx-parser
 import { useGpx } from "@/lib/gpx-context";
 import { formatDuration, formatDistance, calcAirDensity } from "@/lib/power-calc";
 import { fetchWeather, type WeatherData } from "@/lib/weather-service";
-import { useI18n } from "@/lib/i18n-context";
-import { formatNumber, formatCalories, formatDistance as fmtDistance, formatSpeed, formatElevation } from "@/lib/localization-format";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CHART_WIDTH = SCREEN_WIDTH - 48;
@@ -35,7 +33,6 @@ export default function NavigateScreen() {
   const colors = useColors();
   const { settings } = useSettings();
   const { setSharedRoute } = useGpx();
-  const { language } = useI18n();
 
   const [route, setRoute] = useState<GpxRoute | null>(null);
   const [loading, setLoading] = useState(false);
@@ -410,7 +407,7 @@ export default function NavigateScreen() {
                 {/* 總卡路里大字 */}
                 <View style={styles.calorieTotalRow}>
                   <Text style={[styles.calorieTotalValue, { color: colors.accent }]}>
-                    {formatNumber(calorieResult.totalKcal, language, 0)}
+                    {calorieResult.totalKcal.toLocaleString()}
                   </Text>
                   <Text style={[styles.calorieTotalUnit, { color: colors.muted }]}>kcal</Text>
                 </View>

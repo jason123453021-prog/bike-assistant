@@ -38,8 +38,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { useRide, type RideRecord, type RouteStats } from "@/lib/ride-context";
 import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power-calc";
-import { useI18n } from "@/lib/i18n-context";
-import { formatNumber, formatDistance, formatSpeed, formatCalories, formatWater, formatElevation, formatPower, formatHeartRate, formatCadence, formatDateTime } from "@/lib/localization-format";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFavorites } from "@/lib/favorites-context";
 import { ShareCardModal } from "@/components/share-card-modal";
@@ -70,7 +68,6 @@ const DARK_MAP_STYLE = [
 export default function RideDetailScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
-  const { language } = useI18n();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, dispatch, updateRecordName, getRouteStats } = useRide();
   const { favorites, addFavorite, removeFavorite } = useFavorites();
@@ -1127,12 +1124,12 @@ export default function RideDetailScreen() {
             <View style={[styles.statsPanel, { borderColor: colors.border }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>核心數據</Text>
               <View style={styles.statsGrid}>
-                <DetailCell label="距離" value={formatDistance(record.distance / 1000, language).split(' ')[0]} unit="km" />
+                <DetailCell label="距離" value={`${(record.distance / 1000).toFixed(2)}`} unit="km" />
                 <DetailCell label="總時間" value={formatDuration(record.duration)} unit="" />
                 <DetailCell label="移動時間" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" />
-                <DetailCell label="平均速度" value={formatSpeed(((record.distance / 1000) / ((record.duration - (record.totalPausedSec ?? 0)) / 3600)), language).split(' ')[0]} unit="km/h" />
-                <DetailCell label="最高速度" value={formatSpeed(record.maxSpeed, language).split(' ')[0]} unit="km/h" />
-                <DetailCell label="消耗熱量" value={formatNumber(Math.round(record.calories), language, 0)} unit="kcal" />
+                <DetailCell label="平均速度" value={`${((record.distance / 1000) / ((record.duration - (record.totalPausedSec ?? 0)) / 3600)).toFixed(1)}`} unit="km/h" />
+                <DetailCell label="最高速度" value={`${record.maxSpeed.toFixed(1)}`} unit="km/h" />
+                <DetailCell label="消耗熱量" value={`${Math.round(record.calories)}`} unit="kcal" />
                 <DetailCell label="有效騎乘" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" color="#4ADE80" />
                 <DetailCell label="暫停時間" value={formatDuration(record.totalPausedSec ?? 0)} unit="" />
               </View>
@@ -1142,9 +1139,9 @@ export default function RideDetailScreen() {
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>爬升與地形</Text>
               <View style={styles.statsGrid}>
-                <DetailCell label="總爬升高度" value={formatNumber(Math.round(record.totalAscent), language, 0)} unit="m" color="#F59E0B" />
-                <DetailCell label="總下降高度" value={formatNumber(Math.round(record.totalDescent ?? 0), language, 0)} unit="m" color="#4FC3F7" />
-                <DetailCell label="最大海拔" value={formatNumber(Math.round(record.maxElevation ?? 0), language, 0)} unit="m" />
+                <DetailCell label="總爬升高度" value={`${Math.round(record.totalAscent)}`} unit="m" color="#F59E0B" />
+                <DetailCell label="總下降高度" value="0" unit="m" color="#4FC3F7" />
+                <DetailCell label="最大海拔" value="0" unit="m" />
                 <DetailCell label="最小海拔" value="0" unit="m" />
                 <DetailCell label="平均坡度" value="0.0" unit="%" />
                 <DetailCell label="最大坡度" value="0.0" unit="%" />
@@ -1155,13 +1152,13 @@ export default function RideDetailScreen() {
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>進階訓練數據</Text>
               <View style={styles.statsGrid}>
-                <DetailCell label="平均心率" value={record.avgHeartRate ? formatNumber(record.avgHeartRate, language, 0) : "--"} unit="bpm" color="#EF4444" />
-                <DetailCell label="最大心率" value={record.maxHeartRate ? formatNumber(record.maxHeartRate, language, 0) : "--"} unit="bpm" color="#EF4444" />
-                <DetailCell label="平均功率" value={formatNumber(record.avgPower, language, 0)} unit="W" accent />
-                <DetailCell label="最大功率" value={formatNumber(record.maxPower, language, 0)} unit="W" accent />
+                <DetailCell label="平均心率" value={record.avgHeartRate ? `${record.avgHeartRate}` : "--"} unit="bpm" color="#EF4444" />
+                <DetailCell label="最大心率" value={record.maxHeartRate ? `${record.maxHeartRate}` : "--"} unit="bpm" color="#EF4444" />
+                <DetailCell label="平均功率" value={`${record.avgPower}`} unit="W" accent />
+                <DetailCell label="最大功率" value={`${record.maxPower}`} unit="W" accent />
                 <DetailCell label="標準化功率" value="--" unit="W" accent />
-                <DetailCell label="平均踏頻" value={record.avgCadence ? formatNumber(record.avgCadence, language, 0) : "--"} unit="rpm" />
-                <DetailCell label="最大踏頻" value={record.maxCadence ? formatNumber(record.maxCadence, language, 0) : "--"} unit="rpm" />
+                <DetailCell label="平均踏頻" value={record.avgCadence ? `${record.avgCadence}` : "--"} unit="rpm" />
+                <DetailCell label="最大踏頻" value={record.maxCadence ? `${record.maxCadence}` : "--"} unit="rpm" />
               </View>
             </View>
 
@@ -1426,7 +1423,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   panelTitle: {
     fontSize: 14,
@@ -1440,7 +1437,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
 
   playbackControls: {
