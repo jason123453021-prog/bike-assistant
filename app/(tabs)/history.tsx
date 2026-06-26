@@ -139,6 +139,26 @@ export default function HistoryScreen() {
               </Text>
             </Pressable>
 
+            {/* 查看 Relive 按鈕 */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.trailBtn,
+                { backgroundColor: hasRoute ? colors.primary + "18" : colors.border + "40",
+                  borderColor: hasRoute ? colors.primary + "50" : colors.border,
+                  opacity: pressed ? 0.7 : 1 },
+              ]}
+              onPress={() => hasRoute && router.push({ pathname: "/relive", params: { id: item.id } })}
+            >
+              <IconSymbol
+                name="play.circle.fill"
+                size={13}
+                color={hasRoute ? colors.primary : colors.muted}
+              />
+              <Text style={[styles.trailBtnText, { color: hasRoute ? colors.primary : colors.muted }]}>
+                Relive
+              </Text>
+            </Pressable>
+
             {/* 刪除按鈕 */}
             <Pressable
               style={({ pressed }) => [styles.deleteBtn, { opacity: pressed ? 0.6 : 1 }]}
