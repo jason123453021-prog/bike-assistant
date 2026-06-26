@@ -631,34 +631,44 @@ export default function ReliveScreen() {
     }).start();
   }, [panelAnim]);
 
-  // 手勢識別器
+  // 手勢識別器 - 只在 Drag Handle（把手）區域允許拖動
+  // 把手區域高度：12px（把手本身）+ 16px（padding）= 28px，預留邊距設為 40px
+  const DRAG_HANDLE_HEIGHT = 40;
+  
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (_, gs) => {
-        // 只在拉桿區域（頂部 50px）允許拖動
-        return gs.y0 < 50;
+        // 只在把手區域（頂部 40px）允許拖動
+        return gs.y0 < DRAG_HANDLE_HEIGHT;
       },
       onMoveShouldSetPanResponder: (_, gs) => {
-        return gs.y0 < 50 && Math.abs(gs.dy) > 5;
+        // 只在把手區域且垂直移動超過 5px 時才響應
+        return gs.y0 < DRAG_HANDLE_HEIGHT && Math.abs(gs.dy) > 5;
       },
       onPanResponderMove: (_, gs) => {
-        const newHeight = BOTTOM_PANEL_COLLAPSED_HEIGHT + (-gs.dy);
-        const clampedHeight = Math.max(BOTTOM_PANEL_COLLAPSED_HEIGHT, Math.min(BOTTOM_PANEL_EXPANDED_HEIGHT, newHeight));
-        panelAnim.setValue(clampedHeight);
+        // 只允許在把手區域拖動改變高度
+        if (gs.y0 < DRAG_HANDLE_HEIGHT) {
+          const newHeight = BOTTOM_PANEL_COLLAPSED_HEIGHT + (-gs.dy);
+          const clampedHeight = Math.max(BOTTOM_PANEL_COLLAPSED_HEIGHT, Math.min(BOTTOM_PANEL_EXPANDED_HEIGHT, newHeight));
+          panelAnim.setValue(clampedHeight);
+        }
       },
       onPanResponderRelease: (_, gs) => {
-        const currentHeight = (panelAnim as any)._value;
-        const midpoint = (BOTTOM_PANEL_COLLAPSED_HEIGHT + BOTTOM_PANEL_EXPANDED_HEIGHT) / 2;
-        const velocity = gs.vy;
-        
-        // 根據速度或位置決定展開或收縮
-        if (velocity < -0.5 || currentHeight > midpoint) {
-          togglePanel(true);
-        } else if (velocity > 0.5 || currentHeight < midpoint) {
-          togglePanel(false);
-        } else {
-          // 保持當前狀態
-          togglePanel(panelExpanded);
+        // 只在把手區域釋放時才觸發自動展開/收縮
+        if (gs.y0 < DRAG_HANDLE_HEIGHT) {
+          const currentHeight = (panelAnim as any)._value;
+          const midpoint = (BOTTOM_PANEL_COLLAPSED_HEIGHT + BOTTOM_PANEL_EXPANDED_HEIGHT) / 2;
+          const velocity = gs.vy;
+          
+          // 根據速度或位置決定展開或收縮
+          if (velocity < -0.5 || currentHeight > midpoint) {
+            togglePanel(true);
+          } else if (velocity > 0.5 || currentHeight < midpoint) {
+            togglePanel(false);
+          } else {
+            // 保持當前狀態
+            togglePanel(panelExpanded);
+          }
         }
       },
     })
@@ -728,10 +738,9 @@ export default function ReliveScreen() {
           styles.bottomPanel,
           { height: panelAnim, bottom: 0 },
         ]}
-        {...panResponder.panHandlers}
       >
-        {/* 拖拉把手 */}
-        <View style={styles.handleArea}>
+        {/* 拖拉把手 - 唯一可拖動的區域 */}
+        <View style={styles.handleArea} {...panResponder.panHandlers}>
           <View style={styles.panelHandle} />
         </View>
 
@@ -942,6 +951,7 @@ export default function ReliveScreen() {
           <ScrollView
             style={styles.expandedContent}
             showsVerticalScrollIndicator={false}
+            scrollEnabled={panelExpanded}
             contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
           >
             {/* 核心數據 */}
@@ -1308,17 +1318,20 @@ const styles = StyleSheet.create({
   },
   handleArea: {
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    // 清晰的 Drag Handle 可互動區域
   },
   panelHandle: {
     width: 40,
-    height: 4,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    borderRadius: 2,
+    height: 5,
+    backgroundColor: "rgba(255,255,255,0.4)",
+    borderRadius: 2.5,
   },
   collapsedContent: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    // 卡片區域 - 只允許內容捲動，不觸發拖動抽屉
   },
   expandedContent: {
     paddingHorizontal: 12,
