@@ -794,7 +794,10 @@ export default function MapScreen() {
             
             // 只在角度變化超過 0.5° 時更新地圖，提高靈敏度
             if (Math.abs(angleDiff) > 0.5) {
-              const newBearing = (lastMapBearingRef.current + angleDiff * 0.5) % 360;
+              const { width, height } = Dimensions.get("window");
+              const isPortrait = height > width;
+              const smoothFactor = isPortrait ? 0.6 : 0.5;
+              const newBearing = (lastMapBearingRef.current + angleDiff * smoothFactor) % 360;
               lastMapBearingRef.current = newBearing;
               mapRef.current?.setBearing(newBearing, true);
             }
