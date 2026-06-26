@@ -91,3 +91,41 @@ export const rideComments = mysqlTable("rideComments", {
 });
 export type RideCommentRecord = typeof rideComments.$inferSelect;
 export type InsertRideComment = typeof rideComments.$inferInsert;
+
+// ── 騎乘分享 ──────────────────────────────────────────────────────────────
+/** 騎乘分享表：記錄用戶分享騎乘記錄至好友 */
+export const rideShares = mysqlTable("rideShares", {
+  id: int("id").autoincrement().primaryKey(),
+  shareFromUserId: int("shareFromUserId").notNull(),   // 分享者用戶 ID
+  shareToUserId: int("shareToUserId").notNull(),       // 接收分享的用戶 ID
+  rideId: varchar("rideId", { length: 64 }).notNull(), // 騎乘記錄 ID（本地生成）
+  note: text("note"),                                   // 分享備註
+  canComment: int("canComment").default(1).notNull(),  // 1=允許評論，0=不允許
+  canLike: int("canLike").default(1).notNull(),        // 1=允許點讚，0=不允許
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type RideShare = typeof rideShares.$inferSelect;
+export type InsertRideShare = typeof rideShares.$inferInsert;
+
+/** 分享評論表：記錄在分享騎乘記錄上的評論 */
+export const shareComments = mysqlTable("shareComments", {
+  id: int("id").autoincrement().primaryKey(),
+  shareId: int("shareId").notNull(),                   // 分享記錄 ID
+  userId: int("userId").notNull(),                     // 評論者用戶 ID
+  content: text("content").notNull(),                  // 評論內容
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ShareComment = typeof shareComments.$inferSelect;
+export type InsertShareComment = typeof shareComments.$inferInsert;
+
+/** 分享點讚表：記錄對分享騎乘記錄的點讚 */
+export const shareLikes = mysqlTable("shareLikes", {
+  id: int("id").autoincrement().primaryKey(),
+  shareId: int("shareId").notNull(),                   // 分享記錄 ID
+  userId: int("userId").notNull(),                     // 點讚者用戶 ID
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ShareLike = typeof shareLikes.$inferSelect;
+export type InsertShareLike = typeof shareLikes.$inferInsert;

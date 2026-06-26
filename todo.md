@@ -583,23 +583,39 @@
 - [x] 社群互動 UI — 在 Relive 頁面實時統計面板後添加社群互動按鈕和評論區域
 
 
-## 本地社群互動持久化與後端同步（v3.0）
-### 第一階段：本地社群互動持久化
-- [x] 建立 SocialContext（lib/social-context.tsx）：管理按讚、評論、分享數據
-- [x] 實現 AsyncStorage 持久化邏輯（saveInteractions、loadInteractions）
-- [x] 支援按讚狀態持久化（rideId → isLiked、likeCount）
-- [x] 支援評論列表持久化（rideId → comments 陣列）
-- [x] 在 relive.tsx 中集成 SocialContext
-- [x] 應用啟動時自動載入本地社群互動數據
-- [x] 測試跨 App 會話的數據恢復
+## 好友互動分享功能（v3.1）
+### 第一階段：數據模型和後端 API
+- [x] 在 drizzle/schema.ts 中添加 rideShares 表（分享記錄）
+- [x] 在 drizzle/schema.ts 中添加 shareComments 表（分享評論）
+- [x] 執行數據庫遷移
+- [x] 在 server/social-router.ts 中添加分享相關 API
+  - [x] shareRide：分享騎乘記錄至好友
+  - [x] getSharedRides：獲取分享給我的騎乘記錄
+  - [x] getMySharedRides：獲取我分享的騎乘記錄
+  - [x] unshareRide：取消分享
+  - [x] addShareComment：在分享記錄上添加評論
 
-### 第二階段：騎乘數據後端同步
-- [x] 在 server/routers.ts 中新增社群互動 API（getInteractions、toggleLike、addComment、syncInteractions）
-- [x] 在 drizzle/schema.ts 中新增社群互動表（rideInteractions、rideComments）
-- [x] 建立 SocialSyncManager（lib/social-sync.ts）：管理待同步數據和自動同步
-- [x] 實現雲端備份邏輯（同步本地社群數據至後端）
-- [x] 實現多設備同步邏輯（從後端拉取其他設備的社群互動）
-- [x] 在 relive.tsx 中添加同步狀態指示器（🔄 圖示）
-- [x] 實現離線模式（無網路時本地存儲，有網路時自動同步）
-- [ ] 測試端對端社群互動同步流程
-- [ ] 實現好友分享邏輯（分享騎乘記錄至好友、好友可查看與互動）
+### 第二階段：分享 UI 和交互
+- [x] 在 relive.tsx 中添加「分享至好友」按鈕
+- [x] 建立分享模態框組件（ShareModal.tsx）
+  - [x] 好友列表選擇
+  - [x] 分享備註輸入
+  - [x] 分享權限設置（可評論、可點讚等）
+- [x] 實現分享成功提示
+
+### 第三階段：分享記錄頁面
+- [ ] 建立分享記錄頁面（app/shared-rides.tsx）
+  - [ ] 分享給我的騎乘記錄列表
+  - [ ] 我分享的騎乘記錄列表
+  - [ ] 分享者信息展示
+  - [ ] 分享時間和備註
+- [ ] 實現分享記錄詳情頁
+  - [ ] 查看分享的騎乘軌跡
+  - [ ] 添加評論和點讚
+  - [ ] 查看分享者和其他評論者的互動
+
+### 第四階段：集成和測試
+- [ ] 在標籤導航中添加分享記錄頁面
+- [ ] 測試分享功能端對端流程
+- [ ] 測試好友互動（點讚、評論）
+- [ ] 優化 UI 和用戶體驗

@@ -37,6 +37,9 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
 import * as DocumentPicker from "expo-document-picker";
+import { ShareModal } from "@/components/share-modal";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/hooks/use-auth";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 // 動態計算海苔條高度（根據內容自適應）
@@ -74,6 +77,12 @@ interface ReliveState {
     altitude: number;
     power: number;
   };
+}
+
+interface ShareState {
+  showShareModal: boolean;
+  friends: Array<{ id: number; name: string | null; email: string | null }>;
+  isLoadingFriends: boolean;
 }
 
 interface Highlight {
@@ -123,6 +132,58 @@ export default function ReliveScreen() {
   }, [id, social]);
   const [newComment, setNewComment] = useState('');
   const [showComments, setShowComments] = useState(false);
+
+  // 分享狀態
+  const { isAuthenticated } = useAuth();
+  const [shareState, setShareState] = useState<ShareState>({
+    showShareModal: false,
+    friends: [],
+    isLoadingFriends: false,
+  });
+  const friendsQuery = trpc.friends.list.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+  const shareRideMutation = trpc.share.shareRide.useMutation();
+
+  // 加載好友列表
+  useEffect(() => {
+    if (friendsQuery.data) {
+      setShareState((prev) => ({
+        ...prev,
+        friends: friendsQuery.data || [],
+      }));
+    }
+  }, [friendsQuery.data]);
+
+  // 處理分享
+  const handleShareRide = useCallback(
+    async (friendId: number, note: string, canComment: boolean, canLike: boolean) => {
+      if (!id) return;
+      try {
+        await shareRideMutation.mutateAsync({
+          rideId: id,
+          shareToUserId: friendId,
+          note,
+          canComment,
+          canLike,
+        });
+        setShareState((prev) => ({ ...prev, showShareModal: false }));
+      } catch (error) {
+        console.error("[Relive] 分享失敗:", error);
+        throw error;
+      }
+    },
+    [id, shareRideMutation]
+  );
+
+  // 打開分享模態框
+  const handleOpenShareModal = useCallback(() => {
+    if (!isAuthenticated) {
+      Alert.alert("提示", "請先登入以分享騎乘記錄");
+      return;
+    }
+    setShareState((prev) => ({ ...prev, showShareModal: true }));
+  }, [isAuthenticated]);
 
   // 模擬加載照片
   useEffect(() => {
@@ -801,7 +862,7 @@ export default function ReliveScreen() {
                 <Text style={styles.interactionBtnText}>💬 {interaction.comments.length}</Text>
               </Pressable>
               <Pressable
-                onPress={handleShare}
+                onPress={handleOpenShareModal}
                 style={({ pressed }) => [styles.interactionBtn, { opacity: pressed ? 0.7 : 1 }]}
               >
                 <Text style={styles.interactionBtnText}>📤 分享</Text>
@@ -1022,6 +1083,15 @@ export default function ReliveScreen() {
           </ScrollView>
         )}
       </Animated.View>
+
+      {/* 分享模態框 */}
+      <ShareModal
+        visible={shareState.showShareModal}
+        friends={shareState.friends}
+        isLoading={shareRideMutation.isPending}
+        onShare={handleShareRide}
+        onClose={() => setShareState((prev) => ({ ...prev, showShareModal: false }))}
+      />
     </View>
   );
 }

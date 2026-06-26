@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { friendsRouter } from "./friends-router";
 import { socialRouter } from "./social-router";
+import { shareRouter } from "./share-router";
 import { deleteUserById } from "./db";
 
 export const appRouter = router({
@@ -11,6 +12,7 @@ export const appRouter = router({
   system: systemRouter,
   friends: friendsRouter,
   social: socialRouter,
+  share: shareRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
