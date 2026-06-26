@@ -323,6 +323,62 @@ export default function ReliveScreen() {
     }
   }, [record]);
 
+  // 導出 GPX 格式
+  const handleExportGPX = useCallback(async () => {
+    if (!record || record.route.length === 0) {
+      Alert.alert('錯誤', '沒有軌跡數據可導出');
+      return;
+    }
+
+    try {
+      const date = new Date(record.date);
+      const dateStr = date.toISOString();
+      const fileName = `${record.name || 'ride'}_${date.getTime()}.gpx`;
+
+      // 構建 GPX 文件內容
+      let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="BikeAssistant" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${record.name || 'Bike Ride'}</name>
+    <desc>騎乘軌跡 - ${dateStr}</desc>
+    <time>${dateStr}</time>
+  </metadata>
+  <trk>
+    <name>${record.name || 'Bike Ride'}</name>
+    <trkseg>
+`;
+
+      // 添加軌跡點
+      record.route.forEach((point: any, index: number) => {
+        const pointTime = new Date(record.date + index * 1000).toISOString();
+        gpxContent += `      <trkpt lat="${point.latitude}" lon="${point.longitude}">
+        <ele>${point.altitude || 0}</ele>
+        <time>${pointTime}</time>
+        <extensions>
+          <speed>${point.speed || 0}</speed>
+        </extensions>
+      </trkpt>
+`;
+      });
+
+      gpxContent += `    </trkseg>
+  </trk>
+</gpx>`;
+
+      // 使用 Share API 分享 GPX 文件
+      await Share.share({
+        message: `騎乘軌跡導出: ${record.name || 'Bike Ride'}`,
+        title: fileName,
+        url: `data:application/gpx+xml;base64,${Buffer.from(gpxContent).toString('base64')}`,
+      });
+
+      Alert.alert('成功', `已導出 GPX 文件: ${fileName}`);
+    } catch (error) {
+      console.error('GPX 導出失敗:', error);
+      Alert.alert('錯誤', 'GPX 導出失敗，請重試');
+    }
+  }, [record]);
+
   // 分享統計數據
   const handleShare = useCallback(async () => {
     if (!record) return;
@@ -796,6 +852,25 @@ export default function ReliveScreen() {
                 <PowerDistributionChart record={record} />
               </View>
             )}
+
+            {/* 導出按鈕 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>導出數據</Text>
+              <View style={styles.exportButtonsContainer}>
+                <Pressable
+                  onPress={handleExportGPX}
+                  style={({ pressed }) => [styles.exportBtn, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <Text style={styles.exportBtnText}>📥 導出 GPX</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => Alert.alert('提示', 'FIT 格式導出功能即將推出')}
+                  style={({ pressed }) => [styles.exportBtn, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <Text style={styles.exportBtnText}>📥 導出 FIT</Text>
+                </Pressable>
+              </View>
+            </View>
           </ScrollView>
         )}
       </Animated.View>
@@ -1329,5 +1404,23 @@ const styles = StyleSheet.create({
     color: "#fff",
     minWidth: 40,
     textAlign: "right",
+  },
+  exportButtonsContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+  exportBtn: {
+    flex: 1,
+    backgroundColor: "#00E676",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  exportBtnText: {
+    color: "#000",
+    fontWeight: "600",
+    fontSize: 14,
   },
 });
