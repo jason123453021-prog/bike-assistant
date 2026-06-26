@@ -30,6 +30,8 @@ import { router, useLocalSearchParams } from "expo-router";
 
 import { useColors } from "@/hooks/use-colors";
 import { useRide, type RideRecord } from "@/lib/ride-context";
+import { useSocial } from "@/lib/social-context";
+import { getSyncManager } from "@/lib/social-sync";
 import { formatDuration } from "@/lib/power-calc";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
@@ -58,12 +60,7 @@ interface Comment {
   timestamp: number;
 }
 
-interface RideInteraction {
-  recordId: string;
-  likes: number;
-  comments: Comment[];
-  isLiked: boolean;
-}
+
 
 interface ReliveState {
   isPlaying: boolean;
@@ -119,13 +116,11 @@ export default function ReliveScreen() {
   const [photos, setPhotos] = useState<PhotoData[]>([]);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
 
-  // 社群互動狀態
-  const [interaction, setInteraction] = useState<RideInteraction>({
-    recordId: id || '',
-    likes: Math.floor(Math.random() * 50),
-    comments: [],
-    isLiked: false,
-  });
+  // 社群互動狀態（從 Context 載入）
+  const social = useSocial();
+  const interaction = useMemo(() => {
+    return social.getInteraction(id || '');
+  }, [id, social]);
   const [newComment, setNewComment] = useState('');
   const [showComments, setShowComments] = useState(false);
 
@@ -432,29 +427,39 @@ export default function ReliveScreen() {
   }, [record]);
 
   // 按讚功能
-  const handleLike = useCallback(() => {
-    setInteraction(prev => ({
-      ...prev,
-      likes: prev.isLiked ? prev.likes - 1 : prev.likes + 1,
-      isLiked: !prev.isLiked,
-    }));
-  }, []);
+  const handleLike = useCallback(async () => {
+    try {
+      await social.toggleLike(id || '');
+      // 標記為待同步（用於後端同步）
+      const syncManager = getSyncManager();
+      const currentInteraction = social.getInteraction(id || '');
+      await syncManager.markForSync('interaction', {
+        rideId: id,
+        isLiked: currentInteraction.isLiked,
+      });
+    } catch (error) {
+      console.error('[Relive] 按讚失敗:', error);
+      Alert.alert('錯誤', '按讚失敗，請重試');
+    }
+  }, [id, social]);
 
   // 添加評論
-  const handleAddComment = useCallback(() => {
+  const handleAddComment = useCallback(async () => {
     if (!newComment.trim()) return;
-    const comment: Comment = {
-      id: Date.now().toString(),
-      author: '我',
-      content: newComment,
-      timestamp: Date.now(),
-    };
-    setInteraction(prev => ({
-      ...prev,
-      comments: [...prev.comments, comment],
-    }));
-    setNewComment('');
-  }, [newComment]);
+    try {
+      await social.addComment(id || '', '我', newComment);
+      // 標記為待同步（用於後端同步）
+      const syncManager = getSyncManager();
+      await syncManager.markForSync('comment', {
+        rideId: id,
+        content: newComment,
+      });
+      setNewComment('');
+    } catch (error) {
+      console.error('[Relive] 評論失敗:', error);
+      Alert.alert('錯誤', '評論失敗，請重試');
+    }
+  }, [id, newComment, social]);
 
   const handleShare = useCallback(async () => {
     if (!record) return;
@@ -496,6 +501,15 @@ export default function ReliveScreen() {
       animated: true,
     });
   }, [record]);
+
+  // 初始化自動同步
+  useEffect(() => {
+    const syncManager = getSyncManager({ autoSync: true });
+    syncManager.startAutoSync();
+    return () => {
+      syncManager.stopAutoSync();
+    };
+  }, []);
 
   // 回放邏輯
   useEffect(() => {
@@ -778,6 +792,7 @@ export default function ReliveScreen() {
                 <Text style={[styles.interactionBtnText, interaction.isLiked && { color: '#FF6B6B' }]}>
                   {interaction.isLiked ? '❤️' : '🤍'} {interaction.likes}
                 </Text>
+                <Text style={styles.syncIndicator}>💾</Text>
               </Pressable>
               <Pressable
                 onPress={() => setShowComments(!showComments)}
@@ -1574,6 +1589,10 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
+  },
+  syncIndicator: {
+    fontSize: 10,
+    marginLeft: 4,
   },
   commentsSection: {
     marginTop: 12,

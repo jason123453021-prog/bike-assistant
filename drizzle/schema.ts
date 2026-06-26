@@ -66,3 +66,28 @@ export const dwellEvents = mysqlTable("dwellEvents", {
 });
 export type DwellEvent = typeof dwellEvents.$inferSelect;
 export type InsertDwellEvent = typeof dwellEvents.$inferInsert;
+
+// ── 騎乘社群互動 ──────────────────────────────────────────────────────────────
+/** 騎乘互動表：記錄使用者對騎乘記錄的按讚 */
+export const rideInteractions = mysqlTable("rideInteractions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),             // 按讚的使用者
+  rideId: varchar("rideId", { length: 64 }).notNull(), // 騎乘記錄 ID（本地生成）
+  isLiked: int("isLiked").default(0).notNull(), // 1=按讚，0=未按讚
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type RideInteractionRecord = typeof rideInteractions.$inferSelect;
+export type InsertRideInteraction = typeof rideInteractions.$inferInsert;
+
+/** 評論表：記錄使用者對騎乘記錄的評論 */
+export const rideComments = mysqlTable("rideComments", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),             // 評論的使用者
+  rideId: varchar("rideId", { length: 64 }).notNull(), // 騎乘記錄 ID（本地生成）
+  content: text("content").notNull(),           // 評論內容
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type RideCommentRecord = typeof rideComments.$inferSelect;
+export type InsertRideComment = typeof rideComments.$inferInsert;

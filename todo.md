@@ -581,3 +581,25 @@
 - [x] 按讚功能 — 用戶可為騎乘記錄點讚，顯示讚數和按讚狀態
 - [x] 評論功能 — 用戶可添加評論，支援評論列表展示、作者名稱、時間戳
 - [x] 社群互動 UI — 在 Relive 頁面實時統計面板後添加社群互動按鈕和評論區域
+
+
+## 本地社群互動持久化與後端同步（v3.0）
+### 第一階段：本地社群互動持久化
+- [x] 建立 SocialContext（lib/social-context.tsx）：管理按讚、評論、分享數據
+- [x] 實現 AsyncStorage 持久化邏輯（saveInteractions、loadInteractions）
+- [x] 支援按讚狀態持久化（rideId → isLiked、likeCount）
+- [x] 支援評論列表持久化（rideId → comments 陣列）
+- [x] 在 relive.tsx 中集成 SocialContext
+- [x] 應用啟動時自動載入本地社群互動數據
+- [x] 測試跨 App 會話的數據恢復
+
+### 第二階段：騎乘數據後端同步
+- [x] 在 server/routers.ts 中新增社群互動 API（getInteractions、toggleLike、addComment、syncInteractions）
+- [x] 在 drizzle/schema.ts 中新增社群互動表（rideInteractions、rideComments）
+- [x] 建立 SocialSyncManager（lib/social-sync.ts）：管理待同步數據和自動同步
+- [x] 實現雲端備份邏輯（同步本地社群數據至後端）
+- [x] 實現多設備同步邏輯（從後端拉取其他設備的社群互動）
+- [x] 在 relive.tsx 中添加同步狀態指示器（🔄 圖示）
+- [x] 實現離線模式（無網路時本地存儲，有網路時自動同步）
+- [ ] 測試端對端社群互動同步流程
+- [ ] 實現好友分享邏輯（分享騎乘記錄至好友、好友可查看與互動）
