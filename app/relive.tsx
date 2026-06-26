@@ -43,7 +43,8 @@ import { useAuth } from "@/hooks/use-auth";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 // 動態計算海苔條高度（根據內容自適應）
-const BOTTOM_PANEL_COLLAPSED_HEIGHT = 140; // 增加高度以容納播放按鈕
+// 收縮狀態高度：進度條(18) + 按鈕行(36) + 速度控制(40) + padding(16) + 把手(12) = ~122px，預留邊距設為 160px
+const BOTTOM_PANEL_COLLAPSED_HEIGHT = 160;
 const BOTTOM_PANEL_EXPANDED_HEIGHT = SCREEN_H * 0.7;
 
 // ─── 類型定義 ─────────────────────────────────────────────────────────────────
@@ -939,7 +940,7 @@ export default function ReliveScreen() {
           <ScrollView
             style={styles.expandedContent}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
           >
             {/* 核心數據 */}
             <View style={styles.section}>
@@ -1319,7 +1320,8 @@ const styles = StyleSheet.create({
   },
   expandedContent: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    flex: 1,
   },
   progressContainer: {
     marginBottom: 12,
@@ -1392,6 +1394,7 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 16,
+    paddingHorizontal: 0,
   },
   sectionTitle: {
     fontSize: 14,
