@@ -301,10 +301,15 @@ export default function MapScreen() {
   const airDensityRef = useRef<number>(calcAirDensity(25));
   const prevSpeedMsRef = useRef<number>(0); // 用於計算加速阻力
   const headingRef = useRef<number>(0);
-  // 車頭朝前精度改善：7 點循環平均（消除 GPS heading 抖動）
+  // 車頭朝前精度改善：自適應循環平均（消除 GPS heading 抖動）
+  // 低速時用 11 點平均（更平滑），高速時用 7 點平均（更靈敏）
   const headingWindowRef = useRef<number[]>([]);
+  const prevSpeedRef = useRef<number>(0); // 用於判斷速度變化
   // 上一個 GPS 位置（用於低速時計算方位角）
   const prevGpsForBearingRef = useRef<{ lat: number; lon: number } | null>(null);
+  // 地圖旋轉動畫（平滑過渡）
+  const targetBearingRef = useRef<number>(0);
+  const lastMapBearingRef = useRef<number>(0);
 
   // 騎乘狀態
   const [mapRideActive, setMapRideActive] = useState(false);
@@ -759,9 +764,11 @@ export default function MapScreen() {
           }
           // 更新 GPS 位置參考點
           prevGpsForBearingRef.current = { lat: latitude, lon: longitude };
-          // 7 點循環平均：消除 GPS heading 抖動（角度卷繞處理）
+          // 自適應循環平均：根據速度調整平均窗口大小
+          // 低速（≤5 km/h）：11 點平均，高速（>15 km/h）：7 點平均
+          const windowSize = speedKmhRaw <= 5 ? 11 : speedKmhRaw >= 15 ? 7 : 9;
           headingWindowRef.current.push(rawHdg);
-          if (headingWindowRef.current.length > 7) headingWindowRef.current.shift();
+          if (headingWindowRef.current.length > windowSize) headingWindowRef.current.shift();
           // 角度平均：轉換為向量再平均，避免 350°/10° 平均出 180° 的問題
           const sinSum = headingWindowRef.current.reduce((s, h) => s + Math.sin((h * Math.PI) / 180), 0);
           const cosSum = headingWindowRef.current.reduce((s, h) => s + Math.cos((h * Math.PI) / 180), 0);
@@ -776,7 +783,19 @@ export default function MapScreen() {
           // 車頭朝前模式：僅在騎乘中且速度足夠時更新地圖方向和俯視角
           const currentState0 = stateRef.current;
           if (headingUp && hdg !== 0 && currentState0.status === "active" && speedKmhRaw >= 2) {
-            mapRef.current?.setBearing(hdg, true);
+            // 平滑旋轉：計算最短旋轉路徑（避免 350° -> 10° 時旋轉 340°）
+            targetBearingRef.current = hdg;
+            let angleDiff = hdg - lastMapBearingRef.current;
+            if (angleDiff > 180) angleDiff -= 360;
+            if (angleDiff < -180) angleDiff += 360;
+            
+            // 只在角度變化超過 1° 時更新地圖
+            if (Math.abs(angleDiff) > 1) {
+              const newBearing = (lastMapBearingRef.current + angleDiff * 0.3) % 360;
+              lastMapBearingRef.current = newBearing;
+              mapRef.current?.setBearing(newBearing, true);
+            }
+            
             // 根據速度動態設定俯視角（速度越快，俯視角越小）
             const pitch = Math.max(0, Math.min(45, 45 - speedKmhRaw * 1.5));
             if (Math.abs(pitch - mapPitch) > 2) {
