@@ -706,6 +706,9 @@ export default function MapScreen() {
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       if (state.status === "paused") {
         pausedElapsedRef.current = state.elapsed;
+        timerRef.current = setInterval(() => {
+          dispatch({ type: "PAUSE_TICK" });
+        }, 1000);
       }
     }
     return () => {
@@ -782,16 +785,16 @@ export default function MapScreen() {
           }
           // 車頭朝前模式：僅在騎乘中且速度足夠時更新地圖方向和俯視角
           const currentState0 = stateRef.current;
-          if (headingUp && hdg !== 0 && currentState0.status === "active" && speedKmhRaw >= 2) {
+          if (headingUp && currentState0.status === "active" && speedKmhRaw >= 2) {
             // 平滑旋轉：計算最短旋轉路徑（避免 350° -> 10° 時旋轉 340°）
             targetBearingRef.current = hdg;
             let angleDiff = hdg - lastMapBearingRef.current;
             if (angleDiff > 180) angleDiff -= 360;
             if (angleDiff < -180) angleDiff += 360;
             
-            // 只在角度變化超過 1° 時更新地圖
-            if (Math.abs(angleDiff) > 1) {
-              const newBearing = (lastMapBearingRef.current + angleDiff * 0.3) % 360;
+            // 只在角度變化超過 0.5° 時更新地圖，提高靈敏度
+            if (Math.abs(angleDiff) > 0.5) {
+              const newBearing = (lastMapBearingRef.current + angleDiff * 0.5) % 360;
               lastMapBearingRef.current = newBearing;
               mapRef.current?.setBearing(newBearing, true);
             }

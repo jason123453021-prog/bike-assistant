@@ -111,6 +111,7 @@ type RideAction =
   | { type: "STOP" }
   | { type: "RESET" }
   | { type: "TICK"; elapsed: number }
+  | { type: "PAUSE_TICK" }
   | { type: "LOCATION_UPDATE"; point: LocationPoint; power: number; calories: number; ascent: number; distanceM?: number }
   | { type: "SWEAT_UPDATE"; sweatLossMl: number; sweatRatePerHour: number; intensityLabel: string }
   | { type: "CONSUME_CALORIES" }
@@ -202,6 +203,10 @@ function rideReducer(state: RideState, action: RideAction): RideState {
 
     case "TICK":
       return { ...state, elapsed: action.elapsed };
+
+    case "PAUSE_TICK":
+      // 暫停時只更新 totalPausedSec，不更新 elapsed
+      return { ...state, totalPausedSec: state.totalPausedSec + 1 };
 
     case "LOCATION_UPDATE": {
       const { point, power, calories, ascent, distanceM } = action;
