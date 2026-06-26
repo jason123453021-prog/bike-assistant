@@ -52,6 +52,15 @@ interface ReliveState {
   };
 }
 
+interface Highlight {
+  type: 'speed' | 'altitude' | 'slope';
+  label: string;
+  value: number | string;
+  unit: string;
+  index: number;
+  icon: string;
+}
+
 // ─── 主元件 ───────────────────────────────────────────────────────────────────
 
 export default function ReliveScreen() {
@@ -78,6 +87,81 @@ export default function ReliveScreen() {
       power: 0,
     },
   });
+
+  // 高光時刻
+  const highlights = useMemo(() => {
+    if (!record || record.route.length === 0) return [];
+
+    const result: Highlight[] = [];
+
+    // 最高時速
+    let maxSpeedIndex = 0;
+    let maxSpeed = 0;
+    record.route.forEach((p: any, i: number) => {
+      const speed = (p.speed || 0) * 3.6;
+      if (speed > maxSpeed) {
+        maxSpeed = speed;
+        maxSpeedIndex = i;
+      }
+    });
+    if (maxSpeed > 0) {
+      result.push({
+        type: 'speed' as const,
+        label: '最高時速',
+        value: maxSpeed.toFixed(1),
+        unit: 'km/h',
+        index: maxSpeedIndex,
+        icon: 'speedometer',
+      });
+    }
+
+    // 最高海拔
+    let maxAltIndex = 0;
+    let maxAlt = record.route[0]?.altitude || 0;
+    record.route.forEach((p: any, i: number) => {
+      if ((p.altitude || 0) > maxAlt) {
+        maxAlt = p.altitude || 0;
+        maxAltIndex = i;
+      }
+    });
+    if (maxAlt > 0) {
+      result.push({
+        type: 'altitude' as const,
+        label: '最高海拔',
+        value: Math.round(maxAlt).toString(),
+        unit: 'm',
+        index: maxAltIndex,
+        icon: 'peak.2.fill',
+      });
+    }
+
+    // 陡坡挑戰（坡度 > 10%）
+    for (let i = 1; i < record.route.length; i++) {
+      const prev = record.route[i - 1];
+      const curr = record.route[i];
+      const altDiff = (curr.altitude || 0) - (prev.altitude || 0);
+      const distance = Math.hypot(
+        (curr.latitude - prev.latitude) * 111000,
+        (curr.longitude - prev.longitude) * 111000 * Math.cos((curr.latitude * Math.PI) / 180)
+      );
+      if (distance > 0) {
+        const slope = (altDiff / distance) * 100;
+        if (slope > 10) {
+          result.push({
+            type: 'slope' as const,
+            label: '陡坡挑戰',
+            value: slope.toFixed(1),
+            unit: '%',
+            index: i,
+            icon: 'mountain.2.fill',
+          });
+          break;
+        }
+      }
+    }
+
+    return result;
+  }, [record]);
 
   // 底部面板狀態
   const [panelExpanded, setPanelExpanded] = useState(false);
@@ -368,6 +452,36 @@ export default function ReliveScreen() {
                 label="海拔"
               />
             </View>
+
+            {/* 高光時刻 */}
+            {highlights.length > 0 && (
+              <View style={styles.highlightsContainer}>
+                <Text style={styles.highlightsTitle}>⭐ 高光時刻</Text>
+                <View style={styles.highlightsGrid}>
+                  {highlights.map((h, idx) => (
+                    <Pressable
+                      key={idx}
+                      style={({ pressed }) => [
+                        styles.highlightCard,
+                        { opacity: pressed ? 0.7 : 1 },
+                      ]}
+                      onPress={() => {
+                        setReliveState((prev) => ({
+                          ...prev,
+                          playbackIndex: h.index,
+                        }));
+                      }}
+                    >
+                      <IconSymbol name={h.icon as any} size={14} color={colors.primary} />
+                      <Text style={styles.highlightLabel}>{h.label}</Text>
+                      <Text style={styles.highlightValue}>
+                        {h.value} {h.unit}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -476,6 +590,28 @@ export default function ReliveScreen() {
                 </View>
               </View>
             )}
+
+            {/* 速度分布圖 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>速度分布</Text>
+              <SpeedDistributionChart record={record} />
+            </View>
+
+            {/* 心率區間分布 */}
+            {record.avgHeartRate && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>心率區間分布</Text>
+                <HeartRateZonesChart record={record} />
+              </View>
+            )}
+
+            {/* 功率分布 */}
+            {record.avgPower && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>功率分布</Text>
+                <PowerDistributionChart record={record} />
+              </View>
+            )}
           </ScrollView>
         )}
       </Animated.View>
@@ -484,6 +620,99 @@ export default function ReliveScreen() {
 }
 
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
+
+// 速度分布圖表
+function SpeedDistributionChart({ record }: { record: RideRecord }) {
+  const speeds = record.route.map((p: any) => (p.speed || 0) * 3.6);
+  const ranges = [
+    { min: 0, max: 10, label: "0-10", color: "#4CAF50" },
+    { min: 10, max: 20, label: "10-20", color: "#8BC34A" },
+    { min: 20, max: 30, label: "20-30", color: "#FFC107" },
+    { min: 30, max: 40, label: "30-40", color: "#FF9800" },
+    { min: 40, max: 100, label: "40+", color: "#F44336" },
+  ];
+  const counts = ranges.map((r) => speeds.filter((s: number) => s >= r.min && s < r.max).length);
+  const total = counts.reduce((a: number, b: number) => a + b, 0);
+  return (
+    <View style={styles.chartContainer}>
+      {ranges.map((r, idx) => {
+        const percentage = total > 0 ? (counts[idx] / total) * 100 : 0;
+        return (
+          <View key={idx} style={styles.chartRow}>
+            <Text style={styles.chartLabel}>{r.label} km/h</Text>
+            <View style={[styles.chartBar, { backgroundColor: r.color }]}>
+              <View style={[styles.chartBarFill, { width: `${percentage}%`, backgroundColor: r.color }]} />
+            </View>
+            <Text style={styles.chartValue}>{percentage.toFixed(0)}%</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// 心率區間分布圖表
+function HeartRateZonesChart({ record }: { record: RideRecord }) {
+  const zones = [
+    { min: 0, max: 0.5, label: "恢復", color: "#4CAF50" },
+    { min: 0.5, max: 0.7, label: "耐力", color: "#8BC34A" },
+    { min: 0.7, max: 0.85, label: "節奏", color: "#FFC107" },
+    { min: 0.85, max: 0.95, label: "乳酸", color: "#FF9800" },
+    { min: 0.95, max: 1.0, label: "無氧", color: "#F44336" },
+  ];
+  const maxHR = record.maxHeartRate || 180;
+  const heartRates = record.route.map((p: any) => p.heartRate || 0).filter((hr: number) => hr > 0);
+  const counts = zones.map((z) => heartRates.filter((hr: number) => hr >= maxHR * z.min && hr < maxHR * z.max).length);
+  const total = counts.reduce((a: number, b: number) => a + b, 0);
+  return (
+    <View style={styles.chartContainer}>
+      {zones.map((z, idx) => {
+        const percentage = total > 0 ? (counts[idx] / total) * 100 : 0;
+        return (
+          <View key={idx} style={styles.chartRow}>
+            <Text style={styles.chartLabel}>{z.label}</Text>
+            <View style={[styles.chartBar, { backgroundColor: z.color }]}>
+              <View style={[styles.chartBarFill, { width: `${percentage}%`, backgroundColor: z.color }]} />
+            </View>
+            <Text style={styles.chartValue}>{percentage.toFixed(0)}%</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// 功率分布圖表
+function PowerDistributionChart({ record }: { record: RideRecord }) {
+  const powers = record.route.map((p: any) => p.power || 0).filter((pw: number) => pw > 0);
+  if (powers.length === 0) return <Text style={styles.chartLabel}>沒有功率數據</Text>;
+  const maxPower = Math.max(...powers);
+  const ranges = [
+    { min: 0, max: maxPower * 0.25, label: "Z1", color: "#4CAF50" },
+    { min: maxPower * 0.25, max: maxPower * 0.5, label: "Z2", color: "#8BC34A" },
+    { min: maxPower * 0.5, max: maxPower * 0.75, label: "Z3", color: "#FFC107" },
+    { min: maxPower * 0.75, max: maxPower * 0.9, label: "Z4", color: "#FF9800" },
+    { min: maxPower * 0.9, max: maxPower * 1.1, label: "Z5", color: "#F44336" },
+  ];
+  const counts = ranges.map((r) => powers.filter((pw: number) => pw >= r.min && pw < r.max).length);
+  const total = counts.reduce((a: number, b: number) => a + b, 0);
+  return (
+    <View style={styles.chartContainer}>
+      {ranges.map((r, idx) => {
+        const percentage = total > 0 ? (counts[idx] / total) * 100 : 0;
+        return (
+          <View key={idx} style={styles.chartRow}>
+            <Text style={styles.chartLabel}>{r.label}</Text>
+            <View style={[styles.chartBar, { backgroundColor: r.color }]}>
+              <View style={[styles.chartBarFill, { width: `${percentage}%`, backgroundColor: r.color }]} />
+            </View>
+            <Text style={styles.chartValue}>{percentage.toFixed(0)}%</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
 
 function StatCell({
   icon,
@@ -686,5 +915,70 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 10,
     color: "rgba(255,255,255,0.6)",
+  },
+  highlightsContainer: {
+    marginTop: 12,
+    paddingHorizontal: 8,
+  },
+  highlightsTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.8)",
+    marginBottom: 8,
+  },
+  highlightsGrid: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  highlightCard: {
+    flex: 1,
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: "rgba(0, 230, 118, 0.1)",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(0, 230, 118, 0.3)",
+  },
+  highlightLabel: {
+    fontSize: 9,
+    color: "rgba(255,255,255,0.6)",
+  },
+  highlightValue: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#00E676",
+  },
+  chartContainer: {
+    gap: 8,
+  },
+  chartRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  chartLabel: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.6)",
+    minWidth: 50,
+  },
+  chartBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  chartBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  chartValue: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#fff",
+    minWidth: 40,
+    textAlign: "right",
   },
 });
