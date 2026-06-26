@@ -33,6 +33,7 @@ import { formatDuration } from "@/lib/power-calc";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
+import * as DocumentPicker from "expo-document-picker";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 // 動態計算海苔條高度（根據內容自適應）
@@ -251,13 +252,76 @@ export default function ReliveScreen() {
 
   // 照片上傳處理
   const handleUploadPhoto = useCallback(async () => {
-    const newPhoto: PhotoData = {
-      uri: `https://via.placeholder.com/300x400?text=Uploaded+Photo`,
-      timestamp: Date.now(),
-      title: "新上傳的照片",
-    };
-    setPhotos(prev => [...prev, newPhoto].sort((a, b) => a.timestamp - b.timestamp));
-  }, []);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'image/*',
+      });
+
+      if ((result as any).uri) {
+        const fileName = (result as any).name || '上傳的照片';
+        const title = fileName.replace(/\.[^\/\.]+$/, '');
+
+        const newPhoto: PhotoData = {
+          uri: (result as any).uri,
+          timestamp: Date.now(),
+          title: title,
+          latitude: record?.route?.[Math.floor(record.route.length / 2)]?.latitude,
+          longitude: record?.route?.[Math.floor(record.route.length / 2)]?.longitude,
+        };
+        setPhotos(prev => [...prev, newPhoto].sort((a, b) => a.timestamp - b.timestamp));
+        Alert.alert('成功', `已上傳照片：${title}`);
+      }
+    } catch (error) {
+      console.error('照片上傳失敗:', error);
+      Alert.alert('錯誤', '照片上傳失敗，請重試');
+    }
+  }, [record]);
+
+  // 生成分享卡片
+  const handleGenerateShareCard = useCallback(async () => {
+    if (!record) return;
+
+    try {
+      const date = new Date(record.date);
+      const dateStr = `${date.getFullYear()}年${String(date.getMonth() + 1).padStart(2, "0")}月${String(date.getDate()).padStart(2, "0")}日`;
+      const distKm = (record.distance / 1000).toFixed(2);
+      const avgSpeedStr = record.avgSpeed.toFixed(1);
+      const maxSpeedStr = record.maxSpeed.toFixed(1);
+      const durationStr = formatDuration(record.duration);
+
+      const cardMessage = `🚴 ${record.name || "騎乘記錄"}
+
+📅 ${dateStr}
+📍 距離: ${distKm} km
+⏱️ 時間: ${durationStr}
+🏃 平均速度: ${avgSpeedStr} km/h
+⚡ 最高速度: ${maxSpeedStr} km/h
+🔥 卡路里: ${record.calories} kcal
+⛰️ 爬升: ${Math.round(record.totalAscent)} m
+
+用 Relive 記錄我的騎乘軌跡 🚴`;
+
+      Alert.alert('分享卡片', cardMessage, [
+        {
+          text: '分享',
+          onPress: async () => {
+            try {
+              await Share.share({
+                message: cardMessage,
+                title: `${record.name || "騎乘記錄"} - Relive`,
+              });
+            } catch (error) {
+              console.error('分享失敗:', error);
+            }
+          },
+        },
+        { text: '取消', onPress: () => {} },
+      ]);
+    } catch (error) {
+      console.error('生成分享卡片失敗:', error);
+      Alert.alert('錯誤', '生成分享卡片失敗，請重試');
+    }
+  }, [record]);
 
   // 分享統計數據
   const handleShare = useCallback(async () => {
@@ -440,7 +504,7 @@ export default function ReliveScreen() {
             <IconSymbol name="info.circle.fill" size={20} color="#fff" />
           </Pressable>
           <Pressable
-            onPress={handleShare}
+            onPress={handleGenerateShareCard}
             style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.7 : 1 }]}
           >
             <IconSymbol name="square.and.arrow.up" size={20} color="#fff" />
