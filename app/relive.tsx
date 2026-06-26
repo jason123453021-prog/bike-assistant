@@ -209,6 +209,7 @@ export default function ReliveScreen() {
     return result;
   }, [record]);
 
+
   // 軌跡漸進繪製狀態
   const [playedTrailCoords, setPlayedTrailCoords] = useState<Array<{latitude: number; longitude: number}>>([]);
 
@@ -227,6 +228,8 @@ export default function ReliveScreen() {
   }, [reliveState.playbackIndex, record]);
 
   // 平滑相機跟隨
+
+
   useEffect(() => {
     if (!record || record.route.length === 0 || !mapRef.current) return;
     const currentIndex = Math.floor(reliveState.playbackIndex);
@@ -243,6 +246,16 @@ export default function ReliveScreen() {
   const [panelExpanded, setPanelExpanded] = useState(false);
   const panelAnim = useRef(new Animated.Value(BOTTOM_PANEL_COLLAPSED_HEIGHT)).current;
   const mapRef = useRef<LeafletMapHandle>(null);
+
+  // 照片上傳處理
+  const handleUploadPhoto = useCallback(async () => {
+    const newPhoto: PhotoData = {
+      uri: `https://via.placeholder.com/300x400?text=Uploaded+Photo`,
+      timestamp: Date.now(),
+      title: "新上傳的照片",
+    };
+    setPhotos(prev => [...prev, newPhoto].sort((a, b) => a.timestamp - b.timestamp));
+  }, []);
 
   // 分享統計數據
   const handleShare = useCallback(async () => {
@@ -707,6 +720,7 @@ export default function ReliveScreen() {
 
 // 速度分布圖表
 // 照片彈窗組件
+
 function PhotoModal({
   visible,
   photo,
@@ -1147,10 +1161,74 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   photoCloseBtnText: {
-    fontSize: 18,
     color: "#fff",
+    fontSize: 14,
     fontWeight: "600",
   },
+  emptyTimelineContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 24,
+    gap: 12,
+  },
+  emptyTimelineText: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.6)",
+  },
+  uploadPhotoBtn: {
+    backgroundColor: "rgba(0,230,118,0.2)",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0,230,118,0.4)",
+  },
+  uploadPhotoBtnText: {
+    fontSize: 12,
+    color: "#00E676",
+    fontWeight: "600",
+  },
+  timelineContainer: {
+    gap: 12,
+    paddingVertical: 12,
+  },
+  timelineHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  timelineTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  timelineScroll: {
+    height: 100,
+  },
+  photoThumbnail: {
+    marginRight: 12,
+    alignItems: "center",
+    gap: 8,
+  },
+  photoThumbnailContent: {
+    width: 80,
+    height: 80,
+    backgroundColor: "rgba(0,230,118,0.1)",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0,230,118,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  photoThumbnailIcon: {
+    fontSize: 32,
+  },
+  photoThumbnailTime: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.6)",
+  },
+
 
   chartValue: {
     fontSize: 11,
