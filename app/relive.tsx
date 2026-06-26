@@ -43,12 +43,13 @@ import { useAuth } from "@/hooks/use-auth";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 // 收縮面板高度計算（與 ride-detail.tsx 一致）
+const PANEL_COLLAPSED_H = 200;
+const PANEL_EXPANDED_H = Math.min(SCREEN_H * 0.72, 560);
+
+// 動態計算收縮面板高度（與導航頁面一致）
 const CELL_H = 60;
-const HEADER_H = 80; // 把手 + 進度條
-const CTRL_H = 64; // 按鈕行 + 速度控制
-// 自適應收縮高度：把手(50) + 進度條(18) + 按鈕行(36) + 速度控制(48) + padding(32) = 184px
-const BOTTOM_PANEL_COLLAPSED_HEIGHT = Math.min(HEADER_H + CTRL_H + 20, 220);
-const BOTTOM_PANEL_EXPANDED_HEIGHT = Math.min(SCREEN_H * 0.7, 560);
+const HEADER_H = 80;
+const CTRL_H = 64;
 
 // ─── 類型定義 ─────────────────────────────────────────────────────────────────
 
@@ -332,7 +333,7 @@ export default function ReliveScreen() {
 
   // 底部面板狀態
   const [panelExpanded, setPanelExpanded] = useState(false);
-  const panelAnim = useRef(new Animated.Value(BOTTOM_PANEL_COLLAPSED_HEIGHT)).current;
+  const panelAnim = useRef(new Animated.Value(PANEL_COLLAPSED_H)).current;
   const mapRef = useRef<LeafletMapHandle>(null);
 
   // 照片上傳處理
@@ -626,50 +627,59 @@ export default function ReliveScreen() {
   const togglePanel = useCallback((expanded: boolean) => {
     setPanelExpanded(expanded);
     Animated.timing(panelAnim, {
-      toValue: expanded ? BOTTOM_PANEL_EXPANDED_HEIGHT : BOTTOM_PANEL_COLLAPSED_HEIGHT,
+      toValue: expanded ? PANEL_EXPANDED_H : PANEL_COLLAPSED_H,
       duration: 280,
       useNativeDriver: false,
     }).start();
   }, [panelAnim]);
 
-  // 手勢識別器 - 只在 Drag Handle（把手）區域允許拖動
-  // 把手區域高度：12px（把手本身）+ 24px（padding）= 36px，預留邊距設為 50px
-  const DRAG_HANDLE_HEIGHT = 50;
+  // 動態計算收縮面板高度（與導航頁面一致）
+  const dynamicCollapsedH = Math.min(
+    HEADER_H + CTRL_H,
+    PANEL_COLLAPSED_H
+  );
   
+  const prevCollapsedH = useRef(dynamicCollapsedH);
+
+  useEffect(() => {
+    if (!panelExpanded && dynamicCollapsedH !== prevCollapsedH.current) {
+      prevCollapsedH.current = dynamicCollapsedH;
+      Animated.timing(panelAnim, {
+        toValue: dynamicCollapsedH,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [dynamicCollapsedH, panelExpanded, panelAnim]);
+
+  // 手勢識別器（與 ride-detail.tsx 一致）
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (_, gs) => {
-        // 只在把手區域（頂部 50px）允許拖動
-        return gs.y0 < DRAG_HANDLE_HEIGHT;
+        // 只在拉桶區域（頂部 50px）允許拖動
+        return gs.y0 < 50;
       },
       onMoveShouldSetPanResponder: (_, gs) => {
-        // 只在把手區域且垂直移動超過 5px 時才響應
-        return gs.y0 < DRAG_HANDLE_HEIGHT && Math.abs(gs.dy) > 5;
+        return gs.y0 < 50 && Math.abs(gs.dy) > 5;
       },
       onPanResponderMove: (_, gs) => {
-        // 只允許在把手區域拖動改變高度
-        if (gs.y0 < DRAG_HANDLE_HEIGHT) {
-          const newHeight = BOTTOM_PANEL_COLLAPSED_HEIGHT + (-gs.dy);
-          const clampedHeight = Math.max(BOTTOM_PANEL_COLLAPSED_HEIGHT, Math.min(BOTTOM_PANEL_EXPANDED_HEIGHT, newHeight));
-          panelAnim.setValue(clampedHeight);
-        }
+        const newHeight = dynamicCollapsedH + (-gs.dy);
+        const clampedHeight = Math.max(dynamicCollapsedH, Math.min(PANEL_EXPANDED_H, newHeight));
+        panelAnim.setValue(clampedHeight);
       },
       onPanResponderRelease: (_, gs) => {
-        // 只在把手區域釋放時才觸發自動展開/收縮
-        if (gs.y0 < DRAG_HANDLE_HEIGHT) {
-          const currentHeight = (panelAnim as any)._value;
-          const midpoint = (BOTTOM_PANEL_COLLAPSED_HEIGHT + BOTTOM_PANEL_EXPANDED_HEIGHT) / 2;
-          const velocity = gs.vy;
-          
-          // 根據速度或位置決定展開或收縮
-          if (velocity < -0.5 || currentHeight > midpoint) {
-            togglePanel(true);
-          } else if (velocity > 0.5 || currentHeight < midpoint) {
-            togglePanel(false);
-          } else {
-            // 保持當前狀態
-            togglePanel(panelExpanded);
-          }
+        const currentHeight = (panelAnim as any)._value;
+        const midpoint = (dynamicCollapsedH + PANEL_EXPANDED_H) / 2;
+        const velocity = gs.vy;
+        
+        // 根據速度或位置決定展開或收縮
+        if (velocity < -0.5 || currentHeight > midpoint) {
+          togglePanel(true);
+        } else if (velocity > 0.5 || currentHeight < midpoint) {
+          togglePanel(false);
+        } else {
+          // 保持當前狀態
+          togglePanel(panelExpanded);
         }
       },
     })
@@ -736,11 +746,11 @@ export default function ReliveScreen() {
       {/* 底部面板 */}
       <Animated.View
         style={[
-          styles.bottomPanel,
-          { height: panelAnim, bottom: 0 },
+          styles.panel,
+          { height: panelAnim, paddingBottom: insets.bottom + 8 },
         ]}
       >
-        {/* 拖拉把手 - 唯一可拖動的區域 */}
+        {/* 拖拉把手 */}
         <View style={styles.handleArea} {...panResponder.panHandlers}>
           <View style={styles.panelHandle} />
         </View>
@@ -1306,44 +1316,29 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
-  bottomPanel: {
+  panel: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(21,23,24,0.95)",
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: "#0d0d1a",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    paddingHorizontal: 20,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.1)",
+    borderTopColor: "rgba(255,255,255,0.08)",
     overflow: "hidden",
   },
-  handleArea: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    minHeight: 50,
-    // 清晰的 Drag Handle 可互動區域 - 擴大可互動區域
-  },
+  handleArea: { alignItems: "center", paddingTop: 8, paddingBottom: 4 },
   panelHandle: {
-    width: 48,
-    height: 6,
-    backgroundColor: "rgba(255,255,255,0.5)",
-    borderRadius: 3,
-    // 更大更清晰的把手
+    width: 36, height: 4,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 2,
+    marginBottom: 6,
   },
   collapsedContent: {
     paddingHorizontal: 12,
-    paddingVertical: 16,
-    paddingBottom: 20,
-    // 卡片區域 - 只允許內容捲動，不觸發拖動抽屉
-    // 自適應高度，確保所有按鈕都可見
+    paddingVertical: 12,
   },
-  expandedContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    flex: 1,
-  },
+  expandedContent: { flex: 1 },
   progressContainer: {
     marginBottom: 12,
     gap: 6,
