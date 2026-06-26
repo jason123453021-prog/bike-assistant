@@ -83,6 +83,7 @@ interface ReliveState {
     altitude: number;
     power: number;
   };
+  isDraggingProgress?: boolean;
 }
 
 interface ShareState {
@@ -653,6 +654,37 @@ export default function ReliveScreen() {
     }
   }, [dynamicCollapsedH, panelExpanded, panelAnim]);
 
+  // 進度條拖動手勢識別
+  const progressDragResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (_, gs) => {
+        // 在進度條區域允許拖動
+        return gs.y0 >= 770 && gs.y0 <= 800;
+      },
+      onMoveShouldSetPanResponder: (_, gs) => {
+        return gs.y0 >= 770 && gs.y0 <= 800 && Math.abs(gs.dx) > 5;
+      },
+      onPanResponderMove: (_, gs) => {
+        if (!record || record.route.length === 0) return;
+        const barWidth = 280;
+        const newX = Math.max(0, Math.min(barWidth, gs.x0 + gs.dx));
+        const newProgress = newX / barWidth;
+        const newIndex = Math.floor(newProgress * (record.route.length - 1));
+        setReliveState((prev) => ({
+          ...prev,
+          playbackIndex: newIndex,
+          isDraggingProgress: true,
+        }));
+      },
+      onPanResponderRelease: () => {
+        setReliveState((prev) => ({
+          ...prev,
+          isDraggingProgress: false,
+        }));
+      },
+    })
+  ).current;
+
   // 手勢識別器（與 ride-detail.tsx 一致）
   const panResponder = useRef(
     PanResponder.create({
@@ -781,15 +813,34 @@ export default function ReliveScreen() {
                   setReliveState((prev) => ({
                     ...prev,
                     playbackIndex: newIndex,
+                    isDraggingProgress: false,
+                  }));
+                }}
+                onLongPress={() => {
+                  setReliveState((prev) => ({
+                    ...prev,
+                    isDraggingProgress: true,
                   }));
                 }}
               >
                 <View
                   style={[
                     styles.progressFill,
-                    { width: `${progress * 100}%` },
+                    { 
+                      width: `${progress * 100}%`,
+                      backgroundColor: reliveState.isDraggingProgress ? '#00E676' : '#00C853',
+                      opacity: reliveState.isDraggingProgress ? 1 : 0.8,
+                    },
                   ]}
                 />
+                {reliveState.isDraggingProgress && (
+                  <View
+                    style={[
+                      styles.progressDragIndicator,
+                      { left: `${progress * 100}%` },
+                    ]}
+                  />
+                )}
               </Pressable>
               <Text style={styles.progressText}>
                 {Math.round(progress * 100)}%
@@ -1381,6 +1432,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "rgba(255,255,255,0.6)",
     textAlign: "right",
+  },
+  progressDragIndicator: {
+    position: 'absolute' as const,
+    width: 3,
+    height: 18,
+    backgroundColor: '#00E676',
+    borderRadius: 1.5,
+    top: -2,
+    marginLeft: -1.5,
   },
   playbackControls: {
     flexDirection: "row",
