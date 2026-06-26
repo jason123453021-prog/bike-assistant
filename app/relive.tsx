@@ -46,7 +46,8 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const CELL_H = 60;
 const HEADER_H = 80; // 把手 + 進度條
 const CTRL_H = 64; // 按鈕行 + 速度控制
-const BOTTOM_PANEL_COLLAPSED_HEIGHT = Math.min(HEADER_H + CTRL_H, 200);
+// 自適應收縮高度：把手(50) + 進度條(18) + 按鈕行(36) + 速度控制(48) + padding(32) = 184px
+const BOTTOM_PANEL_COLLAPSED_HEIGHT = Math.min(HEADER_H + CTRL_H + 20, 220);
 const BOTTOM_PANEL_EXPANDED_HEIGHT = Math.min(SCREEN_H * 0.7, 560);
 
 // ─── 類型定義 ─────────────────────────────────────────────────────────────────
@@ -632,13 +633,13 @@ export default function ReliveScreen() {
   }, [panelAnim]);
 
   // 手勢識別器 - 只在 Drag Handle（把手）區域允許拖動
-  // 把手區域高度：12px（把手本身）+ 16px（padding）= 28px，預留邊距設為 40px
-  const DRAG_HANDLE_HEIGHT = 40;
+  // 把手區域高度：12px（把手本身）+ 24px（padding）= 36px，預留邊距設為 50px
+  const DRAG_HANDLE_HEIGHT = 50;
   
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (_, gs) => {
-        // 只在把手區域（頂部 40px）允許拖動
+        // 只在把手區域（頂部 50px）允許拖動
         return gs.y0 < DRAG_HANDLE_HEIGHT;
       },
       onMoveShouldSetPanResponder: (_, gs) => {
@@ -1318,24 +1319,29 @@ const styles = StyleSheet.create({
   },
   handleArea: {
     alignItems: "center",
-    paddingVertical: 12,
+    justifyContent: "center",
+    paddingVertical: 16,
     paddingHorizontal: 12,
-    // 清晰的 Drag Handle 可互動區域
+    minHeight: 50,
+    // 清晰的 Drag Handle 可互動區域 - 擴大可互動區域
   },
   panelHandle: {
-    width: 40,
-    height: 5,
-    backgroundColor: "rgba(255,255,255,0.4)",
-    borderRadius: 2.5,
+    width: 48,
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    borderRadius: 3,
+    // 更大更清晰的把手
   },
   collapsedContent: {
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingVertical: 16,
+    paddingBottom: 20,
     // 卡片區域 - 只允許內容捲動，不觸發拖動抽屉
+    // 自適應高度，確保所有按鈕都可見
   },
   expandedContent: {
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingVertical: 16,
     flex: 1,
   },
   progressContainer: {
