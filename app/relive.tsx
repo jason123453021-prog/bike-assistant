@@ -39,10 +39,19 @@ const BOTTOM_PANEL_EXPANDED_HEIGHT = SCREEN_H * 0.7;
 
 // ─── 類型定義 ─────────────────────────────────────────────────────────────────
 
+interface PhotoData {
+  uri: string;
+  timestamp: number; // 毫秒
+  latitude?: number;
+  longitude?: number;
+  title?: string;
+}
+
 interface ReliveState {
   isPlaying: boolean;
   playbackIndex: number;
   playbackSpeed: number;
+  currentPhoto?: PhotoData;
   currentData: {
     speed: number;
     distance: number;
@@ -87,6 +96,43 @@ export default function ReliveScreen() {
       power: 0,
     },
   });
+
+  // 照片時間軸
+  const [photos, setPhotos] = useState<PhotoData[]>([]);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+
+  // 模擬加載照片
+  useEffect(() => {
+    if (record) {
+      const simulatedPhotos: PhotoData[] = [];
+      const startTime = record.date;
+      const endTime = startTime + record.duration * 1000;
+      const photoCount = Math.floor(Math.random() * 3) + 2;
+      for (let i = 0; i < photoCount; i++) {
+        const photoTime = startTime + (Math.random() * (endTime - startTime));
+        simulatedPhotos.push({
+          uri: `https://via.placeholder.com/300x400?text=Photo+${i + 1}`,
+          timestamp: photoTime,
+          title: `騎乘中的瞬間 ${i + 1}`,
+        });
+      }
+      setPhotos(simulatedPhotos.sort((a, b) => a.timestamp - b.timestamp));
+    }
+  }, [record]);
+
+  // 檢查當前回放位置是否有照片
+  useEffect(() => {
+    if (!record || record.route.length === 0) return;
+    const currentPoint = record.route[reliveState.playbackIndex];
+    if (!currentPoint) return;
+    const currentTime = currentPoint.timestamp || 0;
+    const tolerance = 2000;
+    const matchingPhoto = photos.find(p => Math.abs(p.timestamp - currentTime) < tolerance);
+    if (matchingPhoto && matchingPhoto !== reliveState.currentPhoto) {
+      setReliveState(prev => ({ ...prev, currentPhoto: matchingPhoto }));
+      setShowPhotoModal(true);
+    }
+  }, [reliveState.playbackIndex, record, photos]);
 
   // 高光時刻
   const highlights = useMemo(() => {
@@ -162,6 +208,36 @@ export default function ReliveScreen() {
 
     return result;
   }, [record]);
+
+  // 軌跡漸進繪製狀態
+  const [playedTrailCoords, setPlayedTrailCoords] = useState<Array<{latitude: number; longitude: number}>>([]);
+
+  // 更新已回放的軌跡
+  useEffect(() => {
+    if (!record || record.route.length === 0) return;
+    const currentIndex = Math.floor(reliveState.playbackIndex);
+    const newCoords = record.route.slice(0, currentIndex + 1).map((p: any) => ({
+      latitude: p.latitude,
+      longitude: p.longitude,
+    }));
+    setPlayedTrailCoords(newCoords);
+    if (mapRef.current && newCoords.length > 0) {
+      mapRef.current.highlightPlayedTrail(newCoords, "#00E676");
+    }
+  }, [reliveState.playbackIndex, record]);
+
+  // 平滑相機跟隨
+  useEffect(() => {
+    if (!record || record.route.length === 0 || !mapRef.current) return;
+    const currentIndex = Math.floor(reliveState.playbackIndex);
+    const currentPoint = record.route[currentIndex];
+    if (currentPoint) {
+      mapRef.current.animateCamera(
+        { center: { latitude: currentPoint.latitude, longitude: currentPoint.longitude } },
+        { duration: 300 }
+      );
+    }
+  }, [reliveState.playbackIndex, record]);
 
   // 底部面板狀態
   const [panelExpanded, setPanelExpanded] = useState(false);
@@ -296,6 +372,14 @@ export default function ReliveScreen() {
         >
           <Text className="text-white font-semibold">返回</Text>
         </Pressable>
+
+      {/* 照片彈窗 */}
+      <PhotoModal
+        visible={showPhotoModal}
+        photo={reliveState.currentPhoto}
+        onClose={() => setShowPhotoModal(false)}
+      />
+
       </ScreenContainer>
     );
   }
@@ -622,6 +706,35 @@ export default function ReliveScreen() {
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
 // 速度分布圖表
+// 照片彈窗組件
+function PhotoModal({
+  visible,
+  photo,
+  onClose,
+}: {
+  visible: boolean;
+  photo?: PhotoData;
+  onClose: () => void;
+}) {
+  if (!visible || !photo) return null;
+  return (
+    <Pressable style={styles.photoModalOverlay} onPress={onClose}>
+      <View style={styles.photoModalContent}>
+        <View style={styles.photoContainer}>
+          <Text style={styles.photoTitle}>{photo.title || "騎乘中的瞬間"}</Text>
+          <View style={styles.photoPlaceholder}>
+            <Text style={styles.photoPlaceholderText}>📷</Text>
+            <Text style={styles.photoPlaceholderDesc}>照片</Text>
+          </View>
+        </View>
+        <Pressable style={styles.photoCloseBtn} onPress={onClose}>
+          <Text style={styles.photoCloseBtnText}>✕</Text>
+        </Pressable>
+      </View>
+    </Pressable>
+  );
+}
+
 function SpeedDistributionChart({ record }: { record: RideRecord }) {
   const speeds = record.route.map((p: any) => (p.speed || 0) * 3.6);
   const ranges = [
@@ -974,6 +1087,71 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 3,
   },
+  photoModalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  photoModalContent: {
+    backgroundColor: "rgba(21,23,24,0.95)",
+    borderRadius: 12,
+    padding: 16,
+    width: "80%",
+    maxWidth: 300,
+    borderWidth: 1,
+    borderColor: "rgba(0,230,118,0.3)",
+  },
+  photoContainer: {
+    alignItems: "center",
+    gap: 12,
+  },
+  photoTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#fff",
+    textAlign: "center",
+  },
+  photoPlaceholder: {
+    width: 200,
+    height: 250,
+    backgroundColor: "rgba(0,230,118,0.1)",
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "rgba(0,230,118,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  photoPlaceholderText: {
+    fontSize: 48,
+  },
+  photoPlaceholderDesc: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.6)",
+  },
+  photoCloseBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  photoCloseBtnText: {
+    fontSize: 18,
+    color: "#fff",
+    fontWeight: "600",
+  },
+
   chartValue: {
     fontSize: 11,
     fontWeight: "600",
