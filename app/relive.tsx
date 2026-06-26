@@ -38,6 +38,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
 import * as DocumentPicker from "expo-document-picker";
 import { ShareModal } from "@/components/share-modal";
+import { ReliveStatsOverlay } from "@/components/relive-stats-overlay";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -718,6 +719,16 @@ export default function ReliveScreen() {
         onMapReady={() => {}}
       />
 
+      {/* 軌跡基本數據實時顯示 */}
+      <ReliveStatsOverlay
+        distance={record.distance / 1000}
+        duration={Math.round(reliveState.playbackIndex * (record.duration / record.route.length))}
+        avgSpeed={record.distance > 0 ? (record.distance / 1000) / (record.duration / 3600) : 0}
+        maxSpeed={record.maxSpeed || 0}
+        elevation={record.totalAscent || 0}
+        calories={record.calories || 0}
+      />
+
       {/* 回放控制欄 */}
       <View style={[styles.controlBar, { top: insets.top + 8, paddingBottom: 8 }]}>
         <Pressable
@@ -760,14 +771,26 @@ export default function ReliveScreen() {
           <View style={styles.collapsedContent}>
             {/* 進度條 */}
             <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
+              <Pressable
+                style={styles.progressBar}
+                onPress={(e) => {
+                  const { locationX } = e.nativeEvent;
+                  const barWidth = 280;
+                  const newProgress = Math.max(0, Math.min(1, locationX / barWidth));
+                  const newIndex = Math.floor(newProgress * (record.route.length - 1));
+                  setReliveState((prev) => ({
+                    ...prev,
+                    playbackIndex: newIndex,
+                  }));
+                }}
+              >
                 <View
                   style={[
                     styles.progressFill,
                     { width: `${progress * 100}%` },
                   ]}
                 />
-              </View>
+              </Pressable>
               <Text style={styles.progressText}>
                 {Math.round(progress * 100)}%
               </Text>
