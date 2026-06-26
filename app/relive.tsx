@@ -34,7 +34,8 @@ import { ScreenContainer } from "@/components/screen-container";
 import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-const BOTTOM_PANEL_COLLAPSED_HEIGHT = 120;
+// 動態計算海苔條高度（根據內容自適應）
+const BOTTOM_PANEL_COLLAPSED_HEIGHT = 140; // 增加高度以容納播放按鈕
 const BOTTOM_PANEL_EXPANDED_HEIGHT = SCREEN_H * 0.7;
 
 // ─── 類型定義 ─────────────────────────────────────────────────────────────────
@@ -356,21 +357,21 @@ export default function ReliveScreen() {
   }, [panelAnim]);
 
   // 手勢識別器
+  // 儀表板縮放狀態
+  const [panelScale, setPanelScale] = useState(1);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, { dy }) => Math.abs(dy) > 10,
       onPanResponderMove: (_, { dy }) => {
-        const newHeight = Math.max(
-          BOTTOM_PANEL_COLLAPSED_HEIGHT,
-          Math.min(BOTTOM_PANEL_EXPANDED_HEIGHT, BOTTOM_PANEL_COLLAPSED_HEIGHT - dy)
-        );
-        panelAnim.setValue(newHeight);
+        // 上拉放大，下滑縮小儀表板
+        const scaleChange = -dy * 0.001;
+        const newScale = Math.max(0.8, Math.min(1.5, panelScale + scaleChange));
+        setPanelScale(newScale);
       },
-      onPanResponderRelease: (_, { dy }) => {
-        const threshold = (BOTTOM_PANEL_EXPANDED_HEIGHT - BOTTOM_PANEL_COLLAPSED_HEIGHT) / 2;
-        const shouldExpand = dy < -threshold;
-        togglePanel(shouldExpand);
+      onPanResponderRelease: () => {
+        // 手勢結束時保持縮放狀態
       },
     })
   ).current;
@@ -409,7 +410,7 @@ export default function ReliveScreen() {
       />
 
       {/* 回放控制欄 */}
-      <View style={[styles.controlBar, { top: insets.top + 10 }]}>
+      <View style={[styles.controlBar, { top: insets.top + 8, paddingBottom: 8 }]}>
         <Pressable
           onPress={() => router.back()}
           style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.7 : 1 }]}
@@ -429,7 +430,7 @@ export default function ReliveScreen() {
       <Animated.View
         style={[
           styles.bottomPanel,
-          { height: panelAnim, bottom: 0 },
+          { height: panelAnim, bottom: 0, transform: [{ scale: panelScale }] },
         ]}
         {...panResponder.panHandlers}
       >
