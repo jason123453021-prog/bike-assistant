@@ -12,6 +12,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Dimensions,
   PanResponder,
@@ -357,21 +358,34 @@ export default function ReliveScreen() {
   }, [panelAnim]);
 
   // 手勢識別器
-  // 儀表板縮放狀態
-  const [panelScale, setPanelScale] = useState(1);
-
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, { dy }) => Math.abs(dy) > 10,
-      onPanResponderMove: (_, { dy }) => {
-        // 上拉放大，下滑縮小儀表板
-        const scaleChange = -dy * 0.001;
-        const newScale = Math.max(0.8, Math.min(1.5, panelScale + scaleChange));
-        setPanelScale(newScale);
+      onStartShouldSetPanResponder: (_, gs) => {
+        // 只在拉桿區域（頂部 50px）允許拖動
+        return gs.y0 < 50;
       },
-      onPanResponderRelease: () => {
-        // 手勢結束時保持縮放狀態
+      onMoveShouldSetPanResponder: (_, gs) => {
+        return gs.y0 < 50 && Math.abs(gs.dy) > 5;
+      },
+      onPanResponderMove: (_, gs) => {
+        const newHeight = BOTTOM_PANEL_COLLAPSED_HEIGHT + (-gs.dy);
+        const clampedHeight = Math.max(BOTTOM_PANEL_COLLAPSED_HEIGHT, Math.min(BOTTOM_PANEL_EXPANDED_HEIGHT, newHeight));
+        panelAnim.setValue(clampedHeight);
+      },
+      onPanResponderRelease: (_, gs) => {
+        const currentHeight = (panelAnim as any)._value;
+        const midpoint = (BOTTOM_PANEL_COLLAPSED_HEIGHT + BOTTOM_PANEL_EXPANDED_HEIGHT) / 2;
+        const velocity = gs.vy;
+        
+        // 根據速度或位置決定展開或收縮
+        if (velocity < -0.5 || currentHeight > midpoint) {
+          togglePanel(true);
+        } else if (velocity > 0.5 || currentHeight < midpoint) {
+          togglePanel(false);
+        } else {
+          // 保持當前狀態
+          togglePanel(panelExpanded);
+        }
       },
     })
   ).current;
@@ -418,19 +432,27 @@ export default function ReliveScreen() {
           <IconSymbol name="chevron.left" size={24} color="#fff" />
         </Pressable>
         <Text style={styles.title}>{record.name || "軌跡回放"}</Text>
-        <Pressable
-          onPress={handleShare}
-          style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.7 : 1 }]}
-        >
-          <IconSymbol name="square.and.arrow.up" size={20} color="#fff" />
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <Pressable
+            onPress={() => Alert.alert("軌跡回放", "此頁面顯示您的騎乘軌跡、實時統計數據、高光時刻和詳細圖表。上拉展開面板查看更多資訊。")}
+            style={({ pressed }) => [styles.infoBtn, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <IconSymbol name="info.circle.fill" size={20} color="#fff" />
+          </Pressable>
+          <Pressable
+            onPress={handleShare}
+            style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <IconSymbol name="square.and.arrow.up" size={20} color="#fff" />
+          </Pressable>
+        </View>
       </View>
 
       {/* 底部面板 */}
       <Animated.View
         style={[
           styles.bottomPanel,
-          { height: panelAnim, bottom: 0, transform: [{ scale: panelScale }] },
+          { height: panelAnim, bottom: 0 },
         ]}
         {...panResponder.panHandlers}
       >
@@ -889,6 +911,12 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  infoBtn: {
     width: 40,
     height: 40,
     alignItems: "center",
