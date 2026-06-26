@@ -26,7 +26,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Slider from "@react-native-community/slider";
+
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
@@ -42,7 +42,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFavorites } from "@/lib/favorites-context";
 import { ShareCardModal } from "@/components/share-card-modal";
 import { SpeedCurveChart, type KeyMarker, type SpeedDataPoint } from "@/components/speed-curve-chart";
-import { PlaybackStatsCard, type PlaybackStatsData } from "@/components/playback-stats-card";
+
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const STORAGE_KEY = "@bike_records";
@@ -121,11 +121,7 @@ export default function RideDetailScreen() {
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [shareCardVisible, setShareCardVisible] = useState(false);
   
-  // 軌跡回放控制
-  const [isPlayingTrail, setIsPlayingTrail] = useState(false);
-  const [trailPlaybackSpeed, setTrailPlaybackSpeed] = useState(1);
-  const [trailPlaybackIndex, setTrailPlaybackIndex] = useState(0);
-  const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   
   // 動態計算收縮面板高度（與導航頁面一致）
   const CELL_H = 60;
@@ -215,149 +211,8 @@ export default function RideDetailScreen() {
     }
   }, [mapReady, polylineCoords]);
   
-  // 軌跡回放邏輯
-  useEffect(() => {
-    if (!isPlayingTrail || polylineCoords.length === 0) {
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current);
-        playbackIntervalRef.current = null;
-      }
-      return;
-    }
-    
-    // 降低更新頻率：從 100ms 提高到 200ms，減少抖動
-    const baseInterval = Math.max(200, 100 / trailPlaybackSpeed);
-    const interval = setInterval(() => {
-      setTrailPlaybackIndex((prev) => {
-        const next = prev + 1;
-        if (next >= polylineCoords.length) {
-          setIsPlayingTrail(false);
-          return prev;
-        }
-        return next;
-      });
-    }, baseInterval);
-    
-    playbackIntervalRef.current = interval;
-    return () => {
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current);
-      }
-    };
-  }, [isPlayingTrail, trailPlaybackSpeed, polylineCoords.length]);
-  
-  // 計算當前回放位置的顏色、方向和俯視角度
-  const getPlaybackMarkerColor = useCallback(() => {
-    if (!record || trailPlaybackIndex === 0) return '#007AFF';
-    const maxSpeed = record.maxSpeed || 20;
-    const speedPct = record.avgSpeed / maxSpeed;
-    if (speedPct < 0.33) return '#66BB6A'; // 綠色
-    if (speedPct < 0.66) return '#FDD835'; // 黃色
-    return '#EF4444'; // 紅色
-  }, [record, trailPlaybackIndex]);
-  
-  const getPlaybackBearingAndPitch = useCallback(() => {
-    if (trailPlaybackIndex === 0 || trailPlaybackIndex >= polylineCoords.length) {
-      return { bearing: 0, pitch: 0 };
-    }
-    const curr = polylineCoords[trailPlaybackIndex];
-    const prev = polylineCoords[Math.max(0, trailPlaybackIndex - 1)];
-    const dLat = curr.latitude - prev.latitude;
-    const dLon = curr.longitude - prev.longitude;
-    let bearing = Math.atan2(dLon, dLat) * (180 / Math.PI);
-    if (bearing < 0) bearing += 360;
-    
-    // 根據坡度計算俯視角度
-    let pitch = 0;
-    if (record && record.route && record.route[trailPlaybackIndex]) {
-      const currAlt = record.route[trailPlaybackIndex].altitude || 0;
-      const prevAlt = record.route[Math.max(0, trailPlaybackIndex - 1)]?.altitude || 0;
-      const altDiff = currAlt - prevAlt;
-      const distance = Math.sqrt(dLat * dLat + dLon * dLon) * 111000; // 轉換為米
-      if (distance > 0) {
-        const grade = (altDiff / distance) * 100;
-        pitch = Math.max(0, Math.min(45, Math.abs(grade) * 1.5));
-      }
-    }
-    
-    return { bearing, pitch };
-  }, [trailPlaybackIndex, polylineCoords, record]);
-  
-  // 地圖方向模式狀態
-  const [mapHeadingMode, setMapHeadingMode] = useState<'heading' | 'north'>('heading');
 
-  // 地圖自動跟隨回放位置、更新標點顏色、方向旋轉和俯視角度（優化：數據點採樣）
-  useEffect(() => {
-    if (trailPlaybackIndex > 0 && trailPlaybackIndex < polylineCoords.length && mapRef.current) {
-      // 採樣策略：每 2-3 個點更新一次相機，減少抖動
-      const samplingRate = Math.max(2, Math.ceil(polylineCoords.length / 500));
-      if (trailPlaybackIndex % samplingRate !== 0) {
-        return; // 跳過採樣點之間的更新
-      }
-      
-      const currentCoord = polylineCoords[trailPlaybackIndex];
-      const color = getPlaybackMarkerColor();
-      const { bearing, pitch } = getPlaybackBearingAndPitch();
-      
-      // 更新彩色標點
-      mapRef.current.setPlaybackMarker(
-        currentCoord.latitude,
-        currentCoord.longitude,
-        color
-      );
-      
-      // 根據方向模式設定是否旋轉地圖
-      const finalBearing = mapHeadingMode === 'heading' ? bearing : 0;
-      mapRef.current.setBearing(finalBearing, true);
-      
-      // 根據坡度調整俯視角度
-      mapRef.current.setPitch(pitch);
-      
-      // 地圖中心跟隨（優化：動画時間与回放速度匹配，改進平滑性）
-      const cameraDuration = Math.max(200, 150 / trailPlaybackSpeed);
-      mapRef.current.animateCamera(
-        {
-          center: { latitude: currentCoord.latitude, longitude: currentCoord.longitude },
-          zoom: 15,
-        },
-        { duration: cameraDuration }
-      );
-    }
-  }, [trailPlaybackIndex, polylineCoords, getPlaybackMarkerColor, getPlaybackBearingAndPitch, mapHeadingMode]);
   
-  // 計算當前回放位置的數據
-  const currentPlaybackData = useMemo(() => {
-    if (trailPlaybackIndex === 0 || !record) {
-      return { distance: 0, time: 0, speed: 0, heartRate: 0, power: 0 };
-    }
-    const totalDistance = record.distance || 0;
-    const totalDuration = record.duration || 0;
-    const avgSpeed = record.avgSpeed || 0;
-    const avgHeartRate = record.avgHeartRate || 0;
-    const avgPower = record.avgPower || 0;
-    
-    return {
-      distance: (totalDistance * trailPlaybackIndex) / polylineCoords.length,
-      time: (totalDuration * trailPlaybackIndex) / polylineCoords.length,
-      speed: avgSpeed,
-      heartRate: avgHeartRate,
-      power: avgPower,
-    };
-  }, [trailPlaybackIndex, polylineCoords.length, record]);
-  
-  const handlePlayTrail = useCallback(() => {
-    if (!record || polylineCoords.length === 0) return;
-    if (trailPlaybackIndex >= polylineCoords.length - 1) {
-      setTrailPlaybackIndex(0);
-    }
-    setIsPlayingTrail(prev => !prev);
-  }, [record, polylineCoords.length, trailPlaybackIndex]);
-  
-  const handleResetTrail = useCallback(() => {
-    setIsPlayingTrail(false);
-    setTrailPlaybackIndex(0);
-  }, []);
-
   // 心率區間定義（5 個區間，包含 BPM 範圍）
   const HR_ZONES = [
     { name: "恢復", min: 0, max: 0.6, color: "#4FC3F7", minBpm: 60, maxBpm: 120 },
@@ -443,20 +298,7 @@ export default function RideDetailScreen() {
     return markers;
   }, [record, speedCurveData]);
   
-  // 處理關鍵點點擊
-  const handleMarkerPress = useCallback((marker: KeyMarker) => {
-    setTrailPlaybackIndex(marker.index);
-    if (mapRef.current && polylineCoords[marker.index]) {
-      const coord = polylineCoords[marker.index];
-      mapRef.current.animateCamera(
-        {
-          center: { latitude: coord.latitude, longitude: coord.longitude },
-          zoom: 15,
-        },
-        { duration: 300 }
-      );
-    }
-  }, [polylineCoords]);
+  // 處理關鍵點點擊 (已移除)
 
   // 功率分布圓餅圖
   const renderPie = useCallback(() => {
@@ -812,51 +654,7 @@ export default function RideDetailScreen() {
           <Text style={styles.dateText}>{dateStr}</Text>
         </View>
 
-        {/* 摘要（距離 + 時間） */}
-        {/* 軌跡回放欄位（最上方） */}
-        {polylineCoords.length > 0 && (
-          <View style={styles.trailPlaybackSection}>
-            <Text style={styles.sectionTitle}>軌跡回放</Text>
-            <View style={styles.playbackControls}>
-              <Pressable
-                style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1 }]}
-                onPress={handlePlayTrail}
-              >
-                <IconSymbol name={isPlayingTrail ? "pause.fill" : "play.fill"} size={20} color="#fff" />
-                <Text style={styles.playbackBtnText}>{isPlayingTrail ? "暫停" : "播放"}</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1 }]}
-                onPress={handleResetTrail}
-              >
-                <IconSymbol name="arrow.counterclockwise" size={20} color="#fff" />
-                <Text style={styles.playbackBtnText}>重置</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1, backgroundColor: mapHeadingMode === 'heading' ? colors.primary : 'rgba(255,255,255,0.2)' }]}
-                onPress={() => setMapHeadingMode(mapHeadingMode === 'heading' ? 'north' : 'heading')}
-              >
-                <IconSymbol name={mapHeadingMode === 'heading' ? "arrow.up" : "compass"} size={20} color="#fff" />
-                <Text style={styles.playbackBtnText}>{mapHeadingMode === 'heading' ? '指北' : '指向'}</Text>
-              </Pressable>
-            </View>
-            {/* 回放速度滑桿 */}
-            <View style={styles.speedSliderContainer}>
-              <Text style={styles.speedSliderLabel}>速度：{trailPlaybackSpeed}x</Text>
-              <Slider
-                style={styles.speedSlider}
-                minimumValue={0.5}
-                maximumValue={4}
-                step={0.5}
-                value={trailPlaybackSpeed}
-                onValueChange={(value) => setTrailPlaybackSpeed(value)}
-                minimumTrackTintColor={colors.primary}
-                maximumTrackTintColor="rgba(255,255,255,0.3)"
-              />
-            </View>
-            {/* 回放統計卡片已移至下拉面板內 */}
-          </View>
-        )}
+
 
         {/* 摘要（距離 + 時間 + 卡洛里） */}
         <View style={styles.summaryRow}>
@@ -885,10 +683,7 @@ export default function RideDetailScreen() {
           />
         </View>
 
-        {/* 回放統計卡片 - 移至下拉面板內 */}
-        {isPlayingTrail && currentPlaybackData && (
-          <PlaybackStatsCard data={{...currentPlaybackData, altitude: 0}} />
-        )}
+
 
         {/* 展開後的詳細內容 */}
         {panelExpanded && (
@@ -975,91 +770,7 @@ export default function RideDetailScreen() {
               </View>
             )}
 
-            {/* 軌跡回放統計卡片 */}
-            {isPlayingTrail && record && (
-              <PlaybackStatsCard
-                data={{
-                  speed: (record.route?.[trailPlaybackIndex]?.speed || 0) * 3.6,
-                  heartRate: record.avgHeartRate || 0,
-                  power: record.avgPower || 0,
-                  altitude: record.route?.[trailPlaybackIndex]?.altitude || record.maxElevation || 0,
-                  distance: (trailPlaybackIndex / polylineCoords.length) * (record.distance / 1000),
-                  time: (trailPlaybackIndex / polylineCoords.length) * (record.duration || 0),
-                }}
-              />
-            )}
 
-            {/* 軌跡回放控制 */}
-            {polylineCoords.length > 0 && (
-              <View style={styles.trailPlaybackSection}>
-                <Text style={styles.sectionTitle}>軌跡回放</Text>
-                <View style={styles.playbackControls}>
-                  <Pressable
-                    style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1 }]}
-                    onPress={handlePlayTrail}
-                  >
-                    <IconSymbol name={isPlayingTrail ? "pause.fill" : "play.fill"} size={20} color="#fff" />
-                    <Text style={styles.playbackBtnText}>{isPlayingTrail ? "暫停" : "播放"}</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1 }]}
-                    onPress={handleResetTrail}
-                  >
-                    <IconSymbol name="arrow.counterclockwise" size={20} color="#fff" />
-                    <Text style={styles.playbackBtnText}>重置</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.playbackBtn, { opacity: pressed ? 0.7 : 1, backgroundColor: mapHeadingMode === 'heading' ? colors.primary : 'rgba(255,255,255,0.2)' }]}
-                    onPress={() => setMapHeadingMode(mapHeadingMode === 'heading' ? 'north' : 'heading')}
-                  >
-                    <IconSymbol name={mapHeadingMode === 'heading' ? "arrow.up" : "compass"} size={20} color="#fff" />
-                    <Text style={styles.playbackBtnText}>{mapHeadingMode === 'heading' ? '指北' : '指向'}</Text>
-                  </Pressable>
-                  <View style={styles.speedControl}>
-                    <View style={styles.speedLabelRow}>
-                      <Text style={styles.speedLabel}>速度</Text>
-                      <Text style={styles.speedValue}>{trailPlaybackSpeed}x</Text>
-                    </View>
-                    <View style={styles.speedButtons}>
-                      {[0.5, 1, 2, 4].map((speed) => (
-                        <Pressable
-                          key={speed}
-                          style={({ pressed }) => [{
-                            flex: 1,
-                            paddingHorizontal: 4,
-                            paddingVertical: 6,
-                            marginHorizontal: 2,
-                            borderRadius: 4,
-                            backgroundColor: trailPlaybackSpeed === speed ? colors.primary : colors.surface,
-                            opacity: pressed ? 0.7 : 1,
-                            alignItems: 'center',
-                          }]}
-                          onPress={() => setTrailPlaybackSpeed(speed)}
-                        >
-                          <Text style={[styles.speedBtnText, { color: trailPlaybackSpeed === speed ? '#fff' : colors.foreground, fontSize: 12 }]}>
-                            {speed}x
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.playbackProgress}>
-                  <View style={styles.progressBar}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        { width: `${(trailPlaybackIndex / polylineCoords.length) * 100}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.progressText}>
-                    {trailPlaybackIndex} / {polylineCoords.length} ({Math.round((trailPlaybackIndex / polylineCoords.length) * 100)}%)
-                  </Text>
-                </View>
-
-              </View>
-            )}
 
             {/* 心率區間分布 */}
             {heartRateZones && heartRateZones.reduce((a, b) => a + b, 0) > 0 && (
@@ -1430,110 +1141,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 12,
   },
-  trailPlaybackSection: {
-    marginHorizontal: 12,
-    marginTop: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.05)",
-  },
 
-  playbackControls: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 12,
-    alignItems: "center",
-  },
-  playbackBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: "rgba(0, 230, 118, 0.2)",
-  },
-  playbackBtnText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  speedControl: {
-    flex: 1,
-    alignItems: "flex-end",
-    gap: 6,
-  },
-  speedLabel: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.7)",
-  },
-  speedLabelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  speedValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.9)",
-  },
-  speedButtons: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  speedBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  speedBtnText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  speedSliderContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  speedSliderLabel: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.7)",
-  },
-  speedSlider: {
-    width: "100%",
-    height: 30,
-  },
-  playbackProgress: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    alignItems: "center",
-    gap: 8,
-  },
-  progressBar: {
-    width: "100%",
-    height: 6,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  progressBarFill: {
-    height: "100%",
-    backgroundColor: "#00E676",
-    borderRadius: 3,
-  },
-  progressText: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.6)",
-  },
   gradeDistributionSection: {
     marginTop: 16,
     paddingHorizontal: 12,
