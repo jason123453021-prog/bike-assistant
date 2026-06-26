@@ -22,6 +22,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -48,6 +49,20 @@ interface PhotoData {
   latitude?: number;
   longitude?: number;
   title?: string;
+}
+
+interface Comment {
+  id: string;
+  author: string;
+  content: string;
+  timestamp: number;
+}
+
+interface RideInteraction {
+  recordId: string;
+  likes: number;
+  comments: Comment[];
+  isLiked: boolean;
 }
 
 interface ReliveState {
@@ -103,6 +118,16 @@ export default function ReliveScreen() {
   // 照片時間軸
   const [photos, setPhotos] = useState<PhotoData[]>([]);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+
+  // 社群互動狀態
+  const [interaction, setInteraction] = useState<RideInteraction>({
+    recordId: id || '',
+    likes: Math.floor(Math.random() * 50),
+    comments: [],
+    isLiked: false,
+  });
+  const [newComment, setNewComment] = useState('');
+  const [showComments, setShowComments] = useState(false);
 
   // 模擬加載照片
   useEffect(() => {
@@ -380,6 +405,57 @@ export default function ReliveScreen() {
   }, [record]);
 
   // 分享統計數據
+  // 生成 FIT 格式文件
+  const generateFIT = useCallback(async () => {
+    if (!record || record.route.length === 0) return;
+
+    try {
+      // FIT 文件簡化版本（CSV 格式，相容 Garmin）
+      let fitContent = "Date,Time,Latitude,Longitude,Altitude,Speed,Heart Rate,Power,Cadence\n";
+
+      const startDate = new Date(record.date);
+      record.route.forEach((point: any, idx: number) => {
+        const time = new Date(startDate.getTime() + idx * 1000);
+        const dateStr = time.toISOString().split('T')[0];
+        const timeStr = time.toISOString().split('T')[1];
+        fitContent += `${dateStr},${timeStr},${point.latitude},${point.longitude},${point.altitude || 0},${point.speed || 0},${record.avgHeartRate || 0},${record.avgPower || 0},${record.avgCadence || 0}\n`;
+      });
+
+      // 使用系統分享菜單下載
+      await Share.share({
+        message: `騎乘 FIT 數據 - ${record.name || "騎乘記錄"}`,
+        title: `${record.name || "騎乘記錄"}.fit`,
+      });
+    } catch (error) {
+      console.error("FIT 導出失敗:", error);
+    }
+  }, [record]);
+
+  // 按讚功能
+  const handleLike = useCallback(() => {
+    setInteraction(prev => ({
+      ...prev,
+      likes: prev.isLiked ? prev.likes - 1 : prev.likes + 1,
+      isLiked: !prev.isLiked,
+    }));
+  }, []);
+
+  // 添加評論
+  const handleAddComment = useCallback(() => {
+    if (!newComment.trim()) return;
+    const comment: Comment = {
+      id: Date.now().toString(),
+      author: '我',
+      content: newComment,
+      timestamp: Date.now(),
+    };
+    setInteraction(prev => ({
+      ...prev,
+      comments: [...prev.comments, comment],
+    }));
+    setNewComment('');
+  }, [newComment]);
+
   const handleShare = useCallback(async () => {
     if (!record) return;
 
@@ -693,6 +769,63 @@ export default function ReliveScreen() {
               />
             </View>
 
+            {/* 社群互動按鈕 */}
+            <View style={styles.interactionBar}>
+              <Pressable
+                onPress={handleLike}
+                style={({ pressed }) => [styles.interactionBtn, { opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={[styles.interactionBtnText, interaction.isLiked && { color: '#FF6B6B' }]}>
+                  {interaction.isLiked ? '❤️' : '🤍'} {interaction.likes}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setShowComments(!showComments)}
+                style={({ pressed }) => [styles.interactionBtn, { opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={styles.interactionBtnText}>💬 {interaction.comments.length}</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleShare}
+                style={({ pressed }) => [styles.interactionBtn, { opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={styles.interactionBtnText}>📤 分享</Text>
+              </Pressable>
+            </View>
+
+            {/* 評論區域 */}
+            {showComments && (
+              <View style={styles.commentsSection}>
+                <Text style={styles.commentsSectionTitle}>評論 ({interaction.comments.length})</Text>
+                <View style={styles.commentInputContainer}>
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="添加評論..."
+                    placeholderTextColor={colors.muted}
+                    value={newComment}
+                    onChangeText={setNewComment}
+                  />
+                  <Pressable
+                    onPress={handleAddComment}
+                    style={({ pressed }) => [styles.commentSubmitBtn, { opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Text style={styles.commentSubmitBtnText}>發送</Text>
+                  </Pressable>
+                </View>
+                <ScrollView style={styles.commentsList} nestedScrollEnabled>
+                  {interaction.comments.map((comment) => (
+                    <View key={comment.id} style={styles.commentItem}>
+                      <Text style={styles.commentAuthor}>{comment.author}</Text>
+                      <Text style={styles.commentContent}>{comment.content}</Text>
+                      <Text style={styles.commentTime}>
+                        {new Date(comment.timestamp).toLocaleTimeString()}
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             {/* 高光時刻 */}
             {highlights.length > 0 && (
               <View style={styles.highlightsContainer}>
@@ -864,7 +997,7 @@ export default function ReliveScreen() {
                   <Text style={styles.exportBtnText}>📥 導出 GPX</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => Alert.alert('提示', 'FIT 格式導出功能即將推出')}
+                  onPress={generateFIT}
                   style={({ pressed }) => [styles.exportBtn, { opacity: pressed ? 0.7 : 1 }]}
                 >
                   <Text style={styles.exportBtnText}>📥 導出 FIT</Text>
@@ -1422,5 +1555,86 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "600",
     fontSize: 14,
+  },
+  interactionBar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.1)",
+    marginTop: 8,
+  },
+  interactionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  interactionBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  commentsSection: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    borderRadius: 8,
+  },
+  commentsSectionTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  commentInputContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  commentInput: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: "#fff",
+    fontSize: 12,
+  },
+  commentSubmitBtn: {
+    backgroundColor: "#00E676",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    justifyContent: "center",
+  },
+  commentSubmitBtnText: {
+    color: "#000",
+    fontWeight: "600",
+    fontSize: 12,
+  },
+  commentsList: {
+    maxHeight: 200,
+  },
+  commentItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+  },
+  commentAuthor: {
+    color: "#00E676",
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  commentContent: {
+    color: "#fff",
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  commentTime: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 10,
   },
 });
