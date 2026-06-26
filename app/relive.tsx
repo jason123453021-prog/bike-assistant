@@ -798,174 +798,182 @@ export default function ReliveScreen() {
           <View style={styles.panelHandle} />
         </View>
 
-        {/* 收縮狀態：回放控制 */}
-        {!panelExpanded && (
-          <View style={styles.collapsedContent}>
-            {/* 進度條 */}
-            <View style={styles.progressContainer}>
-              <Pressable
-                style={styles.progressBar}
-                onPress={(e) => {
-                  const { locationX } = e.nativeEvent;
-                  const barWidth = 280;
-                  const newProgress = Math.max(0, Math.min(1, locationX / barWidth));
-                  const newIndex = Math.floor(newProgress * (record.route.length - 1));
-                  setReliveState((prev) => ({
-                    ...prev,
-                    playbackIndex: newIndex,
-                    isDraggingProgress: false,
-                  }));
-                }}
-                onLongPress={() => {
-                  setReliveState((prev) => ({
-                    ...prev,
-                    isDraggingProgress: true,
-                  }));
-                }}
-              >
+        {/* 控制面板 - 始終顯示（不在 ScrollView 內） */}
+        <View style={styles.controlPanel}>
+          {/* 進度條 */}
+          <View style={styles.progressContainer}>
+            <Pressable
+              style={styles.progressBar}
+              onPress={(e) => {
+                const { locationX } = e.nativeEvent;
+                const barWidth = 280;
+                const newProgress = Math.max(0, Math.min(1, locationX / barWidth));
+                const newIndex = Math.floor(newProgress * (record.route.length - 1));
+                setReliveState((prev) => ({
+                  ...prev,
+                  playbackIndex: newIndex,
+                  isDraggingProgress: false,
+                }));
+              }}
+              onLongPress={() => {
+                setReliveState((prev) => ({
+                  ...prev,
+                  isDraggingProgress: true,
+                }));
+              }}
+            >
+              <View
+                style={[
+                  styles.progressFill,
+                  { 
+                    width: `${progress * 100}%`,
+                    backgroundColor: reliveState.isDraggingProgress ? '#00E676' : '#00C853',
+                    opacity: reliveState.isDraggingProgress ? 1 : 0.8,
+                  },
+                ]}
+              />
+              {reliveState.isDraggingProgress && (
                 <View
                   style={[
-                    styles.progressFill,
-                    { 
-                      width: `${progress * 100}%`,
-                      backgroundColor: reliveState.isDraggingProgress ? '#00E676' : '#00C853',
-                      opacity: reliveState.isDraggingProgress ? 1 : 0.8,
-                    },
+                    styles.progressDragIndicator,
+                    { left: `${progress * 100}%` },
                   ]}
                 />
-                {reliveState.isDraggingProgress && (
-                  <View
-                    style={[
-                      styles.progressDragIndicator,
-                      { left: `${progress * 100}%` },
-                    ]}
-                  />
-                )}
-              </Pressable>
-              <Text style={styles.progressText}>
-                {Math.round(progress * 100)}%
+              )}
+            </Pressable>
+            <Text style={styles.progressText}>
+              {Math.round(progress * 100)}%
+            </Text>
+          </View>
+
+          {/* 回放按鈕 */}
+          <View style={styles.playbackControls}>
+            <Pressable
+              style={({ pressed }) => [styles.playBtn, { opacity: pressed ? 0.7 : 1 }]}
+              onPress={() =>
+                setReliveState((prev) => ({
+                  ...prev,
+                  isPlaying: !prev.isPlaying,
+                }))
+              }
+            >
+              <IconSymbol
+                name={reliveState.isPlaying ? "pause.fill" : "play.fill"}
+                size={20}
+                color="#fff"
+              />
+              <Text style={styles.playBtnText}>
+                {reliveState.isPlaying ? "暫停" : "播放"}
               </Text>
-            </View>
+            </Pressable>
 
-            {/* 回放按鈕 */}
-            <View style={styles.playbackControls}>
-              <Pressable
-                style={({ pressed }) => [styles.playBtn, { opacity: pressed ? 0.7 : 1 }]}
-                onPress={() =>
-                  setReliveState((prev) => ({
-                    ...prev,
-                    isPlaying: !prev.isPlaying,
-                  }))
-                }
-              >
-                <IconSymbol
-                  name={reliveState.isPlaying ? "pause.fill" : "play.fill"}
-                  size={20}
-                  color="#fff"
-                />
-                <Text style={styles.playBtnText}>
-                  {reliveState.isPlaying ? "暫停" : "播放"}
-                </Text>
-              </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.playBtn, { opacity: pressed ? 0.7 : 1 }]}
+              onPress={() =>
+                setReliveState((prev) => ({
+                  ...prev,
+                  playbackIndex: 0,
+                  isPlaying: false,
+                }))
+              }
+            >
+              <IconSymbol name="arrow.counterclockwise" size={20} color="#fff" />
+              <Text style={styles.playBtnText}>重置</Text>
+            </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [styles.playBtn, { opacity: pressed ? 0.7 : 1 }]}
-                onPress={() =>
-                  setReliveState((prev) => ({
-                    ...prev,
-                    playbackIndex: 0,
-                    isPlaying: false,
-                  }))
-                }
-              >
-                <IconSymbol name="arrow.counterclockwise" size={20} color="#fff" />
-                <Text style={styles.playBtnText}>重置</Text>
-              </Pressable>
-
-              {/* 速度調整 */}
-              <View style={styles.speedControl}>
-                <Text style={styles.speedLabel}>速度</Text>
-                <View style={styles.speedButtons}>
-                  {[0.5, 1, 2, 4].map((speed) => (
-                    <Pressable
-                      key={speed}
-                      style={({ pressed }) => [
-                        styles.speedBtn,
-                        {
-                          backgroundColor:
-                            reliveState.playbackSpeed === speed
-                              ? colors.primary
-                              : "rgba(255,255,255,0.2)",
-                          opacity: pressed ? 0.7 : 1,
-                        },
-                      ]}
-                      onPress={() =>
-                        setReliveState((prev) => ({
-                          ...prev,
-                          playbackSpeed: speed,
-                        }))
-                      }
-                    >
-                      <Text style={styles.speedBtnText}>{speed}x</Text>
-                    </Pressable>
-                  ))}
-                </View>
+            {/* 速度調整 */}
+            <View style={styles.speedControl}>
+              <Text style={styles.speedLabel}>速度</Text>
+              <View style={styles.speedButtons}>
+                {[0.5, 1, 2, 4].map((speed) => (
+                  <Pressable
+                    key={speed}
+                    style={({ pressed }) => [
+                      styles.speedBtn,
+                      {
+                        backgroundColor:
+                          reliveState.playbackSpeed === speed
+                            ? colors.primary
+                            : "rgba(255,255,255,0.2)",
+                        opacity: pressed ? 0.7 : 1,
+                      },
+                    ]}
+                    onPress={() =>
+                      setReliveState((prev) => ({
+                        ...prev,
+                        playbackSpeed: speed,
+                      }))
+                    }
+                  >
+                    <Text style={styles.speedBtnText}>{speed}x</Text>
+                  </Pressable>
+                ))}
               </View>
             </View>
+          </View>
 
-            {/* 實時數據 */}
-            <View style={styles.statsRow}>
-              <StatCell
-                icon="speedometer"
-                value={reliveState.currentData.speed.toFixed(1)}
-                unit="km/h"
-                label="速度"
-              />
-              <StatCell
-                icon="location.fill"
-                value={reliveState.currentData.distance.toFixed(2)}
-                unit="km"
-                label="距離"
-              />
-              <StatCell
-                icon="clock.fill"
-                value={formatDuration(Math.floor(reliveState.currentData.time))}
-                unit=""
-                label="時間"
-              />
-              <StatCell
-                icon="mountain.2.fill"
-                value={Math.round(reliveState.currentData.altitude).toString()}
-                unit="m"
-                label="海拔"
-              />
-            </View>
+          {/* 實時數據 */}
+          <View style={styles.statsRow}>
+            <StatCell
+              icon="speedometer"
+              value={reliveState.currentData.speed.toFixed(1)}
+              unit="km/h"
+              label="速度"
+            />
+            <StatCell
+              icon="location.fill"
+              value={reliveState.currentData.distance.toFixed(2)}
+              unit="km"
+              label="距離"
+            />
+            <StatCell
+              icon="clock.fill"
+              value={formatDuration(Math.floor(reliveState.currentData.time))}
+              unit=""
+              label="時間"
+            />
+            <StatCell
+              icon="mountain.2.fill"
+              value={Math.round(reliveState.currentData.altitude).toString()}
+              unit="m"
+              label="海拔"
+            />
+          </View>
 
-            {/* 社群互動按鈕 */}
-            <View style={styles.interactionBar}>
-              <Pressable
-                onPress={handleLike}
-                style={({ pressed }) => [styles.interactionBtn, { opacity: pressed ? 0.7 : 1 }]}
-              >
-                <Text style={[styles.interactionBtnText, interaction.isLiked && { color: '#FF6B6B' }]}>
-                  {interaction.isLiked ? '❤️' : '🤍'} {interaction.likes}
-                </Text>
-                <Text style={styles.syncIndicator}>💾</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setShowComments(!showComments)}
-                style={({ pressed }) => [styles.interactionBtn, { opacity: pressed ? 0.7 : 1 }]}
-              >
-                <Text style={styles.interactionBtnText}>💬 {interaction.comments.length}</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleOpenShareModal}
-                style={({ pressed }) => [styles.interactionBtn, { opacity: pressed ? 0.7 : 1 }]}
-              >
-                <Text style={styles.interactionBtnText}>📤 分享</Text>
-              </Pressable>
-            </View>
+          {/* 社群互動按鈕 */}
+          <View style={styles.interactionBar}>
+            <Pressable
+              onPress={handleLike}
+              style={({ pressed }) => [styles.interactionBtn, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[styles.interactionBtnText, interaction.isLiked && { color: '#FF6B6B' }]}>
+                {interaction.isLiked ? '❤️' : '🤍'} {interaction.likes}
+              </Text>
+              <Text style={styles.syncIndicator}>💾</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setShowComments(!showComments)}
+              style={({ pressed }) => [styles.interactionBtn, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={styles.interactionBtnText}>💬 {interaction.comments.length}</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleOpenShareModal}
+              style={({ pressed }) => [styles.interactionBtn, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={styles.interactionBtnText}>📤 分享</Text>
+            </Pressable>
+          </View>
+        </View>
 
+        {/* 詳細內容 - 只在展開時顯示，可捲動 */}
+        {panelExpanded && (
+          <ScrollView
+            style={styles.detailedContent}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={panelExpanded}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+          >
             {/* 評論區域 */}
             {showComments && (
               <View style={styles.commentsSection}>
@@ -1028,20 +1036,10 @@ export default function ReliveScreen() {
                 </View>
               </View>
             )}
-          </View>
-        )}
 
-        {/* 展開狀態：詳細統計 */}
-        {panelExpanded && (
-          <ScrollView
-            style={styles.expandedContent}
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={panelExpanded}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
-          >
-            {/* 核心數據 */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>核心數據</Text>
+          {/* 核心數據 */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>核心數據</Text>
               <View style={styles.statsGrid}>
                 <StatCell
                   icon="location.fill"
@@ -1413,6 +1411,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   expandedContent: { flex: 1 },
+  controlPanel: {
+    paddingHorizontal: 12,
+    paddingVertical: 0,
+    gap: 0,
+  },
+  detailedContent: {
+    flex: 1,
+  },
   progressContainer: {
     marginBottom: 12,
     gap: 6,

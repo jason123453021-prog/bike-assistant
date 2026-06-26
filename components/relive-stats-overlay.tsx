@@ -87,7 +87,7 @@ export function ReliveStatsOverlay({
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    top: 16,
+    top: 76,
     left: 16,
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     borderRadius: 12,
