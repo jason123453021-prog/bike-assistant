@@ -42,10 +42,12 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-// 動態計算海苔條高度（根據內容自適應）
-// 收縮狀態高度：進度條(18) + 按鈕行(36) + 速度控制(40) + padding(16) + 把手(12) = ~122px，預留邊距設為 160px
-const BOTTOM_PANEL_COLLAPSED_HEIGHT = 160;
-const BOTTOM_PANEL_EXPANDED_HEIGHT = SCREEN_H * 0.7;
+// 收縮面板高度計算（與 ride-detail.tsx 一致）
+const CELL_H = 60;
+const HEADER_H = 80; // 把手 + 進度條
+const CTRL_H = 64; // 按鈕行 + 速度控制
+const BOTTOM_PANEL_COLLAPSED_HEIGHT = Math.min(HEADER_H + CTRL_H, 200);
+const BOTTOM_PANEL_EXPANDED_HEIGHT = Math.min(SCREEN_H * 0.7, 560);
 
 // ─── 類型定義 ─────────────────────────────────────────────────────────────────
 
@@ -624,7 +626,7 @@ export default function ReliveScreen() {
     setPanelExpanded(expanded);
     Animated.timing(panelAnim, {
       toValue: expanded ? BOTTOM_PANEL_EXPANDED_HEIGHT : BOTTOM_PANEL_COLLAPSED_HEIGHT,
-      duration: 300,
+      duration: 280,
       useNativeDriver: false,
     }).start();
   }, [panelAnim]);
