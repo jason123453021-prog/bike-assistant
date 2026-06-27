@@ -57,7 +57,7 @@ export function ReliveRealtimeStats({
   const slopeInfo = getSlopeInfo(slope);
 
   return (
-    <View style={[styles.container, { borderLeftColor: slopeInfo.color, borderLeftWidth: 4, top: topOffset }]}>
+    <View style={[styles.container, { borderLeftColor: slopeInfo.color, borderLeftWidth: 4, top: topOffset, marginTop: 3 }]}>
       <View style={styles.content}>
         <Text style={styles.text}>
           速度 {speed.toFixed(1)} km/h | 距離 {distance.toFixed(2)} 公里 | 瓦數 {power.toFixed(0)} W
