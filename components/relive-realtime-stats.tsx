@@ -17,6 +17,7 @@ interface ReliveRealtimeStatsProps {
   distance: number; // km
   slope: number; // %
   power: number; // W
+  topOffset?: number; // 距離頂部的偏移量（用於動態定位）
 }
 
 /**
@@ -50,12 +51,13 @@ export function ReliveRealtimeStats({
   distance,
   slope,
   power,
+  topOffset = 64,
 }: ReliveRealtimeStatsProps) {
   const colors = useColors();
   const slopeInfo = getSlopeInfo(slope);
 
   return (
-    <View style={[styles.container, { borderLeftColor: slopeInfo.color, borderLeftWidth: 4 }]}>
+    <View style={[styles.container, { borderLeftColor: slopeInfo.color, borderLeftWidth: 4, top: topOffset }]}>
       <View style={styles.content}>
         <Text style={styles.text}>
           速度 {speed.toFixed(1)} km/h | 距離 {distance.toFixed(2)} 公里 | 瓦數 {power.toFixed(0)} W
@@ -79,7 +81,6 @@ export function ReliveRealtimeStats({
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    top: 64, // 標題欄下方（緊貼標題）
     left: 16,
     right: 16,
     backgroundColor: "rgba(0, 0, 0, 0.7)",

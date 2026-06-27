@@ -812,6 +812,7 @@ export default function ReliveScreen() {
             distance={reliveState.currentData.distance}
             slope={currentSlope}
             power={reliveState.currentData.power}
+            topOffset={insets.top + 56}
           />
         );
       })()}
