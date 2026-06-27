@@ -1398,6 +1398,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.08)",
     overflow: "hidden",
+    zIndex: 50,
+    elevation: 50,
+    flexDirection: "column",
   },
   handleArea: { alignItems: "center", paddingTop: 8, paddingBottom: 4 },
   panelHandle: {
@@ -1415,6 +1418,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 0,
     gap: 0,
+    minHeight: 200,
+    flexShrink: 0,
+    flexDirection: "column",
   },
   detailedContent: {
     flex: 1,
