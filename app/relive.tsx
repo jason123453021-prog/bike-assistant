@@ -39,8 +39,10 @@ import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map"
 import * as DocumentPicker from "expo-document-picker";
 import { ShareModal } from "@/components/share-modal";
 import { ReliveStatsOverlay } from "@/components/relive-stats-overlay";
+import { ReliveRealtimeStats } from "@/components/relive-realtime-stats";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
+import { RideTrackingNative } from "@/lib/ride-tracking-native";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 // 收縮面板高度計算（與 ride-detail.tsx 一致）
@@ -191,6 +193,38 @@ export default function ReliveScreen() {
     }
     setShareState((prev) => ({ ...prev, showShareModal: true }));
   }, [isAuthenticated]);
+
+  // 問騎追蹤服務生命週期
+  useEffect(() => {
+    // 進入 relive 頁面時，啟動追蹤服務
+    const startTracking = async () => {
+      try {
+        await RideTrackingNative.startTracking();
+        // 検查電池最佳化
+        const isIgnoring = await RideTrackingNative.isIgnoringBatteryOptimizations();
+        if (!isIgnoring) {
+          console.warn("[Relive] App is in battery optimization list");
+          // 不强制要求，但記錄警告
+        }
+      } catch (error) {
+        console.error("[Relive] Failed to start tracking service:", error);
+      }
+    };
+
+    startTracking();
+
+    // 點擊返回時，停止追蹤服務
+    return () => {
+      const stopTracking = async () => {
+        try {
+          await RideTrackingNative.stopTracking();
+        } catch (error) {
+          console.error("[Relive] Failed to stop tracking service:", error);
+        }
+      };
+      stopTracking();
+    };
+  }, []);
 
   // 模擬加載照片
   useEffect(() => {
@@ -761,6 +795,14 @@ export default function ReliveScreen() {
         calories={record.calories || 0}
       />
 
+      {/* 實時數據行 */}
+      <ReliveRealtimeStats
+        speed={reliveState.currentData.speed}
+        distance={reliveState.currentData.distance}
+        slope={0} // TODO: 計算坡度
+        power={reliveState.currentData.power}
+      />
+
       {/* 回放控制欄 */}
       <View style={[styles.controlBar, { top: insets.top + 8, paddingBottom: 8 }]}>
         <Pressable
@@ -912,33 +954,7 @@ export default function ReliveScreen() {
             </View>
           </View>
 
-          {/* 實時數據 */}
-          <View style={styles.statsRow}>
-            <StatCell
-              icon="speedometer"
-              value={reliveState.currentData.speed.toFixed(1)}
-              unit="km/h"
-              label="速度"
-            />
-            <StatCell
-              icon="location.fill"
-              value={reliveState.currentData.distance.toFixed(2)}
-              unit="km"
-              label="距離"
-            />
-            <StatCell
-              icon="clock.fill"
-              value={formatDuration(Math.floor(reliveState.currentData.time))}
-              unit=""
-              label="時間"
-            />
-            <StatCell
-              icon="mountain.2.fill"
-              value={Math.round(reliveState.currentData.altitude).toString()}
-              unit="m"
-              label="海拔"
-            />
-          </View>
+          {/* 實時數據已移至地圖區域 - ReliveRealtimeStats */}
 
           {/* 社群互動按鈕 */}
           <View style={styles.interactionBar}>
