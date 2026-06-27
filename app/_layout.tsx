@@ -27,6 +27,7 @@ import { SocialProvider } from "@/lib/social-context";
 import { setupNotifications } from "@/lib/feedback-service";
 // 必須在頂層引入以確保 TaskManager 任務被定義
 import "@/lib/background-location";
+import { RideTrackingNative } from "@/lib/ride-tracking-native";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -66,6 +67,24 @@ export default function RootLayout() {
 
   useEffect(() => {
     setupNotifications().catch(() => {});
+  }, []);
+
+  // 在 App 啟動時檢查電池最佳化狀況
+  useEffect(() => {
+    const checkBatteryOptimization = async () => {
+      try {
+        const isIgnoring = await RideTrackingNative.isIgnoringBatteryOptimizations();
+        if (!isIgnoring) {
+          console.warn("[App] App is in battery optimization list, requesting exemption");
+          // 主動要求用戶設定
+          await RideTrackingNative.requestIgnoreBatteryOptimizations();
+        }
+      } catch (error) {
+        console.error("[App] Failed to check battery optimization:", error);
+      }
+    };
+
+    checkBatteryOptimization();
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {

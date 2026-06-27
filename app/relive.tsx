@@ -796,12 +796,33 @@ export default function ReliveScreen() {
       />
 
       {/* 實時數據行 */}
-      <ReliveRealtimeStats
-        speed={reliveState.currentData.speed}
-        distance={reliveState.currentData.distance}
-        slope={0} // TODO: 計算坡度
-        power={reliveState.currentData.power}
-      />
+      {(() => {
+        // 計算當前坡度
+        let currentSlope = 0;
+        if (record && record.route.length > reliveState.playbackIndex) {
+          const currentIndex = Math.floor(reliveState.playbackIndex);
+          if (currentIndex > 0) {
+            const prev = record.route[currentIndex - 1];
+            const curr = record.route[currentIndex];
+            const altDiff = (curr.altitude || 0) - (prev.altitude || 0);
+            const distance = Math.hypot(
+              (curr.latitude - prev.latitude) * 111000,
+              (curr.longitude - prev.longitude) * 111000 * Math.cos((curr.latitude * Math.PI) / 180)
+            );
+            if (distance > 0) {
+              currentSlope = (altDiff / distance) * 100;
+            }
+          }
+        }
+        return (
+          <ReliveRealtimeStats
+            speed={reliveState.currentData.speed}
+            distance={reliveState.currentData.distance}
+            slope={currentSlope}
+            power={reliveState.currentData.power}
+          />
+        );
+      })()}
 
       {/* 回放控制欄 */}
       <View style={[styles.controlBar, { top: insets.top + 8, paddingBottom: 8 }]}>
