@@ -79,7 +79,7 @@ export function ReliveRealtimeStats({
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    top: 156, // ReliveStatsOverlay 下方（76 + ~80）
+    top: 64, // 標題欄下方（緊貼標題）
     left: 16,
     right: 16,
     backgroundColor: "rgba(0, 0, 0, 0.7)",

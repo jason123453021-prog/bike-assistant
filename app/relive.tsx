@@ -785,15 +785,7 @@ export default function ReliveScreen() {
         onMapReady={() => {}}
       />
 
-      {/* 軌跡基本數據實時顯示 */}
-      <ReliveStatsOverlay
-        distance={record.distance / 1000}
-        duration={Math.round(reliveState.playbackIndex * (record.duration / record.route.length))}
-        avgSpeed={record.distance > 0 ? (record.distance / 1000) / (record.duration / 3600) : 0}
-        maxSpeed={record.maxSpeed || 0}
-        elevation={record.totalAscent || 0}
-        calories={record.calories || 0}
-      />
+      {/* 軌跡基本數據實時顯示 - 已移除，使用 ReliveRealtimeStats 代替 */}
 
       {/* 實時數據行 */}
       {(() => {
