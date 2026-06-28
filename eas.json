@@ -1,0 +1,46 @@
+{
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk",
+        "distribution": "internal"
+      }
+    },
+    "preview2": {
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview3": {
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "aab"
+      }
+    },
+    "dev-client": {
+      "android": {
+        "buildType": "apk",
+        "distribution": "internal",
+        "developmentClient": true,
+        "env": {
+          "EXPO_DEBUG": "1"
+        }
+      }
+    }
+  },
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccount": "~/.eas/google-services.json",
+        "track": "internal"
+      }
+    }
+  }
+}

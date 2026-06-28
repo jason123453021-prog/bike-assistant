@@ -86,6 +86,7 @@ const config: ExpoConfig = {
     favicon: "./assets/images/favicon.png",
   },
   plugins: [
+    require("./plugins/with-foreground-service-plugin.js"),
     "expo-router",
     [
       "expo-location",

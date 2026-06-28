@@ -625,3 +625,23 @@
 - [x] 修正海苔條高度自適應 - 按鈕高度隨內容動態調整
 - [x] 修正滑動面板無法捲動到最下方 - ScrollView 內容被截斷
 - [x] 驗證修復效果
+
+## 嚴重 Bug 修復 (Android 原生)
+
+- [ ] **Bug 1：背景與鎖屏狀態下 GPS 軌跡失效（切西瓜現象）**
+  - [ ] 檢查 AndroidManifest.xml 權限聲明 (ACCESS_BACKGROUND_LOCATION, FOREGROUND_SERVICE_LOCATION)
+  - [ ] 實現原生 Foreground Service
+  - [ ] 實現原生 WakeLock
+  - [ ] 與 React Native 橋接
+
+- [ ] **Bug 2：鎖屏狀態下「無語音播報、未點亮螢幕、無彈窗」**
+  - [ ] 實現 Activity 中的 setShowWhenLocked(true) 和 setTurnScreenOn(true)
+  - [ ] 申請 WAKE_LOCK 權限並使用 ACQUIRE_CAUSES_WAKEUP 強制點亮螢幕
+  - [ ] 確保 App 的 Audio Service 在背景狀態下擁有播放權限與焦點 (Audio Focus)
+  - [ ] 與 React Native 橋接
+
+- [ ] **Bug 3：實體「音量鍵」無法關閉通知彈窗**
+  - [ ] 在彈窗元件或 Activity 中覆寫按鍵監聽事件
+  - [ ] 捕捉 KeyEvent.KEYCODE_VOLUME_DOWN 與 KeyEvent.KEYCODE_VOLUME_UP
+  - [ ] 攔截事件並呼叫關閉彈窗的 function
+  - [ ] 與 React Native 橋接
