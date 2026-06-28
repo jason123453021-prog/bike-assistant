@@ -81,6 +81,7 @@ import {
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
 } from "@/lib/background-location";
+import { BackgroundLocationTracking } from "@/lib/native-modules";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SupplyModal } from "@/components/supply-modal";
 import { RideSummaryModal } from "@/components/ride-summary-modal";
@@ -1333,6 +1334,14 @@ export default function MapScreen() {
 
     await startBackgroundLocationTracking();
 
+    // 啟動原生後台位置追蹤（Android）
+    try {
+      await BackgroundLocationTracking.start();
+      console.log('[Map] Native background location tracking started');
+    } catch (error) {
+      console.warn('[Map] Native background location tracking failed:', error);
+    }
+
     // 初始化並啟動 Foreground Service
     try {
       await ForegroundServiceManager.initialize({
@@ -1387,6 +1396,14 @@ export default function MapScreen() {
           locationSubRef.current?.remove();
           locationSubRef.current = null;
           await stopBackgroundLocationTracking();
+          
+          // 停止原生後台位置追蹤（Android）
+          try {
+            await BackgroundLocationTracking.stop();
+            console.log('[Map] Native background location tracking stopped');
+          } catch (error) {
+            console.warn('[Map] Native background location tracking stop failed:', error);
+          }
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           // 結束騎乘清除感測器更新迴圈
           if (sensorUpdateIntervalRef.current) clearInterval(sensorUpdateIntervalRef.current);

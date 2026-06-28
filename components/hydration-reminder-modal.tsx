@@ -13,6 +13,7 @@ import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/use-colors';
 import { notificationWakeupManager } from '@/lib/notification-wakeup';
+import { ScreenWakeup } from '@/lib/native-modules';
 
 export interface HydrationReminderProps {
   visible: boolean;
@@ -68,6 +69,18 @@ export const HydrationReminderModal: React.FC<HydrationReminderProps> = ({
           notificationId: notificationIdRef.current,
           duration: 0, // 無限期
         });
+
+        // 初始化並使用原生鎖屏喚醒模塊（Android）
+        if (Platform.OS === 'android') {
+          try {
+            await ScreenWakeup.initialize();
+            await ScreenWakeup.wakeupScreen();
+            await ScreenWakeup.requestAudioFocus();
+            console.log('[HydrationReminder] Native screen wakeup initialized');
+          } catch (error) {
+            console.warn('[HydrationReminder] Native screen wakeup failed:', error);
+          }
+        }
 
         // 啟用音頻播放（即使在靜音模式下）
         if (voiceEnabled) {
@@ -134,6 +147,17 @@ export const HydrationReminderModal: React.FC<HydrationReminderProps> = ({
     // 關閉屏幕喚醒
     await notificationWakeupManager.dismissOldestNotification();
 
+    // 釋放原生資源（Android）
+    if (Platform.OS === 'android') {
+      try {
+        await ScreenWakeup.abandonAudioFocus();
+        await ScreenWakeup.releaseWakeupLock();
+        console.log('[HydrationReminder] Native screen wakeup resources released');
+      } catch (error) {
+        console.warn('[HydrationReminder] Native resource release failed:', error);
+      }
+    }
+
     onDismiss();
   };
 
@@ -144,22 +168,32 @@ export const HydrationReminderModal: React.FC<HydrationReminderProps> = ({
     onConfirm();
   };
 
-  // 監聽音量鍵（需要原生模塊支持）
+  // 監聽音量鍵（原生模塊支持）
   useEffect(() => {
     if (!visible) return;
 
-    // 這裡應該集成音量鍵攔截邏輯
-    // 當按下音量鍵時，調用 handleDismiss()
-    // 實現方式：通過原生模塊監聽 KeyEvent
-    
     const handleVolumeKeyDown = async () => {
       console.log('[HydrationReminder] Volume key pressed, dismissing notification');
       await handleDismiss();
     };
 
-    // TODO: 集成音量鍵監聽器
-    // const subscription = VolumeKeyListener.addEventListener('volumeKeyDown', handleVolumeKeyDown);
-    // return () => subscription.remove();
+    // 集成音量鍵監聽器（Android）
+    if (Platform.OS === 'android') {
+      try {
+        const unsubscribeVolumeKey = ScreenWakeup.onVolumeKeyPressed((keyName: string) => {
+          console.log('[HydrationReminder] Volume key pressed:', keyName);
+          handleVolumeKeyDown();
+        });
+
+        return () => {
+          if (unsubscribeVolumeKey) {
+            unsubscribeVolumeKey();
+          }
+        };
+      } catch (error) {
+        console.warn('[HydrationReminder] Volume key listener setup failed:', error);
+      }
+    }
   }, [visible]);
 
   return (
