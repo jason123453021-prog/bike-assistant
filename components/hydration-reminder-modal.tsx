@@ -14,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/use-colors';
 import { notificationWakeupManager } from '@/lib/notification-wakeup';
 import { ScreenWakeup } from '@/lib/native-modules';
+import { ttsManager } from '@/lib/tts-manager';
 
 export interface HydrationReminderProps {
   visible: boolean;
@@ -61,6 +62,10 @@ export const HydrationReminderModal: React.FC<HydrationReminderProps> = ({
 
     const initializeWakeupAndVoice = async () => {
       try {
+        // 初始化 TTS 引擎
+        await ttsManager.initialize();
+        console.log('[HydrationReminder] TTS initialized');
+
         // 初始化通知喚醒模塊
         await notificationWakeupManager.initialize();
 
@@ -127,12 +132,33 @@ export const HydrationReminderModal: React.FC<HydrationReminderProps> = ({
     }, voiceRepeatInterval * 1000);
   };
 
-  // 播放語音提示
+  // 播放語音提示（使用 TTS 動態合成）
   const playVoiceReminder = async () => {
     try {
-      // 這裡應該集成真實的語音文件
-      // 示例：await audioPlayer.play(require('@/assets/audio/hydration-reminder.mp3'));
-      console.log('[HydrationReminder] Voice reminder played');
+      // 根據補給類型構建播報文本
+      let supplyName = '';
+      switch (type) {
+        case 'water':
+          supplyName = '水分';
+          break;
+        case 'calories':
+          supplyName = '能量';
+          break;
+        case 'both':
+          supplyName = '水分和能量';
+          break;
+        default:
+          supplyName = '補給品';
+      }
+
+      // 使用 TTS 播報補給品名稱
+      await ttsManager.speakSupplyReminder(supplyName, {
+        pitch: 1.0,
+        rate: 0.9,
+        volume: 1.0,
+      });
+
+      console.log('[HydrationReminder] Voice reminder played via TTS:', supplyName);
     } catch (error) {
       console.error('[HydrationReminder] Voice playback error:', error);
     }
@@ -142,6 +168,14 @@ export const HydrationReminderModal: React.FC<HydrationReminderProps> = ({
   const handleDismiss = async () => {
     if (voiceIntervalRef.current) {
       clearInterval(voiceIntervalRef.current);
+    }
+
+    // 停止 TTS 播報
+    try {
+      await ttsManager.stop();
+      console.log('[HydrationReminder] TTS stopped');
+    } catch (error) {
+      console.warn('[HydrationReminder] TTS stop failed:', error);
     }
 
     // 關閉屏幕喚醒
