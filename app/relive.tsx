@@ -594,8 +594,8 @@ export default function ReliveScreen() {
       longitude: p.longitude,
     }));
 
-    // 高亮已走過的軌跡
-    mapRef.current.highlightPlayedTrail(polylineCoords, "#00E676");
+    // 高亮已走過的軌跡（預覽軌跡 - 淺灰色，從而與回放時的紅色軌跡作區分）
+    mapRef.current.highlightPlayedTrail(polylineCoords, "#CCCCCC");
 
     // 適配地圖邊界
     mapRef.current.fitToCoordinates(polylineCoords, {
@@ -667,13 +667,13 @@ export default function ReliveScreen() {
             animationDuration
           );
           
-          // 正形回放：高亮已走過的軌跡（動態 Polyline）
+          // 正形回放：高亮已走過的軌跡（動態 Polyline - 紅色）
           const playedCoords = record.route.slice(0, Math.floor(nextIndex) + 1).map((p: any) => ({
             latitude: p.latitude,
             longitude: p.longitude,
           }));
           if (playedCoords.length > 1) {
-            mapRef.current.highlightPlayedTrail(playedCoords, "#00E676");
+            mapRef.current.highlightPlayedTrail(playedCoords, "#FF3B30");
           }
         }
 
