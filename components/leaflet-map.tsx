@@ -68,6 +68,7 @@ export interface LeafletMapHandle {
   setBearing: (bearing: number, headingUp: boolean) => void;
   setPitch: (pitch: number) => void; // 俯視角設定 (0-60 度)
   setPlaybackMarker: (lat: number, lon: number, color: string) => void; // 彩色回放標點
+  animatePlaybackMarker: (lat: number, lon: number, color: string, duration: number) => void; // 平滑動畫回放標點
   highlightPlayedTrail: (coords: LatLng[], color?: string) => void; // 高亮已走過的軌跡
   addDirectionArrows: (coords: LatLng[], color?: string, interval?: number) => void; // 添加方向箭头
 }
@@ -335,6 +336,14 @@ function handleMessage(data) {
           zIndexOffset: 1000,
         }).addTo(map);
         break;
+      case 'animatePlaybackMarker':
+        var lat = msg.lat, lon = msg.lon, color = msg.color || '#007AFF', duration = msg.duration || 100;
+        if (posMarker) { map.removeLayer(posMarker); posMarker = null; }
+        posMarker = L.marker([lat, lon], {
+          icon: makeCircleIcon(color, 16, '#fff'),
+          zIndexOffset: 1000,
+        }).addTo(map);
+        break;
       case 'highlightPlayedTrail':
         var coords = msg.coords || [];
         var color = msg.color || '#10B981';
@@ -453,6 +462,12 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         if (!webViewRef.current) return;
         webViewRef.current.postMessage(
           JSON.stringify({ type: "setPlaybackMarker", lat, lon, color })
+        );
+      },
+      animatePlaybackMarker: (lat: number, lon: number, color: string, duration: number) => {
+        if (!webViewRef.current) return;
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "animatePlaybackMarker", lat, lon, color, duration })
         );
       },
       highlightPlayedTrail: (coords: LatLng[], color = '#10B981') => {

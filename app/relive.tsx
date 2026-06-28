@@ -629,22 +629,42 @@ export default function ReliveScreen() {
         // 計算當前回放位置的數據
         const totalDistance = record.distance || 0;
         const totalDuration = record.duration || 0;
-        const currentPoint = record.route[Math.floor(nextIndex)];
+        const currentIndex = Math.floor(nextIndex);
+        const currentPoint = record.route[currentIndex];
+        const nextPointIndex = Math.min(currentIndex + 1, record.route.length - 1);
+        const nextPoint = record.route[nextPointIndex];
+
+        // 功率提取：優先使用軌跡點的功率，其次是全程平均
+        let power = record.avgPower || 0;
+        if (currentPoint.power !== undefined && currentPoint.power !== null) {
+          power = currentPoint.power;
+        } else if (record.powerHistory && record.powerHistory.length > 0) {
+          // 如果軌跡點沒有功率，從 powerHistory 中提取
+          const powerIndex = Math.min(currentIndex, record.powerHistory.length - 1);
+          power = record.powerHistory[powerIndex] || record.avgPower || 0;
+        }
 
         const currentData = {
           speed: (currentPoint.speed || 0) * 3.6, // m/s to km/h
           distance: (nextIndex / record.route.length) * (totalDistance / 1000),
           time: (nextIndex / record.route.length) * totalDuration,
           altitude: currentPoint.altitude || 0,
-          power: record.avgPower || 0,
+          power: power,
         };
 
-        // 更新地圖回放標記
-        if (mapRef.current && currentPoint) {
-          mapRef.current.setPlaybackMarker(
+        // 更新地圖回放標記（平滑動畫）
+        if (mapRef.current && currentPoint && nextPoint) {
+          // 計算兩點之間的實際時間差（秒）
+          const timeDiff = (nextPoint.timestamp - currentPoint.timestamp) / 1000;
+          // 根據播放倍速計算動畫時間
+          const animationDuration = Math.max(50, (timeDiff * 1000) / reliveState.playbackSpeed);
+          
+          // 使用平滑動畫更新標記位置
+          mapRef.current.animatePlaybackMarker(
             currentPoint.latitude,
             currentPoint.longitude,
-            "#007AFF"
+            "#007AFF",
+            animationDuration
           );
           
           // 正形回放：高亮已走過的軌跡（動態 Polyline）

@@ -12,6 +12,11 @@ export interface LocationPoint {
   altitude: number | null;
   speed: number | null;
   timestamp: number;
+  // 動態數據（回放時使用）
+  power?: number;        // 瓦數 (W)
+  heartRate?: number;    // 心率 (bpm)
+  cadence?: number;      // 踏頻 (rpm)
+  slope?: number;        // 坡度 (%)
 }
 
 // 路線統計資料
@@ -45,6 +50,7 @@ export interface RideRecord {
   intensityFactor?: number; // 強度係數 IF
   tss?: number;           // 訓練壓力分數 TSS
   powerZones: number[];   // [z1, z2, z3, z4, z5] percentage
+  powerHistory: number[];  // 功率時間序列 (W)
   route: LocationPoint[];
   totalSweatMl: number;   // 總汗液流失量 ml
   refillCount: number;    // 補水次數
@@ -405,6 +411,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       avgPower: state.avgPower,
       maxPower: state.maxPower,
       powerZones: state.powerZones,
+      powerHistory: state.powerHistory,  // 功率時間序列（用於回放）
       route: decimateRoute(state.route),  // 抽樣壓縮，最多 500 點
       totalSweatMl: Math.round(state.totalSweatMl),
       refillCount: state.refillCount,
