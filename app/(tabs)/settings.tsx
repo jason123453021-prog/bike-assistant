@@ -744,8 +744,7 @@ export default function SettingsScreen() {
                 </View>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>{settings.calorieAutoDismissSeconds ?? 0}秒</Text>
               </View>
-              <Slider style={{ width: "100%", height: 36 }} minimumValue={0} maximumValue={30} step={1} value={settings.calorieAutoDismissSeconds ?? 0} onValueChange={(v) => updateSettings({ calorieAutoDismissSeconds: Math.round(v) })} minimumTrackTintColor={colors.primary} maximumTrackTintColor={colors.border} />
-              <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>0秒 = 不自動關閉</Text>
+              {/* 自動關閉功能已移除 - 彈窗現在只能通過音量鍵或按鈕手動關閉 */}
             </View>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <View style={{ flex: 1 }}>
@@ -768,17 +767,7 @@ export default function SettingsScreen() {
               </View>
               <Switch value={settings.waterRepeatUntilDismissed ?? false} onValueChange={(v) => updateSettings({ waterRepeatUntilDismissed: v })} trackColor={{ false: colors.border, true: colors.primary }} />
             </View>
-            <View style={{ marginBottom: 12 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>自動關閉延遲</Text>
-                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>彈窗自動關閉延遲</Text>
-                </View>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>{settings.waterAutoDismissSeconds ?? 0}秒</Text>
-              </View>
-              <Slider style={{ width: "100%", height: 36 }} minimumValue={0} maximumValue={30} step={1} value={settings.waterAutoDismissSeconds ?? 0} onValueChange={(v) => updateSettings({ waterAutoDismissSeconds: Math.round(v) })} minimumTrackTintColor={colors.primary} maximumTrackTintColor={colors.border} />
-              <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>0秒 = 不自動關閉</Text>
-            </View>
+            {/* 自動關閉功能已移除 - 彈窗現在只能通過音量鍵或按鈕手動關閉 */}
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>長下坡暫停提醒</Text>
@@ -1645,35 +1634,7 @@ export default function SettingsScreen() {
                   />
                 </View>
 
-                {/* 單次提醒自動關閉 */}
-                <View style={{ marginBottom: 14 }}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                        單次提醒自動關閉
-                      </Text>
-                      <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-                        彈窗自動關閉延遲
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
-                      {supplyForm.autoDismissSeconds ?? 0}秒
-                    </Text>
-                  </View>
-                  <Slider
-                    style={{ width: "100%", height: 36 }}
-                    minimumValue={0}
-                    maximumValue={30}
-                    step={1}
-                    value={supplyForm.autoDismissSeconds ?? 0}
-                    onValueChange={(v) => setSupplyForm({ ...supplyForm, autoDismissSeconds: Math.round(v) })}
-                    minimumTrackTintColor={colors.primary}
-                    maximumTrackTintColor={colors.border}
-                  />
-                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
-                    0秒 = 不自動關閉
-                  </Text>
-                </View>
+                {/* 自動關閉功能已移除 - 彈窗現在只能通過音量鍵或按鈕手動關閉 */}
 
                 {/* 長下坡暫停提醒 */}
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>

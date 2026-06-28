@@ -646,6 +646,15 @@ export default function ReliveScreen() {
             currentPoint.longitude,
             "#007AFF"
           );
+          
+          // 正形回放：高亮已走過的軌跡（動態 Polyline）
+          const playedCoords = record.route.slice(0, Math.floor(nextIndex) + 1).map((p: any) => ({
+            latitude: p.latitude,
+            longitude: p.longitude,
+          }));
+          if (playedCoords.length > 1) {
+            mapRef.current.highlightPlayedTrail(playedCoords, "#00E676");
+          }
         }
 
         return {

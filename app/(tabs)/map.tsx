@@ -99,9 +99,11 @@ const ARRIVAL_THRESHOLD_M = 30;
 const TURN_LOOKAHEAD_M = 150;
 const TURN_ANGLE_DEG = 30;
 const REROUTE_COOLDOWN_MS = 15000;
-const AUTO_PAUSE_THRESHOLD = 2;
+const AUTO_PAUSE_THRESHOLD = 1.5; // 自動暫停速度閾值（km/h）
+const AUTO_PAUSE_RESUME_THRESHOLD = 3; // 自動恢復速度閾值（km/h）- 高於暫停閾值，避免頻繁切換
 const WEATHER_INTERVAL = 10 * 60 * 1000;
 const LOCATION_INTERVAL_SEC = 3;
+const GPS_DRIFT_FILTER_M = 3; // GPS 漂移過濾：距離小於此值時視為漂移，不更新速度
 
 // 底部面板高度：螢幕下方三分之一（收縮）/ 五分之三（展開）
 const PANEL_COLLAPSED_H = Math.round(SCREEN_H / 3);
@@ -214,9 +216,12 @@ export default function MapScreen() {
     maxCadence: 0,
   });
 
-  // 自動暫停連續計數（需連續 3 次低速才暫停，避免 GPS 抖動誤觸發）
+  // 自動暫停連續計數（需連續 4 次低速才暫停，避免 GPS 抖動誤觸發）
   const lowSpeedCountRef = useRef(0);
-  const AUTO_PAUSE_CONSECUTIVE = 3;
+  const AUTO_PAUSE_CONSECUTIVE = 4;
+  // 速度平滑窗口（用於過濾 GPS 速度抖動）
+  const speedWindowRef = useRef<number[]>([]);
+  const lastValidSpeedRef = useRef<number>(0);
 
   // 崩潰恢復
   const [showRecoveryAlert, setShowRecoveryAlert] = useState(false);
@@ -792,19 +797,23 @@ export default function MapScreen() {
             if (angleDiff > 180) angleDiff -= 360;
             if (angleDiff < -180) angleDiff += 360;
             
-            // 只在角度變化超過 0.5° 時更新地圖，提高靈敏度
-            if (Math.abs(angleDiff) > 0.5) {
+            // 只在角度變化超過 0.3° 時更新地圖，提高靈敏度
+            // 速度越快，靈敏度越高（閾值越小）
+            const sensitivityThreshold = speedKmhRaw >= 20 ? 0.2 : speedKmhRaw >= 10 ? 0.3 : 0.4;
+            if (Math.abs(angleDiff) > sensitivityThreshold) {
               const { width, height } = Dimensions.get("window");
               const isPortrait = height > width;
-              const smoothFactor = isPortrait ? 0.6 : 0.5;
+              // 速度越快，平滑係數越大（更快地跟隨方向變化）
+              const smoothFactor = speedKmhRaw >= 20 ? (isPortrait ? 0.7 : 0.65) : (isPortrait ? 0.6 : 0.5);
               const newBearing = (lastMapBearingRef.current + angleDiff * smoothFactor) % 360;
               lastMapBearingRef.current = newBearing;
               mapRef.current?.setBearing(newBearing, true);
             }
             
             // 根據速度動態設定俯視角（速度越快，俯視角越小）
-            const pitch = Math.max(0, Math.min(45, 45 - speedKmhRaw * 1.5));
-            if (Math.abs(pitch - mapPitch) > 2) {
+            // 低速時保持平視（0°），高速時逐漸增加俯視角
+            const pitch = speedKmhRaw >= 5 ? Math.max(0, Math.min(45, (speedKmhRaw - 5) * 1.2)) : 0;
+            if (Math.abs(pitch - mapPitch) > 1) {
               setMapPitch(pitch);
               mapRef.current?.setPitch(pitch);
             }
@@ -822,9 +831,34 @@ export default function MapScreen() {
           const speedKmh = (speed ?? 0) * 3.6;
           const currentState = stateRef.current;
 
-          // 自動暫停/恢復（連續 3 次低速才暫停，避免 GPS 抖動誤觸發）
+          // ── 自動暫停/恢復（改進版本）──────────────────────────────────────────────
+          // 1. GPS 漂移過濾：距離小於 3m 時視為漂移，保持上一個有效速度
+          // 2. 速度平滑：使用 5 點滑動平均過濾速度抖動
+          // 3. 連續計數：需連續 4 次低速才暫停
+          // 4. 不對稱閾值：暫停 1.5 km/h，恢復 3 km/h（避免頻繁切換）
+          
+          let smoothedSpeed = speedKmh;
+          
+          // GPS 漂移過濾
+          if (prevPosRef.current) {
+            const dist = haversine(prevPosRef.current.lat, prevPosRef.current.lon, latitude, longitude);
+            if (dist < GPS_DRIFT_FILTER_M) {
+              // GPS 漂移，保持上一個有效速度
+              smoothedSpeed = lastValidSpeedRef.current;
+            } else {
+              // 有效移動，更新有效速度
+              lastValidSpeedRef.current = speedKmh;
+            }
+          }
+          
+          // 速度平滑（5 點滑動平均）
+          speedWindowRef.current.push(smoothedSpeed);
+          if (speedWindowRef.current.length > 5) speedWindowRef.current.shift();
+          const avgSpeed = speedWindowRef.current.reduce((a, b) => a + b, 0) / speedWindowRef.current.length;
+          
+          // 自動暫停/恢復邏輯
           if (currentState.status === "active") {
-            if (speedKmh < AUTO_PAUSE_THRESHOLD) {
+            if (avgSpeed < AUTO_PAUSE_THRESHOLD) {
               lowSpeedCountRef.current += 1;
               if (lowSpeedCountRef.current >= AUTO_PAUSE_CONSECUTIVE) {
                 lowSpeedCountRef.current = 0;
@@ -841,7 +875,7 @@ export default function MapScreen() {
             } else {
               lowSpeedCountRef.current = 0;
             }
-          } else if (currentState.status === "paused" && speedKmh >= AUTO_PAUSE_THRESHOLD) {
+          } else if (currentState.status === "paused" && avgSpeed >= AUTO_PAUSE_RESUME_THRESHOLD) {
             lowSpeedCountRef.current = 0;
             dispatch({ type: "RESUME" });
             // 集成情感化 UX - 自動恢復反饋
