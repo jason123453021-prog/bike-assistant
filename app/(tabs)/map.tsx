@@ -1955,7 +1955,7 @@ export default function MapScreen() {
           <View style={styles.expandedSection}>
             {/* 超出6格的儀表板欄位（上拉展開後顯示） */}
             {dashOverflowFields.length > 0 && (
-              <View style={[styles.sixGrid, { marginBottom: 8 }]}>
+              <View style={[styles.sixGrid, { marginBottom: 8 /* internal spacing */ }]}>
                 {dashOverflowFields.map((key) => (
                   <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} sensorData={sensorData} />
                 ))}
@@ -2384,7 +2384,7 @@ const bigMetricStyles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.06)",
   },
   wideCell: {},
-  label: { color: "rgba(255,255,255,0.38)", fontSize: 10, marginBottom: 3, letterSpacing: 0.3 },
+  label: { color: "rgba(255,255,255,0.38)", fontSize: 10, marginBottom: 3 /* internal spacing */, letterSpacing: 0.3 },
   valueRow: { flexDirection: "row", alignItems: "baseline", gap: 3 },
   value: { fontWeight: "700", fontVariant: ["tabular-nums"] },
   unit: { fontSize: 10, color: "rgba(255,255,255,0.35)" },
@@ -2473,19 +2473,19 @@ const styles = StyleSheet.create({
   },
   handleArea: {
     alignItems: "center",
-    paddingBottom: 8, // 內部間距，不需要動態計算
+    paddingBottom: 8 /* internal spacing */, // 內部間距，不需要動態計算
   },
   panelHandle: {
     width: 36, height: 4,
     backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 2,
-    marginBottom: 6,
+    marginBottom: 6 /* internal spacing */,
   },
   weatherRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 2,
+    marginBottom: 2 /* internal spacing */,
   },
   weatherItem: { color: "rgba(255,255,255,0.45)", fontSize: 11 },
   weatherSep: { color: "rgba(255,255,255,0.2)", fontSize: 11 },
@@ -2515,7 +2515,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   progressSection: {},
-  progressHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  progressHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 /* internal spacing */ },
   progressLabelRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   progressLabel: { color: "rgba(255,255,255,0.5)", fontSize: 11 },
   progressValue: { color: "rgba(255,255,255,0.7)", fontSize: 11 },
@@ -2525,7 +2525,7 @@ const styles = StyleSheet.create({
   rateText: { fontSize: 10, fontWeight: "600" },
 
   // 控制按鈕
-  btnRow: { alignItems: "center", marginTop: 10, marginBottom: 2 },
+  btnRow: { alignItems: "center", marginTop: 10, marginBottom: 2 /* internal spacing */ },
   activeButtons: { flexDirection: "row", alignItems: "center", gap: 12 },
   startBtn: {
     flexDirection: "row",
@@ -2562,7 +2562,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.04)",
     borderRadius: 10,
     paddingVertical: 10,
-    marginBottom: 12,
+    marginBottom: 12 /* internal spacing */,
   },
   ascentItem: {
     flex: 1,
@@ -2596,12 +2596,12 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "700",
-    marginBottom: 4,
+    marginBottom: 4 /* internal spacing */,
   },
   recoveryDesc: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 13,
-    marginBottom: 12,
+    marginBottom: 12 /* internal spacing */,
   },
   recoveryBtns: {
     flexDirection: "row",
@@ -2674,7 +2674,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 16, // 基礎邊距，在使用時會動態計算
+    paddingBottom: 16 /* internal spacing */, // 基礎邊距，在使用時會動態計算
     zIndex: 300,
     borderTopWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
@@ -2682,7 +2682,7 @@ const styles = StyleSheet.create({
   friendCardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 16 /* internal spacing */,
   },
   friendCardDot: {
     width: 12,
@@ -2730,7 +2730,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingHorizontal: 16,
-    paddingBottom: 4, // 基礎邊距，在使用時會動態計算
+    paddingBottom: 4 /* internal spacing */, // 基礎邊距，在使用時會動態計算
     paddingTop: 4,
   },
   friendCardNavBtn: {
@@ -2764,19 +2764,19 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.04)",
     borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 12 /* internal spacing */,
   },
   gradeDistributionLabel: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 12,
     fontWeight: "600",
-    marginBottom: 8,
+    marginBottom: 8 /* internal spacing */,
   },
   gradeDistributionBars: {
     flexDirection: "row",
     height: 24,
     gap: 2,
-    marginBottom: 8,
+    marginBottom: 8 /* internal spacing */,
     borderRadius: 4,
     overflow: "hidden",
   },

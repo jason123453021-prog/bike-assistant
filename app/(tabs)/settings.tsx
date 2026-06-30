@@ -728,16 +728,16 @@ export default function SettingsScreen() {
 
           {/* 卡路里高級功能 */}
           <View style={{ marginVertical: 8 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>卡路里提醒高級功能</Text>
-            <View style={{ marginBottom: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>卡路里提醒高級功能</Text>
+            <View style={{ marginBottom: 12 /* internal spacing */, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>未關閉時重複提醒</Text>
                 <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>彈窗未確認時持續提醒</Text>
               </View>
               <Switch value={settings.calorieRepeatUntilDismissed ?? false} onValueChange={(v) => updateSettings({ calorieRepeatUntilDismissed: v })} trackColor={{ false: colors.border, true: colors.primary }} />
             </View>
-            <View style={{ marginBottom: 12 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <View style={{ marginBottom: 12 /* internal spacing */ }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 /* internal spacing */ }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>自動關閉延遲</Text>
                   <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>彈窗自動關閉延遲</Text>
@@ -759,8 +759,8 @@ export default function SettingsScreen() {
 
           {/* 水分高級功能 */}
           <View style={{ marginVertical: 8 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>水分提醒高級功能</Text>
-            <View style={{ marginBottom: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>水分提醒高級功能</Text>
+            <View style={{ marginBottom: 12 /* internal spacing */, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>未關閉時重複提醒</Text>
                 <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>彈窗未確認時持續提醒</Text>
@@ -791,7 +791,7 @@ export default function SettingsScreen() {
               <View key={item.id}>
                 <View style={[styles.row, { paddingVertical: 12 }]}>
                   <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 /* internal spacing */ }}>
                       <Switch
                         value={item.enabled}
                         onValueChange={(v) => updateSupplyItem(item.id, { enabled: v })}
@@ -1023,7 +1023,7 @@ export default function SettingsScreen() {
             <>
               <Divider colors={colors} />
               <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 /* internal spacing */ }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <IconSymbol name="clock.fill" size={16} color={colors.muted} />
                     <Text style={{ fontSize: 15, color: colors.foreground }}>自動開啟閒置時間</Text>
@@ -1055,7 +1055,7 @@ export default function SettingsScreen() {
 
         {/* ── 導航儀表板欄位（拖曳排序 + 開關） ── */}
         {/* 導航儀表板欄位標題 + 恢復預設按鈕 */}
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 /* internal spacing */ }}>
           <SectionHeader title="導航儀表板欄位" colors={colors} />
           <Pressable
             onPress={() => {
@@ -1071,7 +1071,7 @@ export default function SettingsScreen() {
             <Text style={{ fontSize: 12, color: colors.muted }}>恢復預設</Text>
           </Pressable>
         </View>
-        <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8, paddingHorizontal: 4 }}>
+        <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 /* internal spacing */, paddingHorizontal: 4 }}>
           拖曳右側☰按鈕可調整顯示順序，前 6 格在收縮面板顯示
         </Text>
         <View style={[styles.section, { borderColor: colors.border }]}>
@@ -1152,7 +1152,7 @@ export default function SettingsScreen() {
           return (
             <>
               {/* 標題 + 恢復預設按鈕 */}
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 /* internal spacing */ }}>
                 <SectionHeader title="精簡模式欄位" colors={colors} />
                 <Pressable
                   onPress={() => {
@@ -1169,7 +1169,7 @@ export default function SettingsScreen() {
                 </Pressable>
               </View>
               {/* 計數徽章 + 說明 */}
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, paddingHorizontal: 4 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 /* internal spacing */, paddingHorizontal: 4 }}>
                 <Text style={{ fontSize: 11, color: colors.muted, flex: 1 }}>
                   拖曳右側☰可調整顯示順序，最多開啟 3 個欄位
                 </Text>
@@ -1250,7 +1250,7 @@ export default function SettingsScreen() {
         })()}
 
         {/* 版本號 */}
-        <View style={{ alignItems: "center", paddingVertical: 20, paddingBottom: 8 }}>
+        <View style={{ alignItems: "center", paddingVertical: 20, paddingBottom: 8 /* internal spacing */ }}>
           <Text style={{ fontSize: 12, color: colors.muted }}>
             單車助手 v{Constants.expoConfig?.version ?? "1.0.1"}
           </Text>
@@ -1312,7 +1312,7 @@ export default function SettingsScreen() {
             {/* Step 1: 第一次確認 */}
             {deleteModal.step === "confirm1" && (
               <>
-                <View style={{ alignItems: "center", marginBottom: 12 }}>
+                <View style={{ alignItems: "center", marginBottom: 12 /* internal spacing */ }}>
                   <View style={[styles.deleteIconWrap, { backgroundColor: colors.error + "18" }]}>
                     <IconSymbol name="trash.fill" size={32} color={colors.error} />
                   </View>
@@ -1351,7 +1351,7 @@ export default function SettingsScreen() {
                 <Text style={[styles.deleteWarningText, { color: colors.muted }]}>
                   請在下方輸入「刪除帳號」以確認此不可復原的操作：
                 </Text>
-                <View style={[styles.editInputRow, { borderColor: deleteModal.errorMsg ? colors.error : colors.border, marginBottom: 4 }]}>
+                <View style={[styles.editInputRow, { borderColor: deleteModal.errorMsg ? colors.error : colors.border, marginBottom: 4 /* internal spacing */ }]}>
                   <TextInput
                     style={[styles.editInput, { color: colors.foreground, fontSize: 18, fontWeight: "600" }]}
                     value={deleteModal.confirmInput}
@@ -1412,7 +1412,7 @@ export default function SettingsScreen() {
             {/* Step 5: 失敗 */}
             {deleteModal.step === "error" && (
               <>
-                <View style={{ alignItems: "center", marginBottom: 12 }}>
+                <View style={{ alignItems: "center", marginBottom: 12 /* internal spacing */ }}>
                   <View style={[styles.deleteIconWrap, { backgroundColor: colors.error + "18" }]}>
                     <IconSymbol name="exclamationmark.triangle.fill" size={36} color={colors.error} />
                   </View>
@@ -1452,8 +1452,8 @@ export default function SettingsScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20 }} style={{ flex: 1 }}>
               {/* 補給品名稱 */}
-              <View style={{ marginBottom: 24 }}>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
+              <View style={{ marginBottom: 24 /* internal spacing */ }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 /* internal spacing */ }}>
                   補給品名稱 *
                 </Text>
                 <TextInput
@@ -1469,8 +1469,8 @@ export default function SettingsScreen() {
               </View>
 
               {/* 觸發方式 */}
-              <View style={{ marginBottom: 24 }}>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
+              <View style={{ marginBottom: 24 /* internal spacing */ }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
                   觸發方式
                 </Text>
                 <View style={{ flexDirection: "row", gap: 12 }}>
@@ -1503,14 +1503,14 @@ export default function SettingsScreen() {
 
               {/* 觸發值 */}
               {supplyForm.triggerType === "time" ? (
-                <View style={{ marginBottom: 24 }}>
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
+                <View style={{ marginBottom: 24 /* internal spacing */ }}>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
                     觸發時間
                   </Text>
                   <View style={{ flexDirection: "row", gap: 14 }}>
                     {/* 時 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8, fontWeight: "600" }}>時</Text>
+                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8 /* internal spacing */, fontWeight: "600" }}>時</Text>
                       <TextInput
                         style={[
                           styles.textInput,
@@ -1525,7 +1525,7 @@ export default function SettingsScreen() {
                     </View>
                     {/* 分 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8, fontWeight: "600" }}>分</Text>
+                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8 /* internal spacing */, fontWeight: "600" }}>分</Text>
                       <TextInput
                         style={[
                           styles.textInput,
@@ -1540,7 +1540,7 @@ export default function SettingsScreen() {
                     </View>
                     {/* 秒 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8, fontWeight: "600" }}>秒</Text>
+                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8 /* internal spacing */, fontWeight: "600" }}>秒</Text>
                       <TextInput
                         style={[
                           styles.textInput,
@@ -1556,8 +1556,8 @@ export default function SettingsScreen() {
                   </View>
                 </View>
               ) : (
-                <View style={{ marginBottom: 16 }}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                <View style={{ marginBottom: 16 /* internal spacing */ }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 /* internal spacing */ }}>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
                       觸發值
                     </Text>
@@ -1579,8 +1579,8 @@ export default function SettingsScreen() {
               )}
 
               {/* 重複模式 */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
+              <View style={{ marginBottom: 16 /* internal spacing */ }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 6 /* internal spacing */ }}>
                   重複模式
                 </Text>
                 <View style={{ gap: 8 }}>
@@ -1612,13 +1612,13 @@ export default function SettingsScreen() {
               </View>
 
               {/* 高級提醒功能 */}
-              <View style={{ marginBottom: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
+              <View style={{ marginBottom: 20 /* internal spacing */, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
                   高級提醒功能
                 </Text>
 
                 {/* 未關閉時重複提醒 */}
-                <View style={{ marginBottom: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <View style={{ marginBottom: 14 /* internal spacing */, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
                       未關閉時重複提醒
@@ -1656,7 +1656,7 @@ export default function SettingsScreen() {
             </ScrollView>
 
             {/* 固定底部按鈕區域 */}
-            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
+            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, paddingBottom: 16 /* internal spacing */, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
               <Pressable
                 style={({ pressed }) => ([
                   styles.editCancelBtn,
@@ -1707,7 +1707,7 @@ function SectionHeader({
         { flexDirection: "row", alignItems: "center", paddingVertical: 2, opacity: pressed ? 0.7 : 1, flex: 1 },
       ])}
     >
-      <Text style={[styles.sectionHeader, { color: colors.muted, flex: 1, marginBottom: 0 }]}>{title}</Text>
+      <Text style={[styles.sectionHeader, { color: colors.muted, flex: 1, marginBottom: 0 /* internal spacing */ }]}>{title}</Text>
       <Text style={{ fontSize: 12, color: colors.muted, marginRight: 4 }}>
         {collapsed ? "▶" : "▼"}
       </Text>
@@ -1770,14 +1770,14 @@ function ToggleRow({
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 20, paddingBottom: 40 },
-  title: { fontSize: 28, fontWeight: "700", letterSpacing: -0.5, marginBottom: 24 },
+  content: { padding: 20, paddingBottom: 40 /* internal spacing */ },
+  title: { fontSize: 28, fontWeight: "700", letterSpacing: -0.5, marginBottom: 24 /* internal spacing */ },
   sectionHeader: {
     fontSize: 12,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginBottom: 8,
+    marginBottom: 8 /* internal spacing */,
     marginTop: 20,
     paddingHorizontal: 4,
   },
@@ -1822,14 +1822,14 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  editTitle: { fontSize: 18, fontWeight: "700", marginBottom: 16 },
+  editTitle: { fontSize: 18, fontWeight: "700", marginBottom: 16 /* internal spacing */ },
   editInputRow: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 20 /* internal spacing */,
   },
   editInput: { flex: 1, fontSize: 24, fontWeight: "300", paddingVertical: 12 },
   editUnit: { fontSize: 16 },
@@ -1874,8 +1874,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   profileAvatarText: { fontSize: 22, fontWeight: "700", color: "#fff" },
-  profileName: { fontSize: 16, fontWeight: "700", marginBottom: 2 },
-  profileEmail: { fontSize: 12, marginBottom: 6 },
+  profileName: { fontSize: 16, fontWeight: "700", marginBottom: 2 /* internal spacing */ },
+  profileEmail: { fontSize: 12, marginBottom: 6 /* internal spacing */ },
   profileBadge: {
     alignSelf: "flex-start",
     paddingHorizontal: 8,
@@ -1927,13 +1927,13 @@ const styles = StyleSheet.create({
   deleteWarningText: {
     fontSize: 14,
     lineHeight: 20,
-    marginBottom: 8,
+    marginBottom: 8 /* internal spacing */,
   },
   deleteInfoBox: {
     borderRadius: 12,
     borderWidth: 1,
     padding: 14,
-    marginBottom: 16,
+    marginBottom: 16 /* internal spacing */,
     gap: 4,
   },
   deleteInfoItem: {
@@ -1953,7 +1953,7 @@ const styles = StyleSheet.create({
   },
   deleteErrorText: {
     fontSize: 13,
-    marginBottom: 4,
+    marginBottom: 4 /* internal spacing */,
     textAlign: "center",
   },
   deleteStatusText: {
@@ -2004,7 +2004,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxHeight: "85%",
     paddingTop: 16,
-    paddingBottom: 0,
+    paddingBottom: 0 /* internal spacing */,
   },
   modalHeader: {
     flexDirection: "row",

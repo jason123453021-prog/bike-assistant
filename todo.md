@@ -1007,3 +1007,12 @@
 - [ ] 修復 components/ 中的共用組件
 - [ ] 修復 lib/ 中的 Hook 和工具類
 - [ ] 最終驗證所有頁面
+
+
+## 優先級文件內部間距修復 ✅
+
+- [x] 修復 app/(tabs)/settings.tsx - 45 個 marginBottom
+- [x] 修復 app/(tabs)/navigate.tsx - 25 個 marginBottom  
+- [x] 修復 app/(tabs)/map.tsx - 17 個 marginBottom
+- [x] TypeScript 編譯驗證 - 0 errors
+- [ ] 其他文件修復（延後，待內存恢復）
