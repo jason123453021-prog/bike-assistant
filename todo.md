@@ -991,3 +991,19 @@
 - [x] 修復好友頁面 (friends.tsx) - 添加 useSafeAreaInsets 動態計算 contentContainerStyle
 - [x] 修復歷史頁面 (history.tsx) - 添加 useSafeAreaInsets 動態計算 listContent paddingBottom
 - [x] 修復設定頁面 (settings-screen-with-permissions.tsx) - 添加 useSafeAreaInsets 動態計算 contentContainerStyle
+
+
+## PR 審查流程集成和自動化檢查 ✅
+
+- [x] 創建 GitHub Actions 工作流程 (.github/workflows/pr-check.yml)
+- [x] 創建 ESLint UI 安全規則配置 (.eslintrc-ui-safety.js)
+- [x] 創建頁面遷移掃描腳本 (scripts/migrate-ui-safety.js)
+- [x] 掃描結果：發現 200+ 個潛在違規（主要是內部間距，非底部邊距）
+
+## 其他頁面逐步遷移計劃 ✅
+
+- [x] 掃描完成：識別所有需要修復的頁面
+- [ ] 修復 app/(tabs)/index.tsx - 首頁
+- [ ] 修復 components/ 中的共用組件
+- [ ] 修復 lib/ 中的 Hook 和工具類
+- [ ] 最終驗證所有頁面
