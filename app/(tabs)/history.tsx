@@ -8,6 +8,7 @@ import {
   Alert,
   TextInput,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -20,6 +21,7 @@ import { calculateWeeklyTrainingStats, calculateMonthlyTrainingStats } from "@/l
 const STORAGE_KEY = "@bike_records";
 
 export default function HistoryScreen() {
+  const insets = useSafeAreaInsets();
   const colors = useColors();
   const { state, dispatch, loadRecords } = useRide();
   const [searchQuery, setSearchQuery] = useState("");
@@ -286,7 +288,7 @@ export default function HistoryScreen() {
           data={filteredRecords}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
           keyboardShouldPersistTaps="handled"

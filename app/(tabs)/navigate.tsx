@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import Svg, { Polyline, Line, Text as SvgText, Rect } from "react-native-svg";
@@ -30,6 +31,7 @@ const CHART_WIDTH = SCREEN_WIDTH - 48;
 const CHART_HEIGHT = 120;
 
 export default function NavigateScreen() {
+  const insets = useSafeAreaInsets();
   const colors = useColors();
   const { settings } = useSettings();
   const { setSharedRoute } = useGpx();
@@ -213,7 +215,7 @@ export default function NavigateScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 40) }]} showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
 
           {/* Header */}

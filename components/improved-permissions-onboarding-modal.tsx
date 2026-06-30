@@ -246,10 +246,10 @@ export function ImprovedPermissionsOnboardingModal({
             </View>
           </ScrollView>
 
-          {/* 底部按鈕 - 使用動態 paddingBottom */}
+          {/* 底部按鈕 - 使用動態 paddingBottom 確保完全可見 */}
           <View
             className="px-4 pt-4 gap-3"
-            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
           >
             <Pressable
               onPress={handleSkip}

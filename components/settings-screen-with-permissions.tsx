@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, Switch } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenContainer } from '@/components/screen-container';
 import { PermissionStatusCard } from '@/components/permission-status-card';
 import { usePushNotification } from '@/hooks/use-push-notification';
@@ -9,6 +10,7 @@ import { usePushNotification } from '@/hooks/use-push-notification';
  * 包含權限狀態卡片和推送通知設定
  */
 export function SettingsScreenWithPermissions() {
+  const insets = useSafeAreaInsets();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [rideRemindersEnabled, setRideRemindersEnabled] = useState(true);
   const [turnInstructionsEnabled, setTurnInstructionsEnabled] = useState(true);
@@ -43,7 +45,7 @@ export function SettingsScreenWithPermissions() {
 
   return (
     <ScreenContainer className="p-4">
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) }}>
         {/* 標題 */}
         <View className="mb-6">
           <Text className="text-3xl font-bold text-foreground mb-2">

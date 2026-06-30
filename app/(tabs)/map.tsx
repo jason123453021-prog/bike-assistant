@@ -2473,7 +2473,7 @@ const styles = StyleSheet.create({
   },
   handleArea: {
     alignItems: "center",
-    paddingBottom: 8,
+    paddingBottom: 8, // 內部間距，不需要動態計算
   },
   panelHandle: {
     width: 36, height: 4,
@@ -2674,7 +2674,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 32,
+    paddingBottom: 16, // 基礎邊距，在使用時會動態計算
     zIndex: 300,
     borderTopWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
@@ -2730,7 +2730,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingHorizontal: 16,
-    paddingBottom: 14,
+    paddingBottom: 4, // 基礎邊距，在使用時會動態計算
     paddingTop: 4,
   },
   friendCardNavBtn: {

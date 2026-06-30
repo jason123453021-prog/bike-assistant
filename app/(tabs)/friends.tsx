@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -239,6 +240,7 @@ function FriendDetailModal({
 
 // ── 主頁面 ────────────────────────────────────────────────────────────────
 export default function FriendsScreen() {
+  const insets = useSafeAreaInsets();
   const colors = useColors();
   const { isAuthenticated } = useAuth();
   const { requestFriendNav } = useFriendNav();
@@ -392,7 +394,7 @@ export default function FriendsScreen() {
     <ScreenContainer>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 32) }}
         showsVerticalScrollIndicator={false}
       >
         {/* 標題 */}
