@@ -16,7 +16,7 @@ export interface ImprovedPermissionsOnboardingModalProps {
  * 支援：
  * - 首次啟動時自動顯示
  * - 返回 App 時自動重新整理權限狀態
- * - 底部自適應（避免被系統導航列遮擋）
+ * - 使用 ScrollView 確保底部按鈕完全可見
  * - 改進的導航邏輯
  */
 export function ImprovedPermissionsOnboardingModal({
@@ -187,90 +187,90 @@ export function ImprovedPermissionsOnboardingModal({
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View className="flex-1 bg-black/50">
-        <View
-          className="flex-1 bg-background rounded-t-3xl"
-          style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-        >
-          {/* 標題 */}
-          <View className="px-4 pt-6 pb-4 border-b border-border">
-            <Text className="text-2xl font-bold text-foreground text-center">
-              🔐 權限設定
-            </Text>
-            <Text className="text-muted text-sm text-center mt-2">
-              為了提供最佳的騎乘體驗，我們需要以下權限
-            </Text>
-          </View>
-
-          {/* 權限列表 */}
+        <View className="flex-1 bg-background rounded-t-3xl">
+          {/* 使用 ScrollView 包覆所有內容，確保底部按鈕可完全滑出 */}
           <ScrollView
-            className="flex-1 px-4 pt-4"
+            className="flex-1"
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingBottom: insets.bottom + 24, // 確保底部有充足的呼吸空間
+            }}
           >
-            {renderPermissionItem(
-              '📍 位置權限',
-              '允許 App 在背景記錄您的騎乘軌跡',
-              permissionStates.location,
-              handleRequestLocationPermission,
-              isLoading
-            )}
-
-            {renderPermissionItem(
-              '🔔 通知權限',
-              '允許 App 發送騎乘提示與補給提醒通知',
-              permissionStates.notification,
-              handleRequestNotificationPermission,
-              isLoading
-            )}
-
-            {renderPermissionItem(
-              '🪟 懸浮窗權限',
-              '允許 App 在其他應用上方顯示導航提示',
-              permissionStates.overlay,
-              handleOpenOverlaySettings,
-              isLoading
-            )}
-
-            {renderPermissionItem(
-              '🔋 電池最佳化白名單',
-              '防止系統因省電機制關閉 App 背景追蹤',
-              permissionStates.batteryOptimization,
-              handleOpenBatterySettings,
-              isLoading
-            )}
-
-            {/* 提示文本 */}
-            <View className="bg-primary/10 rounded-lg p-4 border border-primary/20 mb-4">
-              <Text className="text-primary text-xs text-center">
-                ℹ️ 您可以稍後在設定頁面隨時修改這些權限
+            {/* 標題 */}
+            <View className="px-4 pt-6 pb-4 border-b border-border">
+              <Text className="text-2xl font-bold text-foreground text-center">
+                🔐 權限設定
+              </Text>
+              <Text className="text-muted text-sm text-center mt-2">
+                為了提供最佳的騎乘體驗，我們需要以下權限
               </Text>
             </View>
+
+            {/* 權限列表 */}
+            <View className="px-4 pt-4">
+              {renderPermissionItem(
+                '📍 位置權限',
+                '允許 App 在背景記錄您的騎乘軌跡',
+                permissionStates.location,
+                handleRequestLocationPermission,
+                isLoading
+              )}
+
+              {renderPermissionItem(
+                '🔔 通知權限',
+                '允許 App 發送騎乘提示與補給提醒通知',
+                permissionStates.notification,
+                handleRequestNotificationPermission,
+                isLoading
+              )}
+
+              {renderPermissionItem(
+                '🪟 懸浮窗權限',
+                '允許 App 在其他應用上方顯示導航提示',
+                permissionStates.overlay,
+                handleOpenOverlaySettings,
+                isLoading
+              )}
+
+              {renderPermissionItem(
+                '🔋 電池最佳化白名單',
+                '防止系統因省電機制關閉 App 背景追蹤',
+                permissionStates.batteryOptimization,
+                handleOpenBatterySettings,
+                isLoading
+              )}
+
+              {/* 提示文本 */}
+              <View className="bg-primary/10 rounded-lg p-4 border border-primary/20 mb-4">
+                <Text className="text-primary text-xs text-center">
+                  ℹ️ 您可以稍後在設定頁面隨時修改這些權限
+                </Text>
+              </View>
+
+              {/* 底部按鈕 - 在 ScrollView 內部 */}
+              <View className="gap-3 pt-4">
+                <Pressable
+                  onPress={handleSkip}
+                  disabled={isLoading}
+                  className="bg-primary px-4 py-4 rounded-lg active:opacity-80"
+                >
+                  <Text className="text-white text-center font-bold">
+                    {isLoading ? '處理中...' : '完成設定'}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleSkip}
+                  disabled={isLoading}
+                  className="bg-surface border border-border px-4 py-4 rounded-lg active:opacity-70"
+                >
+                  <Text className="text-foreground text-center font-bold">
+                    稍後設定
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
           </ScrollView>
-
-          {/* 底部按鈕 - 使用動態 paddingBottom 確保完全可見 */}
-          <View
-            className="px-4 pt-4 gap-3"
-            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
-          >
-            <Pressable
-              onPress={handleSkip}
-              disabled={isLoading}
-              className="bg-primary px-4 py-4 rounded-lg active:opacity-80"
-            >
-              <Text className="text-white text-center font-bold">
-                {isLoading ? '處理中...' : '完成設定'}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={handleSkip}
-              disabled={isLoading}
-              className="bg-surface border border-border px-4 py-4 rounded-lg active:opacity-70"
-            >
-              <Text className="text-foreground text-center font-bold">
-                稍後設定
-              </Text>
-            </Pressable>
-          </View>
         </View>
       </View>
     </Modal>

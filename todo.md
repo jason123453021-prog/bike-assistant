@@ -1030,3 +1030,11 @@
 - 總修復項目：~200+ 個 marginBottom/paddingBottom
 - 編譯狀態：✅ 0 errors
 - 掃描狀態：✅ 所有內部間距已標記註釋
+
+
+## 權限設定頁面 ScrollView 修復 ✅
+
+- [x] 改進 ImprovedPermissionsOnboardingModal - 使用 ScrollView 包覆所有內容
+- [x] 確保「稍後設定」按鈕可完全滑出並點擊
+- [x] 添加 insets.bottom + 24 的底部呼吸空間
+- [x] TypeScript 編譯驗證 - 0 errors
