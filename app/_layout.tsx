@@ -30,6 +30,7 @@ import "@/lib/background-location";
 import { RideTrackingNative } from "@/lib/ride-tracking-native";
 import { PermissionsManager } from "@/lib/permissions-manager";
 import { PermissionsOnboardingModal } from "@/components/permissions-onboarding-modal";
+import { usePermissionMonitoring } from "@/lib/use-permission-monitoring";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -42,6 +43,8 @@ export const unstable_settings = {
 function InnerLayout() {
   const { colorScheme } = useThemeContext();
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+
+  usePermissionMonitoring();
 
   useEffect(() => {
     const checkPermissionsOnboarding = async () => {
