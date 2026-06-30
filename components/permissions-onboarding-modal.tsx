@@ -230,12 +230,12 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingTop: 24,
-    paddingBottom: 16,
+    paddingBottom: 16 /* internal spacing */,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 8 /* internal spacing */,
   },
   subtitle: {
     fontSize: 14,
@@ -258,16 +258,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    marginBottom: 8,
+    marginBottom: 8 /* internal spacing */,
   },
   permissionContent: {
-    marginBottom: 12,
+    marginBottom: 12 /* internal spacing */,
   },
   permissionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 8 /* internal spacing */,
   },
   permissionName: {
     fontSize: 16,

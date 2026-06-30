@@ -316,14 +316,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   tabText: { fontSize: 14, fontWeight: "600" },
-  content: { padding: 16, paddingBottom: 40 },
+  content: { padding: 16, paddingBottom: 40 /* internal spacing */ },
   friendRow: {
     flexDirection: "row",
     alignItems: "center",
     padding: 14,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 10,
+    marginBottom: 10 /* internal spacing */,
     gap: 12,
   },
   requestRow: {
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 10,
+    marginBottom: 10 /* internal spacing */,
     gap: 12,
   },
   avatar: {

@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 8 /* internal spacing */,
   },
   stat: {
     flex: 1,

@@ -199,13 +199,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     textAlign: "center",
-    marginBottom: 2,
+    marginBottom: 2 /* internal spacing */,
   },
   bothSubtitle: {
     fontSize: 13,
     textAlign: "center",
     lineHeight: 18,
-    marginBottom: 4,
+    marginBottom: 4 /* internal spacing */,
   },
   alertBlock: {
     borderRadius: 14,

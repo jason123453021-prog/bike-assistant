@@ -47,23 +47,23 @@ export function PlaybackStatsCard({ data, timestamp }: PlaybackStatsCardProps) {
         backgroundColor: colors.surface,
         borderRadius: 12,
         padding: 12,
-        marginBottom: 12,
+        marginBottom: 12 /* internal spacing */,
         borderWidth: 1,
         borderColor: colors.border,
       }}
     >
       {/* 時間戳 */}
       {timestamp && (
-        <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 8, textAlign: 'center' }}>
+        <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 8 /* internal spacing */, textAlign: 'center' }}>
           {timestamp}
         </Text>
       )}
 
       {/* 統計數據網格 - 自適應欄位大小 */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8, flexWrap: 'wrap' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8 /* internal spacing */, flexWrap: 'wrap' }}>
         {/* 速度 */}
         <View style={{ alignItems: 'center', minWidth: '22%' }}>
-          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>速度</Text>
+          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 /* internal spacing */ }}>速度</Text>
           <Text style={{ color: '#10B981', fontSize: 18, fontWeight: 'bold' }}>
             {data.speed.toFixed(1)}
           </Text>
@@ -72,7 +72,7 @@ export function PlaybackStatsCard({ data, timestamp }: PlaybackStatsCardProps) {
 
         {/* 心率 */}
         <View style={{ alignItems: 'center', minWidth: '22%' }}>
-          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>心率</Text>
+          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 /* internal spacing */ }}>心率</Text>
           <Text style={{ color: getHeartRateColor(data.heartRate), fontSize: 18, fontWeight: 'bold' }}>
             {Math.round(data.heartRate)}
           </Text>
@@ -81,7 +81,7 @@ export function PlaybackStatsCard({ data, timestamp }: PlaybackStatsCardProps) {
 
         {/* 功率 */}
         <View style={{ alignItems: 'center', minWidth: '22%' }}>
-          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>功率</Text>
+          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 /* internal spacing */ }}>功率</Text>
           <Text style={{ color: '#F59E0B', fontSize: 18, fontWeight: 'bold' }}>
             {Math.round(data.power)}
           </Text>
@@ -90,7 +90,7 @@ export function PlaybackStatsCard({ data, timestamp }: PlaybackStatsCardProps) {
 
         {/* 海拔 */}
         <View style={{ alignItems: 'center', minWidth: '22%' }}>
-          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>海拔</Text>
+          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 /* internal spacing */ }}>海拔</Text>
           <Text style={{ color: '#8B5CF6', fontSize: 18, fontWeight: 'bold' }}>
             {Math.round(data.altitude)}
           </Text>
@@ -101,13 +101,13 @@ export function PlaybackStatsCard({ data, timestamp }: PlaybackStatsCardProps) {
       {/* 距離和時間 */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
         <View>
-          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>距離</Text>
+          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 /* internal spacing */ }}>距離</Text>
           <Text style={{ color: colors.foreground, fontSize: 16, fontWeight: 'bold' }}>
             {data.distance.toFixed(2)} km
           </Text>
         </View>
         <View>
-          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>時間</Text>
+          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 /* internal spacing */ }}>時間</Text>
           <Text style={{ color: colors.foreground, fontSize: 16, fontWeight: 'bold' }}>
             {formatTime(data.time)}
           </Text>

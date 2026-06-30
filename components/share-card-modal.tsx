@@ -171,7 +171,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 {/* 進階訓練數據 */}
                 {(shareCard.avgHeartRate || shareCard.avgPower || shareCard.avgCadence) && (
                   <View style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.2)", paddingTop: 12 }}>
-                    <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, fontWeight: "600", marginBottom: 8 }}>進階數據</Text>
+                    <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, fontWeight: "600", marginBottom: 8 /* internal spacing */ }}>進階數據</Text>
                     <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
                       {shareCard.avgHeartRate && (
                         <View style={{ alignItems: "center" }}>
@@ -231,7 +231,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 ]}
                 onPress={handleShare}
               >
-                <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600", marginBottom: 8 }}>
+                <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600", marginBottom: 8 /* internal spacing */ }}>
                   📱 分享至社群
                 </Text>
                 <Text

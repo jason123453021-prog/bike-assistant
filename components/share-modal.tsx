@@ -101,16 +101,16 @@ export function ShareModal({
           }}
           onPress={(e) => e.stopPropagation()}
         >
-          <Text style={{ fontSize: 18, fontWeight: "600", color: colors.foreground, marginBottom: 16 }}>
+          <Text style={{ fontSize: 18, fontWeight: "600", color: colors.foreground, marginBottom: 16 /* internal spacing */ }}>
             分享騎乘記錄
           </Text>
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* 好友列表 */}
-            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>
+            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 8 /* internal spacing */ }}>
               選擇好友
             </Text>
-            <View style={{ marginBottom: 16, gap: 8 }}>
+            <View style={{ marginBottom: 16 /* internal spacing */, gap: 8 }}>
               {friends.length === 0 ? (
                 <Text style={{ color: colors.muted, fontSize: 12 }}>暫無好友</Text>
               ) : (
@@ -142,7 +142,7 @@ export function ShareModal({
             </View>
 
             {/* 分享備註 */}
-            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>
+            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 8 /* internal spacing */ }}>
               分享備註（可選）
             </Text>
             <TextInput
@@ -153,7 +153,7 @@ export function ShareModal({
                 padding: 12,
                 color: colors.foreground,
                 backgroundColor: colors.surface,
-                marginBottom: 16,
+                marginBottom: 16 /* internal spacing */,
                 minHeight: 80,
                 textAlignVertical: "top",
               }}
@@ -166,10 +166,10 @@ export function ShareModal({
             />
 
             {/* 權限設置 */}
-            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 12 }}>
+            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
               分享權限
             </Text>
-            <View style={{ gap: 12, marginBottom: 16 }}>
+            <View style={{ gap: 12, marginBottom: 16 /* internal spacing */ }}>
               <View
                 style={{
                   flexDirection: "row",

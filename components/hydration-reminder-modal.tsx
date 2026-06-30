@@ -302,19 +302,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    marginBottom: 16,
+    marginBottom: 16 /* internal spacing */,
     textAlign: 'center',
   },
   content: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: 16 /* internal spacing */,
     textAlign: 'center',
     lineHeight: 28,
   },
   hint: {
     fontSize: 12,
-    marginBottom: 24,
+    marginBottom: 24 /* internal spacing */,
     textAlign: 'center',
     fontStyle: 'italic',
   },

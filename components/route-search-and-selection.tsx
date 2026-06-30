@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 12 /* internal spacing */,
   },
   routesList: {
     gap: 12,
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 8 /* internal spacing */,
   },
   routeCardTitle: {
     fontSize: 14,

@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingTop: 60,
-    paddingBottom: 48,
+    paddingBottom: 48 /* internal spacing */,
     paddingHorizontal: 32,
   },
   directionRow: {
