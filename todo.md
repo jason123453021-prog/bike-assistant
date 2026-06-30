@@ -864,3 +864,29 @@
 - [x] 路線詳情和評分
 - [x] 標籤頁導航
 - [x] TypeScript 0 errors
+
+
+## Bug 修復與體驗優化 ✅
+
+### Phase 1：首次啟動標記機制和權限狀態管理 ✅
+- [x] 創建 OnboardingStateManager - 首次啟動標記
+- [x] 創建 useAppStateListener Hook - AppState 監聽
+- [x] 創建 IntentLauncherManager - 系統設定導航
+- [x] 創建 ImprovedPermissionsOnboardingModal - 改進的彈窗
+
+### 完成的功能
+- [x] 首次啟動標記機制（AsyncStorage）
+- [x] AppState 監聽和動態權限重新整理
+- [x] Linking API 系統設定導航
+- [x] 底部自適應修正（useSafeAreaInsets）
+- [x] 返回 App 時自動重新整理權限狀態
+- [x] 改進的權限 Onboarding 彈窗 UI
+
+### 技術實現
+- [x] OnboardingStateManager：首次啟動標記、Onboarding 狀態管理
+- [x] useAppStateListener：App 前景/背景監聽
+- [x] IntentLauncherManager：系統設定導航（降級方案）
+- [x] ImprovedPermissionsOnboardingModal：完整的權限設定 UI
+
+### TypeScript 編譯
+✅ 0 errors
