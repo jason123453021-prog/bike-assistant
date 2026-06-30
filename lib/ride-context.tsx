@@ -108,6 +108,10 @@ export interface RideState {
   gradeDistribution: number[];
   /** 坡度區間爬升統計 [1-5%, 6-10%, 11-15%, 16-20%, 21-25%, 26%+] */
   gradeAscentDistribution: number[];
+
+  // 自訂補給品計數
+  /** 自訂補給品計數 Map: supplyItemId -> { count: 次數, lastTriggeredTime: 上次觸發時間戳 } */
+  customSupplyItemCounts: Record<string, { count: number; lastTriggeredTime: number }>;
 }
 
 type RideAction =
@@ -169,6 +173,7 @@ const initialState: RideState = {
   totalCalories: 0,
   gradeDistribution: [0, 0, 0, 0, 0, 0],
   gradeAscentDistribution: [0, 0, 0, 0, 0, 0],
+  customSupplyItemCounts: {},
 };
 
 function rideReducer(state: RideState, action: RideAction): RideState {

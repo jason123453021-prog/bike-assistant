@@ -645,3 +645,12 @@
   - [ ] 捕捉 KeyEvent.KEYCODE_VOLUME_DOWN 與 KeyEvent.KEYCODE_VOLUME_UP
   - [ ] 攔截事件並呼叫關閉彈窗的 function
   - [ ] 與 React Native 橋接
+
+
+## Phase 1：首次啟動權限引導機制 ✅
+
+- [x] 創建 PermissionsManager.ts - 權限檢查和請求邏輯
+- [x] 創建 PermissionsOnboardingModal.tsx - 權限 onboarding UI
+- [x] 在 app/_layout.tsx 中集成權限檢查和彈窗
+- [x] 支援位置、通知、懸浮窗、電池最佳化權限
+- [x] 首次啟動時自動顯示，完成後標記為已完成
