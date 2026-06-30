@@ -753,3 +753,17 @@
 - [x] 創建 realtime-navigation.test.ts - 完整測試套件
 - [x] 創建 REALTIME_NAVIGATION_INTEGRATION.md - 集成文檔
 - [x] TypeScript 編譯 0 errors
+
+
+## 離線地圖快取與語音包預先下載 ✅
+
+- [x] 創建 OfflineMapCacheManager.ts - 地圖瓦片快取管理
+- [x] 實現 LRU 快取策略和大小限制
+- [x] 支援多地圖源（OpenStreetMap）
+- [x] 區域瓦片批量下載
+- [x] 創建 OfflineVoicePackageManager.ts - 語音包管理
+- [x] 語音包下載和本地存儲
+- [x] 常用語音短語預生成
+- [x] 創建 NetworkStatusMonitor.ts - 網絡狀態監控
+- [x] 自動離線模式切換
+- [x] TypeScript 編譯 0 errors
