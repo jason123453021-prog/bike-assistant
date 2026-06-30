@@ -924,3 +924,33 @@
 - 新增 4 個組件/管理器（~800 行）
 - 完整的通知系統
 - 設定頁面集成
+
+
+## 全域 UI 自適應與系統導覽列防遮擋規範 ✅
+
+### 完成項目
+- [x] 創建 UI_SAFE_AREA_KNOWLEDGE_POINT.md 知識點文檔
+- [x] 改進 ScreenContainer 組件 - 集成 useSafeAreaInsets 動態邊距
+- [x] 更新組件文檔 - 說明防遮擋機制
+- [x] 提供實作範例和最佳實踐
+
+### 知識點內容
+- 核心問題與根因分析
+- 全域開發規範與解決方案
+- 動態高度補償公式
+- 具體實作清單
+- 預期驗收標準
+- 常見問題與解答
+- 實作範例（底部按鈕列、ScrollView、浮動按鈕）
+- 團隊交接指南
+
+### 技術實現
+- ScreenContainer 自動計算底部邊距
+- useSafeAreaInsets Hook 動態獲取系統 UI 高度
+- Math.max() 確保最小間距
+- 支援 bottomPaddingOverride 自定義邊距
+
+### 編譯狀態
+✅ TypeScript 0 errors
+✅ 所有改進完成
+✅ 文檔完整

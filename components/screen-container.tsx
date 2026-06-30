@@ -1,5 +1,5 @@
 import { View, type ViewProps } from "react-native";
-import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { SafeAreaView, type Edge, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,12 @@ export interface ScreenContainerProps extends ViewProps {
    * Additional className for the SafeAreaView (content layer).
    */
   safeAreaClassName?: string;
+  /**
+   * Override default bottom padding. If not provided, uses insets.bottom.
+   * Useful for pages that need custom bottom spacing.
+   * See: docs/UI_SAFE_AREA_KNOWLEDGE_POINT.md
+   */
+  bottomPaddingOverride?: number;
 }
 
 /**
@@ -28,6 +34,12 @@ export interface ScreenContainerProps extends ViewProps {
  *
  * The outer View extends to full screen (including status bar area) with the background color,
  * while the inner SafeAreaView ensures content is within safe bounds.
+ *
+ * **IMPORTANT**: This component automatically handles system navigation bar (insets.bottom)
+ * to prevent UI elements from being hidden behind the system navigation bar on Android.
+ * This follows the global UI safe area knowledge point.
+ *
+ * See: docs/UI_SAFE_AREA_KNOWLEDGE_POINT.md for detailed guidelines.
  *
  * Usage:
  * ```tsx
@@ -37,6 +49,13 @@ export interface ScreenContainerProps extends ViewProps {
  *   </Text>
  * </ScreenContainer>
  * ```
+ *
+ * With custom bottom padding:
+ * ```tsx
+ * <ScreenContainer className="p-4" bottomPaddingOverride={16}>
+ *   Content here
+ * </ScreenContainer>
+ * ```
  */
 export function ScreenContainer({
   children,
@@ -44,9 +63,20 @@ export function ScreenContainer({
   className,
   containerClassName,
   safeAreaClassName,
+  bottomPaddingOverride,
   style,
   ...props
 }: ScreenContainerProps) {
+  const insets = useSafeAreaInsets();
+
+  // Dynamic bottom padding calculation to prevent UI from being hidden behind system navigation bar
+  // Uses Math.max to ensure minimum spacing is maintained
+  // If system has navigation bar (insets.bottom > 0), uses that height
+  // Otherwise uses override value or defaults to 0
+  const bottomPadding = bottomPaddingOverride
+    ? Math.max(insets.bottom, bottomPaddingOverride)
+    : insets.bottom;
+
   return (
     <View
       className={cn(
@@ -59,7 +89,7 @@ export function ScreenContainer({
       <SafeAreaView
         edges={edges}
         className={cn("flex-1", safeAreaClassName)}
-        style={style}
+        style={[style, { paddingBottom: bottomPadding }]}
       >
         <View className={cn("flex-1", className)}>{children}</View>
       </SafeAreaView>
