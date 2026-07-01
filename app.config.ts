@@ -70,6 +70,10 @@ const config: ExpoConfig = {
       "android.permission.WAKE_LOCK",
       // 開機自啟：恢復背景服務
       "android.permission.RECEIVE_BOOT_COMPLETED",
+      // 懸浮窗權限：顯示騎乘中的浮動提示
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      // 電池最佳化白名單：確保背景位置追蹤不被系統中斷
+      "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
     ],
     intentFilters: [
       {
