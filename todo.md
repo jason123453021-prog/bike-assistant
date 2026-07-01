@@ -1038,3 +1038,12 @@
 - [x] 確保「稍後設定」按鈕可完全滑出並點擊
 - [x] 添加 insets.bottom + 24 的底部呼吸空間
 - [x] TypeScript 編譯驗證 - 0 errors
+
+
+## UX 變更與 Bug 修復 - 移除首次啟動攔截
+
+- [x] Phase 1：移除首次啟動權限引導頁面
+- [ ] Phase 2：配置 AndroidManifest.xml 權限
+- [ ] Phase 3：修復懸浮窗和電池最佳化跳轉
+- [ ] Phase 4：實現設定頁面權限狀態區塊
+- [ ] Phase 5：實現權限狀態動態重新整理機制

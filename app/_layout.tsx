@@ -29,7 +29,6 @@ import { setupNotifications } from "@/lib/feedback-service";
 import "@/lib/background-location";
 import { RideTrackingNative } from "@/lib/ride-tracking-native";
 import { PermissionsManager } from "@/lib/permissions-manager";
-import { PermissionsOnboardingModal } from "@/components/permissions-onboarding-modal";
 import { usePermissionMonitoring } from "@/lib/use-permission-monitoring";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -42,24 +41,8 @@ export const unstable_settings = {
 // ─── Inner layout (inside ThemeProvider, can safely use useThemeContext) ───────
 function InnerLayout() {
   const { colorScheme } = useThemeContext();
-  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
 
   usePermissionMonitoring();
-
-  useEffect(() => {
-    const checkPermissionsOnboarding = async () => {
-      try {
-        const completed = await PermissionsManager.hasCompletedOnboarding();
-        if (!completed) {
-          setShowPermissionsModal(true);
-        }
-      } catch (error) {
-        console.error('[InnerLayout] Error checking permissions onboarding:', error);
-      }
-    };
-
-    checkPermissionsOnboarding();
-  }, []);
 
   return (
     <>
@@ -73,10 +56,6 @@ function InnerLayout() {
         </Stack>
         <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       </NavThemeProvider>
-      <PermissionsOnboardingModal
-        visible={showPermissionsModal}
-        onComplete={() => setShowPermissionsModal(false)}
-      />
     </>
   );
 }
