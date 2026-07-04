@@ -346,7 +346,7 @@ export default function FriendsScreen() {
       preferCycleway: mode === "bike",
     });
     setSelectedFriend(null);
-    router.push("/");
+    router.push("/navigation");
   }, [selectedLocation, selectedFriend, requestFriendNav, router]);
 
   if (!isAuthenticated) {

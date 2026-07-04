@@ -67,17 +67,9 @@ export default function TabLayout() {
         tabBarShowLabel: true,
       }}
     >
-      {/* 原騎乘頁面隱藏（功能已整合至導航頁） */}
+      {/* 新導航頁面 (整合騎乘+地圖) */}
       <Tabs.Screen
-        name="index"
-        options={{
-          href: null,  // 從標籤列隱藏
-        }}
-      />
-
-      {/* 導航（整合騎乘+地圖） */}
-      <Tabs.Screen
-        name="map"
+        name="navigation"
         options={{
           title: "導航",
           tabBarIcon: ({ color, size }) => (
