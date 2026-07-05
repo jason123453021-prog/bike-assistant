@@ -29,7 +29,7 @@ export default function NavigationScreen() {
   const [reroutePath, setReroutePath] = useState<Feature<LineString> | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [dashboardData, setDashboardData] = useState({
-    speed: 0, wattage: 0, distance: 0, time: 0
+    speed: 0, power: 0, distance: 0, time: 0
   });
 
   // 1. GPS 數據獲取與處理 (模擬)
@@ -57,6 +57,7 @@ export default function NavigationScreen() {
           setDashboardData(prev => ({
             ...prev,
             speed: position.coords.speed ? Math.round(position.coords.speed * 3.6) : 0, // m/s to km/h
+            power: Math.random() * 300, // 模擬功率數據
             distance: prev.distance + (position.coords.speed || 0) * 1, // 簡化距離計算
             time: prev.time + 1,
           }));
