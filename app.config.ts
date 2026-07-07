@@ -143,6 +143,11 @@ const config: ExpoConfig = {
     typedRoutes: true,
     reactCompiler: true,
   },
+  extra: {
+    eas: {
+      projectId: "bike-assistant",
+    },
+  },
 };
 
 export default config;
