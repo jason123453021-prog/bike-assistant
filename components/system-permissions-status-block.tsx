@@ -94,8 +94,6 @@ export function SystemPermissionsStatusBlock() {
           return await IntentLauncherImproved.openNotificationPermissionSettings();
         case 'overlay':
           return await IntentLauncherImproved.openOverlayPermissionSettings();
-        case 'battery_optimization':
-          return await IntentLauncherImproved.openBatteryOptimizationSettings();
         default:
           return false;
       }

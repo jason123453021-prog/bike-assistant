@@ -35,7 +35,8 @@ const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
 export const unstable_settings = {
-  anchor: "(tabs)",
+  // 直接進入 (tabs) 標籤頁，不顯示 404 頁面
+  initialRouteName: "(tabs)",
 };
 
 // ─── Inner layout (inside ThemeProvider, can safely use useThemeContext) ───────
@@ -47,7 +48,7 @@ function InnerLayout() {
   return (
     <>
       <NavThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack screenOptions={{ headerShown: false }} initialRouteName="(tabs)">
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="ride-detail" options={{ headerShown: false, presentation: "fullScreenModal" }} />
           <Stack.Screen name="favorites-list" options={{ headerShown: false, presentation: "fullScreenModal" }} />

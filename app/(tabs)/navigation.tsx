@@ -16,10 +16,16 @@ import { TurnDetectionEngine } from '@/lib/turn-detection-engine'; // 轉彎判�
 
 // 儀表板組件 (待實現)
 import { DashboardOverlay } from '@/components/dashboard-overlay';
-// 頂部 UI 組件 (待實現)
 import { TopNavigationUI } from '@/components/top-navigation-ui';
 
 // const mmkv = new MMKVLoader().initialize(); // MMKV 初始化 (待 MMKV 模組實現後啟用)
+
+interface DashboardData {
+  speed: number;
+  power: number;
+  distance: number;
+  time: number;
+}
 
 export default function NavigationScreen() {
   const colors = useColors();
@@ -28,7 +34,7 @@ export default function NavigationScreen() {
   const [gpxRoute, setGpxRoute] = useState<Feature<LineString> | null>(null);
   const [reroutePath, setReroutePath] = useState<Feature<LineString> | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [dashboardData, setDashboardData] = useState({
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
     speed: 0, power: 0, distance: 0, time: 0
   });
 
@@ -54,7 +60,7 @@ export default function NavigationScreen() {
           // });
 
           // 更新儀表板數據 (簡化)
-          setDashboardData(prev => ({
+          setDashboardData((prev: DashboardData) => ({
             ...prev,
             speed: position.coords.speed ? Math.round(position.coords.speed * 3.6) : 0, // m/s to km/h
             power: Math.random() * 300, // 模擬功率數據
@@ -123,40 +129,64 @@ export default function NavigationScreen() {
   // 4. GPX 載入 (模擬)
   const loadGpx = useCallback(async () => {
     // 模擬從文件或網絡加載 GPX
-    const dummyGpx = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>\n<gpx ...>\n  <trk>\n    <trkseg>\n      <trkpt lat="25.0330" lon="121.5654"></trkpt>\n      <trkpt lat="25.0335" lon="121.5660"></trkpt>\n      <trkpt lat="25.0340" lon="121.5665"></trkpt>\n      <!-- 更多點 -->\n    </trkseg>\n  </trk>\n</gpx>`;
-    const geoJson = GpxTrackManager.parseGpxToGeoJSON(dummyGpx);
-    setGpxRoute(geoJson);
-    setIsNavigating(true);
+    const dummyGpx = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>\n<gpx>\n  <trk>\n    <trkseg>\n      <trkpt lat="25.0330" lon="121.5654"></trkpt>\n      <trkpt lat="25.0335" lon="121.5660"></trkpt>\n      <trkpt lat="25.0340" lon="121.5665"></trkpt>\n    </trkseg>\n  </trk>\n</gpx>`;
+    try {
+      const geoJson = GpxTrackManager.parseGpxToGeoJSON(dummyGpx);
+      setGpxRoute(geoJson);
+      setIsNavigating(true);
+    } catch (error) {
+      console.error('GPX parsing error:', error);
+    }
   }, []);
 
   return (
     <ScreenContainer containerClassName="bg-background">
-      {/* MapView (待 MapLibre 模組實現後啟用) */}
-      <View style={styles.mapPlaceholder}>
-        <Text style={{ color: colors.muted }}>地圖區域 (MapLibre 待集成)</Text>
+      {/* 地圖區域 - 使用 MapLibre React Native */}
+      <View style={styles.mapContainer}>
+        {/* TODO: 集成 MapLibre React Native 地圖組件 */}
+        {/* <MapView
+          ref={mapRef}
+          style={styles.map}
+          styleURL="https://demotiles.maplibre.org/style.json"
+          centerCoordinate={[121.5654, 25.0330]}
+          zoomLevel={13}
+        >
+          {currentLocation && (
+            <MapLibreGL.PointAnnotation
+              id="currentLocation"
+              coordinate={[currentLocation.geometry.coordinates[0], currentLocation.geometry.coordinates[1]]}
+            >
+              <View style={styles.chevron} />
+            </MapLibreGL.PointAnnotation>
+          )}
+        </MapLibre> */}
+        <Text style={{ color: colors.muted }}>地圖區域 (MapLibre 集成中...)</Text>
       </View>
 
       {/* 頂部搜尋與轉彎提示 UI */}
       <TopNavigationUI isNavigating={isNavigating} />
 
-      {/* 儀表板懸浮化 (左下角) */}
-      <DashboardOverlay data={dashboardData} />
+      {/* 儀表板懸浮化 (左下角) - 確保不與地圖重疊 */}
+      <View style={{ position: 'absolute', bottom: 100, left: 16, right: 16, zIndex: 50 }}>
+        <DashboardOverlay data={dashboardData} />
+      </View>
 
       {/* 測試按鈕 (開發用) */}
       <View style={styles.testButtons}>
-        <Text onPress={loadGpx} style={{ color: colors.foreground }}>開始導航 (載入GPX)</Text>
-        <Text onPress={() => setIsNavigating(false)} style={{ color: colors.foreground }}>停止導航</Text>
+        <Text onPress={loadGpx} style={{ color: colors.foreground, marginBottom: 8, fontSize: 14 }}>開始導航 (載入GPX)</Text>
+        <Text onPress={() => setIsNavigating(false)} style={{ color: colors.foreground, fontSize: 14 }}>停止導航</Text>
       </View>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  mapPlaceholder: {
+  mapContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
   },
   map: {
     flex: 1,
@@ -169,10 +199,10 @@ const styles = StyleSheet.create({
   },
   testButtons: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 120,
     left: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 12,
+    borderRadius: 8,
   },
 });
