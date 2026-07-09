@@ -45,7 +45,7 @@ export default function TabLayout() {
   }, [pendingQuery.data]);
 
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
-  const tabBarHeight = 60 + bottomPadding;
+  const tabBarHeight = Platform.OS === 'web' ? 60 + bottomPadding : 60 + bottomPadding;
 
   return (
     <Tabs
@@ -121,6 +121,104 @@ export default function TabLayout() {
           ),
           tabBarLabel: ({ focused, color }) => (
             <TabLabel label="好友" focused={focused} color={color} />
+          ),
+        }}
+      />
+
+      {/* 分析 */}
+      <Tabs.Screen
+        name="analytics"
+        options={{
+          title: "分析",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="chart.bar.fill" color={color} />
+          ),
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="分析" focused={focused} color={color} />
+          ),
+        }}
+      />
+
+      {/* 挑戰 */}
+      <Tabs.Screen
+        name="challenges"
+        options={{
+          title: "挑戰",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="flag.fill" color={color} />
+          ),
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="挑戰" focused={focused} color={color} />
+          ),
+        }}
+      />
+
+      {/* 訓練 */}
+      <Tabs.Screen
+        name="training"
+        options={{
+          title: "訓練",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="dumbbell.fill" color={color} />
+          ),
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="訓練" focused={focused} color={color} />
+          ),
+        }}
+      />
+
+      {/* 推薦 */}
+      <Tabs.Screen
+        name="recommendations"
+        options={{
+          title: "推薦",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="sparkles" color={color} />
+          ),
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="推薦" focused={focused} color={color} />
+          ),
+        }}
+      />
+
+      {/* 隊友 */}
+      <Tabs.Screen
+        name="buddies"
+        options={{
+          title: "隊友",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="person.fill" color={color} />
+          ),
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="隊友" focused={focused} color={color} />
+          ),
+        }}
+      />
+
+      {/* 排行榜 */}
+      <Tabs.Screen
+        name="leaderboard"
+        options={{
+          title: "排行榜",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="podium.fill" color={color} />
+          ),
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="排行" focused={focused} color={color} />
+          ),
+        }}
+      />
+
+      {/* 通知 */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "通知",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="bell.fill" color={color} />
+          ),
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="通知" focused={focused} color={color} />
           ),
         }}
       />
