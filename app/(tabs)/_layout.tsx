@@ -124,6 +124,20 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* 設定 */}
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "設定",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="gearshape.fill" color={color} />
+          ),
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="設定" focused={focused} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
