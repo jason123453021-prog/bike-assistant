@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, AppState, Platform } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
-import { MapLibreMap } from '@/components/maplibre-map';
+// import { MapLibreMap } from '@/components/maplibre-map'; // 臨時禁用以修復閃退
 import * as turf from '@turf/turf';
 import { Feature, LineString, Point } from 'geojson'; // GeoJSON types
 import * as Speech from 'expo-speech'; // expo-speech
@@ -158,13 +158,14 @@ export default function NavigationScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background">
-      {/* 地圖區域 - 使用 MapLibre */}
-      <View style={styles.mapContainer}>
-        <MapLibreMap
+      {/* 地圖區域 - 臨時禁用 MapLibre */}
+      <View style={[styles.mapContainer, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: colors.foreground, fontSize: 16 }}>地圖功能維護中...</Text>
+        {/* <MapLibreMap
           currentLocation={currentLocation}
           gpxRoute={reroutePath || gpxRoute}
           rideTrack={rideTrack}
-        />
+        /> */}
 
         {/* 轉彎提示水平水底 */}
         {turnInstruction && (
