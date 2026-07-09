@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, AppState, Platform } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
-// import MapView from '@maplibre/maplibre-react-native'; // 假設使用 MapLibre React Native
+import { MapLibreMap } from '@/components/maplibre-map';
 import * as turf from '@turf/turf';
 import { Feature, LineString, Point } from 'geojson'; // GeoJSON types
 import * as Speech from 'expo-speech'; // expo-speech
@@ -11,7 +11,9 @@ import * as Speech from 'expo-speech'; // expo-speech
 // 導入自訂模組
 import { GpxTrackManager } from '@/lib/gpx-track-manager'; // GPX 軌跡管理
 import { TurnDetectionEngine } from '@/lib/turn-detection-engine'; // 轉彎判定引擎
-// import { ReroutingService } from '@/lib/rerouting-service'; // OSRM 重規劃服務
+import { VoiceNavigationManager } from '@/lib/voice-navigation-manager'; // 語音導航
+import { useOffRouteDetection } from '@/hooks/use-off-route-detection'; // 偏離檢測
+import { ReroutingService } from '@/lib/rerouting-service'; // OSRM 重規劃服務
 // import { ForegroundServiceModule } from '@/lib/foreground-service-module'; // 原生 Foreground Service 橋接
 
 // 儀表板組件 (待實現)
@@ -36,6 +38,18 @@ export default function NavigationScreen() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     speed: 0, power: 0, distance: 0, time: 0
+  });
+  const [rideTrack, setRideTrack] = useState<Feature<LineString> | null>(null);
+  const [turnInstruction, setTurnInstruction] = useState<string | null>(null);
+  const [isOffRoute, setIsOffRoute] = useState(false);
+
+  // 偏離檢測 Hook
+  useOffRouteDetection({
+    gpxRoute,
+    currentLocation,
+    enabled: isNavigating && !!gpxRoute,
+    onOffRoute: setIsOffRoute,
+    onReroute: setReroutePath,
   });
 
   // 1. GPS 數據獲取與處理 (模擬)
@@ -68,22 +82,23 @@ export default function NavigationScreen() {
             time: prev.time + 1,
           }));
 
+          // 更新騎乘軌跡
+          setRideTrack((prev) => {
+            if (!prev) {
+              return turf.lineString([[position.coords.longitude, position.coords.latitude]]);
+            }
+            const coords = prev.geometry.coordinates as [number, number][];
+            return turf.lineString([...coords, [position.coords.longitude, position.coords.latitude]]);
+          });
+
           // 轉彎判定與語音播報
           if (gpxRoute) {
-            const turnInstruction = TurnDetectionEngine.detectTurn(newLocation, gpxRoute);
-            if (turnInstruction) {
-              Speech.speak(turnInstruction.text);
+            const instruction = TurnDetectionEngine.detectTurn(newLocation, gpxRoute);
+            if (instruction) {
+              setTurnInstruction(instruction.text);
+              // 播放語音提示
+              VoiceNavigationManager.speakTurnInstruction(instruction.text);
             }
-
-            // 偏離檢測與重規劃 (待 OSRM 模組實現後啟用)
-            // if (TurnDetectionEngine.isOffRoute(newLocation, gpxRoute)) {
-            //   ReroutingService.reroute(newLocation, gpxRoute).then(newPath => {
-            //     setReroutePath(newPath);
-            //     // 播報新路徑上的第一個轉彎指令
-            //     const firstInstruction = TurnDetectionEngine.getFirstInstruction(newPath);
-            //     if (firstInstruction) Speech.speak(firstInstruction.text);
-            //   });
-            // }
           }
         },
         (error) => console.error("GPS Error:", error),
@@ -141,26 +156,27 @@ export default function NavigationScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background">
-      {/* 地圖區域 - 使用 MapLibre React Native */}
+      {/* 地圖區域 - 使用 MapLibre */}
       <View style={styles.mapContainer}>
-        {/* TODO: 集成 MapLibre React Native 地圖組件 */}
-        {/* <MapView
-          ref={mapRef}
-          style={styles.map}
-          styleURL="https://demotiles.maplibre.org/style.json"
-          centerCoordinate={[121.5654, 25.0330]}
-          zoomLevel={13}
-        >
-          {currentLocation && (
-            <MapLibreGL.PointAnnotation
-              id="currentLocation"
-              coordinate={[currentLocation.geometry.coordinates[0], currentLocation.geometry.coordinates[1]]}
-            >
-              <View style={styles.chevron} />
-            </MapLibreGL.PointAnnotation>
-          )}
-        </MapLibre> */}
-        <Text style={{ color: colors.muted }}>地圖區域 (MapLibre 集成中...)</Text>
+        <MapLibreMap
+          currentLocation={currentLocation}
+          gpxRoute={reroutePath || gpxRoute}
+          rideTrack={rideTrack}
+        />
+
+        {/* 轉彎提示水平水底 */}
+        {turnInstruction && (
+          <View style={[styles.turnInstructionBox, { backgroundColor: colors.primary }]}>
+            <Text style={styles.turnInstructionText}>{turnInstruction}</Text>
+          </View>
+        )}
+
+        {/* 偏離警告 */}
+        {isOffRoute && (
+          <View style={[styles.offRouteWarning, { backgroundColor: colors.error }]}>
+            <Text style={styles.offRouteWarningText}>⚠️ 您已偏離路線，正在重新規劃...</Text>
+          </View>
+        )}
       </View>
 
       {/* 頂部搜尋與轉彎提示 UI */}
@@ -187,6 +203,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f0f0f0',
     borderRadius: 8,
+    position: 'relative',
+  },
+  turnInstructionBox: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  turnInstructionText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  offRouteWarning: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    right: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  offRouteWarningText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   map: {
     flex: 1,
