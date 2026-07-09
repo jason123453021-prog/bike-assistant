@@ -6,6 +6,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
+
+// Polyfill for URL.createObjectURL in React Native
+if (Platform.OS !== 'web' && typeof URL !== 'undefined' && !URL.createObjectURL) {
+  URL.createObjectURL = function(blob: any) {
+    return 'blob:' + Math.random().toString(36).substr(2, 9);
+  };
+  URL.revokeObjectURL = function(url: string) {
+    // No-op in React Native
+  };
+}
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider, useThemeContext } from "@/lib/theme-provider";
 import {
