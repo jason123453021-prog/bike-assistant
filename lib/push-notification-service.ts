@@ -32,6 +32,8 @@ export class PushNotificationService {
           shouldShowAlert: true,
           shouldPlaySound: true,
           shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
         }),
       });
 
@@ -224,7 +226,7 @@ export class PushNotificationService {
   static async updateSettings(settings: Partial<NotificationSettings>): Promise<void> {
     try {
       const current = await this.getSettings();
-      const updated = { ...current, ...settings };
+      const updated: NotificationSettings = { ...current, ...settings } as NotificationSettings;
       await AsyncStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(updated));
     } catch (error) {
       console.error('Failed to update notification settings:', error);
@@ -267,7 +269,7 @@ export class PushNotificationService {
           title: payload.title,
           body: payload.body,
           data: payload.data || {},
-          sound: settings.soundEnabled ? 'default' : null,
+          sound: settings.soundEnabled ? 'default' : undefined,
           vibrate: settings.vibrationEnabled ? [0, 250, 250, 250] : [],
         },
         trigger: null,
