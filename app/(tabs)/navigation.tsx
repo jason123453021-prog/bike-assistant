@@ -14,6 +14,8 @@ import { TurnDetectionEngine } from '@/lib/turn-detection-engine'; // 轉彎判�
 import { VoiceNavigationManager } from '@/lib/voice-navigation-manager'; // 語音導航
 import { useOffRouteDetection } from '@/hooks/use-off-route-detection'; // 偏離檢測
 import { ReroutingService } from '@/lib/rerouting-service'; // OSRM 重規劃服務
+import { RideSessionManager } from '@/lib/ride-session-manager'; // 騎乘會話管理
+import { PowerCalculator } from '@/lib/power-calculator'; // 功率計算
 // import { ForegroundServiceModule } from '@/lib/foreground-service-module'; // 原生 Foreground Service 橋接
 
 // 儀表板組件 (待實現)
