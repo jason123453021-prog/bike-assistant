@@ -260,7 +260,7 @@ export class PushNotificationService {
   /**
    * 發送通知
    */
-  private static async sendNotification(payload: NotificationPayload): Promise<void> {
+  static async sendNotification(payload: NotificationPayload): Promise<void> {
     try {
       const settings = await this.getSettings();
 

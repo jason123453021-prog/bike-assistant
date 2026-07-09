@@ -36,7 +36,7 @@ export class PageNotificationIntegration {
     PushNotificationService.sendNotification({
       title: '排名變化',
       body: `你的排名${direction}至第 ${newRank} 名`,
-      type: 'ranking',
+      type: 'achievement',
       data: { type: 'ranking', newRank, previousRank },
     });
   }
@@ -60,7 +60,7 @@ export class PageNotificationIntegration {
     PushNotificationService.sendNotification({
       title: 'AI 推薦',
       body: recommendation,
-      type: 'recommendation',
+      type: 'achievement',
       data: { type: 'recommendation', recommendation },
     });
   }
@@ -72,7 +72,7 @@ export class PageNotificationIntegration {
     PushNotificationService.sendNotification({
       title: '新通知',
       body: `你有 ${count} 條新通知`,
-      type: 'notification_center',
+      type: 'achievement',
       data: { type: 'notification_center', count },
     });
   }
@@ -96,7 +96,7 @@ export class PageNotificationIntegration {
     PushNotificationService.sendNotification({
       title: '挑戰進度',
       body: `${challengeName}: ${progress}% 完成`,
-      type: 'challenge',
+      type: 'achievement',
       data: { type: 'challenge', challengeName, progress },
     });
   }

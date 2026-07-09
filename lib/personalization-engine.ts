@@ -125,7 +125,7 @@ export class PersonalizationEngine {
       isIdeal: rec.ideal === weather.condition,
       isAcceptable: rec.acceptable.includes(weather.condition),
       shouldAvoid: rec.avoid.includes(weather.condition),
-      recommendation: rec.shouldAvoid?.includes(weather.condition)
+      recommendation: rec.avoid.includes(weather.condition)
         ? `當前天氣不適合騎乘 (${weather.condition})`
         : `天氣適合騎乘`,
     };

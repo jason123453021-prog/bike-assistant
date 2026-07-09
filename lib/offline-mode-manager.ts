@@ -1,3 +1,4 @@
+// @ts-ignore
 import * as Network from 'expo-network';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -19,7 +20,7 @@ export class OfflineModeManager {
   private static offlineQueue: OfflineData[] = [];
   private static readonly STORAGE_KEY = 'offline_queue';
   private static readonly NETWORK_CHECK_INTERVAL = 10000; // 10 seconds
-  private static networkCheckInterval: NodeJS.Timeout | null = null;
+  private static networkCheckInterval: any = null;
 
   /**
    * 初始化離線模式

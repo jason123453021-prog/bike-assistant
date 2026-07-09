@@ -1,40 +1,40 @@
 import { LocalStorageManager } from './local-storage-manager';
 
 /**
+ * 騎乘評論類型
+ */
+interface RideComment {
+  id: string;
+  rideId: string;
+  userId: string;
+  userName: string;
+  content: string;
+  timestamp: number;
+  likes: number;
+  replies: RideComment[];
+}
+
+/**
+ * 騎乘分享類型
+ */
+interface RideShare {
+  id: string;
+  rideId: string;
+  userId: string;
+  platform: 'facebook' | 'twitter' | 'instagram' | 'whatsapp';
+  timestamp: number;
+  caption: string;
+}
+
+/**
  * 社區功能管理器
  */
 export class CommunityFeaturesManager {
   /**
-   * 騎乘評論類型
-   */
-  interface RideComment {
-    id: string;
-    rideId: string;
-    userId: string;
-    userName: string;
-    content: string;
-    timestamp: number;
-    likes: number;
-    replies: RideComment[];
-  }
-
-  /**
-   * 騎乘分享類型
-   */
-  interface RideShare {
-    id: string;
-    rideId: string;
-    userId: string;
-    platform: 'facebook' | 'twitter' | 'instagram' | 'whatsapp';
-    timestamp: number;
-    caption: string;
-  }
-
-  /**
    * 添加評論
    */
   static async addComment(rideId: string, content: string, userName: string = 'You') {
-    const comment: any = {
+    const comment: RideComment = {
       id: `comment_${Date.now()}`,
       rideId,
       userId: 'user_1',
@@ -45,7 +45,8 @@ export class CommunityFeaturesManager {
       replies: [],
     };
 
-    const comments = (await LocalStorageManager.getUserSettings())?.comments || [];
+    const settings = await LocalStorageManager.getUserSettings();
+    const comments = settings?.comments || [];
     comments.push(comment);
 
     await LocalStorageManager.saveUserSettings({
@@ -58,7 +59,7 @@ export class CommunityFeaturesManager {
   /**
    * 獲取騎乘評論
    */
-  static async getRideComments(rideId: string) {
+  static async getRideComments(rideId: string): Promise<RideComment[]> {
     const settings = await LocalStorageManager.getUserSettings();
     const comments = settings?.comments || [];
 
@@ -68,7 +69,7 @@ export class CommunityFeaturesManager {
   /**
    * 點讚評論
    */
-  static async likeComment(commentId: string) {
+  static async likeComment(commentId: string): Promise<RideComment | undefined> {
     const settings = await LocalStorageManager.getUserSettings();
     const comments = settings?.comments || [];
 
@@ -89,7 +90,7 @@ export class CommunityFeaturesManager {
     platform: 'facebook' | 'twitter' | 'instagram' | 'whatsapp',
     caption: string
   ) {
-    const share: any = {
+    const share: RideShare = {
       id: `share_${Date.now()}`,
       rideId,
       userId: 'user_1',
@@ -98,7 +99,8 @@ export class CommunityFeaturesManager {
       caption,
     };
 
-    const shares = (await LocalStorageManager.getUserSettings())?.shares || [];
+    const settings = await LocalStorageManager.getUserSettings();
+    const shares = settings?.shares || [];
     shares.push(share);
 
     await LocalStorageManager.saveUserSettings({ shares });
@@ -137,7 +139,7 @@ export class CommunityFeaturesManager {
   /**
    * 獲取用戶分享歷史
    */
-  static async getShareHistory(limit: number = 10) {
+  static async getShareHistory(limit: number = 10): Promise<RideShare[]> {
     const settings = await LocalStorageManager.getUserSettings();
     const shares = settings?.shares || [];
 
@@ -179,8 +181,9 @@ export class CommunityFeaturesManager {
    */
   static async getUserCommunityRanking() {
     const records = await LocalStorageManager.getAllRideRecords();
-    const shares = (await LocalStorageManager.getUserSettings())?.shares || [];
-    const comments = (await LocalStorageManager.getUserSettings())?.comments || [];
+    const settings = await LocalStorageManager.getUserSettings();
+    const shares = settings?.shares || [];
+    const comments = settings?.comments || [];
 
     return {
       totalRides: records.length,

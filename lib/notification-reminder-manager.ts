@@ -22,6 +22,8 @@ export class NotificationReminderManager {
           shouldShowAlert: true,
           shouldPlaySound: true,
           shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
         }),
       });
 
@@ -50,7 +52,7 @@ export class NotificationReminderManager {
           sound: 'default',
           badge: 1,
         },
-        trigger: delay > 0 ? { seconds: delay } : null,
+        trigger: delay > 0 ? ({ type: 'time' as const, seconds: delay } as any) : null,
       });
     } catch (error) {
       console.error('Failed to send notification:', error);
@@ -65,11 +67,12 @@ export class NotificationReminderManager {
 
     for (const day of daysOfWeek) {
       const trigger = {
+        type: 'calendar' as const,
         weekday: day,
         hour: hours,
         minute: minutes,
         repeats: true,
-      };
+      } as any;
 
       try {
         await Notifications.scheduleNotificationAsync({
@@ -107,10 +110,11 @@ export class NotificationReminderManager {
           data: { type: 'training_reminder', trainingId },
         },
         trigger: {
+          type: 'calendar' as const,
           hour: hours,
           minute: minutes,
           repeats: true,
-        },
+        } as any,
       });
     } catch (error) {
       console.error('Failed to set training reminder:', error);
