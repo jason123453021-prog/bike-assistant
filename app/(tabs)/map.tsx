@@ -46,6 +46,12 @@ import { useRide } from "@/lib/ride-context";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
 import { type GpxPoint } from "@/lib/gpx-parser";
+import { GPSTrackingIndicator } from "@/components/gps-tracking-indicator";
+import { MapZoomControls } from "@/components/map-zoom-controls";
+import { RoutePreview } from "@/components/route-preview";
+import { SimplifiedNavigationMode } from "@/components/simplified-navigation-mode";
+import { createDefaultMapLayout } from "@/lib/map-components-layout";
+import { EnhancedGpxArrows } from "@/components/enhanced-gpx-arrows";
 import {
   speak,
   vibrateLight,
@@ -1908,6 +1914,41 @@ export default function MapScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* ── GPS 追蹤指示器（騎乘中顯示） ── */}
+      {isActive && (
+        <GPSTrackingIndicator
+          isTracking={isActive}
+          accuracy={5}
+          speed={avgSpeed}
+          altitude={0}
+          visible={true}
+        />
+      )}
+
+      {/* ── 地圖縮放控制按鈕 ── */}
+      {currentPos && (
+        <MapZoomControls
+          onZoomIn={() => mapRef.current?.animateCamera({ center: { latitude: currentPos.lat, longitude: currentPos.lon }, zoom: 18 })}
+          onZoomOut={() => mapRef.current?.animateCamera({ center: { latitude: currentPos.lat, longitude: currentPos.lon }, zoom: 12 })}
+        />
+      )}
+
+      {/* ── 路線預覽功能 ── */}
+      {gpxRoute && !isActive && (
+        <RoutePreview
+          coordinates={gpxRoute.points.map(p => ({ latitude: p.lat, longitude: p.lon }))}
+          routeName={gpxRoute.name}
+          visible={true}
+        />
+      )}
+
+      {/* ── GPX 路徑箭頭（導航中顯示） ── */}
+      {isNavigating && gpxRoute && (
+        <EnhancedGpxArrows
+          coordinates={gpxRoute.points.map(p => ({ latitude: p.lat, longitude: p.lon }))}
+        />
+      )}
 
       {/* ── 偏離路線提示橫幅（偏離且導航中且指引開啟顯示） ── */}
       {isOffRoute && isNavigating && guidanceEnabledRef.current && returnBearing !== "" && (
