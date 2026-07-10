@@ -15,6 +15,8 @@ export interface VoiceNavigationConfig {
   language: string; // 語言代碼（zh-TW 或 zh-CN）
   rate: number; // 播報速率（0.5-2.0）
   pitch: number; // 音調（0.5-2.0）
+  enableBatteryWarning: boolean; // 是否啟用電量警告
+  enableKeyControl: boolean; // 是否啟用按鍵控制
 }
 
 export interface PowerSavingConfig {
@@ -31,6 +33,8 @@ class VoiceNavigationManager {
     language: 'zh-TW',
     rate: 1.0,
     pitch: 1.0,
+    enableBatteryWarning: false, // 預設關閉電量警告
+    enableKeyControl: true, // 預設啟用按鍵控制
   };
 
   private isSpeaking = false;
@@ -111,17 +115,25 @@ class VoiceNavigationManager {
    * 播報危險警告
    */
   async speakWarning(warningType: string, details?: string) {
+    // 跳過電量警告
+    if (warningType === 'battery' && !this.config.enableBatteryWarning) {
+      return;
+    }
+
     const warnings: Record<string, string> = {
-      steep: '前方陡坡，請小心',
+      steep: '前方陰坑，請小心',
       intersection: '前方十字路口，請注意安全',
       traffic: '前方車流較多，請謹慎騎乘',
       construction: '前方施工區域，請繞行',
       lowVisibility: '能見度較低，請開啟車燈',
+      battery: '電量不足',
     };
 
     const instruction = `警告：${warnings[warningType] || '請注意安全'}${details ? `，${details}` : ''}`;
     await this.speakInstruction(instruction);
   }
+
+
 
   /**
    * 播報到達目的地
