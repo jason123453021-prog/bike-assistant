@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import { EventEmitter } from 'events';
+import { KalmanFilter, TrajectoryKalmanFilter, type FilteredLocation } from './kalman-filter';
 
 /**
  * GPS 實時位置更新管理器
@@ -43,6 +44,7 @@ export interface TrackerConfig {
 
 class GPSLocationTracker extends EventEmitter {
   private locations: GPSLocation[] = [];
+  private filteredLocations: FilteredLocation[] = [];
   private isTracking = false;
   private subscription: Location.LocationSubscription | null = null;
   private config: Required<TrackerConfig> = {
@@ -54,6 +56,9 @@ class GPSLocationTracker extends EventEmitter {
   };
   private lastValidLocation: GPSLocation | null = null;
   private stopStartTime: number | null = null;
+  private kalmanFilter: KalmanFilter | null = null;
+  private trajectoryFilter: TrajectoryKalmanFilter = new TrajectoryKalmanFilter();
+  private enableKalmanFilter: boolean = true; // 可配置的 Kalman 濾波開關
 
   constructor(config?: TrackerConfig) {
     super();
@@ -120,7 +125,27 @@ class GPSLocationTracker extends EventEmitter {
     }
 
     this.isTracking = false;
+    this.kalmanFilter = null;
+    this.trajectoryFilter.clear();
     this.emit('stopped');
+  }
+
+  /**
+   * 設定是否啟用 Kalman 濾波器
+   */
+  setKalmanFilterEnabled(enabled: boolean): void {
+    this.enableKalmanFilter = enabled;
+    if (!enabled) {
+      this.kalmanFilter = null;
+      this.trajectoryFilter.clear();
+    }
+  }
+
+  /**
+   * 取得濾波後的位置
+   */
+  getFilteredLocations(): FilteredLocation[] {
+    return [...this.filteredLocations];
   }
 
   /**
@@ -178,11 +203,33 @@ class GPSLocationTracker extends EventEmitter {
       }
     }
 
-    this.locations.push(gpsLocation);
-    this.lastValidLocation = gpsLocation;
+    // 應用 Kalman 濾波器
+    let finalLocation = gpsLocation;
+    if (this.enableKalmanFilter) {
+      const filteredLoc = this.trajectoryFilter.addPoint({
+        latitude: gpsLocation.latitude,
+        longitude: gpsLocation.longitude,
+        accuracy: gpsLocation.accuracy,
+        timestamp: gpsLocation.timestamp,
+      });
+
+      if (filteredLoc) {
+        // 更新位置為濾波後的值
+        finalLocation = {
+          ...gpsLocation,
+          latitude: filteredLoc.latitude,
+          longitude: filteredLoc.longitude,
+          speed: filteredLoc.velocity,
+        };
+        this.filteredLocations.push(filteredLoc);
+      }
+    }
+
+    this.locations.push(finalLocation);
+    this.lastValidLocation = finalLocation;
 
     // 發出位置更新事件
-    this.emit('location', gpsLocation);
+    this.emit('location', finalLocation);
     this.emit('stats', this.getStats());
   }
 
@@ -243,7 +290,7 @@ class GPSLocationTracker extends EventEmitter {
   }
 
   /**
-   * 獲取位置歷史
+   * 取得原始位置
    */
   getLocations(): GPSLocation[] {
     return [...this.locations];
