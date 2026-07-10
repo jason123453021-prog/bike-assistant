@@ -29,6 +29,7 @@ export function ImprovedPermissionsOnboardingModal({
     location: false,
     notification: false,
     overlay: false,
+    batteryOptimization: false,
   });
 
   // 重新整理權限狀態
@@ -38,12 +39,14 @@ export function ImprovedPermissionsOnboardingModal({
         PermissionsManager.checkLocationPermission(),
         PermissionsManager.checkNotificationPermission(),
         PermissionsManager.checkOverlayPermission(),
+        PermissionsManager.checkBatteryOptimizationWhitelist(),
       ]);
 
       setPermissionStates({
         location: (states[0] as any) === 'granted',
         notification: (states[1] as any) === 'granted',
         overlay: (states[2] as any) === 'granted',
+        batteryOptimization: (states[3] as any) === 'granted',
       });
 
       console.log('[PermissionsOnboarding] 權限狀態已更新:', states);
@@ -104,7 +107,18 @@ export function ImprovedPermissionsOnboardingModal({
     }
   };
 
-
+  const handleOpenBatterySettings = async () => {
+    try {
+      setIsLoading(true);
+      const intentManager = getIntentLauncherManager();
+      await intentManager.openBatteryOptimizationSettings();
+      // 不立即關閉，等待用戶返回後自動重新整理
+    } catch (error) {
+      console.error('[PermissionsOnboarding] 打開電池設定失敗:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSkip = async () => {
     try {
@@ -211,10 +225,18 @@ export function ImprovedPermissionsOnboardingModal({
               )}
 
               {renderPermissionItem(
-                '📋 懸浮窗權限',
+                '🪟 懸浮窗權限',
                 '允許 App 在其他應用上方顯示導航提示',
                 permissionStates.overlay,
                 handleOpenOverlaySettings,
+                isLoading
+              )}
+
+              {renderPermissionItem(
+                '🔋 電池最佳化白名單',
+                '防止系統因省電機制關閉 App 背景追蹤',
+                permissionStates.batteryOptimization,
+                handleOpenBatterySettings,
                 isLoading
               )}
 
@@ -224,9 +246,6 @@ export function ImprovedPermissionsOnboardingModal({
                   ℹ️ 您可以稍後在設定頁面隨時修改這些權限
                 </Text>
               </View>
-
-              {/* 空白區域 */}
-              <View style={{ height: 16 }} />
 
               {/* 底部按鈕 - 在 ScrollView 內部 */}
               <View className="gap-3 pt-4">

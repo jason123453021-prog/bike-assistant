@@ -8,7 +8,8 @@ const PERMISSIONS_ONBOARDING_KEY = 'permissions_onboarding_completed';
 export type PermissionType = 
   | 'location'
   | 'notification'
-  | 'overlay';
+  | 'overlay'
+  | 'battery_optimization';
 
 export interface PermissionStatus {
   type: PermissionType;
@@ -49,6 +50,9 @@ export class PermissionsManager {
     if (Platform.OS === 'android') {
       const overlayStatus = await this.checkOverlayPermission();
       statuses.push(overlayStatus);
+
+      const batteryStatus = await this.checkBatteryOptimizationWhitelist();
+      statuses.push(batteryStatus);
     }
 
     return statuses;
@@ -116,7 +120,16 @@ export class PermissionsManager {
     };
   }
 
-
+  static async checkBatteryOptimizationWhitelist(): Promise<PermissionStatus> {
+    return {
+      type: 'battery_optimization',
+      name: '電池最佳化白名單',
+      description: '防止系統因省電機制關閉 App 背景進程',
+      granted: false,
+      required: true,
+      systemSettingsUrl: 'android.settings.ACTION_BATTERY_SAVER_SETTINGS',
+    };
+  }
 
   static async requestLocationPermission(): Promise<boolean> {
     try {
@@ -157,6 +170,9 @@ export class PermissionsManager {
             break;
           case 'overlay':
             Linking.openURL('android.settings.action.MANAGE_OVERLAY_PERMISSION');
+            break;
+          case 'battery_optimization':
+            Linking.openURL('android.settings.ACTION_BATTERY_SAVER_SETTINGS');
             break;
         }
       }

@@ -81,9 +81,16 @@ export function SettingsScreenWithPermissions() {
 
           <PermissionStatusCard
             title="懸浮窗權限"
-            description="允許 App 在鎖屏時顯示補給提醒彈窗"
-            icon="📋"
+            description="允許 App 在其他應用上方顯示導航提示"
+            icon="🪟"
             permissionType="overlay"
+          />
+
+          <PermissionStatusCard
+            title="電池最佳化白名單"
+            description="防止系統因省電機制關閉 App 背景追蹤"
+            icon="🔋"
+            permissionType="battery"
           />
         </View>
 

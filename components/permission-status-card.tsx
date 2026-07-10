@@ -8,7 +8,7 @@ export interface PermissionStatusCardProps {
   title: string;
   description: string;
   icon: string;
-  permissionType: 'location' | 'notification' | 'overlay';
+  permissionType: 'location' | 'notification' | 'overlay' | 'battery';
   onStatusChange?: (granted: boolean) => void;
 }
 
@@ -41,6 +41,9 @@ export function PermissionStatusCard({
           break;
         case 'overlay':
           status = await PermissionsManager.checkOverlayPermission();
+          break;
+        case 'battery':
+          status = await PermissionsManager.checkBatteryOptimizationWhitelist();
           break;
       }
 
@@ -81,6 +84,9 @@ export function PermissionStatusCard({
           case 'overlay':
             await intentManager.openOverlayPermissionSettings();
             break;
+          case 'battery':
+            await intentManager.openBatteryOptimizationSettings();
+            break;
         }
       } else {
         // 如果未授予，則請求權限
@@ -94,6 +100,10 @@ export function PermissionStatusCard({
           case 'overlay':
             const intentManager = IntentLauncherManager;
             await intentManager.openOverlayPermissionSettings();
+            break;
+          case 'battery':
+            const batteryManager = IntentLauncherManager;
+            await batteryManager.openBatteryOptimizationSettings();
             break;
         }
       }

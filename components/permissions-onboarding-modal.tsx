@@ -54,6 +54,7 @@ export function PermissionsOnboardingModal({
           granted = await PermissionsManager.requestNotificationPermission();
           break;
         case 'overlay':
+        case 'battery_optimization':
           await PermissionsManager.openSystemSettings(permission.type);
           return;
       }
@@ -210,7 +211,8 @@ function PermissionItem({
           onPress={onRequest}
         >
           <Text style={styles.requestButtonText}>
-            {permission.type === 'overlay'
+            {permission.type === 'overlay' ||
+            permission.type === 'battery_optimization'
               ? '前往設定'
               : '授予權限'}
           </Text>

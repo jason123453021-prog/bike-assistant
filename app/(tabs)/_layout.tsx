@@ -45,7 +45,7 @@ export default function TabLayout() {
   }, [pendingQuery.data]);
 
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
-  const tabBarHeight = Platform.OS === 'web' ? 60 + bottomPadding : 60 + bottomPadding;
+  const tabBarHeight = 60 + bottomPadding;
 
   return (
     <Tabs
@@ -67,9 +67,17 @@ export default function TabLayout() {
         tabBarShowLabel: true,
       }}
     >
-      {/* 導航頁面 */}
+      {/* 原騎乘頁面隱藏（功能已整合至導航頁） */}
       <Tabs.Screen
-        name="navigation"
+        name="index"
+        options={{
+          href: null,  // 從標籤列隱藏
+        }}
+      />
+
+      {/* 導航（整合騎乘+地圖） */}
+      <Tabs.Screen
+        name="map"
         options={{
           title: "導航",
           tabBarIcon: ({ color, size }) => (
@@ -85,7 +93,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="navigate"
         options={{
-          title: "路線",
+          title: "路線分析",
           tabBarIcon: ({ color, size }) => (
             <IconSymbol size={size} name="map.fill" color={color} />
           ),

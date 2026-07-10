@@ -6,16 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
-
-// Polyfill for URL.createObjectURL in React Native
-if (Platform.OS !== 'web' && typeof URL !== 'undefined' && !URL.createObjectURL) {
-  URL.createObjectURL = function(blob: any) {
-    return 'blob:' + Math.random().toString(36).substr(2, 9);
-  };
-  URL.revokeObjectURL = function(url: string) {
-    // No-op in React Native
-  };
-}
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider, useThemeContext } from "@/lib/theme-provider";
 import {
@@ -45,8 +35,7 @@ const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
 export const unstable_settings = {
-  // 直接進入 (tabs) 標籤頁，不顯示 404 頁面
-  initialRouteName: "(tabs)",
+  anchor: "(tabs)",
 };
 
 // ─── Inner layout (inside ThemeProvider, can safely use useThemeContext) ───────
@@ -58,7 +47,7 @@ function InnerLayout() {
   return (
     <>
       <NavThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }} initialRouteName="(tabs)">
+        <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="ride-detail" options={{ headerShown: false, presentation: "fullScreenModal" }} />
           <Stack.Screen name="favorites-list" options={{ headerShown: false, presentation: "fullScreenModal" }} />

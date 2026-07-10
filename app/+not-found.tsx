@@ -9,7 +9,7 @@ export default function NotFoundScreen() {
       <Stack.Screen options={{ title: "找不到頁面" }} />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>找不到此頁面</Text>
-        <Link href="/navigation" style={[styles.link, { color: colors.accent }]}>
+        <Link href="/" style={[styles.link, { color: colors.accent }]}>
           <Text>返回首頁</Text>
         </Link>
       </View>
