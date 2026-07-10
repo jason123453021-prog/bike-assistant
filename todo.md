@@ -1117,3 +1117,24 @@
 - [x] 實現地址輸入與路線規劃 UI
 - [x] 支持自行車/道路模式切換
 - [x] 顯示多條路線選項供用戶選擇
+
+
+## 真實 API 集成與性能優化（v3.2）
+### 地理編碼和路由規劃
+- [x] 集成 Nominatim 地理編碼 API
+- [x] 集成 OSRM 路由規劃 API
+- [x] 實現地址輸入與路線規劃 UI
+- [x] 支持自行車/道路模式切換
+- [x] 顯示多條路線選項供用戶選擇
+
+### GPS 實時位置更新和軌跡渲染
+- [x] 實現 GPS 實時位置更新
+- [x] 實現軌跡增量渲染
+- [x] 實現雙指旋轉功能
+- [x] 性能優化（限制軌跡點數、動態調整密度）
+
+### 新增文件
+- lib/nominatim-geocoding.ts - Nominatim 地理編碼 API
+- lib/osrm-routing.ts - OSRM 路由規劃 API
+- lib/gps-location-tracker.ts - GPS 實時位置追蹤
+- components/optimized-tracking-map.tsx - 優化的軌跡追蹤地圖
