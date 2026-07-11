@@ -46,12 +46,6 @@ import { useRide } from "@/lib/ride-context";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
 import { type GpxPoint } from "@/lib/gpx-parser";
-import { GPSTrackingIndicator } from "@/components/gps-tracking-indicator";
-import { MapZoomControls } from "@/components/map-zoom-controls";
-import { RoutePreview } from "@/components/route-preview";
-import { SimplifiedNavigationMode } from "@/components/simplified-navigation-mode";
-import { createDefaultMapLayout } from "@/lib/map-components-layout";
-import { EnhancedGpxArrows } from "@/components/enhanced-gpx-arrows";
 import {
   speak,
   vibrateLight,
@@ -92,8 +86,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SupplyModal } from "@/components/supply-modal";
 import { RideSummaryModal } from "@/components/ride-summary-modal";
 import { SimplifiedNavOverlay } from "@/components/simplified-nav-overlay";
-import { NavigationBar, type NavigationInstruction } from "@/components/navigation-bar";
-import { RouteSearchPanel } from "@/components/route-search-panel";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
 import { useFriendNav } from "@/lib/friend-nav-context";
@@ -274,12 +266,6 @@ export default function MapScreen() {
   // 回歸路由轉彎步驟
   const [returnSteps, setReturnSteps] = useState<TurnStep[]>([]);
   const [currentReturnStepIdx, setCurrentReturnStepIdx] = useState(0);
-
-  // NavigationBar 指令狀態
-  const [navBarInstruction, setNavBarInstruction] = useState<NavigationInstruction | null>(null);
-
-  // 路線搞索面板顯示狀態
-  const [showRouteSearch, setShowRouteSearch] = useState(false);
 
   // 當共享路線更新時，自動適配地圖視角
   useEffect(() => {
@@ -1249,34 +1235,11 @@ export default function MapScreen() {
 
       if (dEnd < 500 && !arrivedRef.current) {
         const distStr = dEnd < 100 ? "即將" : `${Math.round(dEnd)} 公尺後`;
-        const instruction = `${distStr}到達終點`;
-        setNavInstruction(instruction);
-        setNavBarInstruction({
-          type: 'arrive',
-          distance: Math.round(dEnd),
-          instruction,
-          isNavigating: true,
-        });
+        setNavInstruction(`${distStr}到達終點`);
       } else if (turnInstruction) {
         setNavInstruction(turnInstruction);
-        let type: 'left' | 'right' | 'straight' | 'uturn' | 'arrive' | 'none' = 'straight';
-        if (turnInstruction.includes('左轉')) type = 'left';
-        else if (turnInstruction.includes('右轉')) type = 'right';
-        else if (turnInstruction.includes('迴轉')) type = 'uturn';
-        setNavBarInstruction({
-          type,
-          distance: 0,
-          instruction: turnInstruction,
-          isNavigating: true,
-        });
       } else {
         setNavInstruction("沿路線前進");
-        setNavBarInstruction({
-          type: 'straight',
-          distance: 0,
-          instruction: "沿路線前進",
-          isNavigating: true,
-        });
       }
     },
     [gpxRoute, settings.ttsEnabled, isOffRoute, guidanceEnabled, returnSteps, currentReturnStepIdx]
@@ -1755,28 +1718,7 @@ export default function MapScreen() {
       />
 
       {/* ── 頂部導航指令條 ── */}
-      {/* ── 頂部實時轉彎提示導航欄 ── */}
-      {isNavigating && !showRouteSearch && (
-        <NavigationBar
-          instruction={navBarInstruction}
-          onClose={() => {
-            setIsNavigating(false);
-            setNavInstruction("");
-            setNavBarInstruction(null);
-          }}
-        />
-      )}
-
-      {/* ── 路線搞索面板 ── */}
-      {showRouteSearch && (
-        <RouteSearchPanel
-          currentLocation={currentPos ? { latitude: currentPos.lat, longitude: currentPos.lon } : undefined}
-          onRouteSelected={(route) => {
-            setShowRouteSearch(false);
-          }}
-          onClose={() => setShowRouteSearch(false)}
-        />
-      )}
+      {/* 黑色導航橫條已移除（導航資訊已透過偶離路線提示橫幅顯示） */}
 
       {/* ── 好友導航指令條 ── */}
       {friendNavDest && (
@@ -1914,41 +1856,6 @@ export default function MapScreen() {
           </Pressable>
         )}
       </View>
-
-      {/* ── GPS 追蹤指示器（騎乘中顯示） ── */}
-      {isActive && (
-        <GPSTrackingIndicator
-          isTracking={isActive}
-          accuracy={5}
-          speed={avgSpeed}
-          altitude={0}
-          visible={true}
-        />
-      )}
-
-      {/* ── 地圖縮放控制按鈕 ── */}
-      {currentPos && (
-        <MapZoomControls
-          onZoomIn={() => mapRef.current?.animateCamera({ center: { latitude: currentPos.lat, longitude: currentPos.lon }, zoom: 18 })}
-          onZoomOut={() => mapRef.current?.animateCamera({ center: { latitude: currentPos.lat, longitude: currentPos.lon }, zoom: 12 })}
-        />
-      )}
-
-      {/* ── 路線預覽功能 ── */}
-      {gpxRoute && !isActive && (
-        <RoutePreview
-          coordinates={gpxRoute.points.map(p => ({ latitude: p.lat, longitude: p.lon }))}
-          routeName={gpxRoute.name}
-          visible={true}
-        />
-      )}
-
-      {/* ── GPX 路徑箭頭（導航中顯示） ── */}
-      {isNavigating && gpxRoute && (
-        <EnhancedGpxArrows
-          coordinates={gpxRoute.points.map(p => ({ latitude: p.lat, longitude: p.lon }))}
-        />
-      )}
 
       {/* ── 偏離路線提示橫幅（偏離且導航中且指引開啟顯示） ── */}
       {isOffRoute && isNavigating && guidanceEnabledRef.current && returnBearing !== "" && (
