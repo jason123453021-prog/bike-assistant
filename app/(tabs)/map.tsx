@@ -335,6 +335,12 @@ export default function MapScreen() {
   const pendingWaterRef = useRef(false);
   const lastAscentRef = useRef(0); // 用於判斷下坡狀態
 
+  // ── 地圖長按釘選功能 ──
+  const [pinnedLocation, setPinnedLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [showPinCard, setShowPinCard] = useState(false);
+  const [isFetchingPinRoute, setIsFetchingPinRoute] = useState(false);
+  const [pinRouteInfo, setPinRouteInfo] = useState<{ distM: number; durSec: number; polyline: { latitude: number; longitude: number }[] } | null>(null);
+
   // ── 自訂補給品追蹤 ──
   // 記錄每個補給品上次觸發的時間（秒）或距離（公里）
   const supplyItemsTrackerRef = useRef<Record<string, any>>({});
@@ -1689,6 +1695,11 @@ export default function MapScreen() {
           longitudeDelta: 0.05,
         }}
         onPanDrag={() => setFollowUser(false)}
+        onMapLongPress={(lat, lon) => {
+          setPinnedLocation({ lat, lon });
+          setShowPinCard(true);
+          setFollowUser(false);
+        }}
         currentPos={currentPos}
         gpxPolyline={gpxPolyline}
         passedPolyline={passedPolyline}
@@ -1841,6 +1852,23 @@ export default function MapScreen() {
             <Text style={[styles.returnBtnLabel, { color: preferCycleway ? "#34C759" : "rgba(255,255,255,0.4)" }]}>
               {preferCycleway ? "車道" : "一般"}
             </Text>
+          </Pressable>
+        )}
+        {/* 回到起點按鈕（導航中且有 GPX 路線時顯示） */}
+        {isNavigating && gpxRoute && gpxRoute.points.length > 0 && (
+          <Pressable
+            style={styles.toolBtn}
+            onPress={() => {
+              const startPoint = gpxRoute.points[0];
+              mapRef.current?.animateCamera({
+                center: { latitude: startPoint.lat, longitude: startPoint.lon },
+                zoom: 17
+              });
+              speak("導航回到起點", settings.ttsEnabled);
+            }}
+          >
+            <IconSymbol name="mappin.circle.fill" size={20} color="#FF3B30" />
+            <Text style={[styles.returnBtnLabel, { color: "#FF3B30" }]}>起點</Text>
           </Pressable>
         )}
         {/* 精簡導航手動觸發按鈕（騎乘中且設定為手動模式時顯示） */}
@@ -2212,6 +2240,84 @@ export default function MapScreen() {
         fields={settings.simplifiedModeFields}
         fieldOrder={settings.simplifiedModeFieldOrder}
       />
+
+      {/* ── 釘選地點卡片 ── */}
+      {showPinCard && pinnedLocation && (
+        <View style={[styles.pinCard, { bottom: dynamicCollapsedH + 16 }]}>
+          <View style={styles.pinCardHeader}>
+            <Text style={styles.pinCardTitle}>釘選位置</Text>
+            <Pressable
+              style={styles.pinCardClose}
+              onPress={() => {
+                setShowPinCard(false);
+                setPinnedLocation(null);
+                setPinRouteInfo(null);
+              }}
+            >
+              <Text style={styles.pinCardCloseText}>×</Text>
+            </Pressable>
+          </View>
+          <View style={styles.pinCardBody}>
+            <Text style={styles.pinCardCoord}>
+              {pinnedLocation.lat.toFixed(4)}, {pinnedLocation.lon.toFixed(4)}
+            </Text>
+            {isFetchingPinRoute && (
+              <Text style={styles.pinCardStatus}>計算路緟中…</Text>
+            )}
+            {pinRouteInfo && (
+              <View style={styles.pinCardRoute}>
+                <Text style={styles.pinCardRouteDist}>距離: {(pinRouteInfo.distM / 1000).toFixed(2)} km</Text>
+                <Text style={styles.pinCardRouteDur}>預計: {Math.round(pinRouteInfo.durSec / 60)} 分</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.pinCardBtns}>
+            <Pressable
+              style={[styles.pinCardBtn, { backgroundColor: "#007AFF" }]}
+              onPress={() => {
+                if (!currentPos) return;
+                setIsFetchingPinRoute(true);
+                fetchBikeRoute(
+                  { latitude: currentPos.lat, longitude: currentPos.lon },
+                  { latitude: pinnedLocation.lat, longitude: pinnedLocation.lon },
+                  preferCycleway
+                ).then(result => {
+                  if (result) {
+                    setPinRouteInfo({
+                      distM: result.distanceM,
+                      durSec: result.durationSec,
+                      polyline: result.coordinates
+                    });
+                    speak(`計算完成，${formatRouteDistance(result.distanceM)}，${formatRouteDuration(result.durationSec)}`, settings.ttsEnabled);
+                  }
+                }).catch(() => {
+                  speak("計算路緟失敗", settings.ttsEnabled);
+                }).finally(() => {
+                  setIsFetchingPinRoute(false);
+                });
+              }}
+            >
+              <IconSymbol name="location.fill" size={16} color="#fff" />
+              <Text style={styles.pinCardBtnText}>計算路緟</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.pinCardBtn, { backgroundColor: "#34C759" }]}
+              onPress={() => {
+                if (!pinRouteInfo) {
+                  Alert.alert("計算路緟", "請先計算路緟");
+                  return;
+                }
+                // TODO: 開始導航到釘選位置
+                speak("開始導航到釘選位置", settings.ttsEnabled);
+                setShowPinCard(false);
+              }}
+            >
+              <IconSymbol name="play.fill" size={16} color="#fff" />
+              <Text style={styles.pinCardBtnText}>開始導航</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       {/* ── 好友詳細卡片 ── */}
       {tappedFriend !== null && (
@@ -2663,6 +2769,88 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
   },
+  // 釘選地點卡片
+  pinCard: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(18,18,18,0.96)",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    zIndex: 250,
+    borderWidth: 1,
+    borderColor: "rgba(0,122,255,0.3)",
+  },
+  pinCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8 /* internal spacing */,
+  },
+  pinCardTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  pinCardClose: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pinCardCloseText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 18,
+    lineHeight: 22,
+  },
+  pinCardBody: {
+    marginBottom: 10 /* internal spacing */,
+  },
+  pinCardCoord: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 12,
+    marginBottom: 4 /* internal spacing */,
+  },
+  pinCardStatus: {
+    color: "#007AFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  pinCardRoute: {
+    marginTop: 6 /* internal spacing */,
+  },
+  pinCardRouteDist: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  pinCardRouteDur: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    marginTop: 2 /* internal spacing */,
+  },
+  pinCardBtns: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  pinCardBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    borderRadius: 8,
+    paddingVertical: 8,
+  },
+  pinCardBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
   // 好友詳細卡片
   friendCard: {
     position: "absolute",

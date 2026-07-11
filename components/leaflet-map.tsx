@@ -51,6 +51,7 @@ export interface LeafletMapProps {
   };
   onPanDrag?: () => void;
   onMapReady?: () => void;
+  onMapLongPress?: (lat: number, lon: number) => void;
   // Map data
   currentPos?: { lat: number; lon: number; heading: number } | null;
   gpxPolyline?: LatLng[];
@@ -174,6 +175,56 @@ map.on('dragstart', function() {
   if (window.ReactNativeWebView) {
     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'panDrag' }));
   }
+});
+
+// Long press detection (700ms hold)
+var longPressTimer = null;
+var longPressStart = null;
+var longPressCoord = null;
+var MIN_DRAG_DISTANCE = 10; // pixels
+
+map.on('mousedown', function(e) {
+  longPressStart = { x: e.originalEvent.clientX, y: e.originalEvent.clientY };
+  longPressCoord = e.latlng;
+  longPressTimer = setTimeout(function() {
+    if (window.ReactNativeWebView && longPressCoord) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'mapLongPress',
+        lat: longPressCoord.lat,
+        lon: longPressCoord.lng
+      }));
+    }
+  }, 700);
+});
+
+map.on('mousemove', function(e) {
+  if (longPressStart) {
+    var dx = e.originalEvent.clientX - longPressStart.x;
+    var dy = e.originalEvent.clientY - longPressStart.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > MIN_DRAG_DISTANCE && longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  }
+});
+
+map.on('mouseup', function() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  longPressStart = null;
+  longPressCoord = null;
+});
+
+map.on('mouseleave', function() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  longPressStart = null;
+  longPressCoord = null;
 });
 
 // Message handler
@@ -405,6 +456,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       initialRegion,
       onPanDrag,
       onMapReady,
+      onMapLongPress,
       currentPos,
       gpxPolyline,
       passedPolyline,
@@ -594,6 +646,8 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             speed: msg.speed ?? 0,
             isMoving: msg.isMoving ?? false,
           });
+        } else if (msg.type === "mapLongPress") {
+          onMapLongPress?.(msg.lat, msg.lon);
         }
       } catch {}
     };
