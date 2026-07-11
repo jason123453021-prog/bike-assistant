@@ -1735,6 +1735,11 @@ export default function MapScreen() {
           setPinnedLocation({ lat, lon });
           setShowPinCard(true);
           setFollowUser(false);
+          // 視覺回饋：縮放到釘選位置
+          mapRef.current?.animateCamera(
+            { center: { latitude: lat, longitude: lon }, zoom: 18 },
+            { duration: 300 }
+          );
         }}
         currentPos={currentPos}
         gpxPolyline={gpxPolyline}
@@ -2367,6 +2372,17 @@ export default function MapScreen() {
             >
               <IconSymbol name="play.fill" size={16} color="#fff" />
               <Text style={styles.pinCardBtnText}>開始導航</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.pinCardBtn, { backgroundColor: "#FF3B30" }]}
+              onPress={() => {
+                setShowPinCard(false);
+                setPinnedLocation(null);
+                setPinRouteInfo(null);
+              }}
+            >
+              <IconSymbol name="xmark.circle.fill" size={16} color="#fff" />
+              <Text style={styles.pinCardBtnText}>取消</Text>
             </Pressable>
           </View>
         </View>
