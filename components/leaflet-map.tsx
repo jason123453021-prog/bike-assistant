@@ -181,10 +181,12 @@ map.on('dragstart', function() {
 var longPressTimer = null;
 var longPressStart = null;
 var longPressCoord = null;
-var MIN_DRAG_DISTANCE = 10; // pixels
+var MIN_DRAG_DISTANCE = 15; // pixels
 
-map.on('mousedown', function(e) {
-  longPressStart = { x: e.originalEvent.clientX, y: e.originalEvent.clientY };
+function startLongPress(e) {
+  var clientX = e.originalEvent.clientX || (e.originalEvent.touches && e.originalEvent.touches[0].clientX);
+  var clientY = e.originalEvent.clientY || (e.originalEvent.touches && e.originalEvent.touches[0].clientY);
+  longPressStart = { x: clientX, y: clientY };
   longPressCoord = e.latlng;
   longPressTimer = setTimeout(function() {
     if (window.ReactNativeWebView && longPressCoord) {
@@ -195,37 +197,40 @@ map.on('mousedown', function(e) {
       }));
     }
   }, 700);
-});
+}
 
-map.on('mousemove', function(e) {
+function cancelLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  longPressStart = null;
+  longPressCoord = null;
+}
+
+function checkDragDistance(e) {
   if (longPressStart) {
-    var dx = e.originalEvent.clientX - longPressStart.x;
-    var dy = e.originalEvent.clientY - longPressStart.y;
+    var clientX = e.originalEvent.clientX || (e.originalEvent.touches && e.originalEvent.touches[0].clientX);
+    var clientY = e.originalEvent.clientY || (e.originalEvent.touches && e.originalEvent.touches[0].clientY);
+    var dx = clientX - longPressStart.x;
+    var dy = clientY - longPressStart.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
     if (dist > MIN_DRAG_DISTANCE && longPressTimer) {
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
+      cancelLongPress();
     }
   }
-});
+}
 
-map.on('mouseup', function() {
-  if (longPressTimer) {
-    clearTimeout(longPressTimer);
-    longPressTimer = null;
-  }
-  longPressStart = null;
-  longPressCoord = null;
-});
+map.on('mousedown', startLongPress);
+map.on('mousemove', checkDragDistance);
+map.on('mouseup', cancelLongPress);
+map.on('mouseleave', cancelLongPress);
 
-map.on('mouseleave', function() {
-  if (longPressTimer) {
-    clearTimeout(longPressTimer);
-    longPressTimer = null;
-  }
-  longPressStart = null;
-  longPressCoord = null;
-});
+map.on('touchstart', startLongPress);
+map.on('touchmove', checkDragDistance);
+map.on('touchend', cancelLongPress);
+map.on('touchcancel', cancelLongPress);
+map.on('touchleave', cancelLongPress);
 
 // Message handler
 function handleMessage(data) {
