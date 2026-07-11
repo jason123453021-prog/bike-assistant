@@ -45,6 +45,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
+import KeyEvent from "react-native-key-event";
 import { type GpxPoint } from "@/lib/gpx-parser";
 import {
   speak,
@@ -1630,16 +1631,21 @@ export default function MapScreen() {
 
   // ─── 按鍵控制補給提醒 ────────────────────────────────────────────────────────
   useEffect(() => {
-    const handleKeyEvent = (event: any) => {
-      // 音量鍵或語音鍵事件：關閉補給提醒
-      if (event.keyCode === 24 || event.keyCode === 25) { // 24=音量+, 25=音量-
-        if (calorieAlert) setCalorieAlert(false);
-        if (waterAlert) setWaterAlert(false);
-      }
-    };
-    if (Platform.OS !== "web") {
-      // Android 按鍵監聽（需要原生模組支援）
-      // 暫時使用簡化方案：通過 AppState 監聽螢幕鎖定
+    if (Platform.OS === "android") {
+      const handleKeyDown = (keyCode: number) => {
+        if (keyCode === 24 || keyCode === 25) {
+          if (calorieAlert) setCalorieAlert(false);
+          if (waterAlert) setWaterAlert(false);
+          return true;
+        }
+        return false;
+      };
+      const subscription = KeyEvent.onKeyDownListener(handleKeyDown);
+      return () => {
+        if (subscription) {
+          subscription.remove();
+        }
+      };
     }
     return () => {};
   }, [calorieAlert, waterAlert]);
