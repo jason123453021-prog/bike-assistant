@@ -166,7 +166,7 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { state, dispatch, saveRecord, updateRecordName, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
   const { settings } = useSettings();
-  const { sharedRoute, clearSharedRoute } = useGpx();
+  const { sharedRoute, clearSharedRoute, setSharedRoute } = useGpx();
 
   useKeepAwake();
 
@@ -334,6 +334,8 @@ export default function MapScreen() {
   const pendingCalorieRef = useRef(false);
   const pendingWaterRef = useRef(false);
   const lastAscentRef = useRef(0); // 用於判斷下坡狀態
+  const rideStartLocationRef = useRef<{ lat: number; lon: number } | null>(null); // 記錄騎乘開始座標
+  const lastTurnSpokenRef = useRef<number>(0); // 追蹤上次播報轉彎的時間
 
   // ── 地圖長按釘選功能 ──
   const [pinnedLocation, setPinnedLocation] = useState<{ lat: number; lon: number } | null>(null);
@@ -1229,8 +1231,15 @@ export default function MapScreen() {
         if (Math.abs(diff) >= TURN_ANGLE_DEG) {
           const distToTurn = lookaheadDist;
           if (distToTurn < 50) {
-            if (diff > 0) { turnInstruction = "右轉"; if (guidanceEnabledRef.current) speak("右轉", settings.ttsEnabled); }
-            else { turnInstruction = "左轉"; if (guidanceEnabledRef.current) speak("左轉", settings.ttsEnabled); }
+            // 只在路口時播報（避免重複播報）
+            const now = Date.now();
+            if (now - lastTurnSpokenRef.current > 10000) { // 10秒內不重複播報
+              if (diff > 0) { turnInstruction = "右轉"; if (guidanceEnabledRef.current) speak("右轉", settings.ttsEnabled); }
+              else { turnInstruction = "左轉"; if (guidanceEnabledRef.current) speak("左轉", settings.ttsEnabled); }
+              lastTurnSpokenRef.current = now;
+            } else {
+              turnInstruction = diff > 0 ? "右轉" : "左轉";
+            }
           } else {
             const distStr = distToTurn < 100 ? "前方" : `${Math.round(distToTurn)} 公尺後`;
             turnInstruction = diff > 0 ? `${distStr}右轉` : `${distStr}左轉`;
@@ -1282,6 +1291,11 @@ export default function MapScreen() {
     setMapRideActive(true);
     setFollowUser(true);
     setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
+
+    // 記錄騎乘開始座標（用於「回起點」功能）
+    if (currentPos) {
+      rideStartLocationRef.current = { lat: currentPos.lat, lon: currentPos.lon };
+    }
 
     // 初始化自訂補給品追蹤器
     supplyItemsTrackerRef.current = {};
@@ -1568,10 +1582,10 @@ export default function MapScreen() {
           const level = await Battery.getBatteryLevelAsync();
           batteryLevel = Math.round(level * 100);
         }
-      // 集成情感化 UX - 低電量警告
-      if (batteryLevel > 0 && batteryLevel <= 20) {
-        EmotionalUXManager.onLowBatteryWarning(batteryLevel).catch((error: any) => console.warn("Low battery emotional UX failed:", error));
-      }
+      // 集成情感化 UX - 低電量警告（已禁用）
+      // if (batteryLevel > 0 && batteryLevel <= 20) {
+      //   EmotionalUXManager.onLowBatteryWarning(batteryLevel).catch((error: any) => console.warn("Low battery emotional UX failed:", error));
+      // }
       } catch { /* 忽略電量讀取失敗 */ }
       updateLocationMutation.mutate({
         latitude: currentPos.lat,
@@ -1613,6 +1627,22 @@ export default function MapScreen() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, settings.simplifiedNavMode]);
+
+  // ─── 按鍵控制補給提醒 ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyEvent = (event: any) => {
+      // 音量鍵或語音鍵事件：關閉補給提醒
+      if (event.keyCode === 24 || event.keyCode === 25) { // 24=音量+, 25=音量-
+        if (calorieAlert) setCalorieAlert(false);
+        if (waterAlert) setWaterAlert(false);
+      }
+    };
+    if (Platform.OS !== "web") {
+      // Android 按鍵監聽（需要原生模組支援）
+      // 暫時使用簡化方案：通過 AppState 監聽螢幕鎖定
+    }
+    return () => {};
+  }, [calorieAlert, waterAlert]);
 
   // ─── 計算值 ──────────────────────────────────────────────────────────────────
   const gpxPolyline = useMemo(() => {
@@ -1854,17 +1884,18 @@ export default function MapScreen() {
             </Text>
           </Pressable>
         )}
-        {/* 回到起點按鈕（導航中且有 GPX 路線時顯示） */}
-        {isNavigating && gpxRoute && gpxRoute.points.length > 0 && (
+        {/* 回到起點按鈕（騎乘中且有記錄的開始座標時顯示） */}
+        {isActive && rideStartLocationRef.current && (
           <Pressable
             style={styles.toolBtn}
             onPress={() => {
-              const startPoint = gpxRoute.points[0];
-              mapRef.current?.animateCamera({
-                center: { latitude: startPoint.lat, longitude: startPoint.lon },
-                zoom: 17
-              });
-              speak("導航回到起點", settings.ttsEnabled);
+              if (rideStartLocationRef.current) {
+                mapRef.current?.animateCamera({
+                  center: { latitude: rideStartLocationRef.current.lat, longitude: rideStartLocationRef.current.lon },
+                  zoom: 17
+                });
+                speak("導航回到起點", settings.ttsEnabled);
+              }
             }}
           >
             <IconSymbol name="mappin.circle.fill" size={20} color="#FF3B30" />
@@ -2307,7 +2338,23 @@ export default function MapScreen() {
                   Alert.alert("計算路緟", "請先計算路緟");
                   return;
                 }
-                // TODO: 開始導航到釘選位置
+                const osmrRoute = {
+                  name: "釘選位置導航",
+                  points: pinRouteInfo.polyline.map(p => ({ lat: p.latitude, lon: p.longitude, ele: 0 })),
+                  totalDistance: pinRouteInfo.distM,
+                  totalAscent: 0,
+                  totalDescent: 0,
+                  estimatedDuration: pinRouteInfo.durSec,
+                  estimatedCalories: 0,
+                  elevationProfile: [],
+                  gradientDistribution: {},
+                  avgGradient: 0,
+                  maxGradient: 0,
+                };
+                setSharedRoute(osmrRoute);
+                setIsNavigating(true);
+                setMapRideActive(true);
+                setFollowUser(true);
                 speak("開始導航到釘選位置", settings.ttsEnabled);
                 setShowPinCard(false);
               }}
