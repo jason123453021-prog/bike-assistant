@@ -1035,20 +1035,26 @@ export default function MapScreen() {
 
           // 卡路里提醒邏輯
           if (calPct >= 1 && !calorieReminderSentRef.current) {
+            console.log(`[補給] 卡路里達到閾值: ${newCalories}/${settings.calorieThreshold} (${(calPct*100).toFixed(1)}%)`);
             if (settings.caloriePauseOnDownhill && isDownhill && !calorieAlert) {
               // 下坡時暫停提醒但仍計數
+              console.log('[補給] 下坡時暫停卡路里提醒');
             } else {
               calorieReminderSentRef.current = true;
+              console.log('[補給] 觸發卡路里提醒');
               triggerSupplyReminder("calorie");
             }
           }
 
           // 水分提醒邏輯
           if (waterPct >= 1 && !waterReminderSentRef.current) {
+            console.log(`[補給] 水分達到閾值: ${newSweatSince}/${hydrationThresholdMl} (${(waterPct*100).toFixed(1)}%)`);
             if (settings.waterPauseOnDownhill && isDownhill && !waterAlert) {
               // 下坡時暫停提醒但仍計數
+              console.log('[補給] 下坡時暫停水分提醒');
             } else {
               waterReminderSentRef.current = true;
+              console.log('[補給] 觸發水分提醒');
               triggerSupplyReminder("water", sweatResult.recommendedRefillMl);
             }
           }
