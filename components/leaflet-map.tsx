@@ -305,9 +305,29 @@ function handleMessage(data) {
         break;
       case 'setGpxPolyline':
         gpxLayer.setLatLngs(msg.coords);
-        // Add direction arrows to GPX route
+        // Add direction arrows with adaptive density based on route length
         if (msg.coords && msg.coords.length > 1) {
-          var interval = Math.max(10, Math.floor(msg.coords.length / 20));
+          // Calculate route distance to determine arrow density
+          var totalDistance = 0;
+          for (var j = 1; j < msg.coords.length; j++) {
+            var lat1 = msg.coords[j-1][0] * Math.PI / 180;
+            var lon1 = msg.coords[j-1][1] * Math.PI / 180;
+            var lat2 = msg.coords[j][0] * Math.PI / 180;
+            var lon2 = msg.coords[j][1] * Math.PI / 180;
+            var dLat = lat2 - lat1;
+            var dLon = lon2 - lon1;
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            totalDistance += 6371 * c; // Earth radius in km
+          }
+          // Adaptive interval: target 10-15 arrows per route
+          var targetArrows = 12;
+          var interval = Math.max(1, Math.floor(msg.coords.length / targetArrows));
+          // For very short routes, ensure at least 3 arrows
+          if (msg.coords.length < 30) interval = Math.max(1, Math.floor(msg.coords.length / 3));
+          // For very long routes, limit to 20 arrows
+          if (msg.coords.length > 500) interval = Math.ceil(msg.coords.length / 20);
+          
           for (var i = interval; i < msg.coords.length; i += interval) {
             var prev = msg.coords[i - 1];
             var curr = msg.coords[i];
