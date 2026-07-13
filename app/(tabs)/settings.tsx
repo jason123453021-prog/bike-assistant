@@ -551,32 +551,6 @@ export default function SettingsScreen() {
         <SectionHeader title="感測器配對" colors={colors} onToggle={() => toggleSection("sensors")} collapsed={collapsedSections["sensors"]} />
         {!collapsedSections["sensors"] && <View style={[styles.section, { borderColor: colors.border }]}>
           <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
-            {/* BLE 掃描按鈕 */}
-            <Pressable
-              style={({ pressed }) => [{
-                backgroundColor: colors.primary,
-                borderRadius: 8,
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                opacity: pressed ? 0.8 : 1,
-              }]}
-              onPress={handleBleScan}
-              disabled={bleScanning}
-            >
-              {bleScanning ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Text style={{ fontSize: 16 }}>🔍</Text>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>掃描 BLE 設備</Text>
-                </>
-              )}
-            </Pressable>
-
             {/* 已發現設備列表 */}
             {bleDevices.length > 0 ? (
               <View style={{ gap: 8 }}>
