@@ -45,7 +45,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
-import KeyEvent from "react-native-key-event";
+
 import { type GpxPoint } from "@/lib/gpx-parser";
 import {
   speak,
@@ -1637,40 +1637,8 @@ export default function MapScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, settings.simplifiedNavMode]);
 
-  // ─── 按鍵控制補給提醒 ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (Platform.OS === "android") {
-      const handleKeyDown = (keyCode: number) => {
-        if (keyCode === 24 || keyCode === 25) {
-          if (calorieAlert) {
-            setCalorieAlert(false);
-            dispatch({ type: "CONSUME_CALORIES" });
-            calorieAnim.setValue(0);
-            calorieReminderSentRef.current = false;
-            pendingCalorieRef.current = false;
-          }
-          if (waterAlert) {
-            setWaterAlert(false);
-            setSupplyRecommendedMl(undefined);
-            dispatch({ type: "CONSUME_WATER" });
-            waterAnim.setValue(0);
-            waterReminderSentRef.current = false;
-            pendingWaterRef.current = false;
-          }
-          setActiveSupplyAlerts([]);
-          return true;
-        }
-        return false;
-      };
-      const subscription = KeyEvent.onKeyDownListener(handleKeyDown);
-      return () => {
-        if (subscription) {
-          subscription.remove();
-        }
-      };
-    }
-    return () => {};
-  }, [calorieAlert, waterAlert, activeSupplyAlerts]);
+  // ─── 按鍵控制補給提醒（已移除，使用 UI 按鈕替代）────────────────────────────────────────────────────────
+  // react-native-key-event 與新版 Gradle 不兼容，補給提醒可通過 UI 按鈕關閉
 
   // ─── 計算值 ──────────────────────────────────────────────────────────────────
   const gpxPolyline = useMemo(() => {
