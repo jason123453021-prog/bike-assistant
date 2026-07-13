@@ -551,42 +551,6 @@ export default function SettingsScreen() {
         <SectionHeader title="感測器配對" colors={colors} onToggle={() => toggleSection("sensors")} collapsed={collapsedSections["sensors"]} />
         {!collapsedSections["sensors"] && <View style={[styles.section, { borderColor: colors.border }]}>
           <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
-            {/* 感測器狀態面板 */}
-            <View style={{
-              backgroundColor: colors.primary + "15",
-              borderColor: colors.primary + "40",
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: 12,
-              gap: 8,
-            }}>
-              <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>感測器狀態</Text>
-              <View style={{ gap: 6 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ color: colors.muted, fontSize: 11 }}>已連接設備</Text>
-                  <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>{sensorStatus.connectedCount} 個</Text>
-                </View>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ color: colors.muted, fontSize: 11 }}>最後更新</Text>
-                  <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>{sensorStatus.lastUpdateTimeStr}</Text>
-                </View>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ color: colors.muted, fontSize: 11 }}>信號強度</Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <View style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: sensorStatus.signalQuality === 'excellent' ? '#66BB6A' : sensorStatus.signalQuality === 'good' ? '#FDD835' : sensorStatus.signalQuality === 'poor' ? '#FB8C00' : '#999',
-                    }} />
-                    <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "600" }}>
-                      {sensorStatus.signalQuality === 'excellent' ? '優秀' : sensorStatus.signalQuality === 'good' ? '良好' : sensorStatus.signalQuality === 'poor' ? '弱' : '未連接'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-
             {/* BLE 掃描按鈕 */}
             <Pressable
               style={({ pressed }) => [{
