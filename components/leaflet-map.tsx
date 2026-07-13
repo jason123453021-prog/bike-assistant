@@ -143,6 +143,7 @@ var centerPinMarker = null; // 中心圖釘標記
 
 // 更新位置標記（顯示方向箭頭）
 var directionArrowMarker = null;
+var headingUpMode = false;
 function updatePosMarkerWithHeading(bearing) {
   if (!posMarker) return;
   var lat = posMarker.getLatLng().lat;
@@ -151,11 +152,12 @@ function updatePosMarkerWithHeading(bearing) {
   posMarker = null;
   if (bearing !== null && bearing !== undefined) {
     if (directionArrowMarker) { map.removeLayer(directionArrowMarker); directionArrowMarker = null; }
+    var arrowBearing = headingUpMode ? 0 : bearing;
     var arrowIcon = L.divIcon({
-      html: '<div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 12px solid #007AFF; transform: rotate(' + bearing + 'deg); filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));"></div>',
-      iconSize: [16, 12],
-      iconAnchor: [8, 6],
-      className: 'direction-arrow'
+      html: '<div style="width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-bottom: 20px solid #007AFF; transform: rotate(' + arrowBearing + 'deg); filter: drop-shadow(0 0 3px rgba(0,0,0,0.6));"></div>',
+      iconSize: [24, 20],
+      iconAnchor: [12, 10],
+      className: 'direction-arrow-large'
     });
     directionArrowMarker = L.marker([lat, lon], { icon: arrowIcon, zIndexOffset: 1000 }).addTo(map);
   } else {
@@ -519,6 +521,9 @@ function handleMessage(data) {
           }).addTo(map);
         }
         break;
+      case 'setHeadingUpMode':
+        headingUpMode = msg.enabled || false;
+        break;
     }
   } catch(e) {}
 }
@@ -568,6 +573,9 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         if (!webViewRef.current) return;
         webViewRef.current.postMessage(
           JSON.stringify({ type: "setBearing", bearing, headingUp })
+        );
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "setHeadingUpMode", enabled: headingUp })
         );
       },
       animateCamera: (opts, _anim) => {
