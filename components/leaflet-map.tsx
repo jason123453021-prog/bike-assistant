@@ -88,15 +88,13 @@ const LEAFLET_HTML = `<!DOCTYPE html>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body, #map { width: 100%; height: 100%; background: #f5f3ee; }
   .leaflet-container { background: #f5f3ee; }
-  /* 車頭方向指示器 */
+  /* 車頭方向指示器 - 改稱圓點 */
   .heading-arrow {
-    width: 0;
-    height: 0;
-    border-left: 7px solid transparent;
-    border-right: 7px solid transparent;
-    border-bottom: 18px solid #007AFF;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #007AFF;
     filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
-    transform-origin: 50% 100%;
   }
 </style>
 </head>
