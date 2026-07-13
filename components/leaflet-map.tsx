@@ -295,13 +295,12 @@ function handleMessage(data) {
         if (msg.heading !== undefined && msg.heading !== null) {
           if (directionArrowMarker) { map.removeLayer(directionArrowMarker); directionArrowMarker = null; }
           var arrowBearing = headingUpMode ? 0 : msg.heading;
-          // 改進的箭頭設計：使用 SVG 箭頭，清晰指向
-          var arrowSvg = '<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><style>.arrow-fill{fill:#007AFF;}.arrow-stroke{stroke:#fff;stroke-width:1;}</style></defs><path class="arrow-fill arrow-stroke" d="M16 2 L28 28 L16 22 L4 28 Z" transform="rotate(' + arrowBearing + ' 16 16)"/></svg>';
+          var arrowHtml = '<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;transform:rotate(' + arrowBearing + 'deg);"><svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><style>.arrow-fill{fill:#007AFF;}.arrow-stroke{stroke:#fff;stroke-width:1;}</style></defs><path class="arrow-fill arrow-stroke" d="M16 2 L28 28 L16 22 L4 28 Z"/></svg></div>';
           var arrowIcon = L.divIcon({
-            html: arrowSvg,
+            html: arrowHtml,
             iconSize: [32, 32],
             iconAnchor: [16, 16],
-            className: 'direction-arrow-svg'
+            className: 'direction-arrow-responsive'
           });
           directionArrowMarker = L.marker([lat, lon], { icon: arrowIcon, zIndexOffset: 1000 }).addTo(map);
         } else {
