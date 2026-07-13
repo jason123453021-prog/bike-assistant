@@ -30,7 +30,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, SUPPLY_ITEM_TEMPLATES, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
 import { SensorPairingModal } from "@/components/sensor-pairing-modal";
-import { SystemPermissionsStatusBlock } from "@/components/system-permissions-status-block";
+
 
 import { useAuth } from "@/hooks/use-auth";
 import { startOAuthLogin } from "@/constants/oauth";
@@ -441,11 +441,6 @@ export default function SettingsScreen() {
     <ScreenContainer containerClassName="bg-background">
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={[styles.title, { color: colors.foreground }]}>設定</Text>
-
-        {/* ── 系統權限狀態 ── */}
-        <View style={{ paddingHorizontal: 16, marginVertical: 12 }}>
-          <SystemPermissionsStatusBlock />
-        </View>
 
         {/* ── 個人資料 ── */}
         <SectionHeader title="個人資料" colors={colors} onToggle={() => toggleSection("personal")} collapsed={collapsedSections["personal"]} />

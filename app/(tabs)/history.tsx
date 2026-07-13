@@ -157,7 +157,7 @@ export default function HistoryScreen() {
                 color={hasRoute ? colors.primary : colors.muted}
               />
               <Text style={[styles.trailBtnText, { color: hasRoute ? colors.primary : colors.muted }]}>
-                Relive
+                查看軌跡
               </Text>
             </Pressable>
 

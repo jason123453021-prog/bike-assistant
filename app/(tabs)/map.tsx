@@ -2356,7 +2356,7 @@ export default function MapScreen() {
               {pinnedLocation.lat.toFixed(4)}, {pinnedLocation.lon.toFixed(4)}
             </Text>
             {isFetchingPinRoute && (
-              <Text style={styles.pinCardStatus}>計算路緟中…</Text>
+              <Text style={styles.pinCardStatus}>計算路線中…</Text>
             )}
             {pinRouteInfo && (
               <View style={styles.pinCardRoute}>
@@ -2385,20 +2385,20 @@ export default function MapScreen() {
                     speak(`計算完成，${formatRouteDistance(result.distanceM)}，${formatRouteDuration(result.durationSec)}`, settings.ttsEnabled);
                   }
                 }).catch(() => {
-                  speak("計算路緟失敗", settings.ttsEnabled);
+                  speak("計算路線失敗", settings.ttsEnabled);
                 }).finally(() => {
                   setIsFetchingPinRoute(false);
                 });
               }}
             >
               <IconSymbol name="location.fill" size={16} color="#fff" />
-              <Text style={styles.pinCardBtnText}>計算路緟</Text>
+              <Text style={styles.pinCardBtnText}>計算路線</Text>
             </Pressable>
             <Pressable
               style={[styles.pinCardBtn, { backgroundColor: "#34C759" }]}
               onPress={() => {
                 if (!pinRouteInfo) {
-                  Alert.alert("計算路緟", "請先計算路緟");
+                  Alert.alert("計算路線", "請先計算路線");
                   return;
                 }
                 const osmrRoute = {
