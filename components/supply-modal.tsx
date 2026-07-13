@@ -55,14 +55,8 @@ export function SupplyModal({
 
   const bothAlert = calorieAlert && waterAlert;
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={onDismiss}
-    >
-      <View style={styles.overlay}>
+  return visible ? (
+    <View style={styles.overlay} pointerEvents="box-none">
         <Animated.View
           style={[
             styles.card,
@@ -174,8 +168,7 @@ export function SupplyModal({
           </Pressable>
         </Animated.View>
       </View>
-    </Modal>
-  );
+  ) : null;
 }
 
 const styles = StyleSheet.create({

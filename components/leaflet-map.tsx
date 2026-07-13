@@ -61,6 +61,8 @@ export interface LeafletMapProps {
   isOffRoute?: boolean;
   friendMarkers?: FriendMarker[];
   onFriendTap?: (friend: FriendMarker & { lat: number; lon: number }) => void;
+  centerPinLocation?: { lat: number; lon: number } | null;
+  onMapCenterChanged?: (lat: number, lon: number) => void;
 }
 
 export interface LeafletMapHandle {
@@ -137,18 +139,32 @@ var posAccMarker = null;
 var startMarker = null;
 var endMarker = null;
 var returnEndMarker = null;
+var centerPinMarker = null; // 中心圖釘標記
 
-// 更新位置標記（純蓝點，車頭朝前模式不顯示箭頭）
+// 更新位置標記（顯示方向箭頭）
+var directionArrowMarker = null;
 function updatePosMarkerWithHeading(bearing) {
   if (!posMarker) return;
   var lat = posMarker.getLatLng().lat;
   var lon = posMarker.getLatLng().lng;
   map.removeLayer(posMarker);
   posMarker = null;
-  posMarker = L.marker([lat, lon], {
-    icon: makeCircleIcon('#007AFF', 16, '#fff'),
-    zIndexOffset: 1000,
-  }).addTo(map);
+  if (bearing !== null && bearing !== undefined) {
+    if (directionArrowMarker) { map.removeLayer(directionArrowMarker); directionArrowMarker = null; }
+    var arrowIcon = L.divIcon({
+      html: '<div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 12px solid #007AFF; transform: rotate(' + bearing + 'deg); filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));"></div>',
+      iconSize: [16, 12],
+      iconAnchor: [8, 6],
+      className: 'direction-arrow'
+    });
+    directionArrowMarker = L.marker([lat, lon], { icon: arrowIcon, zIndexOffset: 1000 }).addTo(map);
+  } else {
+    if (directionArrowMarker) { map.removeLayer(directionArrowMarker); directionArrowMarker = null; }
+    posMarker = L.marker([lat, lon], {
+      icon: makeCircleIcon('#007AFF', 16, '#fff'),
+      zIndexOffset: 1000,
+    }).addTo(map);
+  }
 }
 
 // Custom dot icon
@@ -170,10 +186,33 @@ function makeCircleIcon(color, size, borderColor) {
   });
 }
 
-// Pan drag detection
+// Pan drag detection and center pin update
 map.on('dragstart', function() {
   if (window.ReactNativeWebView) {
     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'panDrag' }));
+  }
+});
+
+// Update center pin location when map is dragged
+map.on('drag', function() {
+  var center = map.getCenter();
+  if (window.ReactNativeWebView && centerPinMarker) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'mapCenterChanged',
+      lat: center.lat,
+      lon: center.lng
+    }));
+  }
+});
+
+map.on('dragend', function() {
+  var center = map.getCenter();
+  if (window.ReactNativeWebView && centerPinMarker) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'mapCenterChanged',
+      lat: center.lat,
+      lon: center.lng
+    }));
   }
 });
 
@@ -266,6 +305,21 @@ function handleMessage(data) {
         break;
       case 'setGpxPolyline':
         gpxLayer.setLatLngs(msg.coords);
+        // Add direction arrows to GPX route
+        if (msg.coords && msg.coords.length > 1) {
+          var interval = Math.max(10, Math.floor(msg.coords.length / 20));
+          for (var i = interval; i < msg.coords.length; i += interval) {
+            var prev = msg.coords[i - 1];
+            var curr = msg.coords[i];
+            var bearing = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]) * 180 / Math.PI;
+            var arrowIcon = L.divIcon({
+              html: '<div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #FF3B30; transform: rotate(' + bearing + 'deg);"></div>',
+              iconSize: [10, 8],
+              className: 'gpx-arrow'
+            });
+            L.marker(curr, { icon: arrowIcon, zIndexOffset: 100 }).addTo(map);
+          }
+        }
         // Update start/end markers
         if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
         if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
@@ -436,6 +490,15 @@ function handleMessage(data) {
           arrowMarkers.push(arrowMarker);
         }
         break;
+      case 'setCenterPin':
+        if (centerPinMarker) { map.removeLayer(centerPinMarker); centerPinMarker = null; }
+        if (msg.lat && msg.lon) {
+          centerPinMarker = L.marker([msg.lat, msg.lon], {
+            icon: makeCircleIcon('#FFD60A', 20, '#fff'),
+            zIndexOffset: 900,
+          }).addTo(map);
+        }
+        break;
     }
   } catch(e) {}
 }
@@ -470,6 +533,8 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       isOffRoute,
       friendMarkers,
       onFriendTap,
+      centerPinLocation,
+      onMapCenterChanged,
     },
     ref
   ) => {
@@ -601,6 +666,20 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       }
     }, [returnPolyline, isOffRoute, isReady]);
 
+    // Send center pin location
+    useEffect(() => {
+      if (!isReady || !webViewRef.current) return;
+      if (centerPinLocation) {
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "setCenterPin", lat: centerPinLocation.lat, lon: centerPinLocation.lon })
+        );
+      } else {
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "setCenterPin", lat: null, lon: null })
+        );
+      }
+    }, [centerPinLocation, isReady]);
+
     // Send friend markers
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
@@ -653,6 +732,8 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
           });
         } else if (msg.type === "mapLongPress") {
           onMapLongPress?.(msg.lat, msg.lon);
+        } else if (msg.type === "mapCenterChanged") {
+          onMapCenterChanged?.(msg.lat, msg.lon);
         }
       } catch {}
     };

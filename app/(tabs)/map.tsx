@@ -338,7 +338,9 @@ export default function MapScreen() {
   const rideStartLocationRef = useRef<{ lat: number; lon: number } | null>(null); // 記錄騎乘開始座標
   const lastTurnSpokenRef = useRef<number>(0); // 追蹤上次播報轉彎的時間
 
-  // ── 地圖長按釘選功能 ──
+  // ── 地圖釘選功能（按鈕 + 中心圖釘） ──
+  const [pinSelectMode, setPinSelectMode] = useState(false); // 釘選模式是否啟動
+  const [centerPinLocation, setCenterPinLocation] = useState<{ lat: number; lon: number } | null>(null); // 中心圖釘的位置
   const [pinnedLocation, setPinnedLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [showPinCard, setShowPinCard] = useState(false);
   const [isFetchingPinRoute, setIsFetchingPinRoute] = useState(false);
@@ -1634,8 +1636,22 @@ export default function MapScreen() {
     if (Platform.OS === "android") {
       const handleKeyDown = (keyCode: number) => {
         if (keyCode === 24 || keyCode === 25) {
-          if (calorieAlert) setCalorieAlert(false);
-          if (waterAlert) setWaterAlert(false);
+          if (calorieAlert) {
+            setCalorieAlert(false);
+            dispatch({ type: "CONSUME_CALORIES" });
+            calorieAnim.setValue(0);
+            calorieReminderSentRef.current = false;
+            pendingCalorieRef.current = false;
+          }
+          if (waterAlert) {
+            setWaterAlert(false);
+            setSupplyRecommendedMl(undefined);
+            dispatch({ type: "CONSUME_WATER" });
+            waterAnim.setValue(0);
+            waterReminderSentRef.current = false;
+            pendingWaterRef.current = false;
+          }
+          setActiveSupplyAlerts([]);
           return true;
         }
         return false;
@@ -1648,7 +1664,7 @@ export default function MapScreen() {
       };
     }
     return () => {};
-  }, [calorieAlert, waterAlert]);
+  }, [calorieAlert, waterAlert, activeSupplyAlerts]);
 
   // ─── 計算值 ──────────────────────────────────────────────────────────────────
   const gpxPolyline = useMemo(() => {
@@ -1767,6 +1783,12 @@ export default function MapScreen() {
           speed: friend.speed,
           isMoving: friend.isMoving,
         })}
+        centerPinLocation={pinSelectMode ? centerPinLocation : null}
+        onMapCenterChanged={(lat, lon) => {
+          if (pinSelectMode) {
+            setCenterPinLocation({ lat, lon });
+          }
+        }}
       />
 
       {/* ── 頂部導航指令條 ── */}
@@ -1925,6 +1947,30 @@ export default function MapScreen() {
             <Text style={[styles.returnBtnLabel, { color: simplifiedNavVisible ? "#FFD60A" : "rgba(255,255,255,0.8)" }]}>精簡</Text>
           </Pressable>
         )}
+        {/* 釘選按鈕（中心圖釘釋選導航位置） */}
+        <Pressable
+          style={[styles.toolBtn, pinSelectMode && styles.toolBtnActive]}
+          onPress={() => {
+            if (pinSelectMode) {
+              if (centerPinLocation) {
+                setPinnedLocation(centerPinLocation);
+                setShowPinCard(true);
+                setPinSelectMode(false);
+                setCenterPinLocation(null);
+              }
+            } else {
+              if (currentPos) {
+                setCenterPinLocation({ lat: currentPos.lat, lon: currentPos.lon });
+                setPinSelectMode(true);
+              }
+            }
+          }}
+        >
+          <IconSymbol name="mappin.circle.fill" size={20} color={pinSelectMode ? "#FFD60A" : "#fff"} />
+          <Text style={[styles.returnBtnLabel, { color: pinSelectMode ? "#FFD60A" : "rgba(255,255,255,0.8)" }]}>
+            {pinSelectMode ? "確認" : "釘選"}
+          </Text>
+        </Pressable>
       </View>
 
       {/* ── 偏離路線提示橫幅（偏離且導航中且指引開啟顯示） ── */}
