@@ -2348,7 +2348,7 @@ export default function MapScreen() {
                 setPinRouteInfo(null);
               }}
             >
-              <Text style={styles.pinCardCloseText}>×</Text>
+              <IconSymbol name="xmark.circle.fill" size={20} color="#666" />
             </Pressable>
           </View>
           <View style={styles.pinCardBody}>

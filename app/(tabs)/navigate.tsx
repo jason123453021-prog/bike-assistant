@@ -315,12 +315,12 @@ export default function NavigateScreen() {
                   快速套用常用路線
                 </Text>
               </View>
-              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+              <IconSymbol name="star.fill" size={18} color={colors.muted} />
             </>
           </Pressable>
 
-          {/* GPX 匯入按鈕 */}
-          {/* 匯入 GPX 按鈕已移除 */}
+          {/* GPX 匹入按鈕 */}
+          {/* 匹入 GPX 按鈕已移除 */}
 
           {/* Error */}
           {error && (
