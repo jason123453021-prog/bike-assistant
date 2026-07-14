@@ -9,6 +9,7 @@ const { withAndroidManifest } = require("@expo/config-plugins");
  * 3. 配置 ScreenWakeupActivity
  * 4. 添加 WAKE_LOCK 權限
  * 5. 移除 BOOT_COMPLETED 廣播接收器（改用 WorkManager）
+ * 6. 移除已淘汰的 LAYOUT_IN_DISPLAY_CUTOUT_MODE 屬性（Android 15+）
  */
 module.exports = function withForegroundServicePlugin(config) {
   return withAndroidManifest(config, async (config) => {
@@ -106,7 +107,6 @@ module.exports = function withForegroundServicePlugin(config) {
           "android:exported": "false",
           "android:showWhenLocked": "true",
           "android:turnScreenOn": "true",
-          // 支持大屏幕設備（平板、可摺疊設備）
           "android:resizeableActivity": "true",
         },
       });
@@ -120,20 +120,39 @@ module.exports = function withForegroundServicePlugin(config) {
             "android:smallScreens": "true",
             "android:normalScreens": "true",
             "android:largeScreens": "true",
-            "android:extraLargeScreens": "true",
+            "android:xlargeScreens": "true",
             "android:resizeable": "true",
+            "android:anyDensity": "true",
           },
         },
       ];
     }
 
-    // 添加 Expo 主 Activity 的大屏幕支持
+    // Android 15+ 無邊框配置：移除已淘汰的 LAYOUT_IN_DISPLAY_CUTOUT_MODE
+    // 在 Android 15 中，系統會自動處理無邊框繪製
+    if (application.activity) {
+      application.activity.forEach((activity) => {
+        // 移除已淘汰的 android:windowLayoutInDisplayCutoutMode 屬性
+        if (activity["meta-data"]) {
+          activity["meta-data"] = activity["meta-data"].filter(
+            (meta) => !meta.$["android:name"]?.includes("windowLayoutInDisplayCutoutMode")
+          );
+        }
+        // 移除硬編碼的 cutout 模式
+        delete activity.$["android:windowLayoutInDisplayCutoutMode"];
+      });
+    }
+
+    // 添加 Expo 主 Activity 的大屏幕支持和無邊框配置
     if (application.activity) {
       application.activity.forEach((activity) => {
         const activityName = activity.$["android:name"];
         // 為 MainActivity 添加大屏幕支持
         if (activityName?.includes("MainActivity")) {
           activity.$["android:resizeableActivity"] = "true";
+          // Android 15+ 無邊框：移除已淘汰的屬性，改用新 API
+          // 系統會自動應用 edge-to-edge 繪製
+          delete activity.$["android:windowLayoutInDisplayCutoutMode"];
         }
       });
     }
