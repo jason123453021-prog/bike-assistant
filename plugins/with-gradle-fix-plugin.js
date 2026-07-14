@@ -1,4 +1,4 @@
-const { withBuildGradle } = require("@expo/config-plugins");
+const { withGradleProperties } = require("@expo/config-plugins");
 
 /**
  * Config Plugin: with-gradle-fix-plugin
@@ -8,21 +8,19 @@ const { withBuildGradle } = require("@expo/config-plugins");
  * 2. 修復 Gradle 解析失敗
  */
 module.exports = function withGradleFixPlugin(config) {
-  return withBuildGradle(config, async (config) => {
-    let contents = config.modResults.contents;
+  return withGradleProperties(config, async (config) => {
+    // gradle.properties 中移除 enableBundleCompression
+    const properties = config.modResults;
+    
+    // 過濾掉 enableBundleCompression 相關的屬性
+    const filtered = properties.filter((prop) => {
+      if (typeof prop === "string") {
+        return !prop.includes("enableBundleCompression");
+      }
+      return true;
+    });
 
-    // 移除 enableBundleCompression 屬性
-    // 匹配模式：enableBundleCompression = true 或 enableBundleCompression = false
-    contents = contents.replace(
-      /\s*enableBundleCompression\s*=\s*(true|false)\s*\n?/g,
-      ""
-    );
-
-    // 移除 react 塊中的空行
-    contents = contents.replace(/react\s*\{\s*\n\s*\n/g, "react {\n");
-    contents = contents.replace(/\n\s*\n\s*\}/g, "\n}");
-
-    config.modResults.contents = contents;
+    config.modResults = filtered;
     return config;
   });
 };
