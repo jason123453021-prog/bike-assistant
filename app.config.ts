@@ -135,6 +135,7 @@ const config: ExpoConfig = {
           buildArchs: ["armeabi-v7a", "arm64-v8a"],
           minSdkVersion: 24,
           targetSdkVersion: 35,
+          kotlinVersion: "2.0.20",
           enableProguardInReleaseBuilds: true,
           enableShrinkResources: true,
           enableDexingArtifactTransform: true,
