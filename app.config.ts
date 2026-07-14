@@ -18,14 +18,14 @@ const env = {
 const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
-  version: "1.0.3",
+  version: "1.0.2",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
   newArchEnabled: false,
   ios: {
-    supportsTablet: true,
+    supportsTablet: false,
     bundleIdentifier: env.iosBundleId,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -45,7 +45,7 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    versionCode: 4,
+    versionCode: 3,
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
@@ -91,7 +91,6 @@ const config: ExpoConfig = {
   },
   plugins: [
     require("./plugins/with-foreground-service-plugin.js"),
-    require("./plugins/with-gradle-fix-plugin.js"),
     "expo-router",
     [
       "expo-location",
@@ -136,10 +135,6 @@ const config: ExpoConfig = {
           buildArchs: ["armeabi-v7a", "arm64-v8a"],
           minSdkVersion: 24,
           targetSdkVersion: 35,
-          kotlinVersion: "2.0.20",
-          enableProguardInReleaseBuilds: true,
-          enableShrinkResources: true,
-          enableDexingArtifactTransform: true,
         },
       },
     ],
