@@ -91,6 +91,7 @@ const config: ExpoConfig = {
   },
   plugins: [
     require("./plugins/with-foreground-service-plugin.js"),
+    require("./plugins/with-audio-boot-receiver-fix.js"),
     "expo-router",
     [
       "expo-location",
