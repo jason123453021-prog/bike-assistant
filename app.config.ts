@@ -139,6 +139,8 @@ const config: ExpoConfig = {
           enableProguardInReleaseBuilds: true,
           enableShrinkResources: true,
           enableDexingArtifactTransform: true,
+          // R8 進階配置 - 記憶體效率和性能優化
+          extraProguardRules: "-include ./proguard-rules.pro\n-optimizationpasses 5\n-allowaccessmodification\n-repackageclasses 'com.bikeassistant.obfuscated'",
         },
       },
     ],
