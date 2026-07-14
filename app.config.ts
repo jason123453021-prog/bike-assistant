@@ -25,7 +25,7 @@ const config: ExpoConfig = {
   userInterfaceStyle: "automatic",
   newArchEnabled: false,
   ios: {
-    supportsTablet: false,
+    supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -135,6 +135,9 @@ const config: ExpoConfig = {
           buildArchs: ["armeabi-v7a", "arm64-v8a"],
           minSdkVersion: 24,
           targetSdkVersion: 35,
+          enableProguardInReleaseBuilds: true,
+          enableShrinkResources: true,
+          enableDexingArtifactTransform: true,
         },
       },
     ],
