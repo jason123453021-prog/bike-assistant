@@ -1,15 +1,14 @@
 /**
  * POI 數據源
- * 包括示例數據和 API 集成
+ * 接入 Overpass API (OpenStreetMap) 獲取真實 POI 數據
  */
 
 import { POI, POIType } from './poi-types';
 
 /**
- * 示例 POI 數據（台灣常見地點）
+ * 示例 POI 數據（作為離線備用）
  */
 export const SAMPLE_POIS: POI[] = [
-  // 便利商店
   {
     id: 'poi_1',
     type: POIType.CONVENIENCE_STORE,
@@ -30,8 +29,6 @@ export const SAMPLE_POIS: POI[] = [
     rating: 4.3,
     tags: ['便利商店', '補給'],
   },
-
-  // 餐廳
   {
     id: 'poi_3',
     type: POIType.RESTAURANT,
@@ -42,8 +39,6 @@ export const SAMPLE_POIS: POI[] = [
     rating: 4.8,
     tags: ['餐廳', '自行車友善'],
   },
-
-  // 咖啡館
   {
     id: 'poi_4',
     type: POIType.CAFE,
@@ -54,8 +49,6 @@ export const SAMPLE_POIS: POI[] = [
     rating: 4.6,
     tags: ['咖啡館', '休息點'],
   },
-
-  // 飲水機
   {
     id: 'poi_5',
     type: POIType.WATER_FOUNTAIN,
@@ -66,8 +59,6 @@ export const SAMPLE_POIS: POI[] = [
     rating: 4.0,
     tags: ['飲水', '免費'],
   },
-
-  // 廁所
   {
     id: 'poi_6',
     type: POIType.RESTROOM,
@@ -78,8 +69,6 @@ export const SAMPLE_POIS: POI[] = [
     rating: 3.8,
     tags: ['廁所', '公共設施'],
   },
-
-  // 拍照點
   {
     id: 'poi_7',
     type: POIType.PHOTO_SPOT,
@@ -90,8 +79,6 @@ export const SAMPLE_POIS: POI[] = [
     rating: 4.9,
     tags: ['拍照', '觀景'],
   },
-
-  // 山頂
   {
     id: 'poi_8',
     type: POIType.SUMMIT,
@@ -106,8 +93,66 @@ export const SAMPLE_POIS: POI[] = [
 ];
 
 /**
- * 從 OpenStreetMap 或其他 API 獲取 POI
- * 這是一個示例實現，實際應用中應調用真實 API
+ * Overpass API 查詢模板
+ * 根據 POI 類型生成對應的 Overpass QL 查詢
+ */
+function buildOverpassQuery(lat: number, lon: number, radiusMeters: number): string {
+  // 查詢便利商店、餐廳、咖啡館、飲水機、廁所、觀景點、山頂
+  return `
+[out:json][timeout:10];
+(
+  node["shop"="convenience"](around:${radiusMeters},${lat},${lon});
+  node["amenity"="restaurant"](around:${radiusMeters},${lat},${lon});
+  node["amenity"="cafe"](around:${radiusMeters},${lat},${lon});
+  node["amenity"="drinking_water"](around:${radiusMeters},${lat},${lon});
+  node["amenity"="toilets"](around:${radiusMeters},${lat},${lon});
+  node["tourism"="viewpoint"](around:${radiusMeters},${lat},${lon});
+  node["natural"="peak"](around:${radiusMeters},${lat},${lon});
+);
+out body 50;
+`;
+}
+
+/**
+ * 將 OSM 標籤映射為 POIType
+ */
+function mapOSMToPOIType(tags: Record<string, string>): POIType | null {
+  if (tags.shop === 'convenience') return POIType.CONVENIENCE_STORE;
+  if (tags.amenity === 'restaurant') return POIType.RESTAURANT;
+  if (tags.amenity === 'cafe') return POIType.CAFE;
+  if (tags.amenity === 'drinking_water') return POIType.WATER_FOUNTAIN;
+  if (tags.amenity === 'toilets') return POIType.RESTROOM;
+  if (tags.tourism === 'viewpoint') return POIType.VIEWPOINT;
+  if (tags.natural === 'peak') return POIType.PEAK;
+  return null;
+}
+
+/**
+ * 從 OSM 標籤生成描述
+ */
+function generateDescription(tags: Record<string, string>, type: POIType): string {
+  const parts: string[] = [];
+  if (tags.opening_hours) parts.push(`營業時間: ${tags.opening_hours}`);
+  if (tags.brand) parts.push(tags.brand);
+  if (tags.cuisine) parts.push(`料理: ${tags.cuisine}`);
+  if (tags.ele) parts.push(`海拔: ${tags.ele}m`);
+  if (parts.length > 0) return parts.join(' | ');
+  
+  // 預設描述
+  switch (type) {
+    case POIType.CONVENIENCE_STORE: return '便利商店';
+    case POIType.RESTAURANT: return '餐廳';
+    case POIType.CAFE: return '咖啡館';
+    case POIType.WATER_FOUNTAIN: return '飲水機';
+    case POIType.RESTROOM: return '公共廁所';
+    case POIType.VIEWPOINT: return '觀景點';
+    case POIType.PEAK: return '山頂';
+    default: return '';
+  }
+}
+
+/**
+ * 從 Overpass API 獲取真實 POI 數據
  */
 export async function fetchPOIsFromAPI(
   latitude: number,
@@ -116,19 +161,62 @@ export async function fetchPOIsFromAPI(
   types?: POIType[]
 ): Promise<POI[]> {
   try {
-    // 示例：使用 Overpass API 查詢 OpenStreetMap 數據
-    // 實際應用中應實現真實的 API 調用
-
-    // 這裡返回示例數據
-    return SAMPLE_POIS.filter((poi) => {
-      if (types && types.length > 0) {
-        return types.includes(poi.type);
-      }
-      return true;
+    const radiusMeters = radius * 1000; // 轉換為公尺
+    const query = buildOverpassQuery(latitude, longitude, radiusMeters);
+    
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(query)}`,
     });
+    
+    if (!response.ok) {
+      console.warn('Overpass API request failed, falling back to sample data');
+      return SAMPLE_POIS;
+    }
+    
+    const data = await response.json();
+    const elements = data.elements || [];
+    
+    const pois: POI[] = [];
+    for (const element of elements) {
+      if (!element.lat || !element.lon || !element.tags) continue;
+      
+      const poiType = mapOSMToPOIType(element.tags);
+      if (!poiType) continue;
+      
+      // 如果有類型過濾，跳過不匹配的
+      if (types && types.length > 0 && !types.includes(poiType)) continue;
+      
+      const name = element.tags.name || element.tags.brand || generateDescription(element.tags, poiType);
+      
+      pois.push({
+        id: `osm_${element.id}`,
+        type: poiType,
+        name: name,
+        description: generateDescription(element.tags, poiType),
+        latitude: element.lat,
+        longitude: element.lon,
+        elevation: element.tags.ele ? parseFloat(element.tags.ele) : undefined,
+        hours: element.tags.opening_hours,
+        website: element.tags.website,
+        phone: element.tags.phone,
+        tags: Object.entries(element.tags)
+          .filter(([k]) => !['name', 'source', 'created_by'].includes(k))
+          .map(([k, v]) => `${k}:${v}`)
+          .slice(0, 5),
+      });
+    }
+    
+    // 如果 API 返回結果太少，合併範例數據
+    if (pois.length < 3) {
+      return [...pois, ...SAMPLE_POIS];
+    }
+    
+    return pois;
   } catch (error) {
-    console.error('Failed to fetch POIs from API:', error);
-    return [];
+    console.warn('Overpass API error, falling back to sample data:', error);
+    return SAMPLE_POIS;
   }
 }
 
@@ -139,6 +227,7 @@ export async function savePOIsLocally(pois: POI[]): Promise<void> {
   try {
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     await AsyncStorage.setItem('cached_pois', JSON.stringify(pois));
+    await AsyncStorage.setItem('cached_pois_time', Date.now().toString());
   } catch (error) {
     console.error('Failed to save POIs locally:', error);
   }
@@ -148,7 +237,17 @@ export async function loadPOIsLocally(): Promise<POI[]> {
   try {
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     const data = await AsyncStorage.getItem('cached_pois');
-    return data ? JSON.parse(data) : [];
+    const timeStr = await AsyncStorage.getItem('cached_pois_time');
+    
+    if (!data) return [];
+    
+    // 緩存 30 分鐘有效
+    if (timeStr) {
+      const cacheAge = Date.now() - parseInt(timeStr, 10);
+      if (cacheAge > 30 * 60 * 1000) return []; // 過期
+    }
+    
+    return JSON.parse(data);
   } catch (error) {
     console.error('Failed to load POIs locally:', error);
     return [];
@@ -156,7 +255,7 @@ export async function loadPOIsLocally(): Promise<POI[]> {
 }
 
 /**
- * 獲取 POI 列表（優先使用本地緩存，否則從 API 獲取）
+ * 獲取 POI 列表（優先使用本地緩存，否則從 Overpass API 獲取）
  */
 export async function getPOIs(
   latitude: number,
@@ -168,6 +267,10 @@ export async function getPOIs(
   if (!forceRefresh) {
     const cached = await loadPOIsLocally();
     if (cached.length > 0) {
+      // 如果有類型過濾
+      if (types && types.length > 0) {
+        return cached.filter(poi => types.includes(poi.type));
+      }
       return cached;
     }
   }

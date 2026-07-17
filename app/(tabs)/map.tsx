@@ -92,6 +92,12 @@ import { trpc } from "@/lib/trpc";
 import { useFriendNav } from "@/lib/friend-nav-context";
 import { ForegroundServiceManager } from "@/lib/foreground-service";
 import { EmotionalUXManager } from "@/lib/emotional-ux";
+import {
+  type CompassData,
+  type GPSVector,
+  getFinalDirection,
+  smoothHeading,
+} from "@/lib/compass-gps-optimizer";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -337,6 +343,12 @@ export default function MapScreen() {
   const lastAscentRef = useRef(0); // 用於判斷下坡狀態
   const rideStartLocationRef = useRef<{ lat: number; lon: number } | null>(null); // 記錄騎乘開始座標
   const lastTurnSpokenRef = useRef<number>(0); // 追蹤上次播報轉彎的時間
+  // 電子羅盤訂閱 ref
+  const compassHeadingRef = useRef<CompassData | null>(null);
+  const headingSubRef = useRef<Location.LocationSubscription | null>(null);
+  // 轉彎指示增強狀態
+  const [turnDirection, setTurnDirection] = useState<'left' | 'right' | 'arrive' | null>(null);
+  const [turnDistanceM, setTurnDistanceM] = useState<number>(0);
 
   // ── 地圖釘選功能（按鈕 + 中心圖釘） ──
   const [pinSelectMode, setPinSelectMode] = useState(false); // 釘選模式是否啟動
@@ -764,19 +776,37 @@ export default function MapScreen() {
                     const { latitude, longitude, altitude, heading, speed } = loc.coords;
           const speedKmhRaw = (speed ?? 0) * 3.6;
 
-          // ── 車頭朝前精度改善 ─────────────────────────────────────────────────────────────────────
-          // 策略：速度 > 5 km/h 且 GPS heading 有效時使用 GPS heading
-          //         速度 ≤ 5 km/h 時改用兩點間 bearing（低速 GPS heading 不準）
+          // ── 車頭朝前精度改善（融合電子羅盤 + GPS）──────────────────────────────────────────────────────
+          // 策略：
+          //   1. 速度 > 5 km/h 且 GPS heading 有效 → 使用 GPS heading
+          //   2. 速度 ≤ 5 km/h 且羅盤可用（精度 < 30°）→ 使用羅盤
+          //   3. 兩者都可用 → 混合模式（GPS 60% + 羅盤 40%）
+          //   4. 都不可用 → 兩點 bearing 或保持上次方向
           let rawHdg = heading ?? -1;
-          if (rawHdg < 0 || speedKmhRaw <= 5) {
-            // 低速或 heading 無效：用上一個 GPS 位置計算方位角
+          const gpsHeadingValid = rawHdg >= 0 && speedKmhRaw > 5;
+          const compassData = compassHeadingRef.current;
+          const compassValid = compassData && compassData.accuracy < 30 && (Date.now() - compassData.timestamp < 2000);
+
+          if (headingUp && compassValid && gpsHeadingValid) {
+            // 混合模式：使用 compass-gps-optimizer 融合
+            const gpsVec: GPSVector = { bearing: rawHdg, accuracy: 10, speed: (speed ?? 0), timestamp: Date.now() };
+            const result = getFinalDirection(compassData, gpsVec);
+            rawHdg = result.heading;
+          } else if (headingUp && compassValid && !gpsHeadingValid) {
+            // 低速時用羅盤（更即時的方向感知）
+            rawHdg = smoothHeading(compassData.heading, headingRef.current, 0.35);
+          } else if (gpsHeadingValid) {
+            // GPS heading 有效，直接使用
+            // rawHdg 已是 GPS heading
+          } else {
+            // 低速且羅盤不可用：用兩點 bearing
             const prev = prevGpsForBearingRef.current;
             if (prev) {
               const d = haversine(prev.lat, prev.lon, latitude, longitude);
-              if (d >= 5) { // 至少移動 5m 才更新方位角
+              if (d >= 5) {
                 rawHdg = bearing(prev.lat, prev.lon, latitude, longitude);
               } else {
-                rawHdg = headingRef.current; // 保持上一次的方向
+                rawHdg = headingRef.current;
               }
             } else {
               rawHdg = headingRef.current;
@@ -785,8 +815,11 @@ export default function MapScreen() {
           // 更新 GPS 位置參考點
           prevGpsForBearingRef.current = { lat: latitude, lon: longitude };
           // 自適應循環平均：根據速度調整平均窗口大小
-          // 低速（≤5 km/h）：11 點平均，高速（>15 km/h）：7 點平均
-          const windowSize = speedKmhRaw <= 5 ? 11 : speedKmhRaw >= 15 ? 7 : 9;
+          // 羅盤模式時窗口更小（更靈敏），因為羅盤已經提供即時方向
+          const useCompassMode = headingUp && compassValid;
+          const windowSize = useCompassMode
+            ? (speedKmhRaw <= 5 ? 5 : 3)
+            : (speedKmhRaw <= 5 ? 11 : speedKmhRaw >= 15 ? 7 : 9);
           headingWindowRef.current.push(rawHdg);
           if (headingWindowRef.current.length > windowSize) headingWindowRef.current.shift();
           // 角度平均：轉換為向量再平均，避免 350°/10° 平均出 180° 的問題
@@ -1081,6 +1114,38 @@ export default function MapScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [followUser, mapRideActive, isNavigating, gpxRoute, settings]);
 
+  // ─── 電子羅盤訂閱（優化車頭朝前）──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!headingUp) {
+      // 非車頭朝前模式時不訂閱羅盤，節省電量
+      headingSubRef.current?.remove();
+      headingSubRef.current = null;
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const sub = await Location.watchHeadingAsync((heading) => {
+          if (!active) return;
+          compassHeadingRef.current = {
+            heading: heading.trueHeading >= 0 ? heading.trueHeading : heading.magHeading,
+            accuracy: heading.accuracy ?? 999,
+            timestamp: Date.now(),
+          };
+        });
+        headingSubRef.current = sub;
+      } catch (e) {
+        // 羅盤不可用（例如 Web 平台），静默失敗
+        console.warn('watchHeadingAsync not available:', e);
+      }
+    })();
+    return () => {
+      active = false;
+      headingSubRef.current?.remove();
+      headingSubRef.current = null;
+    };
+  }, [headingUp]);
+
   // ─── GPX 導航邏輯 ────────────────────────────────────────────────────────────
   const handleNavigation = useCallback(
     (lat: number, lon: number, speedMs: number) => {
@@ -1229,6 +1294,8 @@ export default function MapScreen() {
 
       let lookaheadDist = 0;
       let turnInstruction = "";
+      let detectedTurnDir: 'left' | 'right' | null = null;
+      let detectedTurnDist = 0;
       for (let i = idx + 1; i < pts.length - 1; i++) {
         lookaheadDist += haversine(pts[i - 1].lat, pts[i - 1].lon, pts[i].lat, pts[i].lon);
         if (lookaheadDist > TURN_LOOKAHEAD_M) break;
@@ -1239,12 +1306,14 @@ export default function MapScreen() {
         if (diff < -180) diff += 360;
         if (Math.abs(diff) >= TURN_ANGLE_DEG) {
           const distToTurn = lookaheadDist;
+          detectedTurnDir = diff > 0 ? 'right' : 'left';
+          detectedTurnDist = distToTurn;
           if (distToTurn < 50) {
             // 只在路口時播報（避免重複播報）
             const now = Date.now();
-            if (now - lastTurnSpokenRef.current > 10000) { // 10秒內不重複播報
-              if (diff > 0) { turnInstruction = "右轉"; if (guidanceEnabledRef.current) speak("右轉", settings.ttsEnabled); }
-              else { turnInstruction = "左轉"; if (guidanceEnabledRef.current) speak("左轉", settings.ttsEnabled); }
+            if (now - lastTurnSpokenRef.current > 10000) {
+              turnInstruction = diff > 0 ? "右轉" : "左轉";
+              if (guidanceEnabledRef.current) speak(turnInstruction, settings.ttsEnabled);
               lastTurnSpokenRef.current = now;
             } else {
               turnInstruction = diff > 0 ? "右轉" : "左轉";
@@ -1260,10 +1329,16 @@ export default function MapScreen() {
       if (dEnd < 500 && !arrivedRef.current) {
         const distStr = dEnd < 100 ? "即將" : `${Math.round(dEnd)} 公尺後`;
         setNavInstruction(`${distStr}到達終點`);
+        setTurnDirection('arrive');
+        setTurnDistanceM(dEnd);
       } else if (turnInstruction) {
         setNavInstruction(turnInstruction);
+        setTurnDirection(detectedTurnDir);
+        setTurnDistanceM(detectedTurnDist);
       } else {
         setNavInstruction("沿路線前進");
+        setTurnDirection(null);
+        setTurnDistanceM(0);
       }
     },
     [gpxRoute, settings.ttsEnabled, isOffRoute, guidanceEnabled, returnSteps, currentReturnStepIdx]
@@ -2070,6 +2145,46 @@ export default function MapScreen() {
         </View>
       )}
 
+      {/* ── 轉彎指示橫幅（導航中且有轉彎指示時顯示在地圖上方） ── */}
+      {isNavigating && !isOffRoute && turnDirection && navInstruction !== "沿路線前進" && (
+        <View style={[
+          styles.turnBanner,
+          { top: insets.top + 8 },
+          turnDirection === 'arrive' && styles.turnBannerArrive,
+        ]}>
+          <View style={styles.turnBannerIcon}>
+            {turnDirection === 'left' && (
+              <Text style={styles.turnArrowText}>⬅️</Text>
+            )}
+            {turnDirection === 'right' && (
+              <Text style={styles.turnArrowText}>➡️</Text>
+            )}
+            {turnDirection === 'arrive' && (
+              <Text style={styles.turnArrowText}>🏁</Text>
+            )}
+          </View>
+          <View style={styles.turnBannerContent}>
+            <Text style={styles.turnBannerTitle} numberOfLines={1}>{navInstruction}</Text>
+            {turnDistanceM > 0 && turnDirection !== 'arrive' && (
+              <Text style={styles.turnBannerDist}>
+                {turnDistanceM < 100 ? `${Math.round(turnDistanceM)} m` : `${Math.round(turnDistanceM)} m`}
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* ── 導航中「沿路線前進」提示（無轉彎時顯示簡潔橫條） ── */}
+      {isNavigating && !isOffRoute && !turnDirection && navInstruction === "沿路線前進" && (
+        <View style={[styles.straightBanner, { top: insets.top + 8 }]}>
+          <Text style={styles.straightBannerIcon}>⬆️</Text>
+          <Text style={styles.straightBannerText}>沿路線前進</Text>
+          {distToEnd !== null && (
+            <Text style={styles.straightBannerDist}>剩餘 {formatRouteDistance(distToEnd)}</Text>
+          )}
+        </View>
+      )}
+
       {/* ── GPX 路線提示（無路線時，且無導航指令條顯示時） ── */}
       {!gpxRoute && !isActive && !isNavigating && navInstruction === "" && !friendNavDest && (
         <View style={[styles.noRouteBadge, { top: insets.top + 8, left: 16, right: 72 }]}>
@@ -2848,6 +2963,57 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   noRouteText: { color: "rgba(255,255,255,0.5)", fontSize: 11 },
+
+  // 轉彎指示橫幅
+  turnBanner: {
+    position: "absolute",
+    left: 16,
+    right: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "rgba(0,122,255,0.92)",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  turnBannerArrive: {
+    backgroundColor: "rgba(52,199,89,0.92)",
+  },
+  turnBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  turnArrowText: { fontSize: 20 },
+  turnBannerContent: { flex: 1 },
+  turnBannerTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  turnBannerDist: { color: "rgba(255,255,255,0.85)", fontSize: 12, marginTop: 2 },
+
+  // 沿路線前進橫條
+  straightBanner: {
+    position: "absolute",
+    left: 16,
+    right: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  straightBannerIcon: { fontSize: 16 },
+  straightBannerText: { color: "#fff", fontSize: 13, fontWeight: "600", flex: 1 },
+  straightBannerDist: { color: "rgba(255,255,255,0.6)", fontSize: 11 },
 
   // 底部面板（統計面板移至地圖下方）
   panel: {
