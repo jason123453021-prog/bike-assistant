@@ -86,6 +86,7 @@ import {
   getBackgroundTrackPoints,
   getBackgroundState,
   clearBackgroundData,
+  type GpsAccuracyLevel,
 } from "@/lib/background-location";
 import { BackgroundLocationTracking, ScreenWakeup } from "@/lib/native-modules";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -1621,6 +1622,51 @@ export default function MapScreen() {
     });
     return () => { subscription.remove(); };
   }, [mapRideActive, dispatch]);
+
+
+  // ─── GPS 精度即時切換（騎乘中更改設定時自動重啟背景追蹤）────────────────────────────
+  const prevGpsAccuracyRef = useRef<GpsAccuracyLevel>(settings.gpsAccuracy || "standard");
+  useEffect(() => {
+    const currentAccuracy: GpsAccuracyLevel = settings.gpsAccuracy || "standard";
+    if (mapRideActive && currentAccuracy !== prevGpsAccuracyRef.current) {
+      prevGpsAccuracyRef.current = currentAccuracy;
+      (async () => {
+        await stopBackgroundLocationTracking();
+        await startBackgroundLocationTracking(currentAccuracy);
+        console.log(`[GPS] 即時切換背景 GPS 精度為: ${currentAccuracy}`);
+      })();
+    } else {
+      prevGpsAccuracyRef.current = currentAccuracy;
+    }
+  }, [settings.gpsAccuracy, mapRideActive]);
+
+  // ─── 電量低自動降級 GPS 精度 ──────────────────────────────────────────────────────
+  const batteryDegradedRef = useRef(false);
+  useEffect(() => {
+    if (!mapRideActive || Platform.OS === "web") return;
+    let cancelled = false;
+    const checkBattery = async () => {
+      try {
+        const level = await Battery.getBatteryLevelAsync();
+        const pct = Math.round(level * 100);
+        if (pct > 0 && pct <= 20 && !batteryDegradedRef.current) {
+          batteryDegradedRef.current = true;
+          const currentAccuracy: GpsAccuracyLevel = settings.gpsAccuracy || "standard";
+          if (currentAccuracy !== "power_saving") {
+            await stopBackgroundLocationTracking();
+            await startBackgroundLocationTracking("power_saving");
+            Alert.alert("低電量提示", `電量剩餘 ${pct}%，已自動將背景 GPS 切換為省電模式以延長續航。`);
+            console.log(`[GPS] 電量 ${pct}%，自動降級為 power_saving`);
+          }
+        } else if (pct > 20) {
+          batteryDegradedRef.current = false;
+        }
+      } catch { /* 忽略電量讀取失敗 */ }
+    };
+    checkBattery();
+    const interval = setInterval(() => { if (!cancelled) checkBattery(); }, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [mapRideActive, settings.gpsAccuracy]);
 
   // ─── Cleanup ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
