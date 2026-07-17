@@ -26,6 +26,7 @@ import React, {
 import {
   Alert,
   Animated,
+  AppState,
   Dimensions,
   PanResponder,
   Platform,
@@ -82,6 +83,8 @@ import {
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
   initBackgroundState,
+  getBackgroundTrackPoints,
+  getBackgroundState,
 } from "@/lib/background-location";
 import { BackgroundLocationTracking, ScreenWakeup } from "@/lib/native-modules";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -1565,7 +1568,52 @@ export default function MapScreen() {
     }
   }, [currentPos]);
 
-  // ─── Cleanup ─────────────────────────────────────────────────────────────────
+  // ─── 前台恢復背景數據（AppState 監聽） ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const appStateRef = { current: AppState.currentState };
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextState === 'active' &&
+        mapRideActive
+      ) {
+        try {
+          const bgState = await getBackgroundState();
+          const bgTrack = await getBackgroundTrackPoints();
+          if (bgState && bgTrack.length > 0) {
+            // 合併背景軌跡點到當前騎乘記錄
+            for (const pt of bgTrack) {
+              dispatch({
+                type: "LOCATION_UPDATE",
+                point: { latitude: pt.lat, longitude: pt.lon, altitude: 0, speed: 0, timestamp: pt.ts },
+                power: 0,
+                calories: 0,
+                ascent: 0,
+              });
+            }
+            console.log(`[AppState] 已合併 ${bgTrack.length} 個背景軌跡點`);
+            // 檢查背景中是否觸發了補給提醒
+            if (bgState.calorieReminderSent && !calorieReminderSentRef.current) {
+              calorieReminderSentRef.current = true;
+              setCalorieAlert(true);
+              pendingCalorieRef.current = true;
+            }
+            if (bgState.waterReminderSent && !waterReminderSentRef.current) {
+              waterReminderSentRef.current = true;
+              setWaterAlert(true);
+              pendingWaterRef.current = true;
+            }
+          }
+        } catch (e) {
+          console.warn('[AppState] 恢復背景數據失敗:', e);
+        }
+      }
+      appStateRef.current = nextState;
+    });
+    return () => { subscription.remove(); };
+  }, [mapRideActive, dispatch]);
+
+  // ─── Cleanup ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       locationSubRef.current?.remove();
@@ -1573,14 +1621,15 @@ export default function MapScreen() {
     };
   }, []);
 
-  // ─── 音量鍵關閉補給提醒並重新計數 ─────────────────────────────────────────────────────────────────
+  // ─── 音量鍵關閉補給提醒並重新計數（含自訂補給品） ───────────────────────────────────────────
   useEffect(() => {
-    // 只在補給提醒顯示時監聽音量鍵
-    if (!calorieAlert && !waterAlert) return;
+    // 只在任何補給提醒顯示時監聽音量鍵（包含自訂補給品）
+    const hasAnyAlert = calorieAlert || waterAlert || sortedActiveAlerts.length > 0;
+    if (!hasAnyAlert) return;
 
     const unsubscribe = ScreenWakeup.onVolumeKeyPressed(() => {
       // 每次按下音量鍵關閉一個補給提醒並重新計數
-      // 優先關閉卡路里提醒，再關閉水分提醒
+      // 優先關閉卡路里提醒 → 水分提醒 → 自訂補給品（按順序逐一關閉）
       if (calorieAlert) {
         setCalorieAlert(false);
         dispatch({ type: "CONSUME_CALORIES" });
@@ -1588,7 +1637,7 @@ export default function MapScreen() {
         calorieReminderSentRef.current = false;
         pendingCalorieRef.current = false;
         if (settings.vibrationEnabled) vibrateSuccess();
-        if (!waterAlert && !pendingWaterRef.current) clearSupplyRepeatTimer();
+        if (!waterAlert && sortedActiveAlerts.length === 0 && !pendingWaterRef.current) clearSupplyRepeatTimer();
       } else if (waterAlert) {
         setWaterAlert(false);
         setSupplyRecommendedMl(undefined);
@@ -1597,14 +1646,20 @@ export default function MapScreen() {
         waterReminderSentRef.current = false;
         pendingWaterRef.current = false;
         if (settings.vibrationEnabled) vibrateSuccess();
-        if (!pendingCalorieRef.current) clearSupplyRepeatTimer();
+        if (sortedActiveAlerts.length === 0 && !pendingCalorieRef.current) clearSupplyRepeatTimer();
+      } else if (sortedActiveAlerts.length > 0) {
+        // 關閉第一個自訂補給品提醒
+        const firstAlertId = sortedActiveAlerts[0];
+        const item = settings.supplyItems.find(i => i.id === firstAlertId);
+        handleConfirmCustomSupply(firstAlertId, item?.triggerType || 'time');
+        if (settings.vibrationEnabled) vibrateSuccess();
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [calorieAlert, waterAlert, settings.vibrationEnabled, dispatch, clearSupplyRepeatTimer]);
+  }, [calorieAlert, waterAlert, sortedActiveAlerts, settings.vibrationEnabled, settings.supplyItems, dispatch, clearSupplyRepeatTimer, handleConfirmCustomSupply]);
 
   // ─── 好友導航：開始導航至好友位置 ──────────────────────────────────────────────────────────────────────────────
   const startFriendNav = useCallback(async (
