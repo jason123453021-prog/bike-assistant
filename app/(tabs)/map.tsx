@@ -1655,7 +1655,7 @@ export default function MapScreen() {
   const kilometersMarkers = useMemo(() => {
     if (!gpxRoute || gpxRoute.points.length === 0) return [];
     const { calculateKilometerMarkers } = require('@/lib/kilometer-markers');
-    return calculateKilometerMarkers(gpxRoute.points);
+    return calculateKilometerMarkers(gpxRoute);
   }, [gpxRoute]);
 
   // POI 標記狀態
@@ -1665,17 +1665,18 @@ export default function MapScreen() {
   const [isFetchingPOIRoute, setIsFetchingPOIRoute] = useState(false);
   const [poiRouteInfo, setPoiRouteInfo] = useState<{ distM: number; durSec: number; polyline: { latitude: number; longitude: number }[] } | null>(null);
 
-  // 加載 POI 數據（基於當前位置和路線）
+  // 加載 POI 數據（App 啟動即加載，並根據位置和路線動態更新）
   useEffect(() => {
-    if (!currentPos) return;
     const loadPOIs = async () => {
       try {
         const { getPOIsAlongRoute, calculateDistance } = await import('@/lib/poi-manager');
-        const { getPOIs } = await import('@/lib/poi-data');
+        const { getPOIs, SAMPLE_POIS } = await import('@/lib/poi-data');
         
         // 如果有 GPX 路線，獲取沿路線的 POI
         if (gpxRoute && gpxRoute.points.length > 0) {
-          const pois = await getPOIs();
+          const lat = gpxRoute.points[0].lat;
+          const lon = gpxRoute.points[0].lon;
+          const pois = await getPOIs(lat, lon, 10);
           const routePoints = gpxRoute.points.map(p => ({ lat: p.lat, lon: p.lon }));
           const nearbyPOIs = getPOIsAlongRoute(pois, routePoints, 0.5); // 500m 範圍
           setPoiMarkers(nearbyPOIs.map(poi => ({
@@ -1688,14 +1689,26 @@ export default function MapScreen() {
             icon: '📍',
             description: poi.description,
           })));
-        } else {
-          // 如果沒有路線，獲取當前位置附近的 POI
-          const pois = await getPOIs();
+        } else if (currentPos) {
+          // 有位置時，獲取當前位置附近的 POI
+          const pois = await getPOIs(currentPos.lat, currentPos.lon, 5);
           const nearbyPOIs = pois.filter(poi => {
             const dist = calculateDistance(currentPos.lat, currentPos.lon, poi.latitude, poi.longitude);
             return dist <= 2; // 2km 範圍
           });
           setPoiMarkers(nearbyPOIs.map(poi => ({
+            id: poi.id,
+            type: poi.type,
+            name: poi.name,
+            lat: poi.latitude,
+            lon: poi.longitude,
+            color: '#999999',
+            icon: '📍',
+            description: poi.description,
+          })));
+        } else {
+          // 無位置無路線時，直接顯示所有範例 POI
+          setPoiMarkers(SAMPLE_POIS.map(poi => ({
             id: poi.id,
             type: poi.type,
             name: poi.name,
