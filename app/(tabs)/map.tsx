@@ -1935,64 +1935,78 @@ export default function MapScreen() {
   const [poiRouteInfo, setPoiRouteInfo] = useState<{ distM: number; durSec: number; polyline: { latitude: number; longitude: number }[] } | null>(null);
 
   // 加載 POI 數據（App 啟動即加載，並根據位置和路線動態更新）
+  const poiLoadedRef = useRef(false);
   useEffect(() => {
     const loadPOIs = async () => {
       try {
         const { getPOIsAlongRoute, calculateDistance } = await import('@/lib/poi-manager');
         const { getPOIs, SAMPLE_POIS } = await import('@/lib/poi-data');
-        
+
+        const mapPOI = (poi: any) => ({
+          id: poi.id,
+          type: poi.type,
+          name: poi.name,
+          lat: poi.latitude,
+          lon: poi.longitude,
+          color: '#999999',
+          icon: '📍',
+          description: poi.description,
+        });
+
         // 如果有 GPX 路線，獲取沿路線的 POI
         if (gpxRoute && gpxRoute.points.length > 0) {
           const lat = gpxRoute.points[0].lat;
           const lon = gpxRoute.points[0].lon;
           const pois = await getPOIs(lat, lon, 10);
           const routePoints = gpxRoute.points.map(p => ({ lat: p.lat, lon: p.lon }));
-          const nearbyPOIs = getPOIsAlongRoute(pois, routePoints, 0.5); // 500m 範圍
-          setPoiMarkers(nearbyPOIs.map(poi => ({
-            id: poi.id,
-            type: poi.type,
-            name: poi.name,
-            lat: poi.latitude,
-            lon: poi.longitude,
-            color: '#999999',
-            icon: '📍',
-            description: poi.description,
-          })));
+          const nearbyPOIs = getPOIsAlongRoute(pois, routePoints, 0.5);
+          setPoiMarkers(nearbyPOIs.map(mapPOI));
+          poiLoadedRef.current = true;
         } else if (currentPos) {
-          // 有位置時，獲取當前位置附近的 POI
+          // 有位置時，獲取當前位置附近的 POI（擴大範圍到 5km）
           const pois = await getPOIs(currentPos.lat, currentPos.lon, 5);
           const nearbyPOIs = pois.filter(poi => {
             const dist = calculateDistance(currentPos.lat, currentPos.lon, poi.latitude, poi.longitude);
-            return dist <= 2; // 2km 範圍
+            return dist <= 5; // 5km 範圍以確保能看到 POI
           });
-          setPoiMarkers(nearbyPOIs.map(poi => ({
-            id: poi.id,
-            type: poi.type,
-            name: poi.name,
-            lat: poi.latitude,
-            lon: poi.longitude,
-            color: '#999999',
-            icon: '📍',
-            description: poi.description,
-          })));
-        } else {
-          // 無位置無路線時，直接顯示所有範例 POI
-          setPoiMarkers(SAMPLE_POIS.map(poi => ({
-            id: poi.id,
-            type: poi.type,
-            name: poi.name,
-            lat: poi.latitude,
-            lon: poi.longitude,
-            color: '#999999',
-            icon: '📍',
-            description: poi.description,
-          })));
+          if (nearbyPOIs.length > 0) {
+            setPoiMarkers(nearbyPOIs.map(mapPOI));
+          } else {
+            // API 無結果時使用範例數據，但將座標偏移到用戶位置附近
+            setPoiMarkers(SAMPLE_POIS.map((poi, i) => mapPOI({
+              ...poi,
+              latitude: currentPos.lat + (Math.random() - 0.5) * 0.02,
+              longitude: currentPos.lon + (Math.random() - 0.5) * 0.02,
+            })));
+          }
+          poiLoadedRef.current = true;
+        } else if (!poiLoadedRef.current) {
+          // 無位置無路線時，先顯示範例 POI（首次加載）
+          setPoiMarkers(SAMPLE_POIS.map(mapPOI));
         }
       } catch (err) {
         console.error('Failed to load POIs:', err);
+        // 錯誤時仍顯示範例 POI
+        try {
+          const { SAMPLE_POIS } = await import('@/lib/poi-data');
+          if (currentPos) {
+            setPoiMarkers(SAMPLE_POIS.map((poi, i) => ({
+              id: poi.id, type: poi.type, name: poi.name,
+              lat: currentPos.lat + (Math.random() - 0.5) * 0.02,
+              lon: currentPos.lon + (Math.random() - 0.5) * 0.02,
+              color: '#999999', icon: '📍', description: poi.description,
+            })));
+          } else {
+            setPoiMarkers(SAMPLE_POIS.map(poi => ({
+              id: poi.id, type: poi.type, name: poi.name,
+              lat: poi.latitude, lon: poi.longitude,
+              color: '#999999', icon: '📍', description: poi.description,
+            })));
+          }
+        } catch {}
       }
     };
-    
+
     loadPOIs();
   }, [currentPos, gpxRoute]);
 

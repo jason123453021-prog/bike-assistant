@@ -628,54 +628,22 @@ export default function SettingsScreen() {
           />
           <Divider colors={colors} />
 
-          {/* 卡路里高級功能 */}
+          {/* 補給提醒高級功能（統一設定） */}
           <View style={{ marginVertical: 8 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>卡路里提醒高級功能</Text>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>補給提醒高級功能</Text>
             <View style={{ marginBottom: 12 /* internal spacing */, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>未關閉時重複提醒</Text>
-                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>彈窗未確認時持續提醒</Text>
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>彈窗未確認時持續提醒（卡路里和水分）</Text>
               </View>
-              <Switch value={settings.calorieRepeatUntilDismissed ?? false} onValueChange={(v) => updateSettings({ calorieRepeatUntilDismissed: v })} trackColor={{ false: colors.border, true: colors.primary }} />
-            </View>
-            <View style={{ marginBottom: 12 /* internal spacing */ }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 /* internal spacing */ }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>自動關閉延遲</Text>
-                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>彈窗自動關閉延遲</Text>
-                </View>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>{settings.calorieAutoDismissSeconds ?? 0}秒</Text>
-              </View>
-              {/* 自動關閉功能已移除 - 彈窗現在只能通過音量鍵或按鈕手動關閉 */}
+              <Switch value={(settings.calorieRepeatUntilDismissed ?? false) || (settings.waterRepeatUntilDismissed ?? false)} onValueChange={(v) => updateSettings({ calorieRepeatUntilDismissed: v, waterRepeatUntilDismissed: v })} trackColor={{ false: colors.border, true: colors.primary }} />
             </View>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>長下坡暫停提醒</Text>
-                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>下坡時暫停提醒但仍計數</Text>
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>下坡時暫停提醒但仍計數（卡路里和水分）</Text>
               </View>
-              <Switch value={settings.caloriePauseOnDownhill ?? false} onValueChange={(v) => updateSettings({ caloriePauseOnDownhill: v })} trackColor={{ false: colors.border, true: colors.primary }} />
-            </View>
-          </View>
-
-          <Divider colors={colors} />
-
-          {/* 水分高級功能 */}
-          <View style={{ marginVertical: 8 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>水分提醒高級功能</Text>
-            <View style={{ marginBottom: 12 /* internal spacing */, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>未關閉時重複提醒</Text>
-                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>彈窗未確認時持續提醒</Text>
-              </View>
-              <Switch value={settings.waterRepeatUntilDismissed ?? false} onValueChange={(v) => updateSettings({ waterRepeatUntilDismissed: v })} trackColor={{ false: colors.border, true: colors.primary }} />
-            </View>
-            {/* 自動關閉功能已移除 - 彈窗現在只能通過音量鍵或按鈕手動關閉 */}
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>長下坡暫停提醒</Text>
-                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>下坡時暫停提醒但仍計數</Text>
-              </View>
-              <Switch value={settings.waterPauseOnDownhill ?? false} onValueChange={(v) => updateSettings({ waterPauseOnDownhill: v })} trackColor={{ false: colors.border, true: colors.primary }} />
+              <Switch value={(settings.caloriePauseOnDownhill ?? false) || (settings.waterPauseOnDownhill ?? false)} onValueChange={(v) => updateSettings({ caloriePauseOnDownhill: v, waterPauseOnDownhill: v })} trackColor={{ false: colors.border, true: colors.primary }} />
             </View>
           </View>
         </View>}
