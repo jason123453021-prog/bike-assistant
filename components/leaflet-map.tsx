@@ -163,6 +163,32 @@ function makeKilometerIcon(km) {
   });
 }
 
+// POI 標記層
+var poiMarkersLayer = [];
+var poiColorMap = {
+  'convenience_store': '#FF6B6B',
+  'restaurant': '#FF8C42',
+  'cafe': '#FFA500',
+  'water': '#4ECDC4',
+  'toilet': '#95E1D3',
+  'portable_toilet': '#7FD8BE',
+  'photo_spot': '#FFB6C1',
+  'viewpoint': '#DDA0DD',
+  'peak': '#9370DB',
+  'summit': '#8B7ABF'
+};
+
+function makePOIIcon(poiType, label) {
+  var color = poiColorMap[poiType] || '#999999';
+  var iconSize = 28;
+  return L.divIcon({
+    html: '<div style="width: ' + iconSize + 'px; height: ' + iconSize + 'px; background-color: ' + color + '; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); border: 2px solid white; position: relative;" title="' + label + '"><span style="font-size: 10px;">📍</span></div>',
+    iconSize: [iconSize, iconSize],
+    iconAnchor: [iconSize / 2, iconSize / 2],
+    className: 'poi-marker-icon'
+  });
+}
+
 // Markers
 var posMarker = null;
 var posAccMarker = null;
@@ -581,6 +607,38 @@ function handleMessage(data) {
           kilometerMarkersLayer.push(marker);
         });
         break;
+      case 'setPOIMarkers':
+        // 移除舊的 POI 標記
+        poiMarkersLayer.forEach(function(marker) { map.removeLayer(marker); });
+        poiMarkersLayer = [];
+        // 添加新的 POI 標記
+        var poiMarkers = msg.markers || [];
+        poiMarkers.forEach(function(poi) {
+          var marker = L.marker([poi.lat, poi.lon], {
+            icon: makePOIIcon(poi.type, poi.name),
+            zIndexOffset: 550,
+            title: poi.name
+          }).addTo(map);
+          (function(poiData) {
+            marker.on('click', function(e) {
+              L.DomEvent.stopPropagation(e);
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'poiTapped',
+                  poiId: poiData.id,
+                  name: poiData.name,
+                  poiType: poiData.type,
+                  lat: poiData.lat,
+                  lon: poiData.lon,
+                  description: poiData.description || '',
+                  address: poiData.address || ''
+                }));
+              }
+            });
+          })(poi);
+          poiMarkersLayer.push(marker);
+        });
+        break;
       case 'setHeadingUpMode':
         headingUpMode = msg.enabled || false;
         break;
@@ -621,6 +679,8 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       centerPinLocation,
       onMapCenterChanged,
       kilometersMarkers,
+      poiMarkers,
+      onPOITap,
     },
     ref
   ) => {
@@ -765,6 +825,20 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       }
     }, [kilometersMarkers, isReady]);
 
+    // Send POI markers
+    useEffect(() => {
+      if (!isReady || !webViewRef.current) return;
+      if (poiMarkers && poiMarkers.length > 0) {
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "setPOIMarkers", markers: poiMarkers })
+        );
+      } else {
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "setPOIMarkers", markers: [] })
+        );
+      }
+    }, [poiMarkers, isReady]);
+
     // Send center pin location
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
@@ -833,6 +907,17 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
           onMapLongPress?.(msg.lat, msg.lon);
         } else if (msg.type === "mapCenterChanged") {
           onMapCenterChanged?.(msg.lat, msg.lon);
+        } else if (msg.type === "poiTapped") {
+          onPOITap?.({
+            id: msg.poiId,
+            type: msg.poiType,
+            name: msg.name,
+            lat: msg.lat,
+            lon: msg.lon,
+            color: '',
+            icon: '',
+            rating: undefined,
+          });
         }
       } catch {}
     };

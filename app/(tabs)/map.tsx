@@ -1658,6 +1658,63 @@ export default function MapScreen() {
     return calculateKilometerMarkers(gpxRoute.points);
   }, [gpxRoute]);
 
+  // POI 標記狀態
+  const [poiMarkers, setPoiMarkers] = useState<any[]>([]);
+  const [tappedPOI, setTappedPOI] = useState<any | null>(null);
+  const [showPOICard, setShowPOICard] = useState(false);
+  const [isFetchingPOIRoute, setIsFetchingPOIRoute] = useState(false);
+  const [poiRouteInfo, setPoiRouteInfo] = useState<{ distM: number; durSec: number; polyline: { latitude: number; longitude: number }[] } | null>(null);
+
+  // 加載 POI 數據（基於當前位置和路線）
+  useEffect(() => {
+    if (!currentPos) return;
+    const loadPOIs = async () => {
+      try {
+        const { getPOIsAlongRoute } = await import('@/lib/poi-manager');
+        const { getPOIs } = await import('@/lib/poi-data');
+        
+        // 如果有 GPX 路線，獲取沿路線的 POI
+        if (gpxRoute && gpxRoute.points.length > 0) {
+          const routePoints = gpxRoute.points.map(p => ({ lat: p.lat, lon: p.lon }));
+          const pois = await getPOIs();
+          const nearbyPOIs = getPOIsAlongRoute(routePoints, pois, 500); // 500m 範圍
+          setPoiMarkers(nearbyPOIs.map(poi => ({
+            id: poi.id,
+            type: poi.type,
+            name: poi.name,
+            lat: poi.latitude,
+            lon: poi.longitude,
+            color: '#999999',
+            icon: '📍',
+            description: poi.description,
+          })));
+        } else {
+          // 如果沒有路線，獲取當前位置附近的 POI
+          const { calculateDistance } = await import('@/lib/poi-manager');
+          const pois = await getPOIs();
+          const nearbyPOIs = pois.filter(poi => {
+            const dist = calculateDistance(currentPos.lat, currentPos.lon, poi.latitude, poi.longitude);
+            return dist <= 2000; // 2km 範圍
+          });
+          setPoiMarkers(nearbyPOIs.map(poi => ({
+            id: poi.id,
+            type: poi.type,
+            name: poi.name,
+            lat: poi.latitude,
+            lon: poi.longitude,
+            color: '#999999',
+            icon: '📍',
+            description: poi.description,
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to load POIs:', err);
+      }
+    };
+    
+    loadPOIs();
+  }, [currentPos, gpxRoute]);
+
   const avgSpeed = useMemo(() => {
     if (state.elapsed < 5 || state.distance < 10) return 0;
     return (state.distance / 1000) / (state.elapsed / 3600);
@@ -1771,6 +1828,16 @@ export default function MapScreen() {
           }
         }}
         kilometersMarkers={kilometersMarkers}
+        poiMarkers={poiMarkers}
+        onPOITap={(poi) => {
+          setTappedPOI(poi);
+          setShowPOICard(true);
+          setFollowUser(false);
+          mapRef.current?.animateCamera(
+            { center: { latitude: poi.lat, longitude: poi.lon }, zoom: 18 },
+            { duration: 300 }
+          );
+        }}
       />
 
       {/* ── 頂部導航指令條 ── */}
