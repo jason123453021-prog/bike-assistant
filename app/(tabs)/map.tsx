@@ -380,6 +380,7 @@ export default function MapScreen() {
     pendingWaterRef.current = false;
   }, []);
   const lastLocationRef = useRef<Location.LocationObject | null>(null);
+  const lastBgSyncTsRef = useRef<number>(0); // 背景軌跡去重：記錄上次同步的最大時間戳
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -1581,17 +1582,22 @@ export default function MapScreen() {
           const bgState = await getBackgroundState();
           const bgTrack = await getBackgroundTrackPoints();
           if (bgState && bgTrack.length > 0) {
-            // 合併背景軌跡點到當前騎乘記錄
-            for (const pt of bgTrack) {
-              dispatch({
-                type: "LOCATION_UPDATE",
-                point: { latitude: pt.lat, longitude: pt.lon, altitude: 0, speed: 0, timestamp: pt.ts },
-                power: 0,
-                calories: 0,
-                ascent: 0,
-              });
+            // 去重：只合併時間戳大於上次同步的軌跡點
+            const newPoints = bgTrack.filter(pt => pt.ts > lastBgSyncTsRef.current);
+            if (newPoints.length > 0) {
+              for (const pt of newPoints) {
+                dispatch({
+                  type: "LOCATION_UPDATE",
+                  point: { latitude: pt.lat, longitude: pt.lon, altitude: 0, speed: 0, timestamp: pt.ts },
+                  power: 0,
+                  calories: 0,
+                  ascent: 0,
+                });
+              }
+              // 更新最大同步時間戳
+              lastBgSyncTsRef.current = Math.max(...newPoints.map(p => p.ts));
             }
-            console.log(`[AppState] 已合併 ${bgTrack.length} 個背景軌跡點`);
+            console.log(`[AppState] 已合併 ${newPoints.length}/${bgTrack.length} 個背景軌跡點（去重後）`);
             // 檢查背景中是否觸發了補給提醒
             if (bgState.calorieReminderSent && !calorieReminderSentRef.current) {
               calorieReminderSentRef.current = true;
