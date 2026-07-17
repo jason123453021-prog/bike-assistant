@@ -137,6 +137,8 @@ export interface AppSettings {
   teamTelemetryEnabled: boolean; // 是否開啟隊伍遙測
   showFriendDistance: boolean;   // 顯示隊友距離
   showFriendLocation: boolean;   // 顯示隊友位置
+  // 背景 GPS 精度
+  gpsAccuracy: "power_saving" | "standard" | "high_accuracy"; // 背景 GPS 更新頻率
   // 隱私
   ghostMode: boolean;            // 隱身模式：不分享自己位置
   shareLocation: boolean;        // 是否分享位置給好友
@@ -207,6 +209,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   teamTelemetryEnabled: false,
   showFriendDistance: true,
   showFriendLocation: true,
+  gpsAccuracy: "standard",
   ghostMode: false,
   shareLocation: true,
   normalModeFields: DEFAULT_NORMAL_FIELDS,

@@ -549,6 +549,49 @@ export default function SettingsScreen() {
 
 
 
+        {/* ── 背景 GPS 精度 ── */}
+        <SectionHeader title="背景 GPS 精度" colors={colors} onToggle={() => toggleSection("gpsAccuracy")} collapsed={collapsedSections["gpsAccuracy"]} />
+        {!collapsedSections["gpsAccuracy"] && <View style={[styles.section, { borderColor: colors.border }]}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
+            <Text style={{ color: colors.muted, fontSize: 12 }}>設定背景執行時的 GPS 更新頻率，高精度更耗電但軌跡更精確</Text>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {(["power_saving", "standard", "high_accuracy"] as const).map((level) => (
+                <Pressable
+                  key={level}
+                  style={({ pressed }) => [{
+                    flex: 1,
+                    paddingVertical: 10,
+                    paddingHorizontal: 8,
+                    borderRadius: 8,
+                    backgroundColor: settings.gpsAccuracy === level ? colors.primary : colors.surface,
+                    borderWidth: 1,
+                    borderColor: settings.gpsAccuracy === level ? colors.primary : colors.border,
+                    opacity: pressed ? 0.8 : 1,
+                  }]}
+                  onPress={() => updateSettings({ gpsAccuracy: level })}
+                >
+                  <Text style={{
+                    color: settings.gpsAccuracy === level ? "#fff" : colors.foreground,
+                    fontSize: 11,
+                    fontWeight: "600",
+                    textAlign: "center",
+                  }}>
+                    {level === "power_saving" ? "🔋 省電" : level === "standard" ? "⚖️ 標準" : "📡 高精度"}
+                  </Text>
+                  <Text style={{
+                    color: settings.gpsAccuracy === level ? "rgba(255,255,255,0.8)" : colors.muted,
+                    fontSize: 10,
+                    textAlign: "center",
+                    marginTop: 2,
+                  }}>
+                    {level === "power_saving" ? "15s / 30m" : level === "standard" ? "5s / 10m" : "3s / 5m"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </View>}
+
         {/* ── 補給閾值 ── */}
         <SectionHeader title="補給閾值" colors={colors} onToggle={() => toggleSection("supply")} collapsed={collapsedSections["supply"]} />
         {!collapsedSections["supply"] && <View style={[styles.section, { borderColor: colors.border }]}>

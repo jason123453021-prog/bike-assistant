@@ -212,8 +212,17 @@ export async function getBackgroundState(): Promise<BackgroundState | null> {
   }
 }
 
-export async function startBackgroundLocationTracking() {
+export type GpsAccuracyLevel = "power_saving" | "standard" | "high_accuracy";
+
+const ACCURACY_CONFIG: Record<GpsAccuracyLevel, { accuracy: Location.Accuracy; timeInterval: number; distanceInterval: number }> = {
+  power_saving: { accuracy: Location.Accuracy.Balanced, timeInterval: 15000, distanceInterval: 30 },
+  standard: { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
+  high_accuracy: { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 3000, distanceInterval: 5 },
+};
+
+export async function startBackgroundLocationTracking(gpsAccuracy: GpsAccuracyLevel = "standard") {
   try {
+    const { accuracy: accuracyLevel, timeInterval: timeIntervalMs, distanceInterval: distanceIntervalM } = ACCURACY_CONFIG[gpsAccuracy];
     const { status } = await Location.requestBackgroundPermissionsAsync();
     if (status !== "granted") {
       console.warn("[BackgroundLocation] Background permission denied");
@@ -223,9 +232,9 @@ export async function startBackgroundLocationTracking() {
     const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
     if (!isRegistered) {
       await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-        accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 5000,
-        distanceInterval: 10,
+        accuracy: accuracyLevel,
+        timeInterval: timeIntervalMs,
+        distanceInterval: distanceIntervalM,
         foregroundService: {
           notificationTitle: "🚴 單車助手正在追蹤",
           notificationBody: "GPS 追蹤中，點擊返回應用",
@@ -251,5 +260,17 @@ export async function stopBackgroundLocationTracking() {
     }
   } catch (e) {
     console.warn("[BackgroundLocation] Stop failed:", e);
+  }
+}
+
+/**
+ * 清除背景軌跡數據（騎乘結束時調用）
+ */
+export async function clearBackgroundData() {
+  try {
+    await AsyncStorage.multiRemove([BG_TRACK_KEY, BG_STATE_KEY]);
+    console.log("[BackgroundLocation] 已清除背景軌跡數據");
+  } catch (e) {
+    console.warn("[BackgroundLocation] 清除背景數據失敗:", e);
   }
 }

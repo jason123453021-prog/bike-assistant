@@ -85,6 +85,7 @@ import {
   initBackgroundState,
   getBackgroundTrackPoints,
   getBackgroundState,
+  clearBackgroundData,
 } from "@/lib/background-location";
 import { BackgroundLocationTracking, ScreenWakeup } from "@/lib/native-modules";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -1449,7 +1450,7 @@ export default function MapScreen() {
       currentLat: lastPos?.coords.latitude ?? 0,
       currentLon: lastPos?.coords.longitude ?? 0,
     });
-    await startBackgroundLocationTracking();
+    await startBackgroundLocationTracking(settings.gpsAccuracy || "standard");
 
     // 啟動原生後台位置追蹤（Android）
     try {
@@ -1513,6 +1514,8 @@ export default function MapScreen() {
           locationSubRef.current?.remove();
           locationSubRef.current = null;
           await stopBackgroundLocationTracking();
+          await clearBackgroundData(); // 清除背景軌跡數據避免存儲空間增長
+          lastBgSyncTsRef.current = 0; // 重置去重時間戳
           
           // 停止原生後台位置追蹤（Android）
           try {
@@ -1944,7 +1947,7 @@ export default function MapScreen() {
                   setMapRideActive(true);
                   setShowRecoveryAlert(false);
                   setRecoverySnapshot(null);
-                  startBackgroundLocationTracking();
+                  startBackgroundLocationTracking(settings.gpsAccuracy || "standard");
                 }
               }}
             >
