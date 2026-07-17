@@ -1658,8 +1658,14 @@ export default function MapScreen() {
             Alert.alert("低電量提示", `電量剩餘 ${pct}%，已自動將背景 GPS 切換為省電模式以延長續航。`);
             console.log(`[GPS] 電量 ${pct}%，自動降級為 power_saving`);
           }
-        } else if (pct > 20) {
+        } else if (pct > 30 && batteryDegradedRef.current) {
+          // 電量恢復超過 30%，自動回升為用戶原本設定的精度
           batteryDegradedRef.current = false;
+          const userAccuracy: GpsAccuracyLevel = settings.gpsAccuracy || "standard";
+          await stopBackgroundLocationTracking();
+          await startBackgroundLocationTracking(userAccuracy);
+          Alert.alert("電量已恢復", `電量已回升至 ${pct}%，已自動恢復背景 GPS 為「${userAccuracy === "power_saving" ? "省電" : userAccuracy === "standard" ? "標準" : "高精度"}」模式。`);
+          console.log(`[GPS] 電量 ${pct}%，自動回升為 ${userAccuracy}`);
         }
       } catch { /* 忽略電量讀取失敗 */ }
     };
