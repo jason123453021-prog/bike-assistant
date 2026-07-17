@@ -1651,6 +1651,13 @@ export default function MapScreen() {
     return gpxRoute.points.slice(0, nearestIdx + 1).map((p) => ({ latitude: p.lat, longitude: p.lon }));
   }, [gpxRoute, nearestIdx]);
 
+  // 計算里程標記（每 1 公里一個）
+  const kilometersMarkers = useMemo(() => {
+    if (!gpxRoute || gpxRoute.points.length === 0) return [];
+    const { calculateKilometerMarkers } = require('@/lib/kilometer-markers');
+    return calculateKilometerMarkers(gpxRoute.points);
+  }, [gpxRoute]);
+
   const avgSpeed = useMemo(() => {
     if (state.elapsed < 5 || state.distance < 10) return 0;
     return (state.distance / 1000) / (state.elapsed / 3600);
@@ -1763,6 +1770,7 @@ export default function MapScreen() {
             setCenterPinLocation({ lat, lon });
           }
         }}
+        kilometersMarkers={kilometersMarkers}
       />
 
       {/* ── 頂部導航指令條 ── */}

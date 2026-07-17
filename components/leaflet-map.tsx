@@ -41,6 +41,13 @@ export interface FriendMarker {
   isMoving: boolean;
 }
 
+export interface KilometerMarker {
+  kilometer: number;
+  lat: number;
+  lon: number;
+  elevation: number;
+}
+
 export interface LeafletMapProps {
   style?: object;
   initialRegion?: {
@@ -63,6 +70,7 @@ export interface LeafletMapProps {
   onFriendTap?: (friend: FriendMarker & { lat: number; lon: number }) => void;
   centerPinLocation?: { lat: number; lon: number } | null;
   onMapCenterChanged?: (lat: number, lon: number) => void;
+  kilometersMarkers?: KilometerMarker[];
 }
 
 export interface LeafletMapHandle {
@@ -131,10 +139,22 @@ var passedLayer = L.polyline([], { color: '#8B0000', weight: 4, opacity: 0.9 }).
 var trailLayer = L.polyline([], { color: '#00E676', weight: 3, opacity: 0.9 }).addTo(map);
 var returnLayer = L.polyline([], { color: '#FF9500', weight: 4, opacity: 0.9 }).addTo(map);
 
+// 里程標記層
+var kilometerMarkers = [];
+function makeKilometerIcon(km) {
+  return L.divIcon({
+    html: '<div style="width: 32px; height: 32px; background-color: #007AFF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 2px solid white;"><span>' + km + '</span></div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    className: 'kilometer-marker-icon'
+  });
+}
+
 // Markers
 var posMarker = null;
 var posAccMarker = null;
 var startMarker = null;
+var kilometerMarkersLayer = [];
 var endMarker = null;
 var returnEndMarker = null;
 var centerPinMarker = null; // 中心圖釘標記
@@ -533,6 +553,21 @@ function handleMessage(data) {
           }).addTo(map);
         }
         break;
+      case 'setKilometerMarkers':
+        // 移除舊的里程標記
+        kilometerMarkersLayer.forEach(function(marker) { map.removeLayer(marker); });
+        kilometerMarkersLayer = [];
+        // 添加新的里程標記
+        var markers = msg.markers || [];
+        markers.forEach(function(m) {
+          var marker = L.marker([m.lat, m.lon], {
+            icon: makeKilometerIcon(m.kilometer),
+            zIndexOffset: 600,
+            title: m.kilometer + ' km (高度: ' + m.elevation + 'm)'
+          }).addTo(map);
+          kilometerMarkersLayer.push(marker);
+        });
+        break;
       case 'setHeadingUpMode':
         headingUpMode = msg.enabled || false;
         break;
@@ -572,6 +607,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       onFriendTap,
       centerPinLocation,
       onMapCenterChanged,
+      kilometersMarkers,
     },
     ref
   ) => {
@@ -705,6 +741,16 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         );
       }
     }, [returnPolyline, isOffRoute, isReady]);
+
+    // Send kilometer markers
+    useEffect(() => {
+      if (!isReady || !webViewRef.current) return;
+      if (kilometersMarkers && kilometersMarkers.length > 0) {
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "setKilometerMarkers", markers: kilometersMarkers })
+        );
+      }
+    }, [kilometersMarkers, isReady]);
 
     // Send center pin location
     useEffect(() => {
