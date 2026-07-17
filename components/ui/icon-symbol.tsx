@@ -75,6 +75,16 @@ const MAPPING = {
   // Privacy & account
   "doc.text.fill":                         "article",
   "trash.fill":                            "delete",
+  "trash":                                 "delete",
+  // Map & navigation extras
+  "mappin.circle.fill":                    "place",
+  "star.fill":                             "star",
+  "heart":                                 "favorite-border",
+  "heart.fill":                            "favorite",
+  "bag.fill":                              "shopping-bag",
+  "arrow.counterclockwise":                "replay",
+  "arrow.down.doc":                        "file-download",
+  "chevron.left":                          "chevron-left",
 } as IconMapping;
 
 export function IconSymbol({

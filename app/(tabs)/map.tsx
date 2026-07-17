@@ -81,8 +81,9 @@ import {
 import {
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
+  initBackgroundState,
 } from "@/lib/background-location";
-import { BackgroundLocationTracking } from "@/lib/native-modules";
+import { BackgroundLocationTracking, ScreenWakeup } from "@/lib/native-modules";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SupplyModal } from "@/components/supply-modal";
 import { RideSummaryModal } from "@/components/ride-summary-modal";
@@ -1436,6 +1437,14 @@ export default function MapScreen() {
       speak("導航已啟動，沿路線前進", settings.ttsEnabled);
     }
 
+    // 初始化背景狀態（確保背景中能計算距離和觸發補給提醒）
+    const lastPos = await Location.getLastKnownPositionAsync();
+    await initBackgroundState({
+      calorieThreshold: settings.calorieThreshold,
+      waterThreshold: hydrationThresholdMl,
+      currentLat: lastPos?.coords.latitude ?? 0,
+      currentLon: lastPos?.coords.longitude ?? 0,
+    });
     await startBackgroundLocationTracking();
 
     // 啟動原生後台位置追蹤（Android）
@@ -1563,6 +1572,39 @@ export default function MapScreen() {
       if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
     };
   }, []);
+
+  // ─── 音量鍵關閉補給提醒並重新計數 ─────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    // 只在補給提醒顯示時監聽音量鍵
+    if (!calorieAlert && !waterAlert) return;
+
+    const unsubscribe = ScreenWakeup.onVolumeKeyPressed(() => {
+      // 每次按下音量鍵關閉一個補給提醒並重新計數
+      // 優先關閉卡路里提醒，再關閉水分提醒
+      if (calorieAlert) {
+        setCalorieAlert(false);
+        dispatch({ type: "CONSUME_CALORIES" });
+        calorieAnim.setValue(0);
+        calorieReminderSentRef.current = false;
+        pendingCalorieRef.current = false;
+        if (settings.vibrationEnabled) vibrateSuccess();
+        if (!waterAlert && !pendingWaterRef.current) clearSupplyRepeatTimer();
+      } else if (waterAlert) {
+        setWaterAlert(false);
+        setSupplyRecommendedMl(undefined);
+        dispatch({ type: "CONSUME_WATER" });
+        waterAnim.setValue(0);
+        waterReminderSentRef.current = false;
+        pendingWaterRef.current = false;
+        if (settings.vibrationEnabled) vibrateSuccess();
+        if (!pendingCalorieRef.current) clearSupplyRepeatTimer();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [calorieAlert, waterAlert, settings.vibrationEnabled, dispatch, clearSupplyRepeatTimer]);
 
   // ─── 好友導航：開始導航至好友位置 ──────────────────────────────────────────────────────────────────────────────
   const startFriendNav = useCallback(async (
