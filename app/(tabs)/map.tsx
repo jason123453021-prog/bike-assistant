@@ -1670,7 +1670,7 @@ export default function MapScreen() {
     if (!currentPos) return;
     const loadPOIs = async () => {
       try {
-        const { getPOIsAlongRoute } = await import('@/lib/poi-manager');
+        const { getPOIsAlongRoute, calculateDistance } = await import('@/lib/poi-manager');
         const { getPOIs } = await import('@/lib/poi-data');
         
         // 如果有 GPX 路線，獲取沿路線的 POI
@@ -1690,11 +1690,10 @@ export default function MapScreen() {
           })));
         } else {
           // 如果沒有路線，獲取當前位置附近的 POI
-          const { calculateDistance } = await import('@/lib/poi-manager');
           const pois = await getPOIs();
           const nearbyPOIs = pois.filter(poi => {
             const dist = calculateDistance(currentPos.lat, currentPos.lon, poi.latitude, poi.longitude);
-            return dist <= 2000; // 2km 範圍
+            return dist <= 2; // 2km 範圍
           });
           setPoiMarkers(nearbyPOIs.map(poi => ({
             id: poi.id,
