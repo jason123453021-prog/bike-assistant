@@ -48,6 +48,17 @@ export interface KilometerMarker {
   elevation: number;
 }
 
+export interface POIMarker {
+  id: string;
+  type: string;
+  name: string;
+  lat: number;
+  lon: number;
+  color: string;
+  icon: string;
+  rating?: number;
+}
+
 export interface LeafletMapProps {
   style?: object;
   initialRegion?: {
@@ -71,6 +82,8 @@ export interface LeafletMapProps {
   centerPinLocation?: { lat: number; lon: number } | null;
   onMapCenterChanged?: (lat: number, lon: number) => void;
   kilometersMarkers?: KilometerMarker[];
+  poiMarkers?: POIMarker[];
+  onPOITap?: (poi: POIMarker) => void;
 }
 
 export interface LeafletMapHandle {
