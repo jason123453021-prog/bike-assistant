@@ -104,20 +104,59 @@ const LEAFLET_HTML = `<!DOCTYPE html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.7/dist/leaflet-rotate-src.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body, #map { width: 100%; height: 100%; background: #f5f3ee; }
   .leaflet-container { background: #f5f3ee; }
   /* 車頭方向指示器 - 改稱圓點 */
-  .heading-arrow {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background-color: #007AFF;
-    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
-  }
+    .heading-arrow {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: #007AFF;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+    }
+    .marker-cluster-small {
+      background-color: rgba(181, 226, 140, 0.6);
+    }
+    .marker-cluster-small div {
+      background-color: rgba(110, 204, 57, 0.6);
+    }
+    .marker-cluster-medium {
+      background-color: rgba(241, 211, 87, 0.6);
+    }
+    .marker-cluster-medium div {
+      background-color: rgba(240, 194, 12, 0.6);
+    }
+    .marker-cluster-large {
+      background-color: rgba(253, 156, 115, 0.6);
+    }
+    .marker-cluster-large div {
+      background-color: rgba(241, 128, 23, 0.6);
+    }
+
+    .marker-cluster {
+      background-clip: padding-box;
+      border-radius: 20px;
+    }
+    .marker-cluster div {
+      width: 30px;
+      height: 30px;
+      margin-left: 5px;
+      margin-top: 5px;
+
+      text-align: center;
+      border-radius: 15px;
+      font: 12px "Helvetica Neue", Arial, Helvetica, sans-serif;
+    }
+    .marker-cluster span {
+      line-height: 30px;
+    }
 </style>
 </head>
 <body>
@@ -166,7 +205,8 @@ function makeKilometerIcon(km) {
 }
 
 // POI 標記層
-var poiMarkersLayer = [];
+var poiMarkersLayer = L.markerClusterGroup();
+map.addLayer(poiMarkersLayer);
 var poiColorMap = {
   'convenience_store': '#FF6B6B',
   'restaurant': '#FFA500',
@@ -611,16 +651,15 @@ function handleMessage(data) {
         break;
       case 'setPOIMarkers':
         // 移除舊的 POI 標記
-        poiMarkersLayer.forEach(function(marker) { map.removeLayer(marker); });
-        poiMarkersLayer = [];
+        poiMarkersLayer.clearLayers();
         // 添加新的 POI 標記
         var poiMarkers = msg.markers || [];
         poiMarkers.forEach(function(poi) {
           var marker = L.marker([poi.lat, poi.lon], {
             icon: makePOIIcon(poi.type, poi.name, POI_ICONS_MAP[poi.type] || poi.icon),
-            zIndexOffset: 550,
             title: poi.name
-          }).addTo(map);
+          });
+          poiMarkersLayer.addLayer(marker);
           (function(poiData) {
             marker.on('click', function(e) {
               L.DomEvent.stopPropagation(e);

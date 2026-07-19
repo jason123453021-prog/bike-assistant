@@ -1152,3 +1152,9 @@
 - [ ] 確保 POI 在 GPX 匯入時持續顯示
 - [ ] 確保 POI 在導航時持續顯示
 - [ ] 確保 POI 在任何功能開啟時都在地圖上可見
+
+## POI 圖示群聚功能（Clustering）
+- [x] 集成 Leaflet.markercluster 插件
+- [x] 實現 POI 群聚邏輯
+- [x] 自訂群聚樣式
+- [x] 測試群聚功能
