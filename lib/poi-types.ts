@@ -52,16 +52,16 @@ export interface POIFilter {
 }
 
 export const POI_ICONS = {
-  [POIType.CONVENIENCE_STORE]: '🏪',
-  [POIType.RESTAURANT]: '🍽️',
-  [POIType.CAFE]: '☕',
-  [POIType.WATER_FOUNTAIN]: '💧',
-  [POIType.RESTROOM]: '🚻',
-  [POIType.MOBILE_RESTROOM]: '🚐',
-  [POIType.PHOTO_SPOT]: '📷',
-  [POIType.VIEWPOINT]: '🏞️',
-  [POIType.SUMMIT]: '⛰️',
-  [POIType.PEAK]: '🏔️',
+  [POIType.CONVENIENCE_STORE]: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/convenience_store_icon-2wYvCJUamFGHKJiYvxNzMm.webp',
+  [POIType.RESTAURANT]: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/restaurant_icon-FZyhTjQbh8qvYxadcZ3UiM.webp',
+  [POIType.CAFE]: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/cafe_icon-CPgJ93T4qFU5KgPJhQ4d4z.webp',
+  [POIType.WATER_FOUNTAIN]: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/water_dispenser_icon-N4GxEuGprDUAF22dGpikNt.webp',
+  [POIType.RESTROOM]: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/toilet_icon-QcZpib2V6zZMPNDRDZgyGL.webp',
+  [POIType.MOBILE_RESTROOM]: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/toilet_icon-QcZpib2V6zZMPNDRDZgyGL.webp', // 使用相同的廁所圖示
+  [POIType.PHOTO_SPOT]: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/viewpoint_icon-hHPUuKz6dyxh9xF33ivrv7.webp', // 使用相機圖示
+  [POIType.VIEWPOINT]: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/viewpoint_icon-hHPUuKz6dyxh9xF33ivrv7.webp',
+  [POIType.SUMMIT]: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/mountain_peak_icon-iF7W8bqr85jet66YfT3vXM.webp',
+  [POIType.PEAK]: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/mountain_peak_icon-iF7W8bqr85jet66YfT3vXM.webp', // 使用相同的山峰圖示
 };
 
 export const POI_COLORS = {

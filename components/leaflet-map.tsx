@@ -24,6 +24,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { POI_ICONS } from "@/lib/poi-types";
 import { StyleSheet, View, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -121,8 +122,9 @@ const LEAFLET_HTML = `<!DOCTYPE html>
 </head>
 <body>
 <div id="map"></div>
-<script>
-// Init map (with leaflet-rotate plugin)
+    <script>
+    var POI_ICONS_MAP = ${JSON.stringify(POI_ICONS)};
+    // Init map (with leaflet-rotate plugin)
 var map = L.map('map', {
   zoomControl: false,
   attributionControl: false,
@@ -167,24 +169,24 @@ function makeKilometerIcon(km) {
 var poiMarkersLayer = [];
 var poiColorMap = {
   'convenience_store': '#FF6B6B',
-  'restaurant': '#FF8C42',
-  'cafe': '#FFA500',
-  'water': '#4ECDC4',
-  'toilet': '#95E1D3',
-  'portable_toilet': '#7FD8BE',
-  'photo_spot': '#FFB6C1',
-  'viewpoint': '#DDA0DD',
-  'peak': '#9370DB',
-  'summit': '#8B7ABF'
+  'restaurant': '#FFA500',
+  'cafe': '#8B4513',
+  'water_fountain': '#4A90E2',
+  'restroom': '#9B59B6',
+  'mobile_restroom': '#9B59B6',
+  'photo_spot': '#E74C3C',
+  'viewpoint': '#27AE60',
+  'summit': '#34495E',
+  'peak': '#34495E'
 };
 
-function makePOIIcon(poiType, label) {
-  var color = poiColorMap[poiType] || '#999999';
-  var iconSize = 28;
-  return L.divIcon({
-    html: '<div style="width: ' + iconSize + 'px; height: ' + iconSize + 'px; background-color: ' + color + '; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); border: 2px solid white; position: relative;" title="' + label + '"><span style="font-size: 10px;">📍</span></div>',
+function makePOIIcon(poiType, label, iconUrl) {
+  var iconSize = 32; // Adjust size as needed
+  return L.icon({
+    iconUrl: iconUrl,
     iconSize: [iconSize, iconSize],
     iconAnchor: [iconSize / 2, iconSize / 2],
+    popupAnchor: [0, -iconSize / 2],
     className: 'poi-marker-icon'
   });
 }
@@ -615,7 +617,7 @@ function handleMessage(data) {
         var poiMarkers = msg.markers || [];
         poiMarkers.forEach(function(poi) {
           var marker = L.marker([poi.lat, poi.lon], {
-            icon: makePOIIcon(poi.type, poi.name),
+            icon: makePOIIcon(poi.type, poi.name, POI_ICONS_MAP[poi.type] || poi.icon),
             zIndexOffset: 550,
             title: poi.name
           }).addTo(map);
