@@ -82,6 +82,7 @@ export interface LeafletMapProps {
   onFriendTap?: (friend: FriendMarker & { lat: number; lon: number }) => void;
   centerPinLocation?: { lat: number; lon: number } | null;
   onMapCenterChanged?: (lat: number, lon: number) => void;
+  onMapMoveEnd?: (bounds: { northEast: { lat: number; lon: number }; southWest: { lat: number; lon: number } }) => void;
   kilometersMarkers?: KilometerMarker[];
   poiMarkers?: POIMarker[];
   onPOITap?: (poi: POIMarker) => void;
@@ -313,6 +314,25 @@ map.on('dragend', function() {
       type: 'mapCenterChanged',
       lat: center.lat,
       lon: center.lng
+    }));
+  }
+  if (window.ReactNativeWebView) {
+    var bounds = map.getBounds();
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'mapMoveEnd',
+      northEast: { lat: bounds.getNorthEast().lat, lon: bounds.getNorthEast().lng },
+      southWest: { lat: bounds.getSouthWest().lat, lon: bounds.getSouthWest().lng }
+    }));
+  }
+});
+
+map.on('zoomend', function() {
+  if (window.ReactNativeWebView) {
+    var bounds = map.getBounds();
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'mapMoveEnd',
+      northEast: { lat: bounds.getNorthEast().lat, lon: bounds.getNorthEast().lng },
+      southWest: { lat: bounds.getSouthWest().lat, lon: bounds.getSouthWest().lng }
     }));
   }
 });
@@ -677,7 +697,6 @@ function handleMessage(data) {
               }
             });
           })(poi);
-          poiMarkersLayer.push(marker);
         });
         break;
       case 'setHeadingUpMode':
@@ -722,6 +741,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       kilometersMarkers,
       poiMarkers,
       onPOITap,
+      onMapMoveEnd,
     },
     ref
   ) => {
@@ -958,6 +978,11 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             color: '',
             icon: '',
             rating: undefined,
+          });
+        } else if (msg.type === "mapMoveEnd") {
+          onMapMoveEnd?.({
+            northEast: { lat: msg.northEast.lat, lon: msg.northEast.lon },
+            southWest: { lat: msg.southWest.lat, lon: msg.southWest.lon },
           });
         }
       } catch {}

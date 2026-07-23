@@ -1929,14 +1929,21 @@ export default function MapScreen() {
 
   // POI 標記狀態
   const [poiMarkers, setPoiMarkers] = useState<any[]>([]);
+  const [mapBounds, setMapBounds] = useState<{ northEast: { lat: number; lon: number }; southWest: { lat: number; lon: number } } | null>(null);
+
+  const handleMapMoveEnd = useCallback((bounds: { northEast: { lat: number; lon: number }; southWest: { lat: number; lon: number } }) => {
+    setMapBounds(bounds);
+  }, []);
   const [tappedPOI, setTappedPOI] = useState<any | null>(null);
   const [showPOICard, setShowPOICard] = useState(false);
   const [isFetchingPOIRoute, setIsFetchingPOIRoute] = useState(false);
   const [poiRouteInfo, setPoiRouteInfo] = useState<{ distM: number; durSec: number; polyline: { latitude: number; longitude: number }[] } | null>(null);
 
   // 加載 POI 數據（App 啟動即加載，並根據位置和路線動態更新）
-  const poiLoadedRef = useRef(false);
+
   useEffect(() => {
+    // 避免在組件首次渲染時觸發兩次 POI 加載
+    if (!mapBounds && !currentPos && !gpxRoute) return;
     const loadPOIs = async () => {
       try {
         const { getPOIsAlongRoute, calculateDistance } = await import('@/lib/poi-manager');
@@ -1961,7 +1968,15 @@ export default function MapScreen() {
           const routePoints = gpxRoute.points.map(p => ({ lat: p.lat, lon: p.lon }));
           const nearbyPOIs = getPOIsAlongRoute(pois, routePoints, 0.5);
           setPoiMarkers(nearbyPOIs.map(mapPOI));
-          poiLoadedRef.current = true;
+        } else if (mapBounds) {
+          // 如果有地圖邊界，獲取該區域內的 POI
+          const { northEast, southWest } = mapBounds;
+          const pois = await getPOIs(
+            (northEast.lat + southWest.lat) / 2,
+            (northEast.lon + southWest.lon) / 2,
+            haversineDistance(northEast.lat, northEast.lon, southWest.lat, southWest.lon) / 2000 // 獲取邊界半徑內的 POI (km)
+          );
+          setPoiMarkers(pois.map(mapPOI));
         } else if (currentPos) {
           // 有位置時，獲取當前位置附近的 POI（擴大範圍到 5km）
           const pois = await getPOIs(currentPos.lat, currentPos.lon, 5);
@@ -1979,9 +1994,8 @@ export default function MapScreen() {
               longitude: currentPos.lon + (Math.random() - 0.5) * 0.02,
             })));
           }
-          poiLoadedRef.current = true;
-        } else if (!poiLoadedRef.current) {
-          // 無位置無路線時，先顯示範例 POI（首次加載）
+        } else {
+          // 無位置無路線無邊界時，顯示範例 POI
           setPoiMarkers(SAMPLE_POIS.map(mapPOI));
         }
       } catch (err) {
@@ -2008,7 +2022,7 @@ export default function MapScreen() {
     };
 
     loadPOIs();
-  }, [currentPos, gpxRoute]);
+  }, [currentPos, gpxRoute, mapBounds]);
 
   const avgSpeed = useMemo(() => {
     if (state.elapsed < 5 || state.distance < 10) return 0;
@@ -2133,6 +2147,7 @@ export default function MapScreen() {
             { duration: 300 }
           );
         }}
+        onMapMoveEnd={handleMapMoveEnd}
       />
 
       {/* ── 頂部導航指令條 ── */}
