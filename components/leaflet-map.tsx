@@ -411,23 +411,12 @@ function handleMessage(data) {
         // Position marker with direction arrow
         if (posMarker) { map.removeLayer(posMarker); posMarker = null; }
         // 如果有 heading，顯示方向箭頭；否則顯示藍點
-        if (msg.heading !== undefined && msg.heading !== null) {
-          if (directionArrowMarker) { map.removeLayer(directionArrowMarker); directionArrowMarker = null; }
-          var arrowBearing = headingUpMode ? 0 : msg.heading;
-          var arrowHtml = '<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;transform:rotate(' + arrowBearing + 'deg);transition:transform 200ms ease-out;"><svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><style>.arrow-fill{fill:#007AFF;}.arrow-stroke{stroke:#fff;stroke-width:1;}</style></defs><path class="arrow-fill arrow-stroke" d="M16 2 L28 28 L16 22 L4 28 Z"/></svg></div>';
-          var arrowIcon = L.divIcon({
-            html: arrowHtml,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
-            className: 'direction-arrow-responsive'
-          });
-          directionArrowMarker = L.marker([lat, lon], { icon: arrowIcon, zIndexOffset: 1000 }).addTo(map);
-        } else {
+        if (directionArrowMarker) { map.removeLayer(directionArrowMarker); directionArrowMarker = null; }
           posMarker = L.marker([lat, lon], {
             icon: makeCircleIcon('#007AFF', 16, '#fff'),
             zIndexOffset: 1000,
           }).addTo(map);
-        }
+        
         // 車頭朝前模式：同步地圖方向
         if (headingUpMode && msg.heading !== undefined && msg.heading !== null) {
           if (typeof map.setBearing === 'function') {

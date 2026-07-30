@@ -1080,9 +1080,9 @@ export default function MapScreen() {
               // 下坡時暫停提醒但仍計數
               console.log('[補給] 下坡時暫停卡路里提醒');
             } else {
-              calorieReminderSentRef.current = true;
               console.log('[補給] 觸發卡路里提醒');
               triggerSupplyReminder("calorie");
+              calorieReminderSentRef.current = true;
             }
           }
 
@@ -1093,9 +1093,9 @@ export default function MapScreen() {
               // 下坡時暫停提醒但仍計數
               console.log('[補給] 下坡時暫停水分提醒');
             } else {
-              waterReminderSentRef.current = true;
               console.log('[補給] 觸發水分提醒');
               triggerSupplyReminder("water", sweatResult.recommendedRefillMl);
+              waterReminderSentRef.current = true;
             }
           }
 
