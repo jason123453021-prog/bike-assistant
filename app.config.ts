@@ -134,16 +134,19 @@ const config: ExpoConfig = {
       "expo-build-properties",
       {
         android: {
-          buildArchs: ["armeabi-v7a", "arm64-v8a"],
-          minSdkVersion: 36,
+          buildArchs: ["arm64-v8a"],
+          minSdkVersion: 24,
           targetSdkVersion: 36,
+          cppStandard: "c++17",
+          useClang: true,
+          enableLto: false,
         },
       },
     ],
   ],
   experiments: {
     typedRoutes: true,
-    reactCompiler: true,
+    reactCompiler: false,
   },
 };
 

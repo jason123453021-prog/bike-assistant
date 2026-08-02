@@ -3,7 +3,13 @@
     "preview": {
       "android": {
         "buildType": "apk",
-        "distribution": "internal"
+        "distribution": "internal",
+        "env": {
+          "GRADLE_OPTS": "-Xmx4096m -XX:+UseG1GC",
+          "ORG_GRADLE_PROJECT_android_cppStandard": "c++17",
+          "ORG_GRADLE_PROJECT_android_useClang": "true",
+          "ORG_GRADLE_PROJECT_android_enableLto": "false"
+        }
       }
     },
     "preview2": {
@@ -18,7 +24,13 @@
     },
     "production": {
       "android": {
-        "buildType": "aab"
+        "buildType": "aab",
+        "env": {
+          "GRADLE_OPTS": "-Xmx4096m -XX:+UseG1GC",
+          "ORG_GRADLE_PROJECT_android_cppStandard": "c++17",
+          "ORG_GRADLE_PROJECT_android_useClang": "true",
+          "ORG_GRADLE_PROJECT_android_enableLto": "false"
+        }
       }
     },
     "dev-client": {
