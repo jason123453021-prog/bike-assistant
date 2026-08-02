@@ -11,6 +11,7 @@ import { SupplyReminderManager } from '../supply/supply-reminder-manager';
 import { PowerSavingManager } from '../power-saving/power-saving-manager';
 import { DashboardConfigManager } from '../dashboard/dashboard-config-manager';
 import { OfflineManager } from '../offline/offline-manager';
+import { calculateAllMetrics, type GPSPoint } from '../calculation/ride-metrics-calculator';
 
 export interface RideSessionConfig {
   enableGPSSmoothing: boolean;
@@ -273,11 +274,13 @@ export class RideSessionIntegration {
           }
         }
 
-        // 更新補給提醒（假設已計算卡路里和水分）
-        if (this.config.enableSupplyReminder) {
-          // 這裡應該基於實際的卡路里和水分計算
-          // this.supplyReminderManager.updateCalories(caloriesDelta);
-          // this.supplyReminderManager.updateWater(waterDelta);
+        // 計算並更新卡路里
+        if (this.config.enableSupplyReminder && sessionData.coordinates.length > 1) {
+          const metrics = calculateAllMetrics(
+            sessionData.coordinates as GPSPoint[],
+            75 // 默認體重 75kg
+          );
+          sessionData.statistics.calories = metrics.calories;
         }
 
         this.mmkvStorage.saveSession(this.context.sessionId, sessionData);
