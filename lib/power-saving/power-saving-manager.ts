@@ -3,8 +3,14 @@
  * 自動調暗螢幕、多重即時喚醒機制
  */
 
-import * as BrightnessModule from 'expo-brightness';
-const Brightness = BrightnessModule as any;
+// 注意：expo-brightness 在某些環境下可能不可用
+// 使用 try-catch 進行防禦性導入
+let Brightness: any = null;
+try {
+  Brightness = require('expo-brightness');
+} catch (e) {
+  console.warn('expo-brightness 不可用，省電模式功能將被禁用');
+}
 
 export interface PowerSavingConfig {
   enabled: boolean;
@@ -148,6 +154,12 @@ export class PowerSavingManager {
    */
   private async activate(): Promise<void> {
     try {
+      // 檢查 Brightness 模組是否可用
+      if (!Brightness || !Brightness.getBrightnessAsync) {
+        console.warn('[PowerSaving] Brightness module not available');
+        return;
+      }
+
       // 保存當前亮度
       const currentBrightness = await Brightness.getBrightnessAsync();
       this.state.originalBrightness = currentBrightness;
@@ -193,6 +205,10 @@ export class PowerSavingManager {
    */
   private async restoreBrightness(): Promise<void> {
     try {
+      if (!Brightness || !Brightness.setBrightnessAsync) {
+        console.warn('[PowerSaving] Brightness module not available');
+        return;
+      }
       await Brightness.setBrightnessAsync(this.state.originalBrightness);
       this.state.currentBrightness = this.state.originalBrightness;
     } catch (error) {
