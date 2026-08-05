@@ -8,7 +8,9 @@
           "GRADLE_OPTS": "-Xmx4096m -XX:+UseG1GC",
           "ORG_GRADLE_PROJECT_android_cppStandard": "c++17",
           "ORG_GRADLE_PROJECT_android_useClang": "true",
-          "ORG_GRADLE_PROJECT_android_enableLto": "false"
+          "ORG_GRADLE_PROJECT_android_enableLto": "false",
+          "NITRO_MODULES_DISABLE": "true",
+          "CMAKE_VERSION": "3.21.4"
         }
       }
     },
@@ -29,7 +31,9 @@
           "GRADLE_OPTS": "-Xmx4096m -XX:+UseG1GC",
           "ORG_GRADLE_PROJECT_android_cppStandard": "c++17",
           "ORG_GRADLE_PROJECT_android_useClang": "true",
-          "ORG_GRADLE_PROJECT_android_enableLto": "false"
+          "ORG_GRADLE_PROJECT_android_enableLto": "false",
+          "NITRO_MODULES_DISABLE": "true",
+          "CMAKE_VERSION": "3.21.4"
         }
       }
     },
