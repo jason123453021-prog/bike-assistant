@@ -77,7 +77,7 @@ export async function startForegroundService(
     await initializeNotificationChannel(finalConfig.notificationChannelId);
 
     // 發送前台通知
-    notificationId = (await Notifications.scheduleNotificationAsync({
+    const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: finalConfig.notificationTitle,
         body: finalConfig.notificationBody,
@@ -91,7 +91,8 @@ export async function startForegroundService(
         },
       },
       trigger: null, // 立即發送
-    })) as string;
+    });
+    notificationId = typeof id === 'string' ? id : undefined;
 
     isServiceRunning = true;
     console.log('[ForegroundService] Started successfully');
@@ -142,7 +143,7 @@ export async function updateForegroundNotification(
       await Notifications.dismissNotificationAsync(notificationId);
     }
 
-    notificationId = (await Notifications.scheduleNotificationAsync({
+    const id = await Notifications.scheduleNotificationAsync({
       content: {
         title,
         body,
@@ -156,7 +157,8 @@ export async function updateForegroundNotification(
         },
       },
       trigger: null,
-    })) as string;
+    });
+    notificationId = typeof id === 'string' ? id : undefined;
   } catch (error) {
     console.error('[ForegroundService] Failed to update notification:', error);
   }
