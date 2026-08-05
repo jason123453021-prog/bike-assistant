@@ -117,7 +117,21 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 好友頁面已移除 - 純離線模式 */}
+      {/* 好友 */}
+      <Tabs.Screen
+        name="friends"
+        options={{
+          title: "好友",
+          tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.error, fontSize: 10, minWidth: 16, height: 16, borderRadius: 8 },
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="person.2.fill" color={color} />
+          ),
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="好友" focused={focused} color={color} />
+          ),
+        }}
+      />
 
       {/* 設定 */}
       <Tabs.Screen
