@@ -31,7 +31,7 @@ const DEFAULT_CONFIG: ForegroundServiceConfig = {
 };
 
 let isServiceRunning = false;
-let notificationId: string | null = null;
+let notificationId: string | undefined = undefined;
 
 /**
  * 初始化通知頻道（Android 8.0+）
@@ -114,7 +114,7 @@ export async function stopForegroundService(): Promise<void> {
     // 移除通知
     if (notificationId) {
       await Notifications.dismissNotificationAsync(notificationId);
-      notificationId = null;
+      notificationId = undefined;
     }
 
     isServiceRunning = false;
@@ -216,7 +216,7 @@ export async function unregisterBackgroundLocationTask(taskName: string): Promis
  */
 export function getForegroundServiceStatus(): {
   isRunning: boolean;
-  notificationId: string | null;
+  notificationId: string | undefined;
 } {
   return {
     isRunning: isServiceRunning,
