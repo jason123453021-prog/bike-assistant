@@ -2,44 +2,6 @@
 
 本指南說明如何使用 EAS Build 生成包含原生代碼和 TTS 功能的 Dev Client APK。
 
-## ⚠️ 若構建在 19% 卡住或超時
-
-已應用以下優化到 `eas.json`：
-
-```json
-{
-  "build": {
-    "preview": {
-      "android": {
-        "buildType": "apk",
-        "distribution": "internal",
-        "resourceClass": "default",
-        "env": {
-          "EXPO_DEBUG": "0",
-          "SKIP_BUNDLER_CACHE_INVALIDATION": "1"
-        }
-      }
-    }
-  },
-  "cache": {
-    "key": "bike-assistant-cache",
-    "disabled": false
-  },
-  "buildTimeout": 3600
-}
-```
-
-**優化說明**：
-- `EXPO_DEBUG: "0"` - 禁用調試模式，加快編譯
-- `SKIP_BUNDLER_CACHE_INVALIDATION: "1"` - 跳過緩存驗證
-- `cache` - 啟用構建緩存
-- `buildTimeout: 3600` - 增加超時時間到 1 小時
-
-若仍然超時，嘗試：
-```bash
-eas build --platform android --profile dev-client --clear-cache
-```
-
 ## 前置要求
 
 1. **安裝 EAS CLI**
@@ -168,14 +130,3 @@ adb logcat | grep -E "HydrationReminder|BackgroundLocation|ScreenWakeup|TtsManag
 1. 查看 EAS 官方文檔：https://docs.expo.dev/eas-update/introduction/
 2. 檢查 Expo 社區論壇：https://forums.expo.dev
 3. 查看項目日誌了解具體錯誤信息
-
-## 編譯優化檢查清單
-
-在執行 EAS Build 前，確認以下項目：
-
-- [ ] `eas.json` 已應用優化配置（buildTimeout、cache、env）
-- [ ] `app.config.ts` 中的 plugins 已精簡
-- [ ] `package.json` 中移除了未使用的依賴
-- [ ] TypeScript 編譯 0 錯誤：`npm run check`
-- [ ] 本地 Metro 編譯成功：`npm run dev:metro`
-- [ ] 清除緩存並重新構建：`eas build --platform android --profile dev-client --clear-cache`

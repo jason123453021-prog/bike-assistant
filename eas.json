@@ -3,12 +3,7 @@
     "preview": {
       "android": {
         "buildType": "apk",
-        "distribution": "internal",
-        "resourceClass": "default",
-        "env": {
-          "EXPO_DEBUG": "0",
-          "SKIP_BUNDLER_CACHE_INVALIDATION": "1"
-        }
+        "distribution": "internal"
       }
     },
     "preview2": {
@@ -40,11 +35,6 @@
   "cli": {
     "version": ">= 5.0.0"
   },
-  "cache": {
-    "key": "bike-assistant-cache",
-    "disabled": false
-  },
-  "buildTimeout": 3600,
   "submit": {
     "production": {
       "android": {
