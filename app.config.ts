@@ -24,6 +24,7 @@ const config: ExpoConfig = {
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
   newArchEnabled: false,
+  jsEngine: "hermes",
   ios: {
     supportsTablet: false,
     bundleIdentifier: env.iosBundleId,
@@ -143,8 +144,10 @@ const config: ExpoConfig = {
   ],
   experiments: {
     typedRoutes: true,
-    reactCompiler: true,
+    reactCompiler: false,
   },
+  // 明確禁用 NitroModules
+  runtimeVersion: "1.0.2",
 };
 
 export default config;
