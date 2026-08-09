@@ -103,6 +103,7 @@ export async function speakAutoResume(enabled: boolean) {
 export async function setupNotifications() {
   if (Platform.OS === "android") {
     try {
+      // 設定本地通知頻道（禁止遠端推播）
       await Notifications.setNotificationChannelAsync("ride", {
         name: "騎乘通知",
         importance: Notifications.AndroidImportance.HIGH,
@@ -123,6 +124,19 @@ export async function setupNotifications() {
       });
     } catch {}
   }
+  
+  // 禁止遠端推播初始化（本地通知專用）
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch {}
 }
 
 export async function showFriendInviteNotification(senderName: string) {
