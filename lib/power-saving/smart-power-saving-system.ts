@@ -1,0 +1,168 @@
+import * as Brightness from 'expo-brightness';
+import { useEffect, useRef, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export interface PowerSavingSettings {
+  enabled: boolean;
+  timeoutSeconds: number; // 進入省電模式的時間（秒）
+  minBrightness: number; // 最低亮度（0-1）
+  normalBrightness: number; // 正常亮度（0-1）
+}
+
+const DEFAULT_SETTINGS: PowerSavingSettings = {
+  enabled: true,
+  timeoutSeconds: 300, // 5 分鐘
+  minBrightness: 0.1,
+  normalBrightness: 0.8,
+};
+
+const STORAGE_KEY = 'power_saving_settings';
+
+export class SmartPowerSavingManager {
+  private static instance: SmartPowerSavingManager;
+  private settings: PowerSavingSettings = DEFAULT_SETTINGS;
+  private inactivityTimer: NodeJS.Timeout | null = null;
+  private isInPowerSavingMode: boolean = false;
+  private originalBrightness: number = 0.8;
+  private listeners: Set<(isActive: boolean) => void> = new Set();
+
+  private constructor() {
+    this.loadSettings();
+  }
+
+  static getInstance(): SmartPowerSavingManager {
+    if (!SmartPowerSavingManager.instance) {
+      SmartPowerSavingManager.instance = new SmartPowerSavingManager();
+    }
+    return SmartPowerSavingManager.instance;
+  }
+
+  private async loadSettings() {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        this.settings = JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error('[PowerSaving] Failed to load settings:', error);
+    }
+  }
+
+  async saveSettings(newSettings: Partial<PowerSavingSettings>) {
+    try {
+      this.settings = { ...this.settings, ...newSettings };
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
+    } catch (error) {
+      console.error('[PowerSaving] Failed to save settings:', error);
+    }
+  }
+
+  getSettings(): PowerSavingSettings {
+    return this.settings;
+  }
+
+  private resetInactivityTimer() {
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+    }
+
+    if (!this.settings.enabled) return;
+
+    this.inactivityTimer = setTimeout(() => {
+      this.enterPowerSavingMode();
+    }, this.settings.timeoutSeconds * 1000);
+  }
+
+  private async enterPowerSavingMode() {
+    if (this.isInPowerSavingMode) return;
+
+    try {
+      this.originalBrightness = await Brightness.getBrightnessAsync();
+      await Brightness.setBrightnessAsync(this.settings.minBrightness);
+      this.isInPowerSavingMode = true;
+      this.notifyListeners(true);
+      console.log('[PowerSaving] Entered power saving mode');
+    } catch (error) {
+      console.error('[PowerSaving] Failed to enter power saving mode:', error);
+    }
+  }
+
+  private async exitPowerSavingMode() {
+    if (!this.isInPowerSavingMode) return;
+
+    try {
+      await Brightness.setBrightnessAsync(this.originalBrightness);
+      this.isInPowerSavingMode = false;
+      this.notifyListeners(false);
+      console.log('[PowerSaving] Exited power saving mode');
+    } catch (error) {
+      console.error('[PowerSaving] Failed to exit power saving mode:', error);
+    }
+  }
+
+  async wakeUp() {
+    await this.exitPowerSavingMode();
+    this.resetInactivityTimer();
+  }
+
+  onUserInteraction() {
+    this.wakeUp();
+  }
+
+  onTurnGuidance() {
+    this.wakeUp();
+  }
+
+  onSupplyReminder() {
+    this.wakeUp();
+  }
+
+  subscribe(listener: (isActive: boolean) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notifyListeners(isActive: boolean) {
+    this.listeners.forEach(listener => listener(isActive));
+  }
+
+  start() {
+    if (!this.settings.enabled) return;
+    this.resetInactivityTimer();
+  }
+
+  stop() {
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
+    this.exitPowerSavingMode();
+  }
+}
+
+export function useSmartPowerSaving() {
+  const manager = SmartPowerSavingManager.getInstance();
+  const isInPowerSavingMode = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = manager.subscribe((isActive) => {
+      isInPowerSavingMode.current = isActive;
+    });
+
+    manager.start();
+
+    return () => {
+      unsubscribe();
+      manager.stop();
+    };
+  }, []);
+
+  return {
+    manager,
+    isInPowerSavingMode: isInPowerSavingMode.current,
+    wakeUp: () => manager.wakeUp(),
+    onUserInteraction: () => manager.onUserInteraction(),
+    onTurnGuidance: () => manager.onTurnGuidance(),
+    onSupplyReminder: () => manager.onSupplyReminder(),
+  };
+}
