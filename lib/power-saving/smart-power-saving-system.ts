@@ -1,4 +1,4 @@
-import * as Brightness from 'expo-brightness';
+import { setBrightnessAsync, getBrightnessAsync } from 'expo-brightness';
 import { useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -21,7 +21,7 @@ const STORAGE_KEY = 'power_saving_settings';
 export class SmartPowerSavingManager {
   private static instance: SmartPowerSavingManager;
   private settings: PowerSavingSettings = DEFAULT_SETTINGS;
-  private inactivityTimer: NodeJS.Timeout | null = null;
+  private inactivityTimer: ReturnType<typeof setTimeout> | null = null;
   private isInPowerSavingMode: boolean = false;
   private originalBrightness: number = 0.8;
   private listeners: Set<(isActive: boolean) => void> = new Set();
@@ -77,8 +77,8 @@ export class SmartPowerSavingManager {
     if (this.isInPowerSavingMode) return;
 
     try {
-      this.originalBrightness = await Brightness.getBrightnessAsync();
-      await Brightness.setBrightnessAsync(this.settings.minBrightness);
+      this.originalBrightness = await getBrightnessAsync();
+      await setBrightnessAsync(this.settings.minBrightness);
       this.isInPowerSavingMode = true;
       this.notifyListeners(true);
       console.log('[PowerSaving] Entered power saving mode');
@@ -91,7 +91,7 @@ export class SmartPowerSavingManager {
     if (!this.isInPowerSavingMode) return;
 
     try {
-      await Brightness.setBrightnessAsync(this.originalBrightness);
+      await setBrightnessAsync(this.originalBrightness);
       this.isInPowerSavingMode = false;
       this.notifyListeners(false);
       console.log('[PowerSaving] Exited power saving mode');
