@@ -7,8 +7,7 @@ import { HapticTab } from "@/components/haptic-tab";
 import { useColors } from "@/hooks/use-colors";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
-import { useRef, useEffect } from "react";
-import { showFriendInviteNotification } from "@/lib/feedback-service";
+// 移除友誼相關導入
 
 function TabLabel({ label, focused, color }: { label: string; focused: boolean; color: string }) {
   return (
@@ -21,28 +20,7 @@ function TabLabel({ label, focused, color }: { label: string; focused: boolean; 
 export default function TabLayout() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { isAuthenticated } = useAuth();
-  const pendingQuery = trpc.friends.pendingRequests.useQuery(undefined, {
-    enabled: isAuthenticated,
-    refetchInterval: 30000, // 每 30 秒檢查一次
-  });
-  const pendingCount = pendingQuery.data?.length ?? 0;
-
-  // 偵測新好友邀請並發送本地通知
-  const prevPendingIdsRef = useRef<Set<number>>(new Set());
-  useEffect(() => {
-    const items = pendingQuery.data ?? [];
-    const currentIds = new Set(items.map((r) => r.friendshipId));
-    // 找出新增的邀請
-    const newItems = items.filter((r) => !prevPendingIdsRef.current.has(r.friendshipId));
-    if (prevPendingIdsRef.current.size > 0 && newItems.length > 0) {
-      // 有新邀請，發送通知
-      newItems.forEach((r) => {
-        showFriendInviteNotification(r.requester?.name ?? "好友");
-      });
-    }
-    prevPendingIdsRef.current = currentIds;
-  }, [pendingQuery.data]);
+  // 移除友誼查詢邏輯
 
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 60 + bottomPadding;
@@ -117,21 +95,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 好友 */}
-      <Tabs.Screen
-        name="friends"
-        options={{
-          title: "好友",
-          tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.error, fontSize: 10, minWidth: 16, height: 16, borderRadius: 8 },
-          tabBarIcon: ({ color, size }) => (
-            <IconSymbol size={size} name="person.2.fill" color={color} />
-          ),
-          tabBarLabel: ({ focused, color }) => (
-            <TabLabel label="好友" focused={focused} color={color} />
-          ),
-        }}
-      />
+      {/* 好友 Tab 已移除 */}
 
       {/* 設定 */}
       <Tabs.Screen
