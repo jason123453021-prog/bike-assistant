@@ -1,4 +1,14 @@
-import { setBrightnessAsync, getBrightnessAsync } from 'expo-brightness';
+// 動態導入 expo-brightness 以避免編譯錯誤
+let setBrightnessAsync: (brightness: number) => Promise<void> = async () => {};
+let getBrightnessAsync: () => Promise<number> = async () => 0.8;
+
+try {
+  const brightness = require('expo-brightness');
+  setBrightnessAsync = brightness.setBrightnessAsync;
+  getBrightnessAsync = brightness.getBrightnessAsync;
+} catch (e) {
+  console.warn('[PowerSaving] expo-brightness not available');
+}
 import { useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
