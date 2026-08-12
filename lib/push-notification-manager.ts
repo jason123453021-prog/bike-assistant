@@ -1,5 +1,6 @@
-import * as Notifications from 'expo-notifications';
+import type * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { getLocalNotifications } from '@/lib/local-notifications';
 
 export type NotificationType =
   | 'ride_reminder'
@@ -29,14 +30,8 @@ export class PushNotificationManager {
   static async initialize(): Promise<void> {
     try {
       console.log('[PushNotification] 初始化本機通知系統...');
-
-      // Expo Go SDK 53+ 不支援 Android 遠端推播；關閉自動 token 註冊，
-      // 但保留 scheduleNotificationAsync 所需的本機通知能力。
-      try {
-        await Notifications.setAutoServerRegistrationEnabledAsync(false);
-      } catch {
-        // 舊版 Expo Go 沒有此方法時，仍可使用本機通知。
-      }
+      const Notifications = await getLocalNotifications();
+      if (!Notifications) return;
 
       // 設定通知處理器
       Notifications.setNotificationHandler({
@@ -68,6 +63,9 @@ export class PushNotificationManager {
     payload: NotificationPayload,
     delayInSeconds: number = 0
   ): Promise<string | null> {
+    const Notifications = await getLocalNotifications();
+    if (!Notifications) return null;
+
     try {
       console.log('[PushNotification] 發送本地通知:', payload);
 
@@ -213,6 +211,9 @@ export class PushNotificationManager {
    * 取消通知
    */
   static async cancelNotification(notificationId: string): Promise<void> {
+    const Notifications = await getLocalNotifications();
+    if (!Notifications) return;
+
     try {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
       console.log('[PushNotification] 已取消通知:', notificationId);
@@ -225,6 +226,9 @@ export class PushNotificationManager {
    * 取消所有通知
    */
   static async cancelAllNotifications(): Promise<void> {
+    const Notifications = await getLocalNotifications();
+    if (!Notifications) return;
+
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();
       console.log('[PushNotification] 已取消所有通知');
@@ -239,9 +243,12 @@ export class PushNotificationManager {
   static async getAllScheduledNotifications(): Promise<
     Notifications.NotificationRequest[]
   > {
+    const localNotifications = await getLocalNotifications();
+    if (!localNotifications) return [];
+
     try {
       const notifications =
-        await Notifications.getAllScheduledNotificationsAsync();
+        await localNotifications.getAllScheduledNotificationsAsync();
       console.log('[PushNotification] 待發送通知數:', notifications.length);
       return notifications;
     } catch (error) {
@@ -256,11 +263,17 @@ export class PushNotificationManager {
   static addNotificationResponseListener(
     callback: (response: Notifications.NotificationResponse) => void
   ): () => void {
-    const subscription =
-      Notifications.addNotificationResponseReceivedListener(callback);
+    let active = true;
+    let subscription: { remove: () => void } | null = null;
+    void getLocalNotifications().then((Notifications) => {
+      if (active && Notifications) {
+        subscription = Notifications.addNotificationResponseReceivedListener(callback);
+      }
+    });
 
     return () => {
-      subscription.remove();
+      active = false;
+      subscription?.remove();
     };
   }
 
@@ -270,11 +283,17 @@ export class PushNotificationManager {
   static addNotificationReceivedListener(
     callback: (notification: Notifications.Notification) => void
   ): () => void {
-    const subscription =
-      Notifications.addNotificationReceivedListener(callback);
+    let active = true;
+    let subscription: { remove: () => void } | null = null;
+    void getLocalNotifications().then((Notifications) => {
+      if (active && Notifications) {
+        subscription = Notifications.addNotificationReceivedListener(callback);
+      }
+    });
 
     return () => {
-      subscription.remove();
+      active = false;
+      subscription?.remove();
     };
   }
 }

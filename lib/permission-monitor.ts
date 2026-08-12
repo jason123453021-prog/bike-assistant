@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { PermissionsManager, type PermissionStatus, type PermissionType } from './permissions-manager';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
 
 export interface PermissionChangeEvent {
   type: PermissionType;

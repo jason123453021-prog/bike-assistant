@@ -1,17 +1,6 @@
-import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
-
-// 設置通知處理行為，確保背景或前台皆能正常顯示常駐通知
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+import { getLocalNotifications } from "@/lib/local-notifications";
 
 export class ForegroundServiceManager {
   private static instance: ForegroundServiceManager;
@@ -40,6 +29,8 @@ export class ForegroundServiceManager {
     }
 
     try {
+      const Notifications = await getLocalNotifications();
+
       if (Platform.OS === 'android') {
         // 請求前景與背景定位權限
         const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
@@ -54,26 +45,28 @@ export class ForegroundServiceManager {
         }
 
         // 確保通知權限
-        const { status: notifStatus } = await Notifications.requestPermissionsAsync();
-        if (notifStatus !== 'granted') {
-          console.warn('[ForegroundService] Notification permission denied');
+        if (Notifications) {
+          const { status: notifStatus } = await Notifications.requestPermissionsAsync();
+          if (notifStatus !== 'granted') {
+            console.warn('[ForegroundService] Notification permission denied');
+          }
         }
       }
 
       // 發送常駐騎乘狀態通知
-      const notificationRequest = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: '🚴 智慧單車騎乘中',
-          body: 'GPS 正在背景持續紀錄軌跡與數據，保障行程不中斷。',
-          sticky: true,
-          autoDismiss: false,
-          sound: false,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        },
-        trigger: null, // 立即觸發
-      });
-
-      this.notificationId = notificationRequest;
+      if (Notifications) {
+        this.notificationId = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '🚴 智慧單車騎乘中',
+            body: 'GPS 正在背景持續紀錄軌跡與數據，保障行程不中斷。',
+            sticky: true,
+            autoDismiss: false,
+            sound: false,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: null,
+        });
+      }
 
       // 開始高精度背景 GPS 定位監聽
       this.locationSubscription = await Location.watchPositionAsync(
@@ -107,18 +100,22 @@ export class ForegroundServiceManager {
     }
 
     try {
+      const Notifications = await getLocalNotifications();
+
       if (this.locationSubscription) {
         this.locationSubscription.remove();
         this.locationSubscription = null;
       }
 
-      if (this.notificationId) {
+      if (Notifications && this.notificationId) {
         await Notifications.dismissNotificationAsync(this.notificationId);
         this.notificationId = null;
       }
 
       // 取消所有常駐推播
-      await Notifications.dismissAllNotificationsAsync();
+      if (Notifications) {
+        await Notifications.dismissAllNotificationsAsync();
+      }
 
       this.isRunning = false;
       console.log('[ForegroundService] Stopped successfully');

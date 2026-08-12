@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { Platform, Linking, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
+import { getLocalNotifications, isExpoGoRuntime } from '@/lib/local-notifications';
 
 const PERMISSIONS_ONBOARDING_KEY = 'permissions_onboarding_completed';
 
@@ -86,6 +86,19 @@ export class PermissionsManager {
   }
 
   static async checkNotificationPermission(): Promise<PermissionStatus> {
+    const Notifications = await getLocalNotifications();
+    if (!Notifications) {
+      return {
+        type: 'notification',
+        name: '通知權限',
+        description: isExpoGoRuntime()
+          ? 'Expo Go 使用畫面、語音與震動提醒；安裝版可啟用本機通知'
+          : '此裝置暫時無法使用本機通知',
+        granted: false,
+        required: !isExpoGoRuntime(),
+      };
+    }
+
     try {
       const settings = await Notifications.getPermissionsAsync();
       
@@ -147,6 +160,9 @@ export class PermissionsManager {
   }
 
   static async requestNotificationPermission(): Promise<boolean> {
+    const Notifications = await getLocalNotifications();
+    if (!Notifications) return false;
+
     try {
       const settings = await Notifications.requestPermissionsAsync();
       return settings.granted;

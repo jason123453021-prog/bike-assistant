@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import * as Notifications from 'expo-notifications';
+import type * as Notifications from 'expo-notifications';
 import { PushNotificationManager } from '@/lib/push-notification-manager';
 
 export interface UsePushNotificationOptions {

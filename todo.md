@@ -1173,7 +1173,13 @@
 
 
 ## Expo Go 啟動錯誤修復（2026-08-12）
-- [x] 修復 Expo Go 中 expo-notifications 遠端推播警告，維持純本機通知
+- [ ] 在實機 Expo Go 驗證 expo-notifications 遠端推播警告已消失
 - [x] 移除已刪除社群功能的 useFriendNav 殘留呼叫與 Provider 依賴
 - [x] 執行 TypeScript 型別檢查並確認 0 錯誤
 - [ ] 驗證 Expo Go 啟動畫面不再出現 Render Error 或 Console Error
+
+## Expo Go 通知相容層重構（2026-08-12）
+- [x] 追查 Expo Go 啟動時觸發遠端 token 註冊的通知模組載入路徑
+- [x] 建立 Expo Go 安全的本機通知相容層，禁止直接載入遠端推播 API
+- [x] 替換 App 啟動、騎乘與背景定位中的直接 expo-notifications 相依
+- [ ] 驗證 Expo Go 不再顯示 Android Push notifications 警告

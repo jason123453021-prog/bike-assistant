@@ -11,7 +11,7 @@
 import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Notifications from "expo-notifications";
+import { getLocalNotifications } from "@/lib/local-notifications";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
@@ -99,28 +99,34 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       // 檢查補給提醒
       if (state.calories >= state.calorieThreshold && !state.calorieReminderSent) {
         state.calorieReminderSent = true;
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "🍌 補給提醒",
-            body: "已消耗大量卡路里，建議補充能量棒或食物",
-            sound: true,
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-          },
-          trigger: null,
-        });
+        const Notifications = await getLocalNotifications();
+        if (Notifications) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: "🍌 補給提醒",
+              body: "已消耗大量卡路里，建議補充能量棒或食物",
+              sound: true,
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+            },
+            trigger: null,
+          });
+        }
       }
 
       if (state.sweatLossMl >= state.waterThreshold && !state.waterReminderSent) {
         state.waterReminderSent = true;
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "💧 補水提醒",
-            body: "水分流失達到補水條件，建議立即補充水分",
-            sound: true,
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-          },
-          trigger: null,
-        });
+        const Notifications = await getLocalNotifications();
+        if (Notifications) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: "💧 補水提醒",
+              body: "水分流失達到補水條件，建議立即補充水分",
+              sound: true,
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+            },
+            trigger: null,
+          });
+        }
       }
 
       // 保存背景狀態

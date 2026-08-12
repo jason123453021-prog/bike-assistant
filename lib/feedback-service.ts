@@ -8,22 +8,8 @@
 
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
-import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-
-// 僅允許本機通知；禁止 expo-notifications 在啟動時嘗試取得遠端裝置 token。
-// 這是 Expo Go SDK 53+ 不支援遠端推播時的必要防護。
-let autoRegistrationDisabled = false;
-
-async function disableRemoteNotificationRegistration() {
-  if (autoRegistrationDisabled) return;
-  try {
-    await Notifications.setAutoServerRegistrationEnabledAsync(false);
-  } catch {
-    // 某些 Expo Go 版本沒有此方法時，仍可繼續使用本機通知。
-  }
-  autoRegistrationDisabled = true;
-}
+import { getLocalNotifications } from "@/lib/local-notifications";
 
 // ─── 震動回饋 ─────────────────────────────────────────────────────────────────
 
@@ -115,7 +101,8 @@ export async function speakAutoResume(enabled: boolean) {
 // ─── 通知設定 ─────────────────────────────────────────────────────────────────
 
 export async function setupNotifications() {
-  await disableRemoteNotificationRegistration();
+  const Notifications = await getLocalNotifications();
+  if (!Notifications) return;
 
   if (Platform.OS === "android") {
     try {
@@ -156,6 +143,9 @@ export async function setupNotifications() {
 }
 
 export async function showFriendInviteNotification(senderName: string) {
+  const Notifications = await getLocalNotifications();
+  if (!Notifications) return;
+
   try {
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -171,6 +161,9 @@ export async function showFriendInviteNotification(senderName: string) {
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {
+  const Notifications = await getLocalNotifications();
+  if (!Notifications) return false;
+
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
     if (existing === "granted") return true;
@@ -182,6 +175,9 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 export async function showSupplyNotification(type: "calorie" | "water") {
+  const Notifications = await getLocalNotifications();
+  if (!Notifications) return;
+
   const title = type === "calorie" ? "🍌 補給提醒" : "💧 補水提醒";
   const body = type === "calorie"
     ? "已消耗大量卡路里，請補充能量！"
@@ -211,6 +207,9 @@ export async function showRidingNotification(
   distance: number,
   elapsed: number
 ) {
+  const Notifications = await getLocalNotifications();
+  if (!Notifications) return;
+
   const h = Math.floor(elapsed / 3600);
   const m = Math.floor((elapsed % 3600) / 60);
   const timeStr = h > 0 ? `${h}時${m}分` : `${m}分`;
@@ -231,6 +230,9 @@ export async function showRidingNotification(
 }
 
 export async function cancelRidingNotification() {
+  const Notifications = await getLocalNotifications();
+  if (!Notifications) return;
+
   try {
     await Notifications.dismissNotificationAsync(RIDING_NOTIFICATION_ID).catch(() => {});
     await Notifications.dismissAllNotificationsAsync();
