@@ -1247,3 +1247,10 @@
 - [x] 修正 Expo 開發指令：改用通用 Metro 模式與非互動常駐旗標；已成功完成 11,105,054 bytes 的 Android Expo Go Bundle，且產生後 Metro 狀態仍為 running
 - [x] 降低 TypeScript 自動監看程序的記憶體負荷：啟用 skipLibCheck 與增量快取；一次性 pnpm check 已通過
 - [x] 限制 Metro 轉譯併發與 Node 堆積大小：Web Bundle（8,018,051 bytes）與 Android Expo Go Bundle（11,109,839 bytes）均已完成；Android Bundle 後與 30 秒穩定觀察後 Metro 皆維持 running，未再出現新的 OOM 137
+
+## Android Release APK 實際建置驗證（2026-08-13）
+- [x] 檢查本機 Android SDK、Gradle 與原生專案可用性：沙箱無 Android SDK、sdkmanager、adb、Gradle 與預產生 android/ 目錄，不能在此執行本機 Gradle APK 建置
+- [x] 執行 Android production JavaScript Bundle 預檢：成功輸出 1,798 個模組與 5.16 MB Hermes `.hbc` production bundle
+- [x] 產生 Android 原生專案：Expo Prebuild 成功完成，Gradle 專案與原生設定外掛可正確生成
+- [x] 嘗試執行本機 Gradle Release APK 建置：未產出 APK；沙箱無 Android SDK，且預設 Gradle daemon 的 2 GB heap 在此資源限制下意外終止，不能據此宣稱 APK 已成功建置
+- [ ] 由發布介面的「建置 APK」服務執行受管理 Android Build，取得實際 APK 產物與建置紀錄
