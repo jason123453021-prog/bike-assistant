@@ -27,7 +27,6 @@ import {
   View,
 } from "react-native";
 
-import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
 import Svg, { G, Path } from "react-native-svg";
@@ -42,6 +41,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFavorites } from "@/lib/favorites-context";
 import { ShareCardModal } from "@/components/share-card-modal";
 import { SpeedCurveChart, type KeyMarker, type SpeedDataPoint } from "@/components/speed-curve-chart";
+import { createGpxContent } from "@/lib/gpx-export";
+import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
 
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -372,103 +373,29 @@ export default function RideDetailScreen() {
     );
   }, [heartRateZones, HR_ZONES]);
 
-  // 分享
-  // GPX 匯出
-  const generateGpxContent = useCallback((record: RideRecord): string => {
-    if (!record.route || record.route.length === 0) return "";
-
-    const distanceKm = (record.distance / 1000).toFixed(2);
-    const durationHours = Math.floor(record.duration / 3600);
-    const durationMinutes = Math.floor((record.duration % 3600) / 60);
-    const durationStr = `${durationHours}:${String(durationMinutes).padStart(2, "0")}`;
-    const minLat = Math.min(...record.route.map(p => p.latitude));
-    const maxLat = Math.max(...record.route.map(p => p.latitude));
-    const minLon = Math.min(...record.route.map(p => p.longitude));
-    const maxLon = Math.max(...record.route.map(p => p.longitude));
-
-    const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Bike Assistant" xmlns="http://www.topografix.com/GPX/1/1">
-  <metadata>
-    <name>${record.name}</name>
-    <desc>騎乘記錄 - ${new Date(record.date).toISOString()}</desc>
-    <time>${new Date(record.date).toISOString()}</time>
-    <author>Bike Assistant</author>
-    <bounds minlat="${minLat}" minlon="${minLon}" maxlat="${maxLat}" maxlon="${maxLon}"/>
-  </metadata>
-  <trk>
-    <name>${record.name}</name>
-    <desc>騎乘統計: 距離 ${distanceKm}km | 時間 ${durationStr} | 平均速度 ${record.avgSpeed.toFixed(1)}km/h | 最高速度 ${record.maxSpeed.toFixed(1)}km/h | 爆升 ${record.totalAscent}m | 平均功率 ${Math.round(record.avgPower)}W | 最大功率 ${Math.round(record.maxPower)}W | 消耗熱量 ${Math.round(record.calories)}kcal</desc>
-    <extensions>
-      <distance>${distanceKm}</distance>
-      <duration>${record.duration}</duration>
-      <avgSpeed>${record.avgSpeed.toFixed(1)}</avgSpeed>
-      <maxSpeed>${record.maxSpeed.toFixed(1)}</maxSpeed>
-      <totalAscent>${record.totalAscent}</totalAscent>
-      <totalDescent>${record.totalDescent || 0}</totalDescent>
-      <calories>${Math.round(record.calories)}</calories>
-      <avgPower>${Math.round(record.avgPower)}</avgPower>
-      <maxPower>${Math.round(record.maxPower)}</maxPower>
-      <avgHeartRate>${Math.round(record.avgHeartRate || 0)}</avgHeartRate>
-      <maxHeartRate>${Math.round(record.maxHeartRate || 0)}</maxHeartRate>
-      <avgCadence>${Math.round(record.avgCadence || 0)}</avgCadence>
-      <maxCadence>${Math.round(record.maxCadence || 0)}</maxCadence>
-    </extensions>
-    <trkseg>`;
-
-    const trkpts = record.route
-      .map(
-        (pt) =>
-          `      <trkpt lat="${pt.latitude}" lon="${pt.longitude}">
-        <ele>${pt.altitude ?? 0}</ele>
-        <time>${new Date(record.date + (pt.timestamp || 0)).toISOString()}</time>
-      </trkpt>`
-      )
-      .join("\n");
-
-    const gpxFooter = `
-    </trkseg>
-  </trk>
-</gpx>`;
-
-    return gpxHeader + "\n" + trkpts + gpxFooter;
-  }, []);
-
   const handleExportGpx = useCallback(async () => {
     if (!record) return;
     try {
-      const gpxContent = generateGpxContent(record);
-      if (!gpxContent) {
+      const backup = await writeLocalGpxBackup(record);
+      if (!backup) {
         Alert.alert("錯誤", "沒有軌跡數據，無法匯出");
         return;
       }
-
-      // 生成 .gpx 文件
-      const filename = `${record.name || "騎乘"}-${new Date(record.date).getTime()}.gpx`;
-      const filepath = `${FileSystem.documentDirectory}${filename}`;
-
-      // 寫入 GPX 內容到文件
-      await FileSystem.writeAsStringAsync(filepath, gpxContent, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
-
-      // 檢查是否支援分享
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        // 分享 GPX 文件
-        await Sharing.shareAsync(filepath, {
+        await Sharing.shareAsync(backup.uri, {
           mimeType: "application/gpx+xml",
-          dialogTitle: "分享 GPX 文件",
+          dialogTitle: "儲存或分享 GPX 備份",
           UTI: "com.topografix.gpx",
         });
       } else {
-        // 如果不支援分享，顯示文件已保存的提示
-        Alert.alert("成功", `GPX 文件已保存：${filename}`);
+        Alert.alert("已建立本機備份", `${backup.filename}\n已保存至 App 的本機備份資料夾。`);
       }
     } catch (err) {
       console.error('[RideDetail] GPX export error:', err);
-      Alert.alert("錯誤", "匯出 GPX 失敗");
+      Alert.alert("匯出失敗", "無法建立 GPX 本機備份，請確認此記錄包含至少兩個有效 GPS 軌跡點。");
     }
-  }, [record, generateGpxContent]);
+  }, [record]);
 
   // 加入/移除最愛
   const handleToggleFavorite = useCallback(async () => {
@@ -482,7 +409,7 @@ export default function RideDetailScreen() {
           Alert.alert("成功", "已移除最愛");
         }
       } else {
-        const gpxContent = generateGpxContent(record);
+        const gpxContent = createGpxContent(record);
         if (gpxContent) {
           await addFavorite({
             name: record.name,
@@ -497,7 +424,7 @@ export default function RideDetailScreen() {
     } catch (err) {
       Alert.alert("錯誤", isFavorited ? "移除最愛失敗" : "加入最愛失敗");
     }
-  }, [record, isFavorited, favorites, addFavorite, removeFavorite, generateGpxContent]);
+  }, [record, isFavorited, favorites, addFavorite, removeFavorite]);
 
   const handleShare = useCallback(async () => {
     if (!record) return;
@@ -810,7 +737,7 @@ export default function RideDetailScreen() {
               onPress={handleExportGpx}
             >
               <IconSymbol name="arrow.down.doc" size={16} color="#fff" />
-              <Text style={styles.shareBtnText}>匯出 GPX</Text>
+              <Text style={styles.shareBtnText}>離線備份 GPX</Text>
             </Pressable>
 
             {/* 加入最愛按鈕 */}
