@@ -87,6 +87,7 @@ import {
   getBackgroundState,
   clearBackgroundData,
   acknowledgeBackgroundSupplyInterval,
+  acknowledgeBackgroundSupplyReminder,
   type GpsAccuracyLevel,
 } from "@/lib/background-location";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -110,6 +111,13 @@ import {
 } from "@/lib/ride-recovery/ride-session-recovery";
 import { SmartPowerSavingManager } from "@/lib/power-saving/smart-power-saving-system";
 import { getDueSupplyIntervals, type SupplyIntervalKind } from "@/lib/supply-interval";
+import {
+  consumeSupplyNotificationActions,
+  scheduleSupplySnooze,
+  subscribeToSupplyNotificationActions,
+  type SupplyNotificationAction,
+  type SupplyNotificationKind,
+} from "@/lib/supply-notification-actions";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -358,6 +366,7 @@ export default function MapScreen() {
     // 追蹤尚未確認的補給類型（「稍後」只關閉 Modal，不清除此 ref）
   const pendingCalorieRef = useRef(false);
   const pendingWaterRef = useRef(false);
+  const supplySnoozedUntilRef = useRef<Record<"calorie" | "water", number>>({ calorie: 0, water: 0 });
   const lastAscentRef = useRef(0); // 用於判斷下坡狀態
   const rideStartLocationRef = useRef<{ lat: number; lon: number } | null>(null); // 記錄騎乘開始座標
   const lastTurnSpokenRef = useRef<number>(0); // 追蹤上次播報轉彎的時間
@@ -388,6 +397,7 @@ export default function MapScreen() {
   const intervalSupplyAlertsRef = useRef<Partial<Record<SupplyIntervalKind, boolean>>>({});
   const [intervalSupplyAlerts, setIntervalSupplyAlerts] = useState<Partial<Record<SupplyIntervalKind, boolean>>>({});
   const intervalSupplyRepeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intervalSnoozedUntilRef = useRef<Partial<Record<SupplyIntervalKind, number>>>({});
 
   // 清除重複提醒計時器
   const clearSupplyRepeatTimer = useCallback(() => {
@@ -443,6 +453,71 @@ export default function MapScreen() {
     if (settings.ttsEnabled) speak("已確認補給");
     if (settings.vibrationEnabled) vibrateSuccess();
   }, [clearIntervalSupplyRepeatTimer, settings.ttsEnabled, settings.vibrationEnabled]);
+
+  const handleConfirmCalorieSupply = useCallback(() => {
+    setCalorieAlert(false);
+    dispatch({ type: "CONSUME_CALORIES" });
+    calorieAnim.setValue(0);
+    calorieReminderSentRef.current = false;
+    pendingCalorieRef.current = false;
+    supplySnoozedUntilRef.current.calorie = 0;
+    void acknowledgeBackgroundSupplyReminder("calorie");
+    if (settings.vibrationEnabled) vibrateSuccess();
+    if (!pendingWaterRef.current) clearSupplyRepeatTimer();
+  }, [clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled]);
+
+  const handleConfirmWaterSupply = useCallback(() => {
+    setWaterAlert(false);
+    setSupplyRecommendedMl(undefined);
+    dispatch({ type: "CONSUME_WATER" });
+    waterAnim.setValue(0);
+    waterReminderSentRef.current = false;
+    pendingWaterRef.current = false;
+    supplySnoozedUntilRef.current.water = 0;
+    void acknowledgeBackgroundSupplyReminder("water");
+    if (settings.vibrationEnabled) vibrateSuccess();
+    if (!pendingCalorieRef.current) clearSupplyRepeatTimer();
+  }, [clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled]);
+
+  const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind) => {
+    const until = Date.now() + 5 * 60 * 1000;
+    if (kind === "calorie" || kind === "water") {
+      supplySnoozedUntilRef.current[kind] = until;
+      if (kind === "calorie") setCalorieAlert(false);
+      else setWaterAlert(false);
+      if (supplyRepeatTimerRef.current) {
+        clearInterval(supplyRepeatTimerRef.current);
+        supplyRepeatTimerRef.current = null;
+      }
+    } else {
+      const intervalKind: SupplyIntervalKind = kind === "interval-time" ? "time" : "distance";
+      intervalSnoozedUntilRef.current[intervalKind] = until;
+      const nextAlerts = { ...intervalSupplyAlertsRef.current, [intervalKind]: false };
+      intervalSupplyAlertsRef.current = nextAlerts;
+      setIntervalSupplyAlerts(nextAlerts);
+      clearIntervalSupplyRepeatTimer();
+    }
+    void scheduleSupplySnooze(kind);
+  }, [clearIntervalSupplyRepeatTimer]);
+
+  const processSupplyNotificationAction = useCallback((action: SupplyNotificationAction) => {
+    if (action.action === "snooze") {
+      handleSnoozeSupply(action.kind);
+      return;
+    }
+    if (action.kind === "calorie") handleConfirmCalorieSupply();
+    else if (action.kind === "water") handleConfirmWaterSupply();
+    else handleConfirmIntervalSupply(action.kind === "interval-time" ? "time" : "distance");
+  }, [handleConfirmCalorieSupply, handleConfirmIntervalSupply, handleConfirmWaterSupply, handleSnoozeSupply]);
+
+  useEffect(() => {
+    const processQueuedActions = async () => {
+      const actions = await consumeSupplyNotificationActions();
+      actions.forEach(processSupplyNotificationAction);
+    };
+    void processQueuedActions();
+    return subscribeToSupplyNotificationActions(() => { void processQueuedActions(); });
+  }, [processSupplyNotificationAction]);
 
   const sortedActiveAlerts = useMemo(() => {
     return activeSupplyAlerts.sort((a, b) => {
@@ -549,6 +624,7 @@ export default function MapScreen() {
   // ─── 補給提醒 ────────────────────────────────────────────────────────────────
   const triggerSupplyReminder = useCallback(
     async (type: "calorie" | "water", recommendedMl?: number) => {
+      if (supplySnoozedUntilRef.current[type] > Date.now()) return;
       powerSavingManagerRef.current.onSupplyReminder();
       setTouchGuardEnabled(false);
       if (type === "calorie") {
@@ -587,7 +663,7 @@ export default function MapScreen() {
       if (repeatUntilDismissed) {
         const repeatInterval = setInterval(() => {
           const isPending = type === "calorie" ? pendingCalorieRef.current : pendingWaterRef.current;
-          if (isPending) {
+          if (isPending && supplySnoozedUntilRef.current[type] <= Date.now()) {
             if (settings.vibrationEnabled) vibrateWarning();
             if (settings.ttsEnabled) speakSupplyReminder(type, true);
             if (settings.soundEnabled) {
@@ -604,8 +680,9 @@ export default function MapScreen() {
       if (repeatSec > 0 && !supplyRepeatTimerRef.current) {
         supplyRepeatTimerRef.current = setInterval(() => {
           // 使用 pendingRef 判斷（「稍後」關閉 Modal 不會清除此 ref）
-          const caloriePending = pendingCalorieRef.current;
-          const waterPending = pendingWaterRef.current;
+          const now = Date.now();
+          const caloriePending = pendingCalorieRef.current && supplySnoozedUntilRef.current.calorie <= now;
+          const waterPending = pendingWaterRef.current && supplySnoozedUntilRef.current.water <= now;
           if (!caloriePending && !waterPending) {
             clearSupplyRepeatTimer();
             return;
@@ -756,7 +833,11 @@ export default function MapScreen() {
       intervalSupplyTrackerRef.current,
       current.elapsed,
       current.distance / 1000,
-      intervalSupplyAlertsRef.current,
+      {
+        ...intervalSupplyAlertsRef.current,
+        time: Boolean(intervalSupplyAlertsRef.current.time || (intervalSnoozedUntilRef.current.time ?? 0) > Date.now()),
+        distance: Boolean(intervalSupplyAlertsRef.current.distance || (intervalSnoozedUntilRef.current.distance ?? 0) > Date.now()),
+      },
     );
     if (dueKinds.length === 0) return;
 
@@ -771,13 +852,16 @@ export default function MapScreen() {
     if (settings.soundEnabled) {
       try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
     }
-    if (settings.notificationEnabled) showSupplyNotification("calorie");
+    if (settings.notificationEnabled) dueKinds.forEach((kind) => {
+      void showSupplyNotification(kind === "time" ? "interval-time" : "interval-distance");
+    });
 
     const repeatSec = settings.supplyReminderRepeatSec;
     if (repeatSec > 0 && !intervalSupplyRepeatTimerRef.current) {
       intervalSupplyRepeatTimerRef.current = setInterval(() => {
         const alerts = intervalSupplyAlertsRef.current;
-        if (!alerts.time && !alerts.distance) {
+        const snoozed = (intervalSnoozedUntilRef.current.time ?? 0) > Date.now() || (intervalSnoozedUntilRef.current.distance ?? 0) > Date.now();
+        if ((!alerts.time && !alerts.distance) || snoozed) {
           clearIntervalSupplyRepeatTimer();
           return;
         }
@@ -2367,31 +2451,11 @@ export default function MapScreen() {
             onConfirm: () => handleConfirmIntervalSupply("distance"),
           }] : []),
         ]}
-        onConfirmCalorie={() => {
-          setCalorieAlert(false);
-          dispatch({ type: "CONSUME_CALORIES" });
-          calorieAnim.setValue(0);
-          calorieReminderSentRef.current = false;
-          pendingCalorieRef.current = false; // 確認補給，清除待處理標記
-          if (settings.vibrationEnabled) vibrateSuccess();
-          // 如果水分提醒也已確認，清除重複計時器
-          if (!pendingWaterRef.current) clearSupplyRepeatTimer();
-        }}
-        onConfirmWater={() => {
-          setWaterAlert(false);
-          setSupplyRecommendedMl(undefined);
-          dispatch({ type: "CONSUME_WATER" });
-          waterAnim.setValue(0);
-          waterReminderSentRef.current = false;
-          pendingWaterRef.current = false; // 確認補給，清除待處理標記
-          if (settings.vibrationEnabled) vibrateSuccess();
-          // 如果卡路里提醒也已確認，清除重複計時器
-          if (!pendingCalorieRef.current) clearSupplyRepeatTimer();
-        }}
+        onConfirmCalorie={handleConfirmCalorieSupply}
+        onConfirmWater={handleConfirmWaterSupply}
         onDismiss={() => {
-          setCalorieAlert(false);
-          setWaterAlert(false);
-          // 「稍後提醒」：不清除 pendingRef，重複計時器到期後會重新顯示 Modal
+          if (calorieAlert) handleSnoozeSupply("calorie");
+          if (waterAlert) handleSnoozeSupply("water");
         }}
       />
 

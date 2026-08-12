@@ -26,6 +26,7 @@ import "@/lib/background-location";
 import { RideTrackingNative } from "@/lib/ride-tracking-native";
 import { PermissionsManager } from "@/lib/permissions-manager";
 import { usePermissionMonitoring } from "@/lib/use-permission-monitoring";
+import { startSupplyNotificationActionListener } from "@/lib/supply-notification-actions";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -70,6 +71,8 @@ export default function RootLayout() {
   useEffect(() => {
     setupNotifications().catch(() => {});
   }, []);
+
+  useEffect(() => startSupplyNotificationActionListener(), []);
 
   // 在 App 啟動時檢查電池最佳化狀況
   useEffect(() => {

@@ -10,6 +10,7 @@ import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { Platform } from "react-native";
 import { getLocalNotifications } from "@/lib/local-notifications";
+import { configureSupplyNotificationActions, SUPPLY_NOTIFICATION_CATEGORY, type SupplyNotificationKind } from "@/lib/supply-notification-actions";
 
 // ─── 震動回饋 ─────────────────────────────────────────────────────────────────
 
@@ -140,6 +141,7 @@ export async function setupNotifications() {
       }),
     });
   } catch {}
+  await configureSupplyNotificationActions();
 }
 
 export async function showFriendInviteNotification(senderName: string) {
@@ -174,22 +176,26 @@ export async function requestNotificationPermission(): Promise<boolean> {
   }
 }
 
-export async function showSupplyNotification(type: "calorie" | "water") {
+export async function showSupplyNotification(type: SupplyNotificationKind) {
   const Notifications = await getLocalNotifications();
   if (!Notifications) return;
 
-  const title = type === "calorie" ? "🍌 補給提醒" : "💧 補水提醒";
+  const title = type === "calorie" ? "🍌 補給提醒" : type === "water" ? "💧 補水提醒" : "補給提醒";
   const body = type === "calorie"
     ? "已消耗大量卡路里，請補充能量！"
-    : "水分不足，請補充水分！";
+    : type === "water"
+      ? "水分不足，請補充水分！"
+      : "已達自訂補給間隔，請依騎乘狀況補充能量與水分。";
   try {
+    await configureSupplyNotificationActions();
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
         body,
         sound: true,
         badge: 1,
-        categoryIdentifier: "SUPPLY_REMINDER",
+        categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
+        data: { type: "supply_reminder", supplyKind: type },
       } as any,
       trigger: null,
     });

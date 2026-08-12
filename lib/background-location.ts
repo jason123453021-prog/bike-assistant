@@ -12,6 +12,7 @@ import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getLocalNotifications } from "@/lib/local-notifications";
+import { SUPPLY_NOTIFICATION_CATEGORY } from "@/lib/supply-notification-actions";
 import {
   addTrackPoint,
   createNewRideSession,
@@ -140,6 +141,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               title: "🍌 補給提醒",
               body: "已消耗大量卡路里，建議補充能量棒或食物",
               sound: true,
+              categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
+              data: { type: "supply_reminder", supplyKind: "calorie" },
               priority: Notifications.AndroidNotificationPriority.HIGH,
             },
             trigger: null,
@@ -156,6 +159,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               title: "💧 補水提醒",
               body: "水分流失達到補水條件，建議立即補充水分",
               sound: true,
+              categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
+              data: { type: "supply_reminder", supplyKind: "water" },
               priority: Notifications.AndroidNotificationPriority.HIGH,
             },
             trigger: null,
@@ -180,6 +185,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               title: "補給提醒",
               body: `已騎乘 ${state.supplyTimeIntervalMinutes} 分鐘，建議補充能量與水分`,
               sound: true,
+              categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
+              data: { type: "supply_reminder", supplyKind: "interval-time" },
               priority: Notifications.AndroidNotificationPriority.HIGH,
             },
             trigger: null,
@@ -203,6 +210,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               title: "補給提醒",
               body: `已累積騎乘 ${state.supplyDistanceIntervalKm} km，建議補充能量與水分`,
               sound: true,
+              categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
+              data: { type: "supply_reminder", supplyKind: "interval-distance" },
               priority: Notifications.AndroidNotificationPriority.HIGH,
             },
             trigger: null,
@@ -303,6 +312,23 @@ export async function acknowledgeBackgroundSupplyInterval(kind: "time" | "distan
     } else {
       state.intervalLastDistanceKm = state.totalDistanceM / 1000;
       state.intervalDistanceReminderSent = false;
+    }
+    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+/** 在前台或通知按鈕確認卡路里／水分補給後，同步重置背景任務的對應計數。 */
+export async function acknowledgeBackgroundSupplyReminder(kind: "calorie" | "water") {
+  try {
+    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+    if (!stateStr) return;
+    const state: BackgroundState = JSON.parse(stateStr);
+    if (kind === "calorie") {
+      state.calories = 0;
+      state.calorieReminderSent = false;
+    } else {
+      state.sweatLossMl = 0;
+      state.waterReminderSent = false;
     }
     await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   } catch {}
