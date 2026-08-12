@@ -156,6 +156,10 @@ export function SupplyModal({
             </View>
           ))}
 
+          <Text style={[styles.safetyHint, { color: colors.muted }]}> 
+            為避免改變系統音量行為，實體音量鍵維持調整音量；請直接點選上方放大的「已補給」按鈕快速確認。
+          </Text>
+
           {/* 稍後按鈕 */}
           <Pressable
             style={({ pressed }) => [
@@ -242,6 +246,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   confirmBtn: {
+    minHeight: 60,
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
@@ -250,6 +255,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+  safetyHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    paddingHorizontal: 4,
   },
   dismissBtn: {
     paddingVertical: 12,

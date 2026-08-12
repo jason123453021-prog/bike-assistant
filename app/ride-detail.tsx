@@ -874,7 +874,7 @@ export default function RideDetailScreen() {
             </View>
 
             {/* 表現指標面板 */}
-            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}> 
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>表現指標</Text>
               <View style={styles.statsGrid}>
                 <DetailCell label="訓練壓力分數" value={record.tss ? `${record.tss.toFixed(1)}` : "--"} unit="" color="#9C27B0" />
@@ -882,6 +882,25 @@ export default function RideDetailScreen() {
                 <DetailCell label="標準化功率" value={record.normalizedPower ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" />
               </View>
             </View>
+
+            {/* 僅比較此裝置歷史資料的個人最佳紀錄 */}
+            {(record.personalBests?.length ?? 0) > 0 && (
+              <View style={[styles.statsPanel, { borderColor: "#F59E0B66", marginTop: 12 }]}> 
+                <Text style={[styles.panelTitle, { color: "#F59E0B" }]}>本機個人最佳</Text>
+                <Text style={[styles.personalBestHint, { color: colors.muted }]}>僅與此裝置已儲存的歷史騎乘比較，不含雲端或排行榜資料。</Text>
+                <View style={styles.statsGrid}>
+                  {record.personalBests?.map((best) => (
+                    <DetailCell
+                      key={best.metric}
+                      label={best.label}
+                      value={best.unit === "m" ? `${Math.round(best.value)}` : best.value.toFixed(1)}
+                      unit={best.unit}
+                      color="#F59E0B"
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* 訓練負荷與恢復建議面板 */}
             {record.tss && (
@@ -1140,6 +1159,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 12,
+  },
+  personalBestHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: -2,
+    marginBottom: 10,
   },
 
   gradeDistributionSection: {

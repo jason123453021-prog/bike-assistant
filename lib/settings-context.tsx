@@ -133,6 +133,9 @@ export interface AppSettings {
   // 精簡導航模式
   simplifiedNavMode: "off" | "manual" | "auto"; // off=關閉, manual=手動, auto=自動
   simplifiedNavIdleSec: number; // 自動模式開啟前的閒置秒數（預設 30 秒）
+  // 騎乘防誤觸：鎖定時仍可直接閱讀資訊，僅阻擋地圖與控制誤觸
+  touchGuardEnabled: boolean;
+  touchGuardUnlockMode: "hold" | "swipe";
   // 隊伍遙測
   teamTelemetryEnabled: boolean; // 是否開啟隊伍遙測
   showFriendDistance: boolean;   // 顯示隊友距離
@@ -206,6 +209,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   weatherApiKey: "",
   simplifiedNavMode: "off",
   simplifiedNavIdleSec: 30,
+  touchGuardEnabled: true,
+  touchGuardUnlockMode: "hold",
   teamTelemetryEnabled: false,
   showFriendDistance: true,
   showFriendLocation: true,

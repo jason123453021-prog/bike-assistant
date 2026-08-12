@@ -754,6 +754,47 @@ export default function SettingsScreen() {
           </View>
         </View>}
 
+        {/* ── 騎乘防誤觸 ── */}
+        <SectionHeader title="騎乘防誤觸" colors={colors} onToggle={() => toggleSection("touchGuard")} collapsed={collapsedSections["touchGuard"]} />
+        {!collapsedSections["touchGuard"] && <View style={[styles.section, { borderColor: colors.border }]}> 
+          <ToggleRow
+            icon="lock.fill"
+            label="騎乘時自動鎖定觸控"
+            value={settings.touchGuardEnabled}
+            colors={colors}
+            onToggle={(enabled) => updateSettings({ touchGuardEnabled: enabled })}
+          />
+          <Divider colors={colors} />
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>解除方式</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>鎖定時仍能觀看地圖與數據，只會阻擋誤觸控制</Text>
+            </View>
+          </View>
+          <View style={styles.guardModeRow}>
+            {([
+              ["hold", "長按 1.2 秒"],
+              ["swipe", "向右滑動"],
+            ] as const).map(([mode, label]) => (
+              <Pressable
+                key={mode}
+                style={({ pressed }) => [
+                  styles.guardModeChip,
+                  {
+                    backgroundColor: settings.touchGuardUnlockMode === mode ? colors.primary : colors.surface,
+                    borderColor: settings.touchGuardUnlockMode === mode ? colors.primary : colors.border,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+                onPress={() => updateSettings({ touchGuardUnlockMode: mode })}
+                disabled={!settings.touchGuardEnabled}
+              >
+                <Text style={[styles.guardModeChipText, { color: settings.touchGuardUnlockMode === mode ? "#fff" : colors.foreground }]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>}
+
         {/* ── 本機資料匯入 ── */}
         <SectionHeader title="本機資料" colors={colors} onToggle={() => toggleSection("localData")} collapsed={collapsedSections["localData"]} />
         {!collapsedSections["localData"] && <View style={[styles.section, { borderColor: colors.border }]}> 
@@ -1637,6 +1678,22 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     fontSize: 14,
     textAlign: "center",
+  },
+  guardModeRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 2,
+  },
+  guardModeChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  guardModeChipText: {
+    fontSize: 13,
+    fontWeight: "700",
   },
   editConfirmBtn: {
     paddingVertical: 13,

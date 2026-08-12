@@ -211,6 +211,20 @@ export default function MapScreen() {
   const autoRecenterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (!settings.touchGuardEnabled) setTouchGuardEnabled(false);
+  }, [settings.touchGuardEnabled]);
+
+  const touchGuardPanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => settings.touchGuardUnlockMode === "swipe",
+    onMoveShouldSetPanResponder: (_, gesture) => settings.touchGuardUnlockMode === "swipe" && Math.abs(gesture.dx) > 8,
+    onPanResponderRelease: (_, gesture) => {
+      if (settings.touchGuardUnlockMode === "swipe" && gesture.dx > 110 && Math.abs(gesture.dy) < 80) {
+        setTouchGuardEnabled(false);
+      }
+    },
+  }), [settings.touchGuardUnlockMode]);
+
+  useEffect(() => {
     currentPosRef.current = currentPos;
   }, [currentPos]);
 
@@ -509,6 +523,7 @@ export default function MapScreen() {
   const triggerSupplyReminder = useCallback(
     async (type: "calorie" | "water", recommendedMl?: number) => {
       powerSavingManagerRef.current.onSupplyReminder();
+      setTouchGuardEnabled(false);
       if (type === "calorie") {
         setCalorieAlert(true);
       } else {
@@ -1267,7 +1282,7 @@ export default function MapScreen() {
     arrivedRef.current = false;
     setMapRideActive(true);
     setFollowUser(true);
-    setTouchGuardEnabled(true);
+    setTouchGuardEnabled(settings.touchGuardEnabled);
     setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
     recoverySessionRef.current = createNewRideSession();
     void saveRideSessionSnapshot(recoverySessionRef.current);
@@ -1879,14 +1894,14 @@ export default function MapScreen() {
             {headingUp ? "車頭" : "指北"}
           </Text>
         </Pressable>
-        {isActive && (
+        {isActive && settings.touchGuardEnabled && (
           <Pressable
             style={[styles.toolBtn, touchGuardEnabled && styles.toolBtnActive]}
             onPress={() => {
               if (!touchGuardEnabled) setTouchGuardEnabled(true);
             }}
             onLongPress={() => {
-              if (touchGuardEnabled) setTouchGuardEnabled(false);
+              if (touchGuardEnabled && settings.touchGuardUnlockMode === "hold") setTouchGuardEnabled(false);
             }}
             delayLongPress={1200}
           >
@@ -2517,12 +2532,19 @@ export default function MapScreen() {
         <Pressable
           style={styles.touchGuard}
           onPress={() => {}}
-          onLongPress={() => setTouchGuardEnabled(false)}
+          onLongPress={() => {
+            if (settings.touchGuardUnlockMode === "hold") setTouchGuardEnabled(false);
+          }}
           delayLongPress={1200}
+          {...touchGuardPanResponder.panHandlers}
         >
           <View style={styles.touchGuardBadge}>
             <Text style={styles.touchGuardTitle}>觸控已鎖定</Text>
-            <Text style={styles.touchGuardHint}>長按 1.2 秒解除，避免汗水或雨滴誤觸</Text>
+            <Text style={styles.touchGuardHint}>
+              {settings.touchGuardUnlockMode === "swipe"
+                ? "向右滑動解除；鎖定時仍可直接閱讀資訊"
+                : "長按 1.2 秒解除；鎖定時仍可直接閱讀資訊"}
+            </Text>
           </View>
         </Pressable>
       )}

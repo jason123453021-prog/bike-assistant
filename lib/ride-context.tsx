@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { analyzeTraining, estimateFTP } from "./tss-calc";
+import { calculatePersonalBests, type PersonalBest } from "./personal-bests";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,8 @@ export interface RideRecord {
   maxCadence?: number;    // 最高踏頻 rpm（感測器）
   gradeDistribution?: number[];  // 坡度區間距離統計 [1-5%, 6-10%, 11-15%, 16-20%, 21-25%, 26%+]
   gradeAscentDistribution?: number[];  // 坡度區間爬升統計 [1-5%, 6-10%, 11-15%, 16-20%, 21-25%, 26%+]
+  /** 僅與裝置內既有騎乘紀錄比較後得到的個人最佳成績 */
+  personalBests?: PersonalBest[];
 }
 
 export interface RideState {
@@ -403,7 +406,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       ftpW
     );
     
-    const record: RideRecord = {
+    const recordBase: RideRecord = {
       id: now.toString(),
       date: now,
       name: (name && name.trim()) ? name.trim() : generateDefaultName(now),
@@ -433,6 +436,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       tss: trainingAnalysis.tss,
       intensityFactor: trainingAnalysis.intensityFactor,
       normalizedPower: trainingAnalysis.normalizedPower,
+    };
+    const record: RideRecord = {
+      ...recordBase,
+      personalBests: calculatePersonalBests(recordBase, state.records),
     };
     dispatch({ type: "ADD_RECORD", record });
     const existing = await AsyncStorage.getItem(STORAGE_KEY);
