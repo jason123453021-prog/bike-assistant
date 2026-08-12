@@ -33,6 +33,14 @@ export interface LatLng {
   longitude: number;
 }
 
+/** 顯示於地圖的導航路徑圖層；每個圖層各自管理折線、起訖點與方向箭頭。 */
+export interface NavigationRouteOverlay {
+  id: string;
+  coordinates: LatLng[];
+  color: string;
+  showDirectionArrows?: boolean;
+}
+
 export interface FriendMarker {
   userId: string;
   name: string;
@@ -74,6 +82,7 @@ export interface LeafletMapProps {
   // Map data
   currentPos?: { lat: number; lon: number; heading: number } | null;
   gpxPolyline?: LatLng[];
+  routeOverlays?: NavigationRouteOverlay[];
   passedPolyline?: LatLng[];
   liveTrail?: LatLng[];
   returnPolyline?: LatLng[];
@@ -193,6 +202,75 @@ var gpxLayer = L.polyline([], { color: '#FF3B30', weight: 4, opacity: 0.9 }).add
 var passedLayer = L.polyline([], { color: '#8B0000', weight: 4, opacity: 0.9 }).addTo(map);
 var trailLayer = L.polyline([], { color: '#00E676', weight: 3, opacity: 0.9 }).addTo(map);
 var returnLayer = L.polyline([], { color: '#FF9500', weight: 4, opacity: 0.9 }).addTo(map);
+var routeOverlayPolylines = [];
+var routeOverlayArrowMarkers = [];
+var routeOverlayEndpointMarkers = [];
+var arrowMarkers = [];
+
+function clearRouteOverlays() {
+  routeOverlayPolylines.forEach(function(layer) { map.removeLayer(layer); });
+  routeOverlayArrowMarkers.forEach(function(marker) { map.removeLayer(marker); });
+  routeOverlayEndpointMarkers.forEach(function(marker) { map.removeLayer(marker); });
+  routeOverlayPolylines = [];
+  routeOverlayArrowMarkers = [];
+  routeOverlayEndpointMarkers = [];
+
+  // 同步移除舊版單一路徑的折線與起訖標記，避免切換模式後殘留。
+  gpxLayer.setLatLngs([]);
+  if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
+  if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
+
+  // 清理舊版 setGpxPolyline 留下、未保存引用的小方向箭頭。
+  var legacyArrows = [];
+  map.eachLayer(function(layer) {
+    var className = layer && layer.options && layer.options.icon && layer.options.icon.options
+      ? layer.options.icon.options.className
+      : '';
+    if (className === 'gpx-arrow' || className === 'route-direction-arrow') legacyArrows.push(layer);
+  });
+  legacyArrows.forEach(function(marker) { map.removeLayer(marker); });
+}
+
+function renderRouteOverlays(layers) {
+  clearRouteOverlays();
+  (layers || []).forEach(function(route) {
+    var coords = route.coords || [];
+    if (!coords.length) return;
+    var color = route.color || '#FF3B30';
+    var polyline = L.polyline(coords, { color: color, weight: 4, opacity: 0.9 }).addTo(map);
+    routeOverlayPolylines.push(polyline);
+
+    var start = L.marker(coords[0], {
+      icon: makeCircleIcon(color, 14, '#fff'),
+      zIndexOffset: 500,
+    }).addTo(map);
+    routeOverlayEndpointMarkers.push(start);
+    if (coords.length > 1) {
+      var end = L.marker(coords[coords.length - 1], {
+        icon: makeCircleIcon(color, 14, '#fff'),
+        zIndexOffset: 500,
+      }).addTo(map);
+      routeOverlayEndpointMarkers.push(end);
+    }
+
+    if (!route.showDirectionArrows || coords.length < 2) return;
+    var interval = Math.max(1, Math.floor(coords.length / 12));
+    if (coords.length < 30) interval = Math.max(1, Math.floor(coords.length / 3));
+    if (coords.length > 500) interval = Math.ceil(coords.length / 20);
+    for (var i = interval; i < coords.length; i += interval) {
+      var prev = coords[i - 1];
+      var curr = coords[i];
+      var bearing = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]) * 180 / Math.PI;
+      var arrowIcon = L.divIcon({
+        html: '<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid ' + color + ';transform:rotate(' + bearing + 'deg);"></div>',
+        iconSize: [10, 8],
+        className: 'route-direction-arrow'
+      });
+      var arrow = L.marker(curr, { icon: arrowIcon, zIndexOffset: 100 }).addTo(map);
+      routeOverlayArrowMarkers.push(arrow);
+    }
+  });
+}
 
 // 里程標記層
 var kilometerMarkers = [];
@@ -439,57 +517,10 @@ function handleMessage(data) {
         }
         break;
       case 'setGpxPolyline':
-        gpxLayer.setLatLngs(msg.coords);
-        // Add direction arrows with adaptive density based on route length
-        if (msg.coords && msg.coords.length > 1) {
-          // Calculate route distance to determine arrow density
-          var totalDistance = 0;
-          for (var j = 1; j < msg.coords.length; j++) {
-            var lat1 = msg.coords[j-1][0] * Math.PI / 180;
-            var lon1 = msg.coords[j-1][1] * Math.PI / 180;
-            var lat2 = msg.coords[j][0] * Math.PI / 180;
-            var lon2 = msg.coords[j][1] * Math.PI / 180;
-            var dLat = lat2 - lat1;
-            var dLon = lon2 - lon1;
-            var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            totalDistance += 6371 * c; // Earth radius in km
-          }
-          // Adaptive interval: target 10-15 arrows per route
-          var targetArrows = 12;
-          var interval = Math.max(1, Math.floor(msg.coords.length / targetArrows));
-          // For very short routes, ensure at least 3 arrows
-          if (msg.coords.length < 30) interval = Math.max(1, Math.floor(msg.coords.length / 3));
-          // For very long routes, limit to 20 arrows
-          if (msg.coords.length > 500) interval = Math.ceil(msg.coords.length / 20);
-          
-          for (var i = interval; i < msg.coords.length; i += interval) {
-            var prev = msg.coords[i - 1];
-            var curr = msg.coords[i];
-            var bearing = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]) * 180 / Math.PI;
-            var arrowIcon = L.divIcon({
-              html: '<div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #FF3B30; transform: rotate(' + bearing + 'deg);"></div>',
-              iconSize: [10, 8],
-              className: 'gpx-arrow'
-            });
-            L.marker(curr, { icon: arrowIcon, zIndexOffset: 100 }).addTo(map);
-          }
-        }
-        // Update start/end markers
-        if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
-        if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
-        if (msg.coords.length > 0) {
-          startMarker = L.marker(msg.coords[0], {
-            icon: makeCircleIcon('#00C853', 16, '#fff'),
-            zIndexOffset: 500,
-          }).addTo(map);
-        }
-        if (msg.coords.length > 1) {
-          endMarker = L.marker(msg.coords[msg.coords.length - 1], {
-            icon: makeCircleIcon('#FF3B30', 16, '#fff'),
-            zIndexOffset: 500,
-          }).addTo(map);
-        }
+        renderRouteOverlays([{ id: 'legacy', coords: msg.coords || [], color: '#FF3B30', showDirectionArrows: true }]);
+        break;
+      case 'setRouteOverlays':
+        renderRouteOverlays(msg.layers || []);
         break;
       case 'setPassedPolyline':
         passedLayer.setLatLngs(msg.coords);
@@ -730,6 +761,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       onMapLongPress,
       currentPos,
       gpxPolyline,
+      routeOverlays,
       passedPolyline,
       liveTrail,
       returnPolyline,
@@ -834,14 +866,28 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       }
     }, [currentPos, isReady]);
 
-    // Send GPX polyline
+    // Send route overlays. When supplied, this replaces the legacy single GPX layer.
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
+      if (routeOverlays !== undefined) {
+        webViewRef.current.postMessage(
+          JSON.stringify({
+            type: "setRouteOverlays",
+            layers: routeOverlays.map((route) => ({
+              id: route.id,
+              coords: route.coordinates.map((c) => [c.latitude, c.longitude]),
+              color: route.color,
+              showDirectionArrows: route.showDirectionArrows ?? false,
+            })),
+          }),
+        );
+        return;
+      }
       const coords = (gpxPolyline ?? []).map((c) => [c.latitude, c.longitude]);
       webViewRef.current.postMessage(
         JSON.stringify({ type: "setGpxPolyline", coords })
       );
-    }, [gpxPolyline, isReady]);
+    }, [gpxPolyline, isReady, routeOverlays]);
 
     // Send passed polyline
     useEffect(() => {

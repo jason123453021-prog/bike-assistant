@@ -1260,3 +1260,9 @@
 - [x] 檢查 Expo Go 約 68% Bundling 停滯時的 Metro 程序、記憶體與快取狀態：確認 640／1024 MB V8 heap 與整個工作區掃描造成 heap OOM
 - [x] 修正 Metro 記憶體限制、停用工作區根目錄掃描並清除快取，使用單一轉譯工作重新驗證 Android Expo Go Bundle：Android Bundle 已成功完成（1,795 modules、11,109,843 bytes、53.6 秒），Metro 隨後仍為 running
 - [x] 提供受管理 APK 建置的可操作重試條件與必要失敗日誌需求：需先取消目前 1% 卡住任務，再以本次修復版本重新建置；若仍停住，提交該建置服務的完整日誌至支援頁面
+
+## 重新釘選導航路徑確認（2026-08-13）
+- [x] 檢查 GPX、釘選導航與方向箭頭的既有圖層狀態管理：原本共用單一 sharedRoute，且 Leaflet 舊箭頭未保存引用，會造成覆寫與殘留
+- [x] 在既有 GPX 或釘選導航圖層存在時，顯示是否清除先前路徑的確認視窗：支援「取消」、「保留並開始」及「清除並開始」
+- [x] 確認清除時移除所有舊導航圖層與方向箭頭；取消清除時保留舊新圖層並存：Leaflet 改為具名折線、端點與箭頭集合；釘選路徑採不同顏色且不顯示小箭頭
+- [x] 新增流程測試並驗證 TypeScript 與 Android Bundle：pnpm check 通過；29 項測試（28 passed、1 skipped）通過；Android Metro Bundle 1,702 modules、11,116,649 bytes 完成

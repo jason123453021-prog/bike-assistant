@@ -35,7 +35,7 @@ import {
   Text,
   View,
 } from "react-native";
-import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
+import LeafletMapView, { type LeafletMapHandle, type NavigationRouteOverlay } from "@/components/leaflet-map";
 import * as Location from "expo-location";
 import * as Battery from "expo-battery";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,7 +47,7 @@ import { useRide } from "@/lib/ride-context";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
 
-import { type GpxPoint } from "@/lib/gpx-parser";
+import { type GpxPoint, type GpxRoute } from "@/lib/gpx-parser";
 import {
   speak,
   vibrateLight,
@@ -118,6 +118,11 @@ import {
   type SupplyNotificationAction,
   type SupplyNotificationKind,
 } from "@/lib/supply-notification-actions";
+import {
+  applyPinnedNavigationDecision,
+  hasExistingNavigationLayers,
+  type PinnedNavigationLayer,
+} from "@/lib/pinned-navigation-layers";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -191,7 +196,7 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { state, dispatch, saveRecord, updateRecordName, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
   const { settings } = useSettings();
-  const { sharedRoute, clearSharedRoute, setSharedRoute } = useGpx();
+  const { sharedRoute, clearSharedRoute } = useGpx();
 
   useKeepAwake();
 
@@ -288,8 +293,11 @@ export default function MapScreen() {
   const [showRecoveryAlert, setShowRecoveryAlert] = useState(false);
   const [recoverySnapshot, setRecoverySnapshot] = useState<Partial<import("@/lib/ride-context").RideState> | null>(null);
 
-  // GPX 路線（從共享 Context 讀取，不再有本地匯入）
-  const gpxRoute = sharedRoute;
+  // 匯入 GPX 與釘選 OSRM 路徑分開保存，讓使用者可選擇清除或並存顯示。
+  const [pinnedNavigationLayers, setPinnedNavigationLayers] = useState<PinnedNavigationLayer<GpxRoute>[]>([]);
+  const [activeNavigationRoute, setActiveNavigationRoute] = useState<GpxRoute | null>(null);
+  const gpxRoute = activeNavigationRoute ?? sharedRoute ?? pinnedNavigationLayers[pinnedNavigationLayers.length - 1]?.route ?? null;
+  const hasExistingRouteLayers = hasExistingNavigationLayers(Boolean(sharedRoute), pinnedNavigationLayers.length);
 
   // 導航狀態
   const [isNavigating, setIsNavigating] = useState(false);
@@ -299,6 +307,10 @@ export default function MapScreen() {
   const arrivedRef = useRef(false);
   // 釘選 OSRM 路徑一律採自行車道優先；不提供偏離後自動重新規劃。
   const preferCycleway = true;
+
+  useEffect(() => {
+    if (sharedRoute) setActiveNavigationRoute(sharedRoute);
+  }, [sharedRoute]);
 
   // 當共享路線更新時，自動適配地圖視角
   useEffect(() => {
@@ -384,6 +396,51 @@ export default function MapScreen() {
   const [showPinCard, setShowPinCard] = useState(false);
   const [isFetchingPinRoute, setIsFetchingPinRoute] = useState(false);
   const [pinRouteInfo, setPinRouteInfo] = useState<{ distM: number; durSec: number; polyline: { latitude: number; longitude: number }[] } | null>(null);
+
+  const clearAllNavigationLayers = useCallback(() => {
+    clearSharedRoute();
+    setPinnedNavigationLayers([]);
+    setActiveNavigationRoute(null);
+    setNearestIdx(0);
+    setIsNavigating(false);
+    setMapRideActive(false);
+    setDistToEnd(null);
+    setNavInstruction("");
+    arrivedRef.current = false;
+  }, [clearSharedRoute]);
+
+  const startPinnedNavigationRoute = useCallback((route: GpxRoute, announcement: string) => {
+    const nextLayer: PinnedNavigationLayer<GpxRoute> = {
+      id: `pinned-${Date.now()}`,
+      route,
+    };
+    const commitRoute = (clearExisting: boolean) => {
+      if (clearExisting) clearSharedRoute();
+      setPinnedNavigationLayers((previous) => applyPinnedNavigationDecision(previous, nextLayer, clearExisting));
+      setActiveNavigationRoute(route);
+      setIsNavigating(true);
+      setMapRideActive(true);
+      setFollowUser(true);
+      setNearestIdx(0);
+      arrivedRef.current = false;
+      speak(announcement, settings.ttsEnabled);
+    };
+
+    if (!hasExistingNavigationLayers(Boolean(sharedRoute), pinnedNavigationLayers.length)) {
+      commitRoute(false);
+      return;
+    }
+
+    Alert.alert(
+      "清除先前導航路徑？",
+      "地圖已有 GPX 或釘選導航路徑。清除會完整移除所有舊路徑、起訖標記與方向箭頭；保留則新舊路徑會以不同顏色一起顯示。",
+      [
+        { text: "取消", style: "cancel" },
+        { text: "保留並開始", onPress: () => commitRoute(false) },
+        { text: "清除並開始", style: "destructive", onPress: () => commitRoute(true) },
+      ],
+    );
+  }, [clearSharedRoute, pinnedNavigationLayers.length, settings.ttsEnabled, sharedRoute]);
 
   // ── 自訂補給品追蹤 ──
   // 記錄每個補給品上次觸發的時間（秒）或距離（公里）
@@ -1836,6 +1893,29 @@ export default function MapScreen() {
     return gpxRoute.points.map((p) => ({ latitude: p.lat, longitude: p.lon }));
   }, [gpxRoute]);
 
+  const routeOverlays = useMemo<NavigationRouteOverlay[]>(() => {
+    const overlays: NavigationRouteOverlay[] = [];
+    if (sharedRoute) {
+      overlays.push({
+        id: "imported-gpx",
+        coordinates: sharedRoute.points.map((point) => ({ latitude: point.lat, longitude: point.lon })),
+        color: "#FF3B30",
+        showDirectionArrows: activeNavigationRoute === sharedRoute,
+      });
+    }
+    const pinColors = ["#007AFF", "#AF52DE", "#FF9500", "#34C759"];
+    pinnedNavigationLayers.forEach((layer, index) => {
+      overlays.push({
+        id: layer.id,
+        coordinates: layer.route.points.map((point) => ({ latitude: point.lat, longitude: point.lon })),
+        color: pinColors[index % pinColors.length],
+        // 釘選導航採乾淨折線顯示，避免留下難辨識的小箭頭。
+        showDirectionArrows: false,
+      });
+    });
+    return overlays;
+  }, [activeNavigationRoute, pinnedNavigationLayers, sharedRoute]);
+
   const passedPolyline = useMemo(() => {
     if (!gpxRoute || nearestIdx <= 0) return [];
     return gpxRoute.points.slice(0, nearestIdx + 1).map((p) => ({ latitude: p.lat, longitude: p.lon }));
@@ -2030,6 +2110,7 @@ export default function MapScreen() {
         }}
         currentPos={currentPos}
         gpxPolyline={gpxPolyline}
+        routeOverlays={routeOverlays}
         passedPolyline={passedPolyline}
         liveTrail={liveTrail}
         returnPolyline={[]}
@@ -2103,8 +2184,20 @@ export default function MapScreen() {
           </Pressable>
         )}
         {/* GPX 路線狀態指示（有路線時顯示清除按鈕） */}
-        {gpxRoute && !mapRideActive && (
-          <Pressable style={styles.toolBtn} onPress={clearSharedRoute}>
+        {hasExistingRouteLayers && !mapRideActive && (
+          <Pressable
+            style={styles.toolBtn}
+            onPress={() => {
+              Alert.alert(
+                "清除所有導航圖層？",
+                "這會完整清除匯入 GPX、所有釘選導航路徑、起訖標記與方向箭頭。",
+                [
+                  { text: "取消", style: "cancel" },
+                  { text: "清除", style: "destructive", onPress: clearAllNavigationLayers },
+                ],
+              );
+            }}
+          >
             <IconSymbol name="xmark.circle.fill" size={20} color="#FF3B30" />
           </Pressable>
         )}
@@ -2580,11 +2673,7 @@ export default function MapScreen() {
                   avgGradient: 0,
                   maxGradient: 0,
                 };
-                setSharedRoute(osmrRoute);
-                setIsNavigating(true);
-                setMapRideActive(true);
-                setFollowUser(true);
-                speak(`開始導航到 ${tappedPOI.name}`, settings.ttsEnabled);
+                startPinnedNavigationRoute(osmrRoute, `開始導航到 ${tappedPOI.name}`);
                 setShowPOICard(false);
               }}
             >
@@ -2685,11 +2774,7 @@ export default function MapScreen() {
                   avgGradient: 0,
                   maxGradient: 0,
                 };
-                setSharedRoute(osmrRoute);
-                setIsNavigating(true);
-                setMapRideActive(true);
-                setFollowUser(true);
-                speak("開始導航到釘選位置", settings.ttsEnabled);
+                startPinnedNavigationRoute(osmrRoute, "開始導航到釘選位置");
                 setShowPinCard(false);
               }}
             >
