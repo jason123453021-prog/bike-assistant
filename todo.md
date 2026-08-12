@@ -1254,3 +1254,9 @@
 - [x] 產生 Android 原生專案：Expo Prebuild 成功完成，Gradle 專案與原生設定外掛可正確生成
 - [x] 嘗試執行本機 Gradle Release APK 建置：未產出 APK；沙箱無 Android SDK，且預設 Gradle daemon 的 2 GB heap 在此資源限制下意外終止，不能據此宣稱 APK 已成功建置
 - [ ] 由發布介面的「建置 APK」服務執行受管理 Android Build，取得實際 APK 產物與建置紀錄
+
+## APK／Expo Go 卡住排查（2026-08-13）
+- [x] 檢查受管理 APK 建置停在 1% 時的可用建置紀錄與專案原生設定：專案 production Hermes Bundle 與 Expo Prebuild 均可完成，未發現 NitroModules；受管理建置服務未提供可讀取的原生建置日誌，需由該服務輸出失敗日誌才能進一步定位
+- [x] 檢查 Expo Go 約 68% Bundling 停滯時的 Metro 程序、記憶體與快取狀態：確認 640／1024 MB V8 heap 與整個工作區掃描造成 heap OOM
+- [x] 修正 Metro 記憶體限制、停用工作區根目錄掃描並清除快取，使用單一轉譯工作重新驗證 Android Expo Go Bundle：Android Bundle 已成功完成（1,795 modules、11,109,843 bytes、53.6 秒），Metro 隨後仍為 running
+- [x] 提供受管理 APK 建置的可操作重試條件與必要失敗日誌需求：需先取消目前 1% 卡住任務，再以本次修復版本重新建置；若仍停住，提交該建置服務的完整日誌至支援頁面
