@@ -52,6 +52,8 @@ const MAPPING = {
   "pencil":                               "edit",
   "magnifyingglass":                       "search",
   "arrow.up.circle.fill":                  "navigation",
+  "arrow.down.circle.fill":                "file-download",
+  "lock.fill":                             "lock",
   "location.north.fill":                   "explore",
   "compass":                               "explore",
   // Friends & social

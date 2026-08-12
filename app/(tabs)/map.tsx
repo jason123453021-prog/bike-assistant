@@ -123,6 +123,7 @@ import {
   hasExistingNavigationLayers,
   type PinnedNavigationLayer,
 } from "@/lib/pinned-navigation-layers";
+import { shouldTrackRideHeading, shouldTrackRideLocation } from "@/lib/ride-tracking-lifecycle";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -1009,6 +1010,13 @@ export default function MapScreen() {
 
   // ─── GPS 訂閱 ──────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
+    // 待機畫面不請求定位權限、不建立 GPS 訂閱，也不更新速度；
+    // 使用者開始騎乘後才啟用，以避免無謂耗電。
+    if (!shouldTrackRideLocation(mapRideActive)) {
+      locationSubRef.current?.remove();
+      locationSubRef.current = null;
+      return;
+    }
     let active = true;
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -1382,10 +1390,10 @@ export default function MapScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [followUser, mapRideActive, isNavigating, gpxRoute, settings]);
 
-  // ─── 電子羅盤訂閱（優化車頭朝前）──────────────────────────────────────────────────────
+  // ─── 電子羅盤訂閱（只在騎乘中的車頭朝前模式啟用）────────────────────────────────────────
   useEffect(() => {
-    if (!headingUp) {
-      // 非車頭朝前模式時不訂閱羅盤，節省電量
+    if (!shouldTrackRideHeading(mapRideActive, headingUp)) {
+      // 待機或非車頭朝前模式時不訂閱羅盤，節省電量
       headingSubRef.current?.remove();
       headingSubRef.current = null;
       return;
@@ -1412,7 +1420,7 @@ export default function MapScreen() {
       headingSubRef.current?.remove();
       headingSubRef.current = null;
     };
-  }, [headingUp]);
+  }, [headingUp, mapRideActive]);
 
   // ─── GPX 導航邏輯 ────────────────────────────────────────────────────────────
   const handleNavigation = useCallback(

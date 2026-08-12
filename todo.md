@@ -1266,3 +1266,9 @@
 - [x] 在既有 GPX 或釘選導航圖層存在時，顯示是否清除先前路徑的確認視窗：支援「取消」、「保留並開始」及「清除並開始」
 - [x] 確認清除時移除所有舊導航圖層與方向箭頭；取消清除時保留舊新圖層並存：Leaflet 改為具名折線、端點與箭頭集合；釘選路徑採不同顏色且不顯示小箭頭
 - [x] 新增流程測試並驗證 TypeScript 與 Android Bundle：pnpm check 通過；29 項測試（28 passed、1 skipped）通過；Android Metro Bundle 1,702 modules、11,116,649 bytes 完成
+
+## 待機省電與設定圖示修正（2026-08-13）
+- [x] 檢查未開始騎乘時前景定位、速度與羅盤監測的啟動時機：原本 Map 掛載即建立 GPS 訂閱，羅盤僅看車頭模式
+- [x] 未開始騎乘時停止前景／背景定位訂閱與速度更新；開始騎乘後才啟用：GPS 與羅盤均改由 mapRideActive 控制，暫停中的既有騎乘仍維持追蹤，結束騎乘則釋放資源
+- [x] 將設定頁所有不明問號圖示替換為對應功能的語意圖示：補齊 lock.fill → lock 與 arrow.down.circle.fill → file-download 映射；已檢查設定頁全部圖示名稱
+- [x] 新增待機定位生命週期測試，並驗證 TypeScript、完整測試及 Android Bundle：pnpm check 通過；32 項測試（31 passed、1 skipped）通過；Android Metro Bundle 1,766 modules、11,119,724 bytes 完成
