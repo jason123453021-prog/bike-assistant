@@ -19,6 +19,7 @@ import { formatDuration } from "@/lib/power-calc";
 import { calculateWeeklyTrainingStats, calculateMonthlyTrainingStats } from "@/lib/activity-stats";
 import { createRouteFromRideRecord } from "@/lib/history-route";
 import { useGpx } from "@/lib/gpx-context";
+import { buildLocalTrainingLog, shiftTrainingLogMonth } from "@/lib/local-training-log";
 
 const STORAGE_KEY = "@bike_records";
 
@@ -29,10 +30,19 @@ export default function HistoryScreen() {
   const { setSharedRoute } = useGpx();
   const [searchQuery, setSearchQuery] = useState("");
   const [showStats, setShowStats] = useState(false);
+  const [trainingLogMonth, setTrainingLogMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
   // 計算周期訓練統計
   const weeklyStats = useMemo(() => calculateWeeklyTrainingStats(state.records), [state.records]);
   const monthlyStats = useMemo(() => calculateMonthlyTrainingStats(state.records), [state.records]);
+  const selectedMonthStats = useMemo(
+    () => calculateMonthlyTrainingStats(state.records, trainingLogMonth.getMonth(), trainingLogMonth.getFullYear()),
+    [state.records, trainingLogMonth],
+  );
+  const trainingLog = useMemo(
+    () => buildLocalTrainingLog(state.records, trainingLogMonth.getFullYear(), trainingLogMonth.getMonth()),
+    [state.records, trainingLogMonth],
+  );
 
   useEffect(() => {
     loadRecords();
@@ -250,6 +260,60 @@ export default function HistoryScreen() {
                 </View>
               </View>
             </View>
+            <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.trainingLogSection}>
+              <View style={styles.trainingLogHeader}>
+                <Text style={[styles.statsPeriodTitle, { color: colors.foreground }]}>本機訓練日誌</Text>
+                <View style={styles.monthControls}>
+                  <Pressable
+                    accessibilityLabel="上一個月"
+                    onPress={() => setTrainingLogMonth((date) => shiftTrainingLogMonth(date, -1))}
+                    style={({ pressed }) => [styles.monthControl, { borderColor: colors.border, opacity: pressed ? 0.6 : 1 }]}
+                  >
+                    <Text style={[styles.monthArrow, { color: colors.muted }]}>‹</Text>
+                  </Pressable>
+                  <Text style={[styles.trainingMonthText, { color: colors.foreground }]}>
+                    {trainingLogMonth.toLocaleDateString("zh-TW", { year: "numeric", month: "long" })}
+                  </Text>
+                  <Pressable
+                    accessibilityLabel="下一個月"
+                    onPress={() => setTrainingLogMonth((date) => shiftTrainingLogMonth(date, 1))}
+                    style={({ pressed }) => [styles.monthControl, { borderColor: colors.border, opacity: pressed ? 0.6 : 1 }]}
+                  >
+                    <Text style={[styles.monthArrow, { color: colors.muted }]}>›</Text>
+                  </Pressable>
+                </View>
+              </View>
+              <Text style={[styles.trainingLogSummaryText, { color: colors.muted }]}>
+                {selectedMonthStats.rideCount} 次騎乘 · {(selectedMonthStats.totalDuration / 3600).toFixed(1)} 小時 · {selectedMonthStats.totalTSS.toFixed(0)} TSS
+              </Text>
+              <View style={styles.weekdayRow}>
+                {["一", "二", "三", "四", "五", "六", "日"].map((day) => (
+                  <Text key={day} style={[styles.weekdayText, { color: colors.muted }]}>{day}</Text>
+                ))}
+              </View>
+              <View style={styles.calendarGrid}>
+                {trainingLog.days.map((day, index) => {
+                  const isToday = day && day.date.toDateString() === new Date().toDateString();
+                  const isActive = (day?.rideCount ?? 0) > 0;
+                  return (
+                    <View
+                      key={`${trainingLog.year}-${trainingLog.month}-${index}`}
+                      style={[
+                        styles.calendarDay,
+                        { backgroundColor: isActive ? colors.primary + (day!.totalTss > 80 ? "52" : "2D") : colors.background, borderColor: isToday ? colors.primary : colors.border },
+                      ]}
+                    >
+                      {day && <>
+                        <Text style={[styles.calendarDayNumber, { color: isActive ? colors.primary : colors.muted }]}>{day.dayNumber}</Text>
+                        {isActive && <Text style={[styles.calendarDayData, { color: colors.foreground }]}>{day.totalDistanceKm.toFixed(0)} km</Text>}
+                      </>}
+                    </View>
+                  );
+                })}
+              </View>
+              <Text style={[styles.trainingLogNote, { color: colors.muted }]}>只分析此裝置內的騎乘紀錄；較深色方格代表當日 TSS 較高。</Text>
+            </View>
           </View>
         )}
 
@@ -424,4 +488,32 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11 },
   statValue: { fontSize: 14, fontWeight: "600" },
   statsDivider: { height: StyleSheet.hairlineWidth, marginVertical: 8 },
+  trainingLogSection: { gap: 8 },
+  trainingLogHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  monthControls: { flexDirection: "row", alignItems: "center", gap: 6 },
+  monthControl: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+  },
+  monthArrow: { fontSize: 20, lineHeight: 22 },
+  trainingMonthText: { width: 90, textAlign: "center", fontSize: 12, fontWeight: "600" },
+  trainingLogSummaryText: { fontSize: 12 },
+  weekdayRow: { flexDirection: "row" },
+  weekdayText: { width: "14.2857%", textAlign: "center", fontSize: 11, fontWeight: "600" },
+  calendarGrid: { flexDirection: "row", flexWrap: "wrap", gap: 3 },
+  calendarDay: {
+    width: "13.8%",
+    minHeight: 44,
+    paddingTop: 5,
+    alignItems: "center",
+    borderRadius: 7,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  calendarDayNumber: { fontSize: 11, fontWeight: "600" },
+  calendarDayData: { fontSize: 9, marginTop: 3 },
+  trainingLogNote: { fontSize: 11, lineHeight: 16 },
 });

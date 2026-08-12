@@ -1230,3 +1230,9 @@
 - [x] 以 Expo 官方檔案系統將 GPX 安全寫入 App 本機備份資料夾
 - [x] 在騎乘記錄詳情提供系統分享／儲存備份操作與失敗回饋
 - [x] 新增單元測試並完成 TypeScript、測試與 Android Metro 匯出驗證
+
+## Cyclers、Velodash 與 Strava 功能比對（2026-08-12）
+- [x] 蒐集三款 App 的官方公開功能、付費功能與登入依賴資料
+- [x] 篩選可在無帳號、無雲端驗證下本機實作的免費與進階功能
+- [x] 實作優先的 Local-First 進階功能：本機訓練日誌月曆與週／月累積統計
+- [x] 新增測試並完成 TypeScript、測試與 Android Metro 匯出驗證
