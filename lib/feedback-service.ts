@@ -11,6 +11,20 @@ import * as Speech from "expo-speech";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
+// 僅允許本機通知；禁止 expo-notifications 在啟動時嘗試取得遠端裝置 token。
+// 這是 Expo Go SDK 53+ 不支援遠端推播時的必要防護。
+let autoRegistrationDisabled = false;
+
+async function disableRemoteNotificationRegistration() {
+  if (autoRegistrationDisabled) return;
+  try {
+    await Notifications.setAutoServerRegistrationEnabledAsync(false);
+  } catch {
+    // 某些 Expo Go 版本沒有此方法時，仍可繼續使用本機通知。
+  }
+  autoRegistrationDisabled = true;
+}
+
 // ─── 震動回饋 ─────────────────────────────────────────────────────────────────
 
 export async function vibrateLight() {
@@ -101,6 +115,8 @@ export async function speakAutoResume(enabled: boolean) {
 // ─── 通知設定 ─────────────────────────────────────────────────────────────────
 
 export async function setupNotifications() {
+  await disableRemoteNotificationRegistration();
+
   if (Platform.OS === "android") {
     try {
       // 設定本地通知頻道（禁止遠端推播）

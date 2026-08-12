@@ -1170,3 +1170,10 @@
 - [ ] 驗證 Expo SDK 54 相容性和依賴項
 - [ ] 測試應用程式編譯和運行
 - [ ] 驗證權限和功能相容性
+
+
+## Expo Go 啟動錯誤修復（2026-08-12）
+- [x] 修復 Expo Go 中 expo-notifications 遠端推播警告，維持純本機通知
+- [x] 移除已刪除社群功能的 useFriendNav 殘留呼叫與 Provider 依賴
+- [x] 執行 TypeScript 型別檢查並確認 0 錯誤
+- [ ] 驗證 Expo Go 啟動畫面不再出現 Render Error 或 Console Error

@@ -28,7 +28,15 @@ export class PushNotificationManager {
    */
   static async initialize(): Promise<void> {
     try {
-      console.log('[PushNotification] 初始化通知系統...');
+      console.log('[PushNotification] 初始化本機通知系統...');
+
+      // Expo Go SDK 53+ 不支援 Android 遠端推播；關閉自動 token 註冊，
+      // 但保留 scheduleNotificationAsync 所需的本機通知能力。
+      try {
+        await Notifications.setAutoServerRegistrationEnabledAsync(false);
+      } catch {
+        // 舊版 Expo Go 沒有此方法時，仍可使用本機通知。
+      }
 
       // 設定通知處理器
       Notifications.setNotificationHandler({
@@ -47,7 +55,7 @@ export class PushNotificationManager {
         console.log('[PushNotification] 通知權限狀態:', status);
       }
 
-      console.log('[PushNotification] 初始化完成');
+      console.log('[PushNotification] 本機通知初始化完成');
     } catch (error) {
       console.error('[PushNotification] 初始化失敗:', error);
     }
