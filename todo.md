@@ -1236,3 +1236,14 @@
 - [x] 篩選可在無帳號、無雲端驗證下本機實作的免費與進階功能
 - [x] 實作優先的 Local-First 進階功能：本機訓練日誌月曆與週／月累積統計
 - [x] 新增測試並完成 TypeScript、測試與 Android Metro 匯出驗證
+
+## 開發服務恢復（2026-08-12）
+- [x] 重新啟動無回應的開發伺服器並確認預覽恢復
+
+## Expo Go Metro Bundle 恢復（2026-08-12）
+- [x] 檢查 Expo Go Bundle 卡住的 Metro 與快取狀態：發現 Metro 因記憶體壓力以 137 結束
+- [x] 清理 Metro／Expo 快取、停止殘留 TypeScript 監看程序並重新啟動開發服務
+- [x] 驗證 Metro 狀態端點回傳 packager-status:running，Android Metro 匯出亦已通過
+- [x] 修正 Expo 開發指令：改用通用 Metro 模式與非互動常駐旗標；已成功完成 11,105,054 bytes 的 Android Expo Go Bundle，且產生後 Metro 狀態仍為 running
+- [x] 降低 TypeScript 自動監看程序的記憶體負荷：啟用 skipLibCheck 與增量快取；一次性 pnpm check 已通過
+- [x] 限制 Metro 轉譯併發與 Node 堆積大小：Web Bundle（8,018,051 bytes）與 Android Expo Go Bundle（11,109,839 bytes）均已完成；Android Bundle 後與 30 秒穩定觀察後 Metro 皆維持 running，未再出現新的 OOM 137

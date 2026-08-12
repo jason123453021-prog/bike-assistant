@@ -2,6 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": ".expo/tsconfig.tsbuildinfo",
     "types": [
       "node",
       "nativewind/types"
