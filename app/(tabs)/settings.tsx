@@ -798,6 +798,34 @@ export default function SettingsScreen() {
             />
             <Text style={[styles.rowHint, { color: colors.muted, marginLeft: 6 }]}>秒</Text>
           </View>
+          <Divider colors={colors} />
+          <ToggleRow
+            icon="pause.circle.fill"
+            label="靜止自動暫停定位"
+            value={settings.idleAutoPauseEnabled}
+            colors={colors}
+            onToggle={(enabled) => updateSettings({ idleAutoPauseEnabled: enabled })}
+          />
+          <Divider colors={colors} />
+          <View style={styles.row}>
+            <IconSymbol name="clock.badge.exclamationmark" size={18} color={colors.muted} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>靜止後切換省電監測</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>偵測到重新移動時會自動恢復完整定位</Text>
+            </View>
+            <TextInput
+              style={[styles.numericInput, { color: colors.foreground, borderColor: colors.border }]}
+              value={String(settings.idleAutoPauseSeconds)}
+              onChangeText={(value) => {
+                const seconds = Math.max(30, Math.min(900, Number.parseInt(value || "30", 10) || 30));
+                void updateSettings({ idleAutoPauseSeconds: seconds });
+              }}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              editable={settings.idleAutoPauseEnabled}
+            />
+            <Text style={[styles.rowHint, { color: colors.muted, marginLeft: 6 }]}>秒</Text>
+          </View>
         </View>}
 
         {/* ── 騎乘防誤觸 ── */}

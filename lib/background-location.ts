@@ -46,6 +46,8 @@ export interface BackgroundState {
   intervalLastDistanceKm: number;
   intervalTimeReminderSent: boolean;
   intervalDistanceReminderSent: boolean;
+  trackingMode?: "full" | "idle_monitor";
+  gpsAccuracy?: GpsAccuracyLevel;
 }
 
 // Haversine 距離計算（背景任務中不能 import 其他模組的函數）
@@ -84,6 +86,27 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         const timestamp = loc.timestamp;
         const speedMs = speed ?? 0;
         const speedKmh = speedMs * 3.6;
+
+        // 省電監測期間只低頻確認是否重新移動，不寫入騎乘軌跡與統計。
+        if ((state.trackingMode ?? "full") === "idle_monitor") {
+          const movementM = state.lastLat !== 0 && state.lastLon !== 0
+            ? bgHaversine(state.lastLat, state.lastLon, latitude, longitude)
+            : 0;
+          state.lastLat = latitude;
+          state.lastLon = longitude;
+          state.lastTimestamp = timestamp;
+          if (speedKmh >= 3 || movementM >= 18) {
+            state.trackingMode = "full";
+            const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
+            if (isRegistered) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+            await Location.startLocationUpdatesAsync(
+              BACKGROUND_LOCATION_TASK,
+              locationTaskOptions(state.gpsAccuracy ?? "standard", "full"),
+            );
+          }
+          await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+          continue;
+        }
 
         // 計算距離增量
         if (state.lastLat !== 0 && state.lastLon !== 0) {
@@ -280,6 +303,8 @@ export async function initBackgroundState(params: {
     intervalLastDistanceKm: 0,
     intervalTimeReminderSent: false,
     intervalDistanceReminderSent: false,
+    trackingMode: "full",
+    gpsAccuracy: "standard",
   };
   await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   // 清空舊軌跡
@@ -359,12 +384,36 @@ export async function getBackgroundState(): Promise<BackgroundState | null> {
 }
 
 export type GpsAccuracyLevel = "power_saving" | "standard" | "high_accuracy";
+export type BackgroundTrackingMode = "full" | "idle_monitor";
 
 const ACCURACY_CONFIG: Record<GpsAccuracyLevel, { accuracy: Location.Accuracy; timeInterval: number; distanceInterval: number }> = {
   power_saving: { accuracy: Location.Accuracy.Balanced, timeInterval: 15000, distanceInterval: 30 },
   standard: { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
   high_accuracy: { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 3000, distanceInterval: 5 },
 };
+
+const IDLE_MONITOR_CONFIG = {
+  accuracy: Location.Accuracy.Balanced,
+  timeInterval: 60_000,
+  distanceInterval: 18,
+};
+
+function locationTaskOptions(gpsAccuracy: GpsAccuracyLevel, mode: BackgroundTrackingMode) {
+  const config = mode === "idle_monitor" ? IDLE_MONITOR_CONFIG : ACCURACY_CONFIG[gpsAccuracy];
+  return {
+    accuracy: config.accuracy,
+    timeInterval: config.timeInterval,
+    distanceInterval: config.distanceInterval,
+    foregroundService: {
+      notificationTitle: mode === "idle_monitor" ? "🚴 單車助手省電監測中" : "🚴 單車助手正在追蹤",
+      notificationBody: mode === "idle_monitor" ? "靜止中；重新移動會自動恢復完整追蹤" : "GPS 追蹤中，點擊返回應用",
+      notificationColor: "#00C896",
+      killServiceOnDestroy: false,
+    },
+    pausesUpdatesAutomatically: false,
+    showsBackgroundLocationIndicator: true,
+  };
+}
 
 export async function startBackgroundLocationTracking(gpsAccuracy: GpsAccuracyLevel = "standard") {
   try {
@@ -399,6 +448,39 @@ export async function startBackgroundLocationTracking(gpsAccuracy: GpsAccuracyLe
     return true;
   } catch (e) {
     console.warn("[BackgroundLocation] Start failed:", e);
+    return false;
+  }
+}
+
+/** 在完整追蹤與靜止省電監測間更新同一背景定位任務。 */
+export async function setBackgroundLocationTrackingMode(
+  gpsAccuracy: GpsAccuracyLevel = "standard",
+  mode: BackgroundTrackingMode = "full",
+) {
+  try {
+    const foregroundPermission = await Location.requestForegroundPermissionsAsync();
+    if (foregroundPermission.status !== "granted") return false;
+    const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
+    if (backgroundPermission.status !== "granted") return false;
+
+    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+    if (stateStr) {
+      const state: BackgroundState = JSON.parse(stateStr);
+      state.isRiding = true;
+      state.trackingMode = mode;
+      state.gpsAccuracy = gpsAccuracy;
+      await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+    }
+
+    const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
+    if (isRegistered) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+    await Location.startLocationUpdatesAsync(
+      BACKGROUND_LOCATION_TASK,
+      locationTaskOptions(gpsAccuracy, mode),
+    );
+    return true;
+  } catch (e) {
+    console.warn("[BackgroundLocation] Idle monitor start failed:", e);
     return false;
   }
 }

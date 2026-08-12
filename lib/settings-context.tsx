@@ -148,6 +148,9 @@ export interface AppSettings {
   showFriendLocation: boolean;   // 顯示隊友位置
   // 背景 GPS 精度
   gpsAccuracy: "power_saving" | "standard" | "high_accuracy"; // 背景 GPS 更新頻率
+  // 騎乘靜止後的完全自動省電定位：切換為低功耗監測，重新移動時自動恢復。
+  idleAutoPauseEnabled: boolean;
+  idleAutoPauseSeconds: number;
   // 隱私
   ghostMode: boolean;            // 隱身模式：不分享自己位置
   shareLocation: boolean;        // 是否分享位置給好友
@@ -227,6 +230,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   showFriendDistance: true,
   showFriendLocation: true,
   gpsAccuracy: "standard",
+  idleAutoPauseEnabled: true,
+  idleAutoPauseSeconds: 120,
   ghostMode: false,
   shareLocation: true,
   normalModeFields: DEFAULT_NORMAL_FIELDS,

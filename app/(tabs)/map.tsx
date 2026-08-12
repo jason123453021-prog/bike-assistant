@@ -82,6 +82,7 @@ import {
 import {
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
+  setBackgroundLocationTrackingMode,
   initBackgroundState,
   getBackgroundTrackPoints,
   getBackgroundState,
@@ -124,6 +125,7 @@ import {
   type PinnedNavigationLayer,
 } from "@/lib/pinned-navigation-layers";
 import { shouldTrackRideHeading, shouldTrackRideLocation } from "@/lib/ride-tracking-lifecycle";
+import { shouldEnterIdleMonitor, shouldResumeFromIdleMonitor, type RideLocationTrackingMode } from "@/lib/idle-auto-pause";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -220,6 +222,10 @@ export default function MapScreen() {
   const [currentPos, setCurrentPos] = useState<{ lat: number; lon: number; heading: number } | null>(null);
   const currentPosRef = useRef<{ lat: number; lon: number; heading: number } | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
+  const idlePauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pausedAtRef = useRef<number | null>(null);
+  const idleMonitorLastPositionRef = useRef<{ lat: number; lon: number } | null>(null);
+  const [rideLocationTrackingMode, setRideLocationTrackingMode] = useState<RideLocationTrackingMode>("full");
   const recoverySessionRef = useRef<RideSession | null>(null);
   const [followUser, setFollowUser] = useState(true);
   const [touchGuardEnabled, setTouchGuardEnabled] = useState(false);
@@ -1008,6 +1014,48 @@ export default function MapScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ─── 靜止逾時後切換為低功耗監測；重新移動由低頻 GPS 自動恢復完整紀錄 ───────────────
+  useEffect(() => {
+    const canMonitorIdle = mapRideActive
+      && state.status === "paused"
+      && settings.idleAutoPauseEnabled;
+
+    if (!canMonitorIdle) {
+      if (state.status === "active") pausedAtRef.current = null;
+      if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+      idlePauseTimerRef.current = null;
+      return;
+    }
+
+    if (pausedAtRef.current === null) pausedAtRef.current = Date.now();
+    if (rideLocationTrackingMode === "idle_monitor") return;
+
+    const pausedAtMs = pausedAtRef.current;
+    const delayMs = Math.max(0, settings.idleAutoPauseSeconds * 1000 - (Date.now() - pausedAtMs));
+    idlePauseTimerRef.current = setTimeout(() => {
+      if (!shouldEnterIdleMonitor(
+        { enabled: settings.idleAutoPauseEnabled, idleTimeoutSeconds: settings.idleAutoPauseSeconds },
+        true,
+        pausedAtMs,
+        Date.now(),
+      )) return;
+
+      locationSubRef.current?.remove();
+      locationSubRef.current = null;
+      idleMonitorLastPositionRef.current = currentPosRef.current
+        ? { lat: currentPosRef.current.lat, lon: currentPosRef.current.lon }
+        : null;
+      setRideLocationTrackingMode("idle_monitor");
+      void setBackgroundLocationTrackingMode(settings.gpsAccuracy || "standard", "idle_monitor");
+      if (settings.ttsEnabled) speak("偵測到靜止，已切換為省電定位監測", true);
+    }, delayMs);
+
+    return () => {
+      if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+      idlePauseTimerRef.current = null;
+    };
+  }, [mapRideActive, rideLocationTrackingMode, settings.gpsAccuracy, settings.idleAutoPauseEnabled, settings.idleAutoPauseSeconds, settings.ttsEnabled, state.status]);
+
   // ─── GPS 訂閱 ──────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     // 待機畫面不請求定位權限、不建立 GPS 訂閱，也不更新速度；
@@ -1023,16 +1071,31 @@ export default function MapScreen() {
       if (status !== "granted") return;
       notifPermRef.current = await requestNotificationPermission();
 
+      const isIdleMonitor = rideLocationTrackingMode === "idle_monitor";
       const sub = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: LOCATION_INTERVAL_SEC * 1000,
-          distanceInterval: 3,
+          accuracy: isIdleMonitor ? Location.Accuracy.Balanced : Location.Accuracy.BestForNavigation,
+          timeInterval: isIdleMonitor ? 60_000 : LOCATION_INTERVAL_SEC * 1000,
+          distanceInterval: isIdleMonitor ? 18 : 3,
         },
         (loc) => {
           if (!active) return;
-                    const { latitude, longitude, altitude, heading, speed } = loc.coords;
+          const { latitude, longitude, altitude, heading, speed } = loc.coords;
           const speedKmhRaw = (speed ?? 0) * 3.6;
+
+          if (isIdleMonitor) {
+            const previous = idleMonitorLastPositionRef.current;
+            const movementM = previous ? haversine(previous.lat, previous.lon, latitude, longitude) : 0;
+            idleMonitorLastPositionRef.current = { lat: latitude, lon: longitude };
+            if (shouldResumeFromIdleMonitor(speedKmhRaw, movementM)) {
+              pausedAtRef.current = null;
+              setRideLocationTrackingMode("full");
+              dispatch({ type: "RESUME" });
+              void setBackgroundLocationTrackingMode(settings.gpsAccuracy || "standard", "full");
+              if (settings.ttsEnabled) speak("已偵測到重新移動，恢復騎乘紀錄", true);
+            }
+            return;
+          }
 
           // ── 車頭朝前精度改善（融合電子羅盤 + GPS）──────────────────────────────────────────────────────
           // 策略：
@@ -1388,7 +1451,7 @@ export default function MapScreen() {
       locationSubRef.current?.remove();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followUser, mapRideActive, isNavigating, gpxRoute, settings]);
+  }, [followUser, mapRideActive, isNavigating, gpxRoute, rideLocationTrackingMode, settings]);
 
   // ─── 電子羅盤訂閱（只在騎乘中的車頭朝前模式啟用）────────────────────────────────────────
   useEffect(() => {
@@ -1499,6 +1562,11 @@ export default function MapScreen() {
 
   // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
+    if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+    idlePauseTimerRef.current = null;
+    pausedAtRef.current = null;
+    idleMonitorLastPositionRef.current = null;
+    setRideLocationTrackingMode("full");
     pausedElapsedRef.current = 0;
     dispatch({ type: "START", hydrationThresholdMl });
     calorieReminderSentRef.current = false;
@@ -1639,6 +1707,11 @@ export default function MapScreen() {
           setMapRideActive(false);
           setIsNavigating(false);
           setNavInstruction("");
+          if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+          idlePauseTimerRef.current = null;
+          pausedAtRef.current = null;
+          idleMonitorLastPositionRef.current = null;
+          setRideLocationTrackingMode("full");
           locationSubRef.current?.remove();
           locationSubRef.current = null;
           await stopBackgroundLocationTracking();
@@ -1713,6 +1786,12 @@ export default function MapScreen() {
         try {
           const bgState = await getBackgroundState();
           const bgTrack = await getBackgroundTrackPoints();
+          if (bgState?.trackingMode === "full" && rideLocationTrackingMode === "idle_monitor") {
+            pausedAtRef.current = null;
+            setRideLocationTrackingMode("full");
+            dispatch({ type: "RESUME" });
+            if (settings.ttsEnabled) speak("已偵測到重新移動，恢復騎乘紀錄", true);
+          }
           if (bgState && bgTrack.length > 0) {
             // 去重：只合併時間戳大於上次同步的軌跡點
             const newPoints = bgTrack.filter(pt => pt.ts > lastBgSyncTsRef.current);
@@ -1758,7 +1837,7 @@ export default function MapScreen() {
       appStateRef.current = nextState;
     });
     return () => { subscription.remove(); };
-  }, [mapRideActive, dispatch]);
+  }, [mapRideActive, dispatch, rideLocationTrackingMode, settings.ttsEnabled]);
 
 
   // ─── GPS 精度即時切換（騎乘中更改設定時自動重啟背景追蹤）────────────────────────────

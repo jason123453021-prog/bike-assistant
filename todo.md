@@ -1272,3 +1272,9 @@
 - [x] 未開始騎乘時停止前景／背景定位訂閱與速度更新；開始騎乘後才啟用：GPS 與羅盤均改由 mapRideActive 控制，暫停中的既有騎乘仍維持追蹤，結束騎乘則釋放資源
 - [x] 將設定頁所有不明問號圖示替換為對應功能的語意圖示：補齊 lock.fill → lock 與 arrow.down.circle.fill → file-download 映射；已檢查設定頁全部圖示名稱
 - [x] 新增待機定位生命週期測試，並驗證 TypeScript、完整測試及 Android Bundle：pnpm check 通過；32 項測試（31 passed、1 skipped）通過；Android Metro Bundle 1,766 modules、11,119,724 bytes 完成
+
+## 騎乘靜止自動暫停省電（2026-08-13）
+- [x] 檢查現有低速自動暫停與前景／背景定位追蹤生命週期：既有 PAUSE 未降低 GPS 頻率，背景任務亦持續寫入資料
+- [x] 定義靜止逾時轉為低功耗定位監測、重新移動後自動恢復高精度追蹤的狀態機：預設靜止 120 秒後切換 Balanced／60 秒／18 公尺監測；速度達 3 km/h 或位移達 18 公尺即自動恢復
+- [x] 實作完全自動的靜止省電與移動恢復定位紀錄流程：低功耗模式不寫入軌跡或統計，前景與背景皆可自動切回完整追蹤；設定頁提供總開關與 30–900 秒門檻
+- [x] 新增邏輯測試並驗證 TypeScript、完整測試及 Android Bundle：pnpm check 通過；35 項測試（34 passed、1 skipped）通過；Android Metro Bundle 1,783 modules、11,130,329 bytes 完成

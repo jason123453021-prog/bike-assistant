@@ -15,6 +15,7 @@ const MAPPING = {
   // Ride screen
   "play.fill":                           "play-arrow",
   "pause.fill":                          "pause",
+  "pause.circle.fill":                   "pause-circle-filled",
   "stop.fill":                           "stop",
   "bolt.fill":                           "flash-on",
   "wind":                                "air",
