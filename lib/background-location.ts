@@ -12,6 +12,12 @@ import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getLocalNotifications } from "@/lib/local-notifications";
+import {
+  addTrackPoint,
+  createNewRideSession,
+  initializeRideSession,
+  saveRideSessionSnapshot,
+} from "@/lib/ride-recovery/ride-session-recovery";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
@@ -59,6 +65,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       if (!stateStr) return; // 未啟動騎乘，忽略
       const state: BackgroundState = JSON.parse(stateStr);
       if (!state.isRiding) return;
+      const recoverySession = (await initializeRideSession()) ?? createNewRideSession();
 
       // 處理每個位置更新
       for (const loc of locations) {
@@ -94,6 +101,23 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         state.lastLat = latitude;
         state.lastLon = longitude;
         state.lastTimestamp = timestamp;
+
+        addTrackPoint(
+          recoverySession,
+          {
+            timestamp,
+            latitude,
+            longitude,
+            altitude: loc.coords.altitude ?? undefined,
+            speed: speed ?? undefined,
+            accuracy: loc.coords.accuracy ?? undefined,
+            heading: loc.coords.heading ?? undefined,
+          },
+          recoverySession.trackPoints.at(-1),
+        );
+        recoverySession.stats.caloriesBurned = state.calories;
+        recoverySession.stats.waterLoss = state.sweatLossMl;
+        await saveRideSessionSnapshot(recoverySession);
       }
 
       // 檢查補給提醒
@@ -229,14 +253,19 @@ const ACCURACY_CONFIG: Record<GpsAccuracyLevel, { accuracy: Location.Accuracy; t
 export async function startBackgroundLocationTracking(gpsAccuracy: GpsAccuracyLevel = "standard") {
   try {
     const { accuracy: accuracyLevel, timeInterval: timeIntervalMs, distanceInterval: distanceIntervalM } = ACCURACY_CONFIG[gpsAccuracy];
+    const foregroundPermission = await Location.requestForegroundPermissionsAsync();
+    if (foregroundPermission.status !== "granted") {
+      console.warn("[BackgroundLocation] Foreground permission denied");
+      return false;
+    }
     const { status } = await Location.requestBackgroundPermissionsAsync();
     if (status !== "granted") {
       console.warn("[BackgroundLocation] Background permission denied");
       return false;
     }
 
-    const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
-    if (!isRegistered) {
+    const isTracking = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+    if (!isTracking) {
       await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
         accuracy: accuracyLevel,
         timeInterval: timeIntervalMs,
@@ -245,6 +274,7 @@ export async function startBackgroundLocationTracking(gpsAccuracy: GpsAccuracyLe
           notificationTitle: "🚴 單車助手正在追蹤",
           notificationBody: "GPS 追蹤中，點擊返回應用",
           notificationColor: "#00C896",
+          killServiceOnDestroy: false,
         },
         pausesUpdatesAutomatically: false,
         showsBackgroundLocationIndicator: true,

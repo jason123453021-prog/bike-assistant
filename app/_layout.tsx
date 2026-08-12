@@ -1,5 +1,4 @@
 import "@/global.css";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -15,7 +14,6 @@ import {
   initialWindowMetrics,
 } from "react-native-safe-area-context";
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
-import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from "@react-navigation/native";
 import { RideProvider } from "@/lib/ride-context";
@@ -49,7 +47,6 @@ function InnerLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="ride-detail" options={{ headerShown: false, presentation: "fullScreenModal" }} />
           <Stack.Screen name="favorites-list" options={{ headerShown: false, presentation: "fullScreenModal" }} />
-          <Stack.Screen name="oauth/callback" />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
@@ -103,20 +100,6 @@ export default function RootLayout() {
     return () => unsubscribe();
   }, [handleSafeAreaUpdate]);
 
-  // Create clients once and reuse them
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            refetchOnWindowFocus: false,
-            retry: 1,
-          },
-        },
-      }),
-  );
-  const [trpcClient] = useState(() => createTRPCClient());
-
   const providerInitialMetrics = useMemo(() => {
     const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
     return {
@@ -131,19 +114,15 @@ export default function RootLayout() {
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>
-          <SettingsProvider>
-            <GpxProvider>
-              <RideProvider>
-                <ThemeProvider>
-                  <InnerLayout />
-                </ThemeProvider>
-              </RideProvider>
-            </GpxProvider>
-          </SettingsProvider>
-        </QueryClientProvider>
-      </trpc.Provider>
+      <SettingsProvider>
+        <GpxProvider>
+          <RideProvider>
+            <ThemeProvider>
+              <InnerLayout />
+            </ThemeProvider>
+          </RideProvider>
+        </GpxProvider>
+      </SettingsProvider>
     </GestureHandlerRootView>
   );
 

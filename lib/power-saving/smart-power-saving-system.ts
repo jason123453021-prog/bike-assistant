@@ -47,15 +47,16 @@ export class SmartPowerSavingManager {
     return SmartPowerSavingManager.instance;
   }
 
-  private async loadSettings() {
+  async loadSettings(): Promise<PowerSavingSettings> {
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
-        this.settings = JSON.parse(stored);
+        this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
       }
     } catch (error) {
       console.error('[PowerSaving] Failed to load settings:', error);
     }
+    return this.settings;
   }
 
   async saveSettings(newSettings: Partial<PowerSavingSettings>) {

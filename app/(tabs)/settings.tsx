@@ -25,24 +25,59 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 }
 import Slider from "@react-native-community/slider";
 import { router } from "expo-router";
+import * as DocumentPicker from "expo-document-picker";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, SUPPLY_ITEM_TEMPLATES, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
 import { SensorPairingModal } from "@/components/sensor-pairing-modal";
+import { SmartPowerSavingManager, type PowerSavingSettings } from "@/lib/power-saving/smart-power-saving-system";
+import { importLocalRideFile } from "@/lib/local-ride-import";
+import { useRide } from "@/lib/ride-context";
 
 
-import { useAuth } from "@/hooks/use-auth";
-import { startOAuthLogin } from "@/constants/oauth";
-import { trpc } from "@/lib/trpc";
 import Constants from "expo-constants";
 
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
-  const { user, isAuthenticated, logout } = useAuth();
-  const deleteAccountMutation = trpc.auth.deleteAccount.useMutation();
+  const { loadRecords } = useRide();
+  const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
+  const [powerSavingSettings, setPowerSavingSettings] = useState<PowerSavingSettings>(
+    powerSavingManagerRef.current.getSettings(),
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    powerSavingManagerRef.current.loadSettings().then((loaded) => {
+      if (mounted) setPowerSavingSettings(loaded);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  const updatePowerSavingSettings = async (patch: Partial<PowerSavingSettings>) => {
+    const next = { ...powerSavingSettings, ...patch };
+    setPowerSavingSettings(next);
+    await powerSavingManagerRef.current.saveSettings(patch);
+  };
+
+  const handleManualRideImport = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/gpx+xml", "application/json", "text/xml", "text/plain"],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const file = result.assets[0];
+      const imported = await importLocalRideFile(file.uri, file.name);
+      await loadRecords();
+      Alert.alert("匯入完成", `已匯入 ${imported.importedCount} 筆${imported.sourceType.toUpperCase()}紀錄${imported.skippedCount ? `，略過 ${imported.skippedCount} 筆重複資料` : ""}。`);
+    } catch (error) {
+      Alert.alert("匯入失敗", error instanceof Error ? error.message : "無法讀取選取的檔案。");
+    }
+  };
 
   // ── 感測器配對 Modal 狀態 ──
   const [sensorModalVisible, setSensorModalVisible] = useState(false);
@@ -155,53 +190,6 @@ export default function SettingsScreen() {
     }
   };
 
-  // ── 刪除帳號防呆 Modal 狀態 ──
-  const [deleteModal, setDeleteModal] = useState<{
-    step: "confirm1" | "confirm2" | "loading" | "success" | "error";
-    visible: boolean;
-    confirmInput: string;
-    errorMsg: string;
-  }>({
-    step: "confirm1",
-    visible: false,
-    confirmInput: "",
-    errorMsg: "",
-  });
-  const CONFIRM_KEYWORD = "刪除帳號";
-
-  const openDeleteModal = useCallback(() => {
-    setDeleteModal({ step: "confirm1", visible: true, confirmInput: "", errorMsg: "" });
-  }, []);
-
-  const closeDeleteModal = useCallback(() => {
-    setDeleteModal((prev) => ({ ...prev, visible: false, confirmInput: "", errorMsg: "" }));
-  }, []);
-
-  const handleDeleteAccount = openDeleteModal;
-
-  const proceedToConfirm2 = useCallback(() => {
-    setDeleteModal((prev) => ({ ...prev, step: "confirm2", confirmInput: "", errorMsg: "" }));
-  }, []);
-
-  const executeDelete = useCallback(async () => {
-    const { confirmInput } = deleteModal;
-    if (confirmInput.trim() !== CONFIRM_KEYWORD) {
-      setDeleteModal((prev) => ({ ...prev, errorMsg: `請輸入「${CONFIRM_KEYWORD}」以確認` }));
-      return;
-    }
-    setDeleteModal((prev) => ({ ...prev, step: "loading" }));
-    try {
-      await deleteAccountMutation.mutateAsync();
-      setDeleteModal((prev) => ({ ...prev, step: "success" }));
-      // 2 秒後自動關閉並登出
-      setTimeout(() => {
-        closeDeleteModal();
-        logout();
-      }, 2000);
-    } catch {
-      setDeleteModal((prev) => ({ ...prev, step: "error", errorMsg: "刪除失敗，請稍後再試或聯絡開發者。" }));
-    }
-  }, [deleteModal, deleteAccountMutation, logout, closeDeleteModal]);
   const [editModal, setEditModal] = useState<{
     visible: boolean;
     key: string;
@@ -700,7 +688,7 @@ export default function SettingsScreen() {
 
         {/* ── 回饋設定 ── */}
         <SectionHeader title="回饋設定" colors={colors} onToggle={() => toggleSection("feedback")} collapsed={collapsedSections["feedback"]} />
-        {!collapsedSections["feedback"] && <View style={[styles.section, { borderColor: colors.border }]}>
+        {!collapsedSections["feedback"] && <View style={[styles.section, { borderColor: colors.border }]}> 
           <ToggleRow
             icon="iphone.radiowaves.left.and.right"
             label="震動回饋"
@@ -734,131 +722,51 @@ export default function SettingsScreen() {
           />
         </View>}
 
-        {/* ── 帳號與社交 ── */}
-        <SectionHeader title="帳號與好友" colors={colors} onToggle={() => toggleSection("account")} collapsed={collapsedSections["account"]} />
-        {!collapsedSections["account"] && <View style={[styles.section, { borderColor: colors.border }]}>
-          {isAuthenticated ? (
-            <>
-              {/* 個人資料卡片 */}
-              <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
-                <View style={[styles.profileAvatar, { backgroundColor: colors.accent }]}>
-                  <Text style={styles.profileAvatarText}>
-                    {(user?.name ?? "?").charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.profileName, { color: colors.foreground }]}>{user?.name ?? "未命名"}</Text>
-                  <Text style={[styles.profileEmail, { color: colors.muted }]}>{user?.email ?? ""}</Text>
-                  <View style={[styles.profileBadge, { backgroundColor: colors.accent + "22" }]}>
-                    <Text style={[styles.profileBadgeText, { color: colors.accent }]}>已登入</Text>
-                  </View>
-                </View>
-              </View>
-              <Divider colors={colors} />
-              <Pressable
-                style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
-                onPress={() => router.push("/friends" as any)}
-              >
-                <IconSymbol name="person.2.fill" size={18} color={colors.muted} />
-                <Text style={[styles.rowLabel, { color: colors.foreground }]}>好友管理</Text>
-                <View style={styles.rowRight}>
-                  <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-                </View>
-              </Pressable>
-              <Divider colors={colors} />
-              <Pressable
-                style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
-                onPress={() => Alert.alert("登出", "確定要登出帳號？", [
-                  { text: "取消", style: "cancel" },
-                  { text: "登出", style: "destructive", onPress: logout },
-                ])}
-              >
-                <IconSymbol name="arrow.left" size={18} color={colors.error} />
-                <Text style={[styles.rowLabel, { color: colors.error }]}>登出帳號</Text>
-              </Pressable>
-              <Divider colors={colors} />
-              <Pressable
-                style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
-                onPress={handleDeleteAccount}
-              >
-                <IconSymbol name="trash.fill" size={18} color={colors.error} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: colors.error }]}>刪除帳號</Text>
-                  <Text style={[styles.rowHint, { color: colors.muted }]}>永久刪除帳號及所有伺服器資料</Text>
-                </View>
-              </Pressable>
-            </>
-          ) : (
-            <Pressable
-              style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
-              onPress={startOAuthLogin}
-            >
-              <IconSymbol name="person.fill" size={18} color={colors.accent} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.rowLabel, { color: colors.accent }]}>登入帳號</Text>
-                <Text style={[styles.rowHint, { color: colors.muted }]}>登入後可使用好友功能與隱私設定</Text>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-            </Pressable>
-          )}
+        {/* ── 智慧省電模式 ── */}
+        <SectionHeader title="智慧省電模式" colors={colors} onToggle={() => toggleSection("powerSaving")} collapsed={collapsedSections["powerSaving"]} />
+        {!collapsedSections["powerSaving"] && <View style={[styles.section, { borderColor: colors.border }]}> 
+          <ToggleRow
+            icon="moon.fill"
+            label="自動省電模式"
+            value={powerSavingSettings.enabled}
+            colors={colors}
+            onToggle={(enabled) => { void updatePowerSavingSettings({ enabled }); }}
+          />
+          <Divider colors={colors} />
+          <View style={styles.row}>
+            <IconSymbol name="moon.fill" size={18} color={colors.muted} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>無操作後自動調暗</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>觸控、轉彎提示或補給提醒會立即恢復亮度</Text>
+            </View>
+            <TextInput
+              style={[styles.numericInput, { color: colors.foreground, borderColor: colors.border }]}
+              value={String(powerSavingSettings.timeoutSeconds)}
+              onChangeText={(value) => {
+                const seconds = Math.max(15, Math.min(3600, Number.parseInt(value || "15", 10) || 15));
+                void updatePowerSavingSettings({ timeoutSeconds: seconds });
+              }}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              editable={powerSavingSettings.enabled}
+            />
+            <Text style={[styles.rowHint, { color: colors.muted, marginLeft: 6 }]}>秒</Text>
+          </View>
         </View>}
 
-        {/* ── 隊伍遙測 ── */}
-        <SectionHeader title="隊伍遙測" colors={colors} onToggle={() => toggleSection("team")} collapsed={collapsedSections["team"]} />
-        {!collapsedSections["team"] && <View style={[styles.section, { borderColor: colors.border }]}>
-          <ToggleRow
-            icon="person.2.fill"
-            label="開啟隊伍遙測"
-            value={settings.teamTelemetryEnabled}
-            colors={colors}
-            onToggle={(v) => updateSettings({ teamTelemetryEnabled: v })}
-          />
-          <Divider colors={colors} />
-          <ToggleRow
-            icon="location.fill"
-            label="顯示隊友位置"
-            value={settings.showFriendLocation}
-            colors={colors}
-            onToggle={(v) => updateSettings({ showFriendLocation: v })}
-          />
-          <Divider colors={colors} />
-          <ToggleRow
-            icon="arrow.up.circle.fill"
-            label="顯示隊友距離"
-            value={settings.showFriendDistance}
-            colors={colors}
-            onToggle={(v) => updateSettings({ showFriendDistance: v })}
-          />
-        </View>}
-
-        {/* ── 隱私設定 ── */}
-        <SectionHeader title="安全與隱私" colors={colors} onToggle={() => toggleSection("privacy")} collapsed={collapsedSections["privacy"]} />
-        {!collapsedSections["privacy"] && <View style={[styles.section, { borderColor: colors.border }]}>
-          <ToggleRow
-            icon="eye.slash.fill"
-            label="隱身模式"
-            value={settings.ghostMode}
-            colors={colors}
-            onToggle={(v) => updateSettings({ ghostMode: v })}
-          />
-          <Divider colors={colors} />
-          <ToggleRow
-            icon="location.fill"
-            label="分享位置給好友"
-            value={settings.shareLocation}
-            colors={colors}
-            onToggle={(v) => updateSettings({ shareLocation: v })}
-          />
-          <Divider colors={colors} />
+        {/* ── 本機資料匯入 ── */}
+        <SectionHeader title="本機資料" colors={colors} onToggle={() => toggleSection("localData")} collapsed={collapsedSections["localData"]} />
+        {!collapsedSections["localData"] && <View style={[styles.section, { borderColor: colors.border }]}> 
           <Pressable
             style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
-            onPress={() => router.push("/privacy" as any)}
+            onPress={handleManualRideImport}
           >
-            <IconSymbol name="doc.text.fill" size={18} color={colors.muted} />
-            <Text style={[styles.rowLabel, { color: colors.foreground }]}>隱私政策</Text>
-            <View style={styles.rowRight}>
-              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            <IconSymbol name="arrow.down.circle.fill" size={18} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>匯入／手動同步騎乘紀錄</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>從手機選取 .gpx 或 .json 備份，僅儲存在本機</Text>
             </View>
+            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
           </Pressable>
         </View>}
 
@@ -1165,139 +1073,6 @@ export default function SettingsScreen() {
                 <Text style={styles.editSaveText}>儲存</Text>
               </Pressable>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 刪除帳號防呆 Modal */}
-      <Modal
-        visible={deleteModal.visible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeDeleteModal}
-      >
-        <View style={styles.editOverlay}>
-          <View style={[styles.editCard, { backgroundColor: colors.surface, borderColor: colors.border, maxWidth: 340 }]}>
-
-            {/* Step 1: 第一次確認 */}
-            {deleteModal.step === "confirm1" && (
-              <>
-                <View style={{ alignItems: "center", marginBottom: 12 /* internal spacing */ }}>
-                  <View style={[styles.deleteIconWrap, { backgroundColor: colors.error + "18" }]}>
-                    <IconSymbol name="trash.fill" size={32} color={colors.error} />
-                  </View>
-                </View>
-                <Text style={[styles.editTitle, { color: colors.error, textAlign: "center" }]}>刪除帳號</Text>
-                <Text style={[styles.deleteWarningText, { color: colors.muted }]}>
-                  此操作無法復原。以下資料將被永久刪除：
-                </Text>
-                <View style={[styles.deleteInfoBox, { backgroundColor: colors.error + "0D", borderColor: colors.error + "30" }]}>
-                  <Text style={[styles.deleteInfoItem, { color: colors.foreground }]}>• 帳號資料（姓名、Email）</Text>
-                  <Text style={[styles.deleteInfoItem, { color: colors.foreground }]}>• 好友關係記錄</Text>
-                  <Text style={[styles.deleteInfoItem, { color: colors.foreground }]}>• 伺服器上的位置分享資料</Text>
-                  <Text style={[styles.deleteInfoItem, { color: colors.muted, marginTop: 6, fontSize: 12 }]}>⚠️ 本機騎乘記錄不受影響</Text>
-                </View>
-                <View style={styles.editBtnRow}>
-                  <Pressable
-                    style={({ pressed }) => [styles.editCancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
-                    onPress={closeDeleteModal}
-                  >
-                    <Text style={[styles.editCancelText, { color: colors.muted }]}>取消</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.deleteConfirmBtn, { backgroundColor: colors.error, opacity: pressed ? 0.85 : 1 }]}
-                    onPress={proceedToConfirm2}
-                  >
-                    <Text style={styles.deleteConfirmText}>下一步</Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
-
-            {/* Step 2: 輸入確認文字 */}
-            {deleteModal.step === "confirm2" && (
-              <>
-                <Text style={[styles.editTitle, { color: colors.error, textAlign: "center" }]}>最後確認</Text>
-                <Text style={[styles.deleteWarningText, { color: colors.muted }]}>
-                  請在下方輸入「刪除帳號」以確認此不可復原的操作：
-                </Text>
-                <View style={[styles.editInputRow, { borderColor: deleteModal.errorMsg ? colors.error : colors.border, marginBottom: 4 /* internal spacing */ }]}>
-                  <TextInput
-                    style={[styles.editInput, { color: colors.foreground, fontSize: 18, fontWeight: "600" }]}
-                    value={deleteModal.confirmInput}
-                    onChangeText={(v) => setDeleteModal((prev) => ({ ...prev, confirmInput: v, errorMsg: "" }))}
-                    placeholder="刪除帳號"
-                    placeholderTextColor={colors.muted}
-                    autoFocus
-                    returnKeyType="done"
-                    onSubmitEditing={executeDelete}
-                  />
-                </View>
-                {deleteModal.errorMsg ? (
-                  <Text style={[styles.deleteErrorText, { color: colors.error }]}>{deleteModal.errorMsg}</Text>
-                ) : null}
-                <View style={[styles.editBtnRow, { marginTop: 12 }]}>
-                  <Pressable
-                    style={({ pressed }) => [styles.editCancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
-                    onPress={() => setDeleteModal((prev) => ({ ...prev, step: "confirm1", errorMsg: "" }))}
-                  >
-                    <Text style={[styles.editCancelText, { color: colors.muted }]}>返回</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.deleteConfirmBtn,
-                      {
-                        backgroundColor: deleteModal.confirmInput.trim() === CONFIRM_KEYWORD ? colors.error : colors.border,
-                        opacity: pressed ? 0.85 : 1,
-                      },
-                    ]}
-                    onPress={executeDelete}
-                  >
-                    <Text style={styles.deleteConfirmText}>永久刪除</Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
-
-            {/* Step 3: 載入中 */}
-            {deleteModal.step === "loading" && (
-              <View style={{ alignItems: "center", paddingVertical: 24, gap: 16 }}>
-                <ActivityIndicator size="large" color={colors.error} />
-                <Text style={[styles.deleteStatusText, { color: colors.foreground }]}>正在刪除帳號資料…</Text>
-                <Text style={[{ fontSize: 12, color: colors.muted }]}>請勿關閉應用程式</Text>
-              </View>
-            )}
-
-            {/* Step 4: 成功 */}
-            {deleteModal.step === "success" && (
-              <View style={{ alignItems: "center", paddingVertical: 24, gap: 12 }}>
-                <View style={[styles.deleteIconWrap, { backgroundColor: colors.success + "20" }]}>
-                  <IconSymbol name="checkmark.circle.fill" size={40} color={colors.success} />
-                </View>
-                <Text style={[styles.deleteStatusText, { color: colors.success }]}>帳號已成功刪除</Text>
-                <Text style={[{ fontSize: 13, color: colors.muted, textAlign: "center" }]}>所有伺服器資料已清除，即將登出…</Text>
-              </View>
-            )}
-
-            {/* Step 5: 失敗 */}
-            {deleteModal.step === "error" && (
-              <>
-                <View style={{ alignItems: "center", marginBottom: 12 /* internal spacing */ }}>
-                  <View style={[styles.deleteIconWrap, { backgroundColor: colors.error + "18" }]}>
-                    <IconSymbol name="exclamationmark.triangle.fill" size={36} color={colors.error} />
-                  </View>
-                </View>
-                <Text style={[styles.editTitle, { color: colors.error, textAlign: "center" }]}>刪除失敗</Text>
-                <Text style={[styles.deleteWarningText, { color: colors.muted, textAlign: "center" }]}>{deleteModal.errorMsg}</Text>
-                <Pressable
-                  style={({ pressed }) => [styles.editCancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1, marginTop: 8 }]}
-                  onPress={closeDeleteModal}
-                >
-                  <Text style={[styles.editCancelText, { color: colors.muted }]}>關閉</Text>
-                </Pressable>
-              </>
-            )}
-
           </View>
         </View>
       </Modal>
@@ -1853,6 +1628,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
+  },
+  numericInput: {
+    minWidth: 56,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    fontSize: 14,
+    textAlign: "center",
   },
   editConfirmBtn: {
     paddingVertical: 13,

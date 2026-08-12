@@ -266,7 +266,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
         currentSpeed: speedKmh,
         maxSpeed: Math.max(state.maxSpeed, speedKmh),
         avgSpeed: newRoute.length > 1
-          ? state.distance / 1000 / (state.elapsed / 3600) || 0
+          ? (state.distance + distance) / 1000 / (state.elapsed / 3600) || 0
           : 0,
         currentPower: power,
         avgPower: Math.round(avgPower),
@@ -275,7 +275,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
         currentAltitude: point.altitude ?? state.currentAltitude,
         calories: newCalories,
         totalCalories: newTotalCalories,
-        distance: state.distance + (point.speed ?? 0) * 3,
+        distance: state.distance + distance,
         powerHistory: newPowerHistory,
         powerZones: newZones,
         gradeDistribution: newGradeDistribution,

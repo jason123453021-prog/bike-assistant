@@ -88,14 +88,10 @@ import {
   clearBackgroundData,
   type GpsAccuracyLevel,
 } from "@/lib/background-location";
-import { BackgroundLocationTracking, ScreenWakeup } from "@/lib/native-modules";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SupplyModal } from "@/components/supply-modal";
 import { RideSummaryModal } from "@/components/ride-summary-modal";
 import { SimplifiedNavOverlay } from "@/components/simplified-nav-overlay";
-import { useAuth } from "@/hooks/use-auth";
-import { trpc } from "@/lib/trpc";
-import { ForegroundServiceManager } from "@/lib/foreground-service";
 import { EmotionalUXManager } from "@/lib/emotional-ux";
 import {
   type CompassData,
@@ -103,15 +99,22 @@ import {
   getFinalDirection,
   smoothHeading,
 } from "@/lib/compass-gps-optimizer";
+import {
+  addTrackPoint,
+  completeRideSession,
+  createNewRideSession,
+  initializeRideSession,
+  saveRideSessionSnapshot,
+  type RideSession,
+} from "@/lib/ride-recovery/ride-session-recovery";
+import { SmartPowerSavingManager } from "@/lib/power-saving/smart-power-saving-system";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 // ─── 常數 ─────────────────────────────────────────────────────────────────────
-const OFF_ROUTE_THRESHOLD_M = 50;
 const ARRIVAL_THRESHOLD_M = 30;
 const TURN_LOOKAHEAD_M = 150;
 const TURN_ANGLE_DEG = 30;
-const REROUTE_COOLDOWN_MS = 15000;
 const AUTO_PAUSE_THRESHOLD = 1.5; // 自動暫停速度閾值（km/h）
 const AUTO_PAUSE_RESUME_THRESHOLD = 3; // 自動恢復速度閾值（km/h）- 高於暫停閾值，避免頻繁切換
 const WEATHER_INTERVAL = 10 * 60 * 1000;
@@ -199,8 +202,29 @@ export default function MapScreen() {
 
   // 當前位置
   const [currentPos, setCurrentPos] = useState<{ lat: number; lon: number; heading: number } | null>(null);
+  const currentPosRef = useRef<{ lat: number; lon: number; heading: number } | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
+  const recoverySessionRef = useRef<RideSession | null>(null);
   const [followUser, setFollowUser] = useState(true);
+  const [touchGuardEnabled, setTouchGuardEnabled] = useState(false);
+  const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
+  const autoRecenterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    currentPosRef.current = currentPos;
+  }, [currentPos]);
+
+  const scheduleAutoRecenter = useCallback(() => {
+    setFollowUser(false);
+    if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
+    autoRecenterTimerRef.current = setTimeout(() => {
+      const position = currentPosRef.current;
+      if (!position) return;
+      // 不傳入 zoom，也不修改 bearing：保留使用者手動調整的縮放與角度。
+      mapRef.current?.animateCamera({ center: { latitude: position.lat, longitude: position.lon } }, { duration: 350 });
+      setFollowUser(true);
+    }, 3000);
+  }, []);
 
   // 地圖方向模式：true = 車頭朝前（heading-up），false = 指北（north-up）
   const [headingUp, setHeadingUp] = useState(false);
@@ -248,36 +272,9 @@ export default function MapScreen() {
   const [nearestIdx, setNearestIdx] = useState(0);
   const [navInstruction, setNavInstruction] = useState<string>("");
   const [distToEnd, setDistToEnd] = useState<number | null>(null);
-  const lastRerouteRef = useRef<number>(0);
   const arrivedRef = useRef(false);
-
-  // 偏離路線狀態
-  const [isOffRoute, setIsOffRoute] = useState(false);
-  const [offRouteDist, setOffRouteDist] = useState(0);
-  // 回歸路徑（OSRM 計算後的多點折線）
-  const [returnPolyline, setReturnPolyline] = useState<{ latitude: number; longitude: number }[]>([]);
-  const [returnBearing, setReturnBearing] = useState<string>("");
-  const showReturnRef = useRef(false);
-  // OSRM 路由計算結果
-  const [routeDistM, setRouteDistM] = useState<number | null>(null);
-  const [routeDurSec, setRouteDurSec] = useState<number | null>(null);
-  const [isFetchingRoute, setIsFetchingRoute] = useState(false);
-  const isFetchingRouteRef = useRef(false); // ref 版本，避免 closure 問題
-  const lastRouteFetchRef = useRef<number>(0);
-  const ROUTE_FETCH_COOLDOWN_MS = 30000; // 最少 30 秒才重新計算一次（避免 API 過載）
-  const routeFetchFailCountRef = useRef(0); // 連續失敗次數
-  // 偏離指引開關（預設開啟）
-  const [guidanceEnabled, setGuidanceEnabled] = useState(true);
-  // 用 ref 追蹤指引開關狀態，讓非同步回調（OSRM Promise）也能讀到最新值
-  const guidanceEnabledRef = useRef(true);
-  // 強制重渲染計數器（讓 ref 變更立即反映到 UI）
-  const [, forceRender] = useReducer((n: number) => n + 1, 0);
-  // 自行車道優先開關（預設開啟）
-  const [preferCycleway, setPreferCycleway] = useState(true);
-  const preferCyclewayRef = useRef(true);
-  // 回歸路由轉彎步驟
-  const [returnSteps, setReturnSteps] = useState<TurnStep[]>([]);
-  const [currentReturnStepIdx, setCurrentReturnStepIdx] = useState(0);
+  // 釘選 OSRM 路徑一律採自行車道優先；不提供偏離後自動重新規劃。
+  const preferCycleway = true;
 
   // 當共享路線更新時，自動適配地圖視角
   useEffect(() => {
@@ -414,26 +411,6 @@ export default function MapScreen() {
     });
   }, [activeSupplyAlerts, settings.supplyItems]);
   
-  const { user, isAuthenticated } = useAuth();
-  // 好友詳細卡片
-  const [tappedFriend, setTappedFriend] = useState<{
-    userId: string; name: string; lat: number; lon: number;
-    speed: number; isMoving: boolean;
-  } | null>(null);
-
-  // 好友導航狀態
-  const [friendNavDest, setFriendNavDest] = useState<{
-    name: string; lat: number; lon: number;
-  } | null>(null);
-  const [friendNavPolyline, setFriendNavPolyline] = useState<{ latitude: number; longitude: number }[]>([]);
-  const [friendNavSteps, setFriendNavSteps] = useState<TurnStep[]>([]);
-  const [friendNavStepIdx, setFriendNavStepIdx] = useState(0);
-  const [friendNavDistM, setFriendNavDistM] = useState<number | null>(null);
-  const [friendNavDurSec, setFriendNavDurSec] = useState<number | null>(null);
-  const [isFetchingFriendNav, setIsFetchingFriendNav] = useState(false);
-  const [friendNavPreferCycleway, setFriendNavPreferCycleway] = useState(true);
-  const friendNavDestRef = useRef<{ lat: number; lon: number } | null>(null);
-
   // 精簡導航模式
   const [simplifiedNavVisible, setSimplifiedNavVisible] = useState(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -443,14 +420,12 @@ export default function MapScreen() {
   const isPaused = state.status === "paused";
   const isActive = isRiding || isPaused;
 
-  // 隊伍遙測：查詢好友即時位置（每 5 秒更新）
-  const teamQuery = trpc.friends.getFriendsLocations.useQuery(
-    undefined,
-    {
-      enabled: isAuthenticated && settings.teamTelemetryEnabled,
-      refetchInterval: 5000,
-    }
-  );
+  useEffect(() => {
+    const manager = powerSavingManagerRef.current;
+    if (isActive) manager.start();
+    else manager.stop();
+    return () => manager.stop();
+  }, [isActive]);
 
   const hydrationThresholdMl = settings.waterThreshold > 0
     ? settings.waterThreshold
@@ -533,6 +508,7 @@ export default function MapScreen() {
   // ─── 補給提醒 ────────────────────────────────────────────────────────────────
   const triggerSupplyReminder = useCallback(
     async (type: "calorie" | "water", recommendedMl?: number) => {
+      powerSavingManagerRef.current.onSupplyReminder();
       if (type === "calorie") {
         setCalorieAlert(true);
       } else {
@@ -752,6 +728,36 @@ export default function MapScreen() {
   // ─── 崩潰恢復檢查 ──────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
+      const persistentSession = await initializeRideSession();
+      if (persistentSession?.isActive && persistentSession.trackPoints.length > 0) {
+        recoverySessionRef.current = persistentSession;
+        const recoveredRoute = persistentSession.trackPoints.map((point) => ({
+          latitude: point.latitude,
+          longitude: point.longitude,
+          altitude: point.altitude ?? 0,
+          speed: point.speed ?? 0,
+          timestamp: point.timestamp,
+        }));
+        const lastPoint = persistentSession.trackPoints.at(-1);
+        dispatch({
+          type: "RESTORE",
+          snapshot: {
+            elapsed: Math.round(persistentSession.stats.totalTime / 1000),
+            distance: persistentSession.stats.totalDistance,
+            totalAscent: persistentSession.stats.totalElevationGain,
+            route: recoveredRoute,
+            currentAltitude: lastPoint?.altitude ?? 0,
+            currentSpeed: (lastPoint?.speed ?? 0) * 3.6,
+            calories: persistentSession.stats.caloriesBurned,
+            totalCalories: persistentSession.stats.caloriesBurned,
+            totalSweatMl: persistentSession.stats.waterLoss,
+            sweatSinceLastRefill: persistentSession.stats.waterLoss,
+          },
+        });
+        setLiveTrail(recoveredRoute.map((point) => ({ latitude: point.latitude, longitude: point.longitude })));
+        setMapRideActive(true);
+        return;
+      }
       const snapshot = await checkSnapshot();
       if (snapshot && snapshot.elapsed && snapshot.elapsed > 30) {
         setRecoverySnapshot(snapshot);
@@ -1058,6 +1064,23 @@ export default function MapScreen() {
             intensityLabel: sweatResult.intensityLabel,
           });
 
+          const recoverySession = recoverySessionRef.current;
+          if (recoverySession) {
+            const trackPoint = {
+              timestamp: loc.timestamp ?? Date.now(),
+              latitude,
+              longitude,
+              altitude: altitude ?? undefined,
+              speed: speed ?? undefined,
+              accuracy: loc.coords.accuracy ?? undefined,
+              heading: hdg,
+            };
+            addTrackPoint(recoverySession, trackPoint, recoverySession.trackPoints.at(-1));
+            recoverySession.stats.caloriesBurned += calIncrement;
+            recoverySession.stats.waterLoss += sweatResult.sweatLossMl;
+            void saveRideSessionSnapshot(recoverySession);
+          }
+
           const newCalories = currentState.calories + calIncrement;
           const calPct = Math.min(1, newCalories / settings.calorieThreshold);
           const newSweatSince = currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
@@ -1171,131 +1194,6 @@ export default function MapScreen() {
         return;
       }
 
-      const now = Date.now();
-
-      // 偏離偵測：若指引關閉則完全跳過（清除任何殘留偏離狀態）
-      if (!guidanceEnabled) {
-        if (isOffRoute) {
-          setIsOffRoute(false);
-          setReturnPolyline([]);
-          setReturnBearing("");
-          setRouteDistM(null);
-          setRouteDurSec(null);
-          setReturnSteps([]);
-        }
-        // 指引關閉時跳過偏離偵測，直接進入轉彎導航邏輯
-      } else if (distToNearest > OFF_ROUTE_THRESHOLD_M) {
-        // 偏離偵測：更新偏離狀態與回歸路徑
-        setIsOffRoute(true);
-        setOffRouteDist(Math.round(distToNearest));
-
-        const nearPt = pts[idx];
-
-        // 計算方位詞（直線方向，供橫幅提示用）
-        const brg = bearing(lat, lon, nearPt.lat, nearPt.lon);
-        const dirs = ["正北", "東北", "正東", "東南", "正南", "西南", "正西", "西北", "正北"];
-        const dirIdx = Math.round(brg / 45) % 8;
-        setReturnBearing(dirs[dirIdx]);
-
-        // 非同步呼叫路由引擎，取得沿道路路徑（有冷卻時間）
-        // 使用 ref 版本的 isFetchingRouteRef 避免 closure 問題
-        if (now - lastRouteFetchRef.current > ROUTE_FETCH_COOLDOWN_MS && !isFetchingRouteRef.current) {
-          lastRouteFetchRef.current = now;
-          isFetchingRouteRef.current = true;
-          setIsFetchingRoute(true);
-          // 先顯示直線作為即時備用（讓使用者知道方向）
-          setReturnPolyline([
-            { latitude: lat, longitude: lon },
-            { latitude: nearPt.lat, longitude: nearPt.lon },
-          ]);
-          fetchBikeRoute(
-            { latitude: lat, longitude: lon },
-            { latitude: nearPt.lat, longitude: nearPt.lon },
-            preferCyclewayRef.current  // 自行車道優先開關
-          ).then((result) => {
-            isFetchingRouteRef.current = false;
-            setIsFetchingRoute(false);
-            if (result && result.coordinates.length > 1) {
-              routeFetchFailCountRef.current = 0;
-              setReturnPolyline(result.coordinates);
-              setRouteDistM(result.distanceM);
-              setRouteDurSec(result.durationSec);
-              // 儲存轉灣步驟，從第一步開始（跳過 depart）
-              const filteredSteps = result.steps.filter(s => s.instruction !== "出發，進入路線");
-              setReturnSteps(filteredSteps);
-              setCurrentReturnStepIdx(0);
-              // 語音播報第一個轉灣指令（用 ref 檢查，避免 closure 問題）
-              if (filteredSteps.length > 0 && settings.ttsEnabled && guidanceEnabledRef.current) {
-                speak(`回歸路線：${filteredSteps[0].instruction}，${formatRouteDistance(filteredSteps[0].distanceM)}後`, settings.ttsEnabled);
-              }
-            } else {
-              // API 回傳空結果：保留直線備用
-              routeFetchFailCountRef.current += 1;
-              // 失敗次數導致冷卻縮短，讓下次請求更快重試
-              if (routeFetchFailCountRef.current >= 2) {
-                lastRouteFetchRef.current = now - ROUTE_FETCH_COOLDOWN_MS + 10000; // 10秒後重試
-                routeFetchFailCountRef.current = 0;
-              }
-            }
-          }).catch(() => {
-            isFetchingRouteRef.current = false;
-            setIsFetchingRoute(false);
-            routeFetchFailCountRef.current += 1;
-            // 網路錯誤：10 秒後重試
-            lastRouteFetchRef.current = now - ROUTE_FETCH_COOLDOWN_MS + 10000;
-          });
-        } else if (!isFetchingRouteRef.current && returnPolyline.length === 0) {
-          // 尚未有路徑時先顯示直線作為備用
-          setReturnPolyline([
-            { latitude: lat, longitude: lon },
-            { latitude: nearPt.lat, longitude: nearPt.lon },
-          ]);
-        } else if (!isFetchingRouteRef.current && returnPolyline.length > 0) {
-          // 已有路徑：更新路徑起點為當前位置（讓路徑跟著移動）
-          setReturnPolyline(prev => [
-            { latitude: lat, longitude: lon },
-            ...prev.slice(1),
-          ]);
-        }
-
-        // 自動推進回歸步驟：檢查是否已經通過當前步驟的轉灣點
-        if (returnSteps.length > 0 && currentReturnStepIdx < returnSteps.length) {
-          const step = returnSteps[currentReturnStepIdx];
-          const distToStep = haversine(lat, lon, step.location.latitude, step.location.longitude);
-          // 如果已接近轉灣點（50m 內），推進到下一步
-          if (distToStep < 50 && currentReturnStepIdx + 1 < returnSteps.length) {
-            const nextStep = returnSteps[currentReturnStepIdx + 1];
-            setCurrentReturnStepIdx(i => i + 1);
-            if (guidanceEnabledRef.current && settings.ttsEnabled) {
-              speak(`${nextStep.instruction}${nextStep.distanceM > 0 ? `，${formatRouteDistance(nextStep.distanceM)}後` : ""}`, settings.ttsEnabled);
-            }
-          } else if (distToStep < 150 && guidanceEnabledRef.current) {
-            // 接近轉灣點時語音提醒（每個步驟只播報一次）
-            // 用 REROUTE_COOLDOWN_MS 防止重複播報
-          }
-        }
-
-        if (now - lastRerouteRef.current > REROUTE_COOLDOWN_MS) {
-          lastRerouteRef.current = now;
-          setNavInstruction("⚠️ 偏離路線");
-          // 用 ref 檢查，避免按下關閉後仍播放
-          if (guidanceEnabledRef.current) speak("您已偏離路線，請返回路線", settings.ttsEnabled);
-          vibrateLight();
-        }
-        return;
-      } else {
-        // 回到路線範圍內，清除偏離狀態
-        if (isOffRoute) {
-          setIsOffRoute(false);
-          setReturnPolyline([]);
-          setReturnBearing("");
-          setRouteDistM(null);
-          setRouteDurSec(null);
-          setReturnSteps([]);
-          if (guidanceEnabledRef.current) speak("已回到路線，繼續前進", settings.ttsEnabled);
-        }
-      }
-
       let lookaheadDist = 0;
       let turnInstruction = "";
       let detectedTurnDir: 'left' | 'right' | null = null;
@@ -1317,7 +1215,7 @@ export default function MapScreen() {
             const now = Date.now();
             if (now - lastTurnSpokenRef.current > 10000) {
               turnInstruction = diff > 0 ? "右轉" : "左轉";
-              if (guidanceEnabledRef.current) speak(turnInstruction, settings.ttsEnabled);
+              speak(turnInstruction, settings.ttsEnabled);
               lastTurnSpokenRef.current = now;
             } else {
               turnInstruction = diff > 0 ? "右轉" : "左轉";
@@ -1331,11 +1229,13 @@ export default function MapScreen() {
       }
 
       if (dEnd < 500 && !arrivedRef.current) {
+        powerSavingManagerRef.current.onTurnGuidance();
         const distStr = dEnd < 100 ? "即將" : `${Math.round(dEnd)} 公尺後`;
         setNavInstruction(`${distStr}到達終點`);
         setTurnDirection('arrive');
         setTurnDistanceM(dEnd);
       } else if (turnInstruction) {
+        powerSavingManagerRef.current.onTurnGuidance();
         setNavInstruction(turnInstruction);
         setTurnDirection(detectedTurnDir);
         setTurnDistanceM(detectedTurnDist);
@@ -1345,7 +1245,7 @@ export default function MapScreen() {
         setTurnDistanceM(0);
       }
     },
-    [gpxRoute, settings.ttsEnabled, isOffRoute, guidanceEnabled, returnSteps, currentReturnStepIdx]
+    [gpxRoute, settings.ttsEnabled]
   );
 
   // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
@@ -1365,20 +1265,12 @@ export default function MapScreen() {
     gradeWindowRef.current = [];
     lowSpeedCountRef.current = 0;
     arrivedRef.current = false;
-    setIsOffRoute(false);
-    setReturnPolyline([]);
-    setReturnBearing("");
-    setRouteDistM(null);
-    setRouteDurSec(null);
-    setIsFetchingRoute(false);
-    isFetchingRouteRef.current = false;
-    lastRouteFetchRef.current = 0;
-    routeFetchFailCountRef.current = 0;
-    setReturnSteps([]);
-    setCurrentReturnStepIdx(0);
     setMapRideActive(true);
     setFollowUser(true);
+    setTouchGuardEnabled(true);
     setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
+    recoverySessionRef.current = createNewRideSession();
+    void saveRideSessionSnapshot(recoverySessionRef.current);
 
     // 記錄騎乘開始座標（用於「回起點」功能）
     if (currentPos) {
@@ -1450,26 +1342,6 @@ export default function MapScreen() {
     });
     await startBackgroundLocationTracking(settings.gpsAccuracy || "standard");
 
-    // 啟動原生後台位置追蹤（Android）
-    try {
-      await BackgroundLocationTracking.start();
-      console.log('[Map] Native background location tracking started');
-    } catch (error) {
-      console.warn('[Map] Native background location tracking failed:', error);
-    }
-
-    // 初始化並啟動 Foreground Service
-    try {
-      await ForegroundServiceManager.initialize({
-        accuracy: Location.Accuracy.High,
-        timeInterval: 1000,
-        distanceInterval: 5,
-      });
-      await ForegroundServiceManager.startLocationTracking();
-    } catch (error) {
-      console.warn('Foreground Service initialization failed:', error);
-    }
-
     // 初始化情感化 UX
     try {
       await EmotionalUXManager.initialize({
@@ -1515,13 +1387,6 @@ export default function MapScreen() {
           await clearBackgroundData(); // 清除背景軌跡數據避免存儲空間增長
           lastBgSyncTsRef.current = 0; // 重置去重時間戳
           
-          // 停止原生後台位置追蹤（Android）
-          try {
-            await BackgroundLocationTracking.stop();
-            console.log('[Map] Native background location tracking stopped');
-          } catch (error) {
-            console.warn('[Map] Native background location tracking stop failed:', error);
-          }
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           // 結束騎乘清除感測器更新迴圈
           if (sensorUpdateIntervalRef.current) clearInterval(sensorUpdateIntervalRef.current);
@@ -1544,6 +1409,10 @@ export default function MapScreen() {
 
           // 結束騎乘清除崩潰恢復快照
           await clearSnapshot();
+          if (recoverySessionRef.current) {
+            await completeRideSession(recoverySessionRef.current);
+            recoverySessionRef.current = null;
+          }
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新
           await saveRecord(undefined, sensorStatsRef.current);
           setShowSummary(true);
@@ -1712,116 +1581,8 @@ export default function MapScreen() {
     return () => {
       locationSubRef.current?.remove();
       if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
+      if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
     };
-  }, []);
-
-  // ─── 音量鍵關閉補給提醒並重新計數（含自訂補給品） ───────────────────────────────────────────
-  useEffect(() => {
-    // 只在任何補給提醒顯示時監聽音量鍵（包含自訂補給品）
-    const hasAnyAlert = calorieAlert || waterAlert || sortedActiveAlerts.length > 0;
-    if (!hasAnyAlert) return;
-
-    const unsubscribe = ScreenWakeup.onVolumeKeyPressed(() => {
-      // 每次按下音量鍵關閉一個補給提醒並重新計數
-      // 優先關閉卡路里提醒 → 水分提醒 → 自訂補給品（按順序逐一關閉）
-      if (calorieAlert) {
-        setCalorieAlert(false);
-        dispatch({ type: "CONSUME_CALORIES" });
-        calorieAnim.setValue(0);
-        calorieReminderSentRef.current = false;
-        pendingCalorieRef.current = false;
-        if (settings.vibrationEnabled) vibrateSuccess();
-        if (!waterAlert && sortedActiveAlerts.length === 0 && !pendingWaterRef.current) clearSupplyRepeatTimer();
-      } else if (waterAlert) {
-        setWaterAlert(false);
-        setSupplyRecommendedMl(undefined);
-        dispatch({ type: "CONSUME_WATER" });
-        waterAnim.setValue(0);
-        waterReminderSentRef.current = false;
-        pendingWaterRef.current = false;
-        if (settings.vibrationEnabled) vibrateSuccess();
-        if (sortedActiveAlerts.length === 0 && !pendingCalorieRef.current) clearSupplyRepeatTimer();
-      } else if (sortedActiveAlerts.length > 0) {
-        // 關閉第一個自訂補給品提醒
-        const firstAlertId = sortedActiveAlerts[0];
-        const item = settings.supplyItems.find(i => i.id === firstAlertId);
-        handleConfirmCustomSupply(firstAlertId, item?.triggerType || 'time');
-        if (settings.vibrationEnabled) vibrateSuccess();
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [calorieAlert, waterAlert, sortedActiveAlerts, settings.vibrationEnabled, settings.supplyItems, dispatch, clearSupplyRepeatTimer, handleConfirmCustomSupply]);
-
-  // ─── 好友導航：開始導航至好友位置 ──────────────────────────────────────────────────────────────────────────────
-  const startFriendNav = useCallback(async (
-    friendName: string,
-    friendLat: number,
-    friendLon: number,
-    preferCycleway: boolean,
-  ) => {
-    if (!currentPos) {
-      Alert.alert("導航失敗", "無法取得目前位置，請確認已開啟位置權限。");
-      return;
-    }
-    setIsFetchingFriendNav(true);
-    setFriendNavDest({ name: friendName, lat: friendLat, lon: friendLon });
-    friendNavDestRef.current = { lat: friendLat, lon: friendLon };
-    setFriendNavPreferCycleway(preferCycleway);
-    // 先顯示直線備用路徑
-    setFriendNavPolyline([
-      { latitude: currentPos.lat, longitude: currentPos.lon },
-      { latitude: friendLat, longitude: friendLon },
-    ]);
-    setFriendNavSteps([]);
-    setFriendNavStepIdx(0);
-    setFriendNavDistM(null);
-    setFriendNavDurSec(null);
-    setTappedFriend(null);
-    setFollowUser(false);
-    // 適配地圖視角包含自己與好友
-    mapRef.current?.fitToCoordinates(
-      [
-        { latitude: currentPos.lat, longitude: currentPos.lon },
-        { latitude: friendLat, longitude: friendLon },
-      ],
-      { edgePadding: { top: 80, right: 40, bottom: dynamicCollapsedH + 40, left: 40 }, animated: true }
-    );
-    try {
-      const result = await fetchBikeRoute(
-        { latitude: currentPos.lat, longitude: currentPos.lon },
-        { latitude: friendLat, longitude: friendLon },
-        preferCycleway,
-      );
-      if (result && result.coordinates.length > 1) {
-        setFriendNavPolyline(result.coordinates);
-        setFriendNavDistM(result.distanceM);
-        setFriendNavDurSec(result.durationSec);
-        const filtered = result.steps.filter(s => s.instruction !== "出發，進入路線");
-        setFriendNavSteps(filtered);
-        setFriendNavStepIdx(0);
-        speak(`開始導航至${friendName}，${formatRouteDistance(result.distanceM)}，${formatRouteDuration(result.durationSec)}`, settings.ttsEnabled);
-      } else {
-        speak(`導航至${friendName}，請朝好友方向前進`, settings.ttsEnabled);
-      }
-    } catch {
-      speak(`導航至${friendName}，請朝好友方向前進`, settings.ttsEnabled);
-    } finally {
-      setIsFetchingFriendNav(false);
-    }
-  }, [currentPos, settings.ttsEnabled]);
-
-  const stopFriendNav = useCallback(() => {
-    setFriendNavDest(null);
-    friendNavDestRef.current = null;
-    setFriendNavPolyline([]);
-    setFriendNavSteps([]);
-    setFriendNavStepIdx(0);
-    setFriendNavDistM(null);
-    setFriendNavDurSec(null);
-    setIsFetchingFriendNav(false);
   }, []);
 
   // ─── 騎乘進度快照（每 10 秒儲存一次，用於崩潰恢復）───────────────────────────────────────
@@ -1832,38 +1593,6 @@ export default function MapScreen() {
     }, 10000);
     return () => clearInterval(timer);
   }, [state.status, saveSnapshot]);
-
-  // ─── 位置上傳 mutation（隊伍遙測）────────────────────────────────────────────
-  const updateLocationMutation = trpc.friends.updateMyLocation.useMutation();
-
-  // 每次 GPS 更新時，若已登入且開啟分享位置，即上報位置（不限騎乘中）
-  useEffect(() => {
-    if (!isAuthenticated || !settings.shareLocation || !currentPos) return;
-    const doUpload = async () => {
-      let batteryLevel = -1;
-      try {
-        if (Platform.OS !== "web") {
-          const level = await Battery.getBatteryLevelAsync();
-          batteryLevel = Math.round(level * 100);
-        }
-      // 集成情感化 UX - 低電量警告（已禁用）
-      // if (batteryLevel > 0 && batteryLevel <= 20) {
-      //   EmotionalUXManager.onLowBatteryWarning(batteryLevel).catch((error: any) => console.warn("Low battery emotional UX failed:", error));
-      // }
-      } catch { /* 忽略電量讀取失敗 */ }
-      updateLocationMutation.mutate({
-        latitude: currentPos.lat,
-        longitude: currentPos.lon,
-        speed: state.currentSpeed ?? 0,
-        heading: currentPos.heading,
-        altitude: 0,
-        isGhostMode: settings.ghostMode,
-        batteryLevel,
-      });
-    };
-    doUpload();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPos]);
 
   // ─── 精簡導航閒置計時器（自動模式）─────────────────────────────────────────
   const resetIdleTimer = useCallback(() => {
@@ -2031,7 +1760,10 @@ export default function MapScreen() {
 
   // ─── 渲染 ────────────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onTouchStart={() => powerSavingManagerRef.current.onUserInteraction()}
+    >
       {/* ── 崩潰恢復強調表示 */}
       {showRecoveryAlert && recoverySnapshot && (
         <View style={[styles.recoveryBanner, { top: insets.top + 8 }]}>
@@ -2079,11 +1811,11 @@ export default function MapScreen() {
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
-        onPanDrag={() => setFollowUser(false)}
+        onPanDrag={scheduleAutoRecenter}
         onMapLongPress={(lat, lon) => {
           setPinnedLocation({ lat, lon });
           setShowPinCard(true);
-          setFollowUser(false);
+          scheduleAutoRecenter();
           // 視覺回饋：縮放到釘選位置
           mapRef.current?.animateCamera(
             { center: { latitude: lat, longitude: lon }, zoom: 18 },
@@ -2094,28 +1826,9 @@ export default function MapScreen() {
         gpxPolyline={gpxPolyline}
         passedPolyline={passedPolyline}
         liveTrail={liveTrail}
-        returnPolyline={friendNavDest ? friendNavPolyline : returnPolyline}
-        isOffRoute={friendNavDest ? friendNavPolyline.length > 0 : isOffRoute}
-        friendMarkers={
-          isAuthenticated && settings.teamTelemetryEnabled && teamQuery.data
-            ? teamQuery.data.map((f: any) => ({
-                userId: f.userId,
-                name: f.name ?? f.email?.split('@')[0] ?? '好友',
-                latitude: f.latitude,
-                longitude: f.longitude,
-                speed: f.speed ?? 0,
-                isMoving: (f.speed ?? 0) > 0.5,
-              }))
-            : []
-        }
-        onFriendTap={(friend) => setTappedFriend({
-          userId: friend.userId,
-          name: friend.name,
-          lat: friend.lat,
-          lon: friend.lon,
-          speed: friend.speed,
-          isMoving: friend.isMoving,
-        })}
+        returnPolyline={[]}
+        isOffRoute={false}
+        friendMarkers={[]}
         centerPinLocation={pinSelectMode ? centerPinLocation : null}
         onMapCenterChanged={(lat, lon) => {
           if (pinSelectMode) {
@@ -2127,51 +1840,17 @@ export default function MapScreen() {
         onPOITap={(poi) => {
           setTappedPOI(poi);
           setShowPOICard(true);
-          setFollowUser(false);
+          scheduleAutoRecenter();
           mapRef.current?.animateCamera(
             { center: { latitude: poi.lat, longitude: poi.lon }, zoom: 18 },
             { duration: 300 }
           );
         }}
-        onMapMoveEnd={handleMapMoveEnd}
+        onMapMoveEnd={(bounds) => {
+          handleMapMoveEnd(bounds);
+          scheduleAutoRecenter();
+        }}
       />
-
-      {/* ── 頂部導航指令條 ── */}
-      {/* 黑色導航橫條已移除（導航資訊已透過偶離路線提示橫幅顯示） */}
-
-      {/* ── 好友導航指令條 ── */}
-      {friendNavDest && (
-        <View style={[styles.navBar, { top: insets.top + 8, backgroundColor: "rgba(52,199,89,0.92)" }]}>
-          <IconSymbol name="person.fill" size={16} color="#fff" />
-          <View style={{ flex: 1 }}>
-            {isFetchingFriendNav ? (
-              <Text style={styles.navText} numberOfLines={1}>計算至 {friendNavDest.name} 的路線…</Text>
-            ) : friendNavSteps.length > 0 && friendNavStepIdx < friendNavSteps.length ? (
-              <Text style={styles.navText} numberOfLines={1}>
-                {friendNavSteps[friendNavStepIdx].instruction}
-                {friendNavSteps[friendNavStepIdx].distanceM > 0
-                  ? `，${formatRouteDistance(friendNavSteps[friendNavStepIdx].distanceM)}後`
-                  : ""}
-              </Text>
-            ) : (
-              <Text style={styles.navText} numberOfLines={1}>導航至 {friendNavDest.name}</Text>
-            )}
-            {friendNavDistM !== null && (
-              <Text style={[styles.navDist, { fontSize: 11 }]}>
-                {formatRouteDistance(friendNavDistM)}
-                {friendNavDurSec !== null ? `·${formatRouteDuration(friendNavDurSec)}` : ""}
-                ·{friendNavPreferCycleway ? "車道優先" : "一般路"}
-              </Text>
-            )}
-          </View>
-          <Pressable
-            style={{ paddingHorizontal: 8, paddingVertical: 4 }}
-            onPress={stopFriendNav}
-          >
-            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>×</Text>
-          </Pressable>
-        </View>
-      )}
 
       {/* ── 右側工具列 ── */}
       <View style={[styles.toolBar, { top: insets.top + 8, right: 16 }]}>
@@ -2196,88 +1875,31 @@ export default function MapScreen() {
           ) : (
             <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', lineHeight: 22 }}>N</Text>
           )}
-          <Text style={[styles.returnBtnLabel, { color: headingUp ? "#34C759" : "rgba(255,255,255,0.8)" }]}>
+          <Text style={[styles.returnBtnLabel, { color: headingUp ? "#34C759" : "rgba(255,255,255,0.8)" }]}> 
             {headingUp ? "車頭" : "指北"}
           </Text>
         </Pressable>
+        {isActive && (
+          <Pressable
+            style={[styles.toolBtn, touchGuardEnabled && styles.toolBtnActive]}
+            onPress={() => {
+              if (!touchGuardEnabled) setTouchGuardEnabled(true);
+            }}
+            onLongPress={() => {
+              if (touchGuardEnabled) setTouchGuardEnabled(false);
+            }}
+            delayLongPress={1200}
+          >
+            <Text style={{ color: touchGuardEnabled ? "#34C759" : "rgba(255,255,255,0.8)", fontSize: 16, fontWeight: "800" }}>
+              {touchGuardEnabled ? "鎖" : "開"}
+            </Text>
+            <Text style={[styles.returnBtnLabel, { color: touchGuardEnabled ? "#34C759" : "rgba(255,255,255,0.8)" }]}>觸控</Text>
+          </Pressable>
+        )}
         {/* GPX 路線狀態指示（有路線時顯示清除按鈕） */}
         {gpxRoute && !mapRideActive && (
           <Pressable style={styles.toolBtn} onPress={clearSharedRoute}>
             <IconSymbol name="xmark.circle.fill" size={20} color="#FF3B30" />
-          </Pressable>
-        )}
-        {/* 偏離指引開關（導航中顯示） */}
-        {isNavigating && (
-          <Pressable
-            style={[styles.toolBtn, guidanceEnabled && styles.toolBtnActive]}
-            onPress={() => {
-              const next = !guidanceEnabledRef.current; // 直接讀 ref，避免 closure 舊值
-              guidanceEnabledRef.current = next;
-              setGuidanceEnabled(next); // 同步 state 供其他 effect 使用
-              forceRender(); // 立即重渲染，不等 React 批次更新
-              if (!next) {
-                // 關閉指引：立即停止語音、清除所有偷離狀態（包含 returnBearing）
-                stopSpeech();
-                setIsOffRoute(false);
-                setReturnPolyline([]);
-                setReturnBearing("");
-                setRouteDistM(null);
-                setRouteDurSec(null);
-                setReturnSteps([]);
-                setCurrentReturnStepIdx(0);
-                lastRerouteRef.current = 0;
-              } else {
-                // 重新開啟指引：重置偷離計時器，讓偷離檢測立即重新執行
-                lastRerouteRef.current = 0;
-                routeFetchFailCountRef.current = 0;
-              }
-            }}
-          >
-            <IconSymbol name="location.fill" size={18} color={guidanceEnabled ? "#FF9500" : "rgba(255,255,255,0.4)"} />
-            <Text style={[styles.returnBtnLabel, { color: guidanceEnabled ? "#FF9500" : "rgba(255,255,255,0.4)" }]}>
-              {guidanceEnabled ? "指引" : "關閉"}
-            </Text>
-          </Pressable>
-        )}
-        {/* 自行車道優先開關（導航中顯示） */}
-        {isNavigating && (
-          <Pressable
-            style={[styles.toolBtn, preferCycleway && styles.toolBtnActive]}
-            onPress={() => {
-              const next = !preferCycleway;
-              preferCyclewayRef.current = next;
-              setPreferCycleway(next);
-              lastRouteFetchRef.current = 0;
-              routeFetchFailCountRef.current = 0;
-              if (isOffRoute) {
-                setReturnPolyline([]);
-                setIsFetchingRoute(false);
-                isFetchingRouteRef.current = false;
-              }
-            }}
-          >
-            <IconSymbol name="bicycle" size={18} color={preferCycleway ? "#34C759" : "rgba(255,255,255,0.4)"} />
-            <Text style={[styles.returnBtnLabel, { color: preferCycleway ? "#34C759" : "rgba(255,255,255,0.4)" }]}>
-              {preferCycleway ? "車道" : "一般"}
-            </Text>
-          </Pressable>
-        )}
-        {/* 回到起點按鈕（騎乘中且有記錄的開始座標時顯示） */}
-        {isActive && rideStartLocationRef.current && (
-          <Pressable
-            style={styles.toolBtn}
-            onPress={() => {
-              if (rideStartLocationRef.current) {
-                mapRef.current?.animateCamera({
-                  center: { latitude: rideStartLocationRef.current.lat, longitude: rideStartLocationRef.current.lon },
-                  zoom: 17
-                });
-                speak("導航回到起點", settings.ttsEnabled);
-              }
-            }}
-          >
-            <IconSymbol name="mappin.circle.fill" size={20} color="#FF3B30" />
-            <Text style={[styles.returnBtnLabel, { color: "#FF3B30" }]}>起點</Text>
           </Pressable>
         )}
         {/* 精簡導航手動觸發按鈕（騎乘中且設定為手動模式時顯示） */}
@@ -2318,44 +1940,8 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      {/* ── 偏離路線提示橫幅（偏離且導航中且指引開啟顯示） ── */}
-      {isOffRoute && isNavigating && guidanceEnabledRef.current && returnBearing !== "" && (
-        <View style={[
-          styles.offRouteBanner,
-          { top: insets.top + 8 }
-        ]}>
-          <Text style={styles.offRouteBannerIcon}>⚠️</Text>
-          <View style={styles.offRouteBannerText}>
-            <Text style={styles.offRouteBannerTitle}>偏離路線 {offRouteDist} m</Text>
-            {isFetchingRoute ? (
-              <Text style={styles.offRouteBannerSub}>朝{returnBearing}方向前進（計算路徑中…）</Text>
-            ) : returnSteps.length > 0 && currentReturnStepIdx < returnSteps.length ? (
-              <>
-                <Text style={styles.offRouteBannerSub}>
-                  {returnSteps[currentReturnStepIdx].instruction}
-                  {returnSteps[currentReturnStepIdx].distanceM > 0
-                    ? `，${formatRouteDistance(returnSteps[currentReturnStepIdx].distanceM)}後`
-                    : ""}
-                </Text>
-                {routeDistM !== null && (
-                  <Text style={styles.offRouteBannerSub}>
-                    回歸距離：{formatRouteDistance(routeDistM)}，預估 {routeDurSec !== null ? formatRouteDuration(routeDurSec) : ""}
-                  </Text>
-                )}
-              </>
-            ) : routeDistM !== null ? (
-              <Text style={styles.offRouteBannerSub}>
-                騎車回歸：{formatRouteDistance(routeDistM)}，{routeDurSec !== null ? formatRouteDuration(routeDurSec) : ""}
-              </Text>
-            ) : (
-              <Text style={styles.offRouteBannerSub}>朝{returnBearing}方向回到路線</Text>
-            )}
-          </View>
-        </View>
-      )}
-
       {/* ── 轉彎指示橫幅（導航中且有轉彎指示時顯示在地圖上方） ── */}
-      {isNavigating && !isOffRoute && turnDirection && navInstruction !== "沿路線前進" && (
+      {isNavigating && turnDirection && navInstruction !== "沿路線前進" && (
         <View style={[
           styles.turnBanner,
           { top: insets.top + 8 },
@@ -2384,7 +1970,7 @@ export default function MapScreen() {
       )}
 
       {/* ── 導航中「沿路線前進」提示（無轉彎時顯示簡潔橫條） ── */}
-      {isNavigating && !isOffRoute && !turnDirection && navInstruction === "沿路線前進" && (
+      {isNavigating && !turnDirection && navInstruction === "沿路線前進" && (
         <View style={[styles.straightBanner, { top: insets.top + 8 }]}>
           <Text style={styles.straightBannerIcon}>⬆️</Text>
           <Text style={styles.straightBannerText}>沿路線前進</Text>
@@ -2395,7 +1981,7 @@ export default function MapScreen() {
       )}
 
       {/* ── GPX 路線提示（無路線時，且無導航指令條顯示時） ── */}
-      {!gpxRoute && !isActive && !isNavigating && navInstruction === "" && !friendNavDest && (
+      {!gpxRoute && !isActive && !isNavigating && navInstruction === "" && (
         <View style={[styles.noRouteBadge, { top: insets.top + 8, left: 16, right: 72 }]}>
           <IconSymbol name="map.fill" size={13} color="rgba(255,255,255,0.5)" />
           <Text style={styles.noRouteText}>前往「路線」頁面匯入 GPX 路線</Text>
@@ -2927,63 +2513,20 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* ── 好友詳細卡片 ── */}
-      {tappedFriend !== null && (
-        <View style={styles.friendCard}>
-          <View style={styles.friendCardHeader}>
-            <View style={[styles.friendCardDot, { backgroundColor: tappedFriend.isMoving ? "#34C759" : "#FF9500" }]} />
-            <Text style={styles.friendCardName}>{tappedFriend.name}</Text>
-            <Pressable
-              style={styles.friendCardClose}
-              onPress={() => setTappedFriend(null)}
-            >
-              <Text style={styles.friendCardCloseText}>×</Text>
-            </Pressable>
+      {touchGuardEnabled && isActive && (
+        <Pressable
+          style={styles.touchGuard}
+          onPress={() => {}}
+          onLongPress={() => setTouchGuardEnabled(false)}
+          delayLongPress={1200}
+        >
+          <View style={styles.touchGuardBadge}>
+            <Text style={styles.touchGuardTitle}>觸控已鎖定</Text>
+            <Text style={styles.touchGuardHint}>長按 1.2 秒解除，避免汗水或雨滴誤觸</Text>
           </View>
-          <View style={styles.friendCardBody}>
-            <View style={styles.friendCardMetric}>
-              <Text style={styles.friendCardMetricLabel}>狀態</Text>
-              <Text style={[styles.friendCardMetricValue, { color: tappedFriend.isMoving ? "#34C759" : "#FF9500" }]}>
-                {tappedFriend.isMoving ? "行進中" : "停留中"}
-              </Text>
-            </View>
-            <View style={styles.friendCardMetric}>
-              <Text style={styles.friendCardMetricLabel}>速度</Text>
-              <Text style={styles.friendCardMetricValue}>
-                {tappedFriend.speed > 0 ? `${(tappedFriend.speed * 3.6).toFixed(1)} km/h` : "--"}
-              </Text>
-            </View>
-            <View style={styles.friendCardMetric}>
-              <Text style={styles.friendCardMetricLabel}>距我</Text>
-              <Text style={styles.friendCardMetricValue}>
-                {currentPos
-                  ? (() => {
-                      const d = haversine(currentPos.lat, currentPos.lon, tappedFriend.lat, tappedFriend.lon);
-                      return d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`;
-                    })()
-                  : "--"}
-              </Text>
-            </View>
-          </View>
-          {/* 導航前往按鈕區 */}
-          <View style={styles.friendCardNavRow}>
-            <Pressable
-              style={styles.friendCardNavBtn}
-              onPress={() => startFriendNav(tappedFriend.name, tappedFriend.lat, tappedFriend.lon, true)}
-            >
-              <IconSymbol name="bicycle" size={16} color="#fff" />
-              <Text style={styles.friendCardNavBtnText}>車道優先</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.friendCardNavBtn, { backgroundColor: "rgba(0,122,255,0.85)" }]}
-              onPress={() => startFriendNav(tappedFriend.name, tappedFriend.lat, tappedFriend.lon, false)}
-            >
-              <IconSymbol name="location.fill" size={16} color="#fff" />
-              <Text style={styles.friendCardNavBtnText}>一般路線</Text>
-            </Pressable>
-          </View>
-        </View>
+        </Pressable>
       )}
+
     </View>
   );
 }
@@ -3124,7 +2667,7 @@ const styles = StyleSheet.create({
   navText: { flex: 1, color: "#fff", fontSize: 14, fontWeight: "600" },
   navDist: { color: "#00E676", fontSize: 12, fontWeight: "700" },
 
-  toolBar: { position: "absolute", gap: 10 },
+  toolBar: { position: "absolute", gap: 10, zIndex: 30 },
   toolBtn: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: "rgba(0,0,0,0.7)",
@@ -3132,6 +2675,24 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "rgba(255,255,255,0.15)",
   },
   toolBtnActive: { backgroundColor: "rgba(0,122,255,0.2)", borderColor: "#007AFF" },
+  touchGuard: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    backgroundColor: "rgba(0,0,0,0.03)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  touchGuardBadge: {
+    backgroundColor: "rgba(10,34,24,0.9)",
+    borderColor: "rgba(52,199,89,0.8)",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  touchGuardTitle: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  touchGuardHint: { color: "rgba(255,255,255,0.72)", fontSize: 11, marginTop: 3 },
   returnBtn: {
     backgroundColor: "rgba(255,149,0,0.2)",
     borderColor: "#FF9500",
@@ -3143,7 +2704,6 @@ const styles = StyleSheet.create({
   },
   returnBtnLabel: { color: "#FF9500", fontSize: 10, fontWeight: "700" },
 
-  // 偏離路線提示橫幅
   offRouteBanner: {
     position: "absolute",
     left: 16,
