@@ -17,6 +17,8 @@ import { useColors } from "@/hooks/use-colors";
 import { useRide, type RideRecord } from "@/lib/ride-context";
 import { formatDuration } from "@/lib/power-calc";
 import { calculateWeeklyTrainingStats, calculateMonthlyTrainingStats } from "@/lib/activity-stats";
+import { createRouteFromRideRecord } from "@/lib/history-route";
+import { useGpx } from "@/lib/gpx-context";
 
 const STORAGE_KEY = "@bike_records";
 
@@ -24,6 +26,7 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { state, dispatch, loadRecords } = useRide();
+  const { setSharedRoute } = useGpx();
   const [searchQuery, setSearchQuery] = useState("");
   const [showStats, setShowStats] = useState(false);
 
@@ -75,6 +78,16 @@ export default function HistoryScreen() {
 
   const handleViewDetail = (id: string) => {
     router.push({ pathname: "/ride-detail", params: { id } });
+  };
+
+  const handleReuseRoute = (record: RideRecord) => {
+    const route = createRouteFromRideRecord(record);
+    if (!route) {
+      Alert.alert("無法再次導航", "這筆記錄沒有足夠的 GPS 軌跡資料可建立本機路線。");
+      return;
+    }
+    setSharedRoute(route);
+    router.push("/map");
   };
 
   const renderItem = ({ item }: { item: RideRecord }) => {
@@ -136,9 +149,25 @@ export default function HistoryScreen() {
                 size={13}
                 color={hasRoute ? colors.accent : colors.muted}
               />
-              <Text style={[styles.trailBtnText, { color: hasRoute ? colors.accent : colors.muted }]}>
+              <Text style={[styles.trailBtnText, { color: hasRoute ? colors.accent : colors.muted }]}> 
                 查看軌跡
               </Text>
+            </Pressable>
+
+            <Pressable
+              disabled={!hasRoute}
+              style={({ pressed }) => [
+                styles.reuseBtn,
+                {
+                  backgroundColor: hasRoute ? colors.primary + "18" : colors.border + "40",
+                  borderColor: hasRoute ? colors.primary + "50" : colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+              onPress={() => handleReuseRoute(item)}
+            >
+              <IconSymbol name="location.fill" size={13} color={hasRoute ? colors.primary : colors.muted} />
+              <Text style={[styles.trailBtnText, { color: hasRoute ? colors.primary : colors.muted }]}>再次導航</Text>
             </Pressable>
 
             {/* 刪除按鈕 */}
@@ -378,6 +407,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  reuseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
   },
   statsPeriod: { gap: 8 },
