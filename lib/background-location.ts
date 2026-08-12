@@ -35,6 +35,16 @@ export interface BackgroundState {
   waterThreshold: number;
   calorieReminderSent: boolean;
   waterReminderSent: boolean;
+  rideStartedAt: number;
+  supplyIntervalReminderEnabled: boolean;
+  supplyTimeIntervalEnabled: boolean;
+  supplyTimeIntervalMinutes: number;
+  supplyDistanceIntervalEnabled: boolean;
+  supplyDistanceIntervalKm: number;
+  intervalLastTimeSec: number;
+  intervalLastDistanceKm: number;
+  intervalTimeReminderSent: boolean;
+  intervalDistanceReminderSent: boolean;
 }
 
 // Haversine 距離計算（背景任務中不能 import 其他模組的函數）
@@ -153,6 +163,53 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         }
       }
 
+      const elapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
+      const timeIntervalSec = (state.supplyTimeIntervalMinutes ?? 0) * 60;
+      if (
+        state.supplyIntervalReminderEnabled &&
+        state.supplyTimeIntervalEnabled &&
+        timeIntervalSec > 0 &&
+        elapsedSec - (state.intervalLastTimeSec ?? 0) >= timeIntervalSec &&
+        !state.intervalTimeReminderSent
+      ) {
+        state.intervalTimeReminderSent = true;
+        const Notifications = await getLocalNotifications();
+        if (Notifications) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: "補給提醒",
+              body: `已騎乘 ${state.supplyTimeIntervalMinutes} 分鐘，建議補充能量與水分`,
+              sound: true,
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+            },
+            trigger: null,
+          });
+        }
+      }
+
+      const distanceKm = state.totalDistanceM / 1000;
+      if (
+        state.supplyIntervalReminderEnabled &&
+        state.supplyDistanceIntervalEnabled &&
+        state.supplyDistanceIntervalKm > 0 &&
+        distanceKm - (state.intervalLastDistanceKm ?? 0) >= state.supplyDistanceIntervalKm &&
+        !state.intervalDistanceReminderSent
+      ) {
+        state.intervalDistanceReminderSent = true;
+        const Notifications = await getLocalNotifications();
+        if (Notifications) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: "補給提醒",
+              body: `已累積騎乘 ${state.supplyDistanceIntervalKm} km，建議補充能量與水分`,
+              sound: true,
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+            },
+            trigger: null,
+          });
+        }
+      }
+
       // 保存背景狀態
       await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
 
@@ -185,19 +242,35 @@ export async function initBackgroundState(params: {
   waterThreshold: number;
   currentLat: number;
   currentLon: number;
+  supplyIntervalReminderEnabled: boolean;
+  supplyTimeIntervalEnabled: boolean;
+  supplyTimeIntervalMinutes: number;
+  supplyDistanceIntervalEnabled: boolean;
+  supplyDistanceIntervalKm: number;
 }) {
+  const startedAt = Date.now();
   const state: BackgroundState = {
     totalDistanceM: 0,
     calories: 0,
     sweatLossMl: 0,
     lastLat: params.currentLat,
     lastLon: params.currentLon,
-    lastTimestamp: Date.now(),
+    lastTimestamp: startedAt,
     isRiding: true,
     calorieThreshold: params.calorieThreshold,
     waterThreshold: params.waterThreshold,
     calorieReminderSent: false,
     waterReminderSent: false,
+    rideStartedAt: startedAt,
+    supplyIntervalReminderEnabled: params.supplyIntervalReminderEnabled,
+    supplyTimeIntervalEnabled: params.supplyTimeIntervalEnabled,
+    supplyTimeIntervalMinutes: params.supplyTimeIntervalMinutes,
+    supplyDistanceIntervalEnabled: params.supplyDistanceIntervalEnabled,
+    supplyDistanceIntervalKm: params.supplyDistanceIntervalKm,
+    intervalLastTimeSec: 0,
+    intervalLastDistanceKm: 0,
+    intervalTimeReminderSent: false,
+    intervalDistanceReminderSent: false,
   };
   await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   // 清空舊軌跡
@@ -215,6 +288,23 @@ export async function stopBackgroundState() {
       state.isRiding = false;
       await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
     }
+  } catch {}
+}
+
+/** 在前台確認時間／距離補給後，將背景任務的同一項計數基準同步重置。 */
+export async function acknowledgeBackgroundSupplyInterval(kind: "time" | "distance") {
+  try {
+    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+    if (!stateStr) return;
+    const state: BackgroundState = JSON.parse(stateStr);
+    if (kind === "time") {
+      state.intervalLastTimeSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
+      state.intervalTimeReminderSent = false;
+    } else {
+      state.intervalLastDistanceKm = state.totalDistanceM / 1000;
+      state.intervalDistanceReminderSent = false;
+    }
+    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   } catch {}
 }
 

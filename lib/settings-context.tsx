@@ -112,6 +112,12 @@ export interface AppSettings {
   calorieThreshold: number;   // kcal before reminder
   waterThreshold: number;     // ml before reminder
   supplyReminderRepeatSec: number; // 0 = 不重複；>0 = 每幾秒重複語音提醒
+  // 通用補給間隔：可依騎乘時間、距離或兩者提醒，不綁定特定補給品
+  supplyIntervalReminderEnabled: boolean;
+  supplyTimeIntervalEnabled: boolean;
+  supplyTimeIntervalMinutes: number;
+  supplyDistanceIntervalEnabled: boolean;
+  supplyDistanceIntervalKm: number;
   // 卡路里高級設定
   calorieRepeatUntilDismissed?: boolean; // 未關閉時重複提醒
   calorieAutoDismissSeconds?: number;    // 自動關閉延遲（秒）
@@ -200,6 +206,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   calorieThreshold: 300,
   waterThreshold: 500,
   supplyReminderRepeatSec: 60,
+  // 升級後預設不主動開啟，須由使用者依自身補給策略啟用。
+  supplyIntervalReminderEnabled: false,
+  supplyTimeIntervalEnabled: true,
+  supplyTimeIntervalMinutes: 45,
+  supplyDistanceIntervalEnabled: false,
+  supplyDistanceIntervalKm: 20,
   supplyItems: [],
   vibrationEnabled: true,
   ttsEnabled: true,

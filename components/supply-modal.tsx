@@ -69,8 +69,8 @@ export function SupplyModal({
           ]}
         >
           {/* 標題列 */}
-          <Text style={[styles.mainTitle, { color: colors.foreground }]}>
-            {bothAlert ? "補給提醒" : calorieAlert ? "補充能量" : "補充水分"}
+          <Text style={[styles.mainTitle, { color: colors.foreground }]}> 
+            {bothAlert || customSupplyAlerts.length > 0 ? "補給提醒" : calorieAlert ? "補充能量" : "補充水分"}
           </Text>
           {bothAlert && (
             <Text style={[styles.bothSubtitle, { color: colors.muted }]}>

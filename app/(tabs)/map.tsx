@@ -86,6 +86,7 @@ import {
   getBackgroundTrackPoints,
   getBackgroundState,
   clearBackgroundData,
+  acknowledgeBackgroundSupplyInterval,
   type GpsAccuracyLevel,
 } from "@/lib/background-location";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -108,6 +109,7 @@ import {
   type RideSession,
 } from "@/lib/ride-recovery/ride-session-recovery";
 import { SmartPowerSavingManager } from "@/lib/power-saving/smart-power-saving-system";
+import { getDueSupplyIntervals, type SupplyIntervalKind } from "@/lib/supply-interval";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -381,6 +383,11 @@ export default function MapScreen() {
   // 自訂補給品提醒狀態
   const [customSupplyAlerts, setCustomSupplyAlerts] = useState<Record<string, boolean>>({});
   const [activeSupplyAlerts, setActiveSupplyAlerts] = useState<string[]>([]);
+  // 通用補給間隔：與自訂補給品分開追蹤，確認後只重置對應類型的基準。
+  const intervalSupplyTrackerRef = useRef({ lastTimeSec: 0, lastDistanceKm: 0 });
+  const intervalSupplyAlertsRef = useRef<Partial<Record<SupplyIntervalKind, boolean>>>({});
+  const [intervalSupplyAlerts, setIntervalSupplyAlerts] = useState<Partial<Record<SupplyIntervalKind, boolean>>>({});
+  const intervalSupplyRepeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 清除重複提醒計時器
   const clearSupplyRepeatTimer = useCallback(() => {
@@ -390,6 +397,12 @@ export default function MapScreen() {
     }
     pendingCalorieRef.current = false;
     pendingWaterRef.current = false;
+  }, []);
+  const clearIntervalSupplyRepeatTimer = useCallback(() => {
+    if (intervalSupplyRepeatTimerRef.current) {
+      clearInterval(intervalSupplyRepeatTimerRef.current);
+      intervalSupplyRepeatTimerRef.current = null;
+    }
   }, []);
   const lastLocationRef = useRef<Location.LocationObject | null>(null);
   const lastBgSyncTsRef = useRef<number>(0); // 背景軌跡去重：記錄上次同步的最大時間戳
@@ -416,6 +429,20 @@ export default function MapScreen() {
     speak(`已確認補給${settings.supplyItems.find(s => s.id === id)?.name}`, settings.ttsEnabled);
     vibrateLight();
   }, [state.elapsed, state.distance, settings.supplyItems, settings.ttsEnabled]);
+
+  const handleConfirmIntervalSupply = useCallback((kind: SupplyIntervalKind) => {
+    const current = stateRef.current;
+    if (kind === "time") intervalSupplyTrackerRef.current.lastTimeSec = current.elapsed;
+    else intervalSupplyTrackerRef.current.lastDistanceKm = current.distance / 1000;
+    void acknowledgeBackgroundSupplyInterval(kind);
+
+    const nextAlerts = { ...intervalSupplyAlertsRef.current, [kind]: false };
+    intervalSupplyAlertsRef.current = nextAlerts;
+    setIntervalSupplyAlerts(nextAlerts);
+    if (!nextAlerts.time && !nextAlerts.distance) clearIntervalSupplyRepeatTimer();
+    if (settings.ttsEnabled) speak("已確認補給");
+    if (settings.vibrationEnabled) vibrateSuccess();
+  }, [clearIntervalSupplyRepeatTimer, settings.ttsEnabled, settings.vibrationEnabled]);
 
   const sortedActiveAlerts = useMemo(() => {
     return activeSupplyAlerts.sort((a, b) => {
@@ -713,6 +740,63 @@ export default function MapScreen() {
     },
     [settings, alertPlayer]
   );
+
+  const triggerIntervalSupplyReminder = useCallback(() => {
+    const current = stateRef.current;
+    if (current.status !== "active") return;
+
+    const dueKinds = getDueSupplyIntervals(
+      {
+        enabled: settings.supplyIntervalReminderEnabled,
+        timeEnabled: settings.supplyTimeIntervalEnabled,
+        timeMinutes: settings.supplyTimeIntervalMinutes,
+        distanceEnabled: settings.supplyDistanceIntervalEnabled,
+        distanceKm: settings.supplyDistanceIntervalKm,
+      },
+      intervalSupplyTrackerRef.current,
+      current.elapsed,
+      current.distance / 1000,
+      intervalSupplyAlertsRef.current,
+    );
+    if (dueKinds.length === 0) return;
+
+    const nextAlerts = { ...intervalSupplyAlertsRef.current };
+    dueKinds.forEach((kind) => { nextAlerts[kind] = true; });
+    intervalSupplyAlertsRef.current = nextAlerts;
+    setIntervalSupplyAlerts(nextAlerts);
+    powerSavingManagerRef.current.onSupplyReminder();
+    setTouchGuardEnabled(false);
+    if (settings.vibrationEnabled) vibrateWarning();
+    if (settings.ttsEnabled) speak("請補給");
+    if (settings.soundEnabled) {
+      try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+    }
+    if (settings.notificationEnabled) showSupplyNotification("calorie");
+
+    const repeatSec = settings.supplyReminderRepeatSec;
+    if (repeatSec > 0 && !intervalSupplyRepeatTimerRef.current) {
+      intervalSupplyRepeatTimerRef.current = setInterval(() => {
+        const alerts = intervalSupplyAlertsRef.current;
+        if (!alerts.time && !alerts.distance) {
+          clearIntervalSupplyRepeatTimer();
+          return;
+        }
+        if (settings.vibrationEnabled) vibrateWarning();
+        if (settings.ttsEnabled) speak("請補給");
+        if (settings.soundEnabled) {
+          try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+        }
+      }, repeatSec * 1000);
+    }
+  }, [alertPlayer, clearIntervalSupplyRepeatTimer, settings]);
+
+  useEffect(() => {
+    if (state.status !== "active") return;
+    const checkInterval = setInterval(triggerIntervalSupplyReminder, 10_000);
+    return () => clearInterval(checkInterval);
+  }, [state.status, triggerIntervalSupplyReminder]);
+
+  useEffect(() => () => clearIntervalSupplyRepeatTimer(), [clearIntervalSupplyRepeatTimer]);
 
   // ─── 計時器 ──────────────────────────────────────────────────────────────────
   const startTimeRef = useRef<number>(0);
@@ -1140,6 +1224,7 @@ export default function MapScreen() {
               triggerCustomSupplyReminder(supplyItem);
             }
           }
+          triggerIntervalSupplyReminder();
 
           if (notifPermRef.current && settings.notificationEnabled && currentState.elapsed % 30 === 0) {
             showRidingNotification(speedKmh, currentState.distance, currentState.elapsed);
@@ -1301,6 +1386,10 @@ export default function MapScreen() {
         triggered: false,
       };
     });
+    intervalSupplyTrackerRef.current = { lastTimeSec: 0, lastDistanceKm: 0 };
+    intervalSupplyAlertsRef.current = {};
+    setIntervalSupplyAlerts({});
+    clearIntervalSupplyRepeatTimer();
 
     // 感測器初始化
     setSensorData({
@@ -1354,6 +1443,11 @@ export default function MapScreen() {
       waterThreshold: hydrationThresholdMl,
       currentLat: lastPos?.coords.latitude ?? 0,
       currentLon: lastPos?.coords.longitude ?? 0,
+      supplyIntervalReminderEnabled: settings.supplyIntervalReminderEnabled,
+      supplyTimeIntervalEnabled: settings.supplyTimeIntervalEnabled,
+      supplyTimeIntervalMinutes: settings.supplyTimeIntervalMinutes,
+      supplyDistanceIntervalEnabled: settings.supplyDistanceIntervalEnabled,
+      supplyDistanceIntervalKm: settings.supplyDistanceIntervalKm,
     });
     await startBackgroundLocationTracking(settings.gpsAccuracy || "standard");
 
@@ -1421,6 +1515,10 @@ export default function MapScreen() {
           setWaterAlert(false);
           setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
           supplyItemsTrackerRef.current = {}; // 重置自訂補給品追蹤器
+          intervalSupplyTrackerRef.current = { lastTimeSec: 0, lastDistanceKm: 0 };
+          intervalSupplyAlertsRef.current = {};
+          setIntervalSupplyAlerts({});
+          clearIntervalSupplyRepeatTimer();
 
           // 結束騎乘清除崩潰恢復快照
           await clearSnapshot();
@@ -1493,6 +1591,15 @@ export default function MapScreen() {
               waterReminderSentRef.current = true;
               setWaterAlert(true);
               pendingWaterRef.current = true;
+            }
+            const restoredIntervalAlerts: Partial<Record<SupplyIntervalKind, boolean>> = {
+              time: bgState.intervalTimeReminderSent || false,
+              distance: bgState.intervalDistanceReminderSent || false,
+            };
+            if (restoredIntervalAlerts.time || restoredIntervalAlerts.distance) {
+              intervalSupplyAlertsRef.current = restoredIntervalAlerts;
+              setIntervalSupplyAlerts(restoredIntervalAlerts);
+              setTouchGuardEnabled(false);
             }
           }
         } catch (e) {
@@ -2240,14 +2347,26 @@ export default function MapScreen() {
         calorieAlert={calorieAlert}
         waterAlert={waterAlert}
         recommendedMl={supplyRecommendedMl}
-        customSupplyAlerts={sortedActiveAlerts.map(id => {
-          const item = settings.supplyItems.find(i => i.id === id);
-          return {
-            id,
-            name: item?.name || 'Unknown',
-            onConfirm: () => handleConfirmCustomSupply(id, item?.triggerType || 'time'),
-          };
-        })}
+        customSupplyAlerts={[
+          ...sortedActiveAlerts.map(id => {
+            const item = settings.supplyItems.find(i => i.id === id);
+            return {
+              id,
+              name: item?.name || 'Unknown',
+              onConfirm: () => handleConfirmCustomSupply(id, item?.triggerType || 'time'),
+            };
+          }),
+          ...(intervalSupplyAlerts.time ? [{
+            id: "supply-interval-time",
+            name: `時間間隔補給（每 ${settings.supplyTimeIntervalMinutes} 分鐘）`,
+            onConfirm: () => handleConfirmIntervalSupply("time"),
+          }] : []),
+          ...(intervalSupplyAlerts.distance ? [{
+            id: "supply-interval-distance",
+            name: `距離間隔補給（每 ${settings.supplyDistanceIntervalKm} km）`,
+            onConfirm: () => handleConfirmIntervalSupply("distance"),
+          }] : []),
+        ]}
         onConfirmCalorie={() => {
           setCalorieAlert(false);
           dispatch({ type: "CONSUME_CALORIES" });

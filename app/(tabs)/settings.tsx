@@ -604,6 +604,52 @@ export default function SettingsScreen() {
             onPress={() => openEdit("waterThreshold", "汗液流失提醒閾值 (ml)", settings.waterThreshold, "ml")}
           />
           <Divider colors={colors} />
+          <ToggleRow
+            icon="bell.badge.fill"
+            label="依時間／距離提醒補給"
+            value={settings.supplyIntervalReminderEnabled}
+            colors={colors}
+            onToggle={(enabled) => updateSettings({ supplyIntervalReminderEnabled: enabled })}
+          />
+          {settings.supplyIntervalReminderEnabled && <>
+            <Divider colors={colors} />
+            <ToggleRow
+              icon="clock.fill"
+              label="按時間間隔提醒"
+              value={settings.supplyTimeIntervalEnabled}
+              colors={colors}
+              onToggle={(enabled) => updateSettings({ supplyTimeIntervalEnabled: enabled })}
+            />
+            {settings.supplyTimeIntervalEnabled && <NumberRow
+              icon="clock.fill"
+              label="時間提醒間隔"
+              value={settings.supplyTimeIntervalMinutes}
+              unit="分鐘"
+              colors={colors}
+              iconColor={colors.primary}
+              hint="從開始騎乘或上次確認補給後重新計時"
+              onPress={() => openEdit("supplyTimeIntervalMinutes", "時間提醒間隔", settings.supplyTimeIntervalMinutes, "分鐘")}
+            />}
+            <Divider colors={colors} />
+            <ToggleRow
+              icon="location.fill"
+              label="按距離間隔提醒"
+              value={settings.supplyDistanceIntervalEnabled}
+              colors={colors}
+              onToggle={(enabled) => updateSettings({ supplyDistanceIntervalEnabled: enabled })}
+            />
+            {settings.supplyDistanceIntervalEnabled && <NumberRow
+              icon="location.fill"
+              label="距離提醒間隔"
+              value={settings.supplyDistanceIntervalKm}
+              unit="km"
+              colors={colors}
+              iconColor="#9C27B0"
+              hint="從開始騎乘或上次確認補給後重新累計距離"
+              onPress={() => openEdit("supplyDistanceIntervalKm", "距離提醒間隔", settings.supplyDistanceIntervalKm, "km")}
+            />}
+          </>}
+          <Divider colors={colors} />
           <NumberRow
             icon="bell.badge.fill"
             label="未關閉時重複提醒間隔"
