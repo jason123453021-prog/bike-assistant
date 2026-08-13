@@ -46,6 +46,7 @@ import Svg, { Circle } from "react-native-svg";
 import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
+import { calculateAgeFromBirthday } from "@/lib/personal-profile";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
 
@@ -144,6 +145,7 @@ const AUTO_PAUSE_RESUME_THRESHOLD = 3; // 自動恢復速度閾值（km/h）- �
 const WEATHER_INTERVAL = 10 * 60 * 1000;
 const LOCATION_INTERVAL_SEC = 3;
 const GPS_DRIFT_FILTER_M = 3; // GPS 漂移過濾：距離小於此值時視為漂移，不更新速度
+const AUTO_RECENTER_AFTER_INTERACTION_MS = 12_000;
 
 // 底部面板高度：螢幕下方三分之一（收縮）/ 五分之三（展開）
 const PANEL_COLLAPSED_H = Math.round(SCREEN_H / 3);
@@ -191,6 +193,15 @@ export default function MapScreen() {
   const { state, dispatch, saveRecord, updateRideActivity, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
   const { settings } = useSettings();
   const { sharedRoute, clearSharedRoute } = useGpx();
+  const autoPersonalMetrics = useMemo(() => deriveAutoPersonalMetrics(state.records, {
+    ftpW: settings.ftp,
+    age: settings.age,
+    birthday: settings.birthday,
+    maxHeartRate: settings.maxHeartRate,
+    restingHeartRate: settings.restingHeartRate,
+  }), [state.records, settings.age, settings.birthday, settings.ftp, settings.maxHeartRate, settings.restingHeartRate]);
+  const estimateFtpW = settings.autoPersonalMetricsEnabled ? autoPersonalMetrics.ftpW : settings.ftp;
+  const estimateAgeYears = calculateAgeFromBirthday(settings.birthday) ?? settings.age;
 
   useKeepAwake();
 
@@ -240,7 +251,7 @@ export default function MapScreen() {
       // 不傳入 zoom，也不修改 bearing：保留使用者手動調整的縮放與角度。
       mapRef.current?.animateCamera({ center: { latitude: position.lat, longitude: position.lon } }, { duration: 350 });
       setFollowUser(true);
-    }, 3000);
+    }, AUTO_RECENTER_AFTER_INTERACTION_MS);
   }, []);
 
   // 地圖方向模式：true = 車頭朝前（heading-up），false = 指北（north-up）
@@ -1487,7 +1498,7 @@ export default function MapScreen() {
             speedKmh,
             gradePct: grade,
             riderWeightKg: settings.weight,
-            ftpW: settings.ftp,
+            ftpW: estimateFtpW,
             intervalSec: LOCATION_INTERVAL_SEC,
             temperatureC: currentWeather?.temperature,
             humidityPct: currentWeather?.humidity,
@@ -1513,10 +1524,10 @@ export default function MapScreen() {
             temperatureC: weatherRef.current?.temperature ?? 25,
             humidityPct: weatherRef.current?.humidity ?? 60,
             weatherCode: weatherRef.current?.weatherCode ?? 1,
-            ftpW: settings.ftp,
+            ftpW: estimateFtpW,
             headwindMs,
             precipitationProb: currentWeather?.precipitationProb ?? 0,
-            ageYears: settings.age ?? 32,
+            ageYears: estimateAgeYears ?? 32,
             calibrationMultiplier: settings.sweatRateCalibrationMultiplier,
           });
           dispatch({
@@ -1549,7 +1560,7 @@ export default function MapScreen() {
             waterThresholdMl: hydrationThresholdMl,
             elapsedSec: currentState.elapsed,
             riderWeightKg: settings.weight,
-            ftpW: settings.ftp,
+            ftpW: estimateFtpW,
             intensityFactor: calorieResult.intensityFactor,
             sweatRatePerHour: sweatResult.sweatRatePerHour,
             environmentLoad: sweatResult.environmentLoad,
@@ -1842,8 +1853,8 @@ export default function MapScreen() {
       riderProfile: {
         weightKg: settings.weight,
         heightCm: settings.height,
-        ageYears: settings.age ?? 32,
-        ftpW: settings.ftp,
+        ageYears: estimateAgeYears ?? 32,
+        ftpW: estimateFtpW,
         bikeWeightKg: settings.bikeWeight ?? 10,
         sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
       },
@@ -1943,17 +1954,10 @@ export default function MapScreen() {
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新；個人設定與環境摘要只保存在裝置上。
           const environmentSummary = environmentSummaryRef.current;
           const sampleCount = environmentSummary.sampleCount;
-          const autoPersonalMetrics = deriveAutoPersonalMetrics(state.records, {
-            ftpW: settings.ftp,
-            age: settings.age,
-            maxHeartRate: settings.maxHeartRate,
-            restingHeartRate: settings.restingHeartRate,
-          });
-          const effectiveFtpW = settings.autoPersonalMetricsEnabled ? autoPersonalMetrics.ftpW : settings.ftp;
-          const savedRecordId = await saveRecord(undefined, sensorStatsRef.current, {
-            riderWeightKg: settings.weight,
-            bikeWeightKg: settings.bikeWeight ?? 10,
-            ftpW: effectiveFtpW,
+            const savedRecordId = await saveRecord(undefined, sensorStatsRef.current, {
+              riderWeightKg: settings.weight,
+              bikeWeightKg: settings.bikeWeight ?? 10,
+              ftpW: estimateFtpW,
             autoRpeEnabled: settings.autoRpeEnabled,
             environment: {
               sampleCount,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { router } from "expo-router";
 import {
   View,
@@ -21,9 +21,10 @@ import { useColors } from "@/hooks/use-colors";
 import { useSettings } from "@/lib/settings-context";
 import { useRide } from "@/lib/ride-context";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
-import { estimateRouteCompletionTime } from "@/lib/route-time-estimator";
+import { buildRouteEstimateSnapshot, type RoutePlanningPoint } from "@/lib/route-estimate-snapshot";
+import { calculateAgeFromBirthday } from "@/lib/personal-profile";
 import * as Location from "expo-location";
-import { estimateRouteCalories, type GpxRoute } from "@/lib/gpx-parser";
+import { type GpxRoute } from "@/lib/gpx-parser";
 import { useGpx } from "@/lib/gpx-context";
 import { formatDuration, formatDistance, calcAirDensity } from "@/lib/power-calc";
 import { fetchWeather, type WeatherData } from "@/lib/weather-service";
@@ -61,27 +62,41 @@ export default function NavigateScreen() {
   }), [rideState.records, settings.age, settings.birthday, settings.ftp, settings.maxHeartRate, settings.restingHeartRate]);
 
   // 天氣連動溫度：如果已取得路線天氣則使用即時溫度，否則預設 25°C
-  const routeTempC = routeWeather?.temperature ?? 25;
+  const forecastEnvironment = useMemo(() => {
+    const hours = routeWeather?.forecast?.length ? routeWeather.forecast : routeWeather ? [routeWeather] : [];
+    if (!hours.length) return { temperature: 25, humidity: 60, windSpeed: 0, windDirection: 0, weatherCode: 1, precipitationProb: 0 };
+    const average = (key: "temperature" | "humidity" | "windSpeed" | "precipitationProb") => hours.reduce((sum, hour) => sum + hour[key], 0) / hours.length;
+    const directionX = hours.reduce((sum, hour) => sum + Math.cos(hour.windDirection * Math.PI / 180), 0);
+    const directionY = hours.reduce((sum, hour) => sum + Math.sin(hour.windDirection * Math.PI / 180), 0);
+    return {
+      temperature: average("temperature"), humidity: average("humidity"), windSpeed: average("windSpeed"),
+      windDirection: (Math.atan2(directionY, directionX) * 180 / Math.PI + 360) % 360,
+      weatherCode: routeWeather?.weatherCode ?? 1, precipitationProb: average("precipitationProb"),
+    };
+  }, [routeWeather]);
+  const routeTempC = forecastEnvironment.temperature;
   // 空氣密度（依溫度計算）
   const routeAirDensity = calcAirDensity(routeTempC);
-  const routeTimeEstimate = useMemo(() => {
+  const routeEstimate = useMemo(() => {
     if (!route) return null;
-    return estimateRouteCompletionTime({
+    return buildRouteEstimateSnapshot({
       route,
       ftpW: autoMetrics.ftpW,
       riderWeightKg: riderKg,
       bikeWeightKg: bikeKg,
+      heightCm: settings.height,
+      ageYears: calculateAgeFromBirthday(settings.birthday) ?? settings.age,
       temperatureC: routeTempC,
-      humidityPct: routeWeather?.humidity,
+      humidityPct: forecastEnvironment.humidity,
+      windSpeedKmh: forecastEnvironment.windSpeed,
+      windDirection: forecastEnvironment.windDirection,
+      weatherCode: forecastEnvironment.weatherCode,
+      precipitationProb: forecastEnvironment.precipitationProb,
+      sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
     });
-  }, [autoMetrics.ftpW, bikeKg, riderKg, route, routeTempC, routeWeather?.humidity]);
+  }, [autoMetrics.ftpW, bikeKg, forecastEnvironment, riderKg, route, routeTempC, settings.age, settings.birthday, settings.height, settings.sweatRateCalibrationMultiplier]);
+  const routeTimeEstimate = routeEstimate?.time ?? null;
   const avgSpeedKmh = routeTimeEstimate?.movingAverageKmh ?? 20;
-
-  // 即時重算卡路里（天氣連動空氣密度）
-  const calorieResult = useMemo(() => {
-    if (!route) return null;
-    return estimateRouteCalories(route, totalMassKg, avgSpeedKmh, routeTempC);
-  }, [route, totalMassKg, avgSpeedKmh, routeTempC]);
 
   const handleImportGpx = async () => {
     setError(null);
@@ -372,7 +387,7 @@ export default function NavigateScreen() {
           </View>
 
           {/* Route Info */}
-          {route && calorieResult && (
+          {route && routeEstimate && (
             <>
               {/* Route Name */}
               <View style={[styles.routeNameCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
@@ -382,7 +397,7 @@ export default function NavigateScreen() {
                 </Text>
               </View>
 
-              <RoutePreview route={route} colors={colors} />
+              <RoutePreview route={route} planningPoints={routeEstimate.planningPoints} colors={colors} />
 
               {/* Basic Stats Grid */}
               <View style={[styles.statsGrid, { borderColor: colors.border }]}> 
@@ -418,77 +433,60 @@ export default function NavigateScreen() {
                 </View>
               )}
 
-              {/* ── 卡路里分析卡片 ──────────────────────────────────────────── */}
-              <View style={[styles.calorieCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>卡路里預估分析</Text>
-                <Text style={[styles.calorieFormula, { color: colors.muted }]}>
-                  科學公式：重力位能 + 滾動阻力 + 空氣阻力，25% 肌肉代謝效率
-                </Text>
+              {routeWeather && (
+                <View style={[styles.forecastCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>起點天氣與風向預報</Text>
+                  <Text style={[styles.forecastCurrent, { color: colors.muted }]}>{routeWeather.description} · {routeWeather.temperature}°C · 風速 {routeWeather.windSpeed} km/h · 風向 {Math.round(routeWeather.windDirection)}°</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.forecastRow}>
+                    {(routeWeather.forecast ?? []).map((hour) => (
+                      <View key={hour.time} style={[styles.forecastPill, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                        <Text style={[styles.forecastHour, { color: colors.muted }]}>{hour.time.slice(11, 16)}</Text>
+                        <Text style={[styles.forecastValue, { color: colors.foreground }]}>{hour.temperature}°</Text>
+                        <Text style={[styles.forecastMeta, { color: colors.muted }]}>風 {hour.windSpeed}</Text>
+                        <Text style={[styles.forecastMeta, { color: colors.muted }]}>{Math.round(hour.windDirection)}° · 雨 {hour.precipitationProb}%</Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
 
-                {/* 總卡路里大字 */}
+              {/* ── 卡路里分析卡片 ──────────────────────────────────────────── */}
+              <View style={[styles.calorieCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>統一補給與消耗預估</Text>
+                <Text style={[styles.calorieFormula, { color: colors.muted }]}> 
+                  完成時間、卡路里與水分均使用相同的 FTP、總重、GPX 坡度、天氣與風向快照。
+                </Text>
                 <View style={styles.calorieTotalRow}>
-                  <Text style={[styles.calorieTotalValue, { color: colors.accent }]}>
-                    {calorieResult.totalKcal.toLocaleString()}
+                  <Text style={[styles.calorieTotalValue, { color: colors.accent }]}> 
+                    {routeEstimate.estimatedCaloriesKcal.toLocaleString()}
                   </Text>
                   <Text style={[styles.calorieTotalUnit, { color: colors.muted }]}>kcal</Text>
                 </View>
-
-                {/* 分項明細 */}
-                <View style={[styles.breakdownGrid, { borderTopColor: colors.border }]}>
-                  <BreakdownItem
-                    label="爬坡消耗"
-                    sublabel="重力位能 ÷ 25%"
-                    value={calorieResult.climbKcal}
-                    pct={calorieResult.totalKcal > 0
-                      ? Math.round((calorieResult.climbKcal / calorieResult.totalKcal) * 100)
-                      : 0}
-                    color="#F97316"
-                    colors={colors}
-                  />
-                  <BreakdownItem
-                    label="滾動阻力"
-                    sublabel={`Crr=0.004 × ${totalMassKg.toFixed(0)}kg`}
-                    value={calorieResult.breakdown.rollingKcal}
-                    pct={calorieResult.totalKcal > 0
-                      ? Math.round((calorieResult.breakdown.rollingKcal / calorieResult.totalKcal) * 100)
-                      : 0}
-                    color="#3B82F6"
-                    colors={colors}
-                  />
-                  <BreakdownItem
-                    label="空氣阻力"
-                    sublabel={`CdA=0.35 @ ${avgSpeedKmh}km/h`}
-                    value={calorieResult.breakdown.aeroKcal}
-                    pct={calorieResult.totalKcal > 0
-                      ? Math.round((calorieResult.breakdown.aeroKcal / calorieResult.totalKcal) * 100)
-                      : 0}
-                    color="#8B5CF6"
-                    colors={colors}
-                  />
+                <View style={[styles.breakdownGrid, { borderTopColor: colors.border }]}> 
+                  <BreakdownItem label="預估水分流失" sublabel="熱負荷、濕度、強度與爬升" value={routeEstimate.estimatedWaterLossMl} pct={0} color="#38BDF8" colors={colors} unit="ml" />
+                  <BreakdownItem label="每次建議補水" sublabel="依統一強度與環境負荷" value={routeEstimate.suggestedWaterMl} pct={0} color="#22C55E" colors={colors} unit="ml" />
+                  <BreakdownItem label="每次建議能量" sublabel="依預估時長與功率強度" value={routeEstimate.suggestedEnergyKcal} pct={0} color="#F97316" colors={colors} unit="kcal" />
                 </View>
-
-                {/* 爬坡 vs 平路 對比 */}
-                <View style={[styles.compareRow, { borderTopColor: colors.border }]}>
-                  <View style={styles.compareItem}>
-                    <Text style={[styles.compareValue, { color: "#F97316" }]}>
-                      {calorieResult.climbKcal} kcal
-                    </Text>
-                    <Text style={[styles.compareLabel, { color: colors.muted }]}>爬坡消耗</Text>
-                  </View>
-                  <View style={[styles.compareDivider, { backgroundColor: colors.border }]} />
-                  <View style={styles.compareItem}>
-                    <Text style={[styles.compareValue, { color: "#3B82F6" }]}>
-                      {calorieResult.flatKcal} kcal
-                    </Text>
-                    <Text style={[styles.compareLabel, { color: colors.muted }]}>平路消耗</Text>
-                  </View>
-                </View>
-
-                {/* 說明文字 */}
-                <Text style={[styles.calorieNote, { color: colors.muted }]}>
-                  * 以總重 {totalMassKg.toFixed(1)} kg 計算，下坡視為制動耗散不計入能量消耗
+                <Text style={[styles.calorieNote, { color: colors.muted }]}> 
+                  * {routeEstimate.sourceLabel}；預估補給點為路線規劃位置，不代表現場有商店、飲水機或休息站。
                 </Text>
               </View>
+
+              {routeEstimate.planningPoints.length > 0 && (
+                <View style={[styles.planningCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>建議補給／休息規劃點</Text>
+                  <Text style={[styles.planningHint, { color: colors.muted }]}>依預估移動時間、補水與能量間隔自動配置；請自行確認現場可停留與補給條件。</Text>
+                  {routeEstimate.planningPoints.map((point) => (
+                    <View key={point.pointIndex} style={[styles.planningRow, { borderTopColor: colors.border }]}>
+                      <View style={[styles.planningDot, { backgroundColor: colors.warning }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.planningTitle, { color: colors.foreground }]}>{point.label} · {formatDistance(point.distanceM)}</Text>
+                        <Text style={[styles.planningMeta, { color: colors.muted }]}>建議補水 {point.waterMl} ml · 能量 {point.energyKcal} kcal</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               {/* Elevation Chart */}
               {renderElevationChart()}
@@ -530,10 +528,10 @@ export default function NavigateScreen() {
                 <Text style={[styles.tipsTitle, { color: colors.foreground }]}>騎乘建議</Text>
                 <Text style={[styles.tipsText, { color: colors.muted }]}>
                   {route.totalAscent > 500
-                    ? `本路線爬升 ${Math.round(route.totalAscent)}m，預估消耗 ${calorieResult.totalKcal} kcal，建議攜帶充足補給（約 ${Math.ceil(calorieResult.totalKcal / 200)} 份能量棒）及充足水分。`
+                    ? `本路線爬升 ${Math.round(route.totalAscent)}m，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，建議依規劃點準備補水與能量。`
                     : route.totalAscent > 200
-                    ? `本路線有適度爬升，預估消耗 ${calorieResult.totalKcal} kcal，建議攜帶 1-2 瓶水及能量補給。`
-                    : `本路線地形平緩，預估消耗 ${calorieResult.totalKcal} kcal，攜帶基本補給即可。`}
+                    ? `本路線有適度爬升，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，建議依統一補給預估準備水分與能量。`
+                    : `本路線地形平緩，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，請以預估水分與能量需求安排補給。`}
                 </Text>
               </View>
             </>
@@ -557,7 +555,7 @@ export default function NavigateScreen() {
 
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
-function RoutePreview({ route, colors }: { route: GpxRoute; colors: any }) {
+function RoutePreview({ route, planningPoints, colors }: { route: GpxRoute; planningPoints: RoutePlanningPoint[]; colors: any }) {
   const lats = route.points.map((point) => point.lat);
   const lons = route.points.map((point) => point.lon);
   const minLat = Math.min(...lats); const maxLat = Math.max(...lats);
@@ -581,6 +579,17 @@ function RoutePreview({ route, colors }: { route: GpxRoute; colors: any }) {
       <Svg width={width} height={height}>
         <Rect x={0} y={0} width={width} height={height} rx={12} fill={colors.background} />
         <Polyline points={points} fill="none" stroke={colors.accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        {planningPoints.map((planningPoint, index) => {
+          const point = route.points[planningPoint.pointIndex];
+          if (!point) return null;
+          const marker = project(point);
+          return (
+            <Fragment key={planningPoint.pointIndex}>
+              <Circle cx={marker.x} cy={marker.y} r={7} fill="#F59E0B" />
+              <SvgText x={marker.x} y={marker.y + 3.5} fontSize={8} fontWeight="700" fill="#111827" textAnchor="middle">{index + 1}</SvgText>
+            </Fragment>
+          );
+        })}
         <Circle cx={startPoint.x} cy={startPoint.y} r={5} fill="#22C55E" />
         <Circle cx={endPoint.x} cy={endPoint.y} r={5} fill="#EF4444" />
       </Svg>
@@ -604,9 +613,9 @@ function RouteStatCell({ label, value, colors, accent }: {
 }
 
 function BreakdownItem({
-  label, sublabel, value, pct, color, colors,
+  label, sublabel, value, pct, color, colors, unit = "kcal",
 }: {
-  label: string; sublabel: string; value: number; pct: number; color: string; colors: any;
+  label: string; sublabel: string; value: number; pct: number; color: string; colors: any; unit?: string;
 }) {
   return (
     <View style={styles.breakdownItem}>
@@ -618,8 +627,8 @@ function BreakdownItem({
         </View>
       </View>
       <View style={styles.breakdownRight}>
-        <Text style={[styles.breakdownValue, { color }]}>{value} kcal</Text>
-        <Text style={[styles.breakdownPct, { color: colors.muted }]}>{pct}%</Text>
+        <Text style={[styles.breakdownValue, { color }]}>{value} {unit}</Text>
+        {pct > 0 && <Text style={[styles.breakdownPct, { color: colors.muted }]}>{pct}%</Text>}
       </View>
     </View>
   );
@@ -738,6 +747,21 @@ const styles = StyleSheet.create({
   routeConfirmNotice: { fontSize: 11, lineHeight: 16, marginTop: 7 },
   startRouteBtn: { marginTop: 15, minHeight: 48, borderRadius: 13, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   startRouteBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+
+  forecastCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 16, marginBottom: 16 },
+  forecastCurrent: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  forecastRow: { gap: 8 },
+  forecastPill: { width: 94, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 9 },
+  forecastHour: { fontSize: 11 },
+  forecastValue: { fontSize: 17, fontWeight: "700", marginTop: 3 },
+  forecastMeta: { fontSize: 10, marginTop: 2 },
+
+  planningCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 16, marginBottom: 16 },
+  planningHint: { fontSize: 11, lineHeight: 16, marginBottom: 8 },
+  planningRow: { flexDirection: "row", gap: 10, alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 11 },
+  planningDot: { width: 10, height: 10, borderRadius: 5 },
+  planningTitle: { fontSize: 13, fontWeight: "600" },
+  planningMeta: { fontSize: 11, marginTop: 3 },
 
   // Calorie Card
   calorieCard: {

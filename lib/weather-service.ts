@@ -11,6 +11,16 @@ export interface WeatherData {
   precipitationProb: number; // %
   weatherCode: number;
   description: string;
+  forecast: WeatherForecastHour[];
+}
+
+export interface WeatherForecastHour {
+  time: string;
+  temperature: number;
+  humidity: number;
+  windSpeed: number;
+  windDirection: number;
+  precipitationProb: number;
 }
 
 const WMO_CODES: Record<number, string> = {
@@ -36,6 +46,18 @@ async function _doFetch(url: string): Promise<WeatherData | null> {
     if (!response.ok) return null;
     const data = await response.json();
     const c = data.current;
+    const hourly = data.hourly ?? {};
+    const nowIndex = Math.max(0, (hourly.time ?? []).findIndex((time: string) => time >= (c.time ?? "")));
+    const forecast = Array.from({ length: 4 }, (_, index) => nowIndex + index * 2)
+      .filter((index) => hourly.time?.[index])
+      .map((index) => ({
+        time: hourly.time[index],
+        temperature: Math.round(hourly.temperature_2m?.[index] ?? c.temperature_2m),
+        humidity: Math.round(hourly.relative_humidity_2m?.[index] ?? c.relative_humidity_2m ?? 60),
+        windSpeed: Math.round(hourly.wind_speed_10m?.[index] ?? c.wind_speed_10m),
+        windDirection: hourly.wind_direction_10m?.[index] ?? c.wind_direction_10m,
+        precipitationProb: Math.round(hourly.precipitation_probability?.[index] ?? 0),
+      }));
     return {
       temperature: Math.round(c.temperature_2m),
       humidity: Math.round(c.relative_humidity_2m ?? 60),
@@ -44,6 +66,7 @@ async function _doFetch(url: string): Promise<WeatherData | null> {
       precipitationProb: c.precipitation_probability ?? 0,
       weatherCode: c.weather_code,
       description: WMO_CODES[c.weather_code] ?? "未知",
+      forecast,
     };
   } catch {
     clearTimeout(timer);
@@ -65,7 +88,8 @@ export async function fetchWeather(
   const url =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${latitude}&longitude=${longitude}` +
-    `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,weather_code` +
+      `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,weather_code` +
+      `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation_probability` +
     `&wind_speed_unit=kmh&timezone=auto&forecast_days=1`;
 
   // 第一次嘗試

@@ -1,5 +1,6 @@
 import { calculatePower, calcAirDensity, haversineDistance } from "./power-calc";
 import type { GpxRoute } from "./gpx-parser";
+import { getHeadwindMs } from "./weather-service";
 
 export interface RouteTimeEstimate {
   estimatedDurationSeconds: number;
@@ -8,6 +9,7 @@ export interface RouteTimeEstimate {
   movingAverageKmh: number;
   targetPowerW: number;
   intensityFactor: number;
+  averageHeadwindMs: number;
   confidence: "low" | "medium" | "high";
   factors: string[];
 }
@@ -28,6 +30,7 @@ function solveSpeedForPower(
   riderWeightKg: number,
   bikeWeightKg: number,
   airDensityKgM3: number,
+  headwindMs: number,
 ): number {
   let low = 1.4;
   let high = gradePct < -2 ? 15.5 : 13.5;
@@ -36,7 +39,7 @@ function solveSpeedForPower(
     const required = calculatePower({
       speedMs: middle,
       gradePct,
-      windSpeedMs: 0,
+      windSpeedMs: headwindMs,
       riderMassKg: riderWeightKg,
       bikeMassKg: bikeWeightKg,
       airDensityKgM3,
@@ -58,6 +61,8 @@ export function estimateRouteCompletionTime(input: {
   bikeWeightKg?: number;
   temperatureC?: number;
   humidityPct?: number;
+  windSpeedKmh?: number;
+  windDirection?: number;
 }): RouteTimeEstimate {
   const { route } = input;
   const riderWeightKg = clamp(input.riderWeightKg, 35, 180);
@@ -67,14 +72,24 @@ export function estimateRouteCompletionTime(input: {
   const airDensityKgM3 = calcAirDensity(input.temperatureC ?? 20, input.humidityPct ?? 60);
 
   let movingSeconds = 0;
+  let weightedHeadwindMs = 0;
   for (let index = 1; index < route.points.length; index += 1) {
     const previous = route.points[index - 1];
     const point = route.points[index];
     const distanceM = haversineDistance(previous.lat, previous.lon, point.lat, point.lon);
     if (!Number.isFinite(distanceM) || distanceM < 1 || distanceM > 5000) continue;
     const gradePct = clamp(((point.ele - previous.ele) / distanceM) * 100, -18, 18);
-    const speedMs = solveSpeedForPower(targetPowerW, gradePct, riderWeightKg, bikeWeightKg, airDensityKgM3);
+    const headingDeg = (Math.atan2(
+      Math.sin((point.lon - previous.lon) * Math.PI / 180) * Math.cos(point.lat * Math.PI / 180),
+      Math.cos(previous.lat * Math.PI / 180) * Math.sin(point.lat * Math.PI / 180) -
+      Math.sin(previous.lat * Math.PI / 180) * Math.cos(point.lat * Math.PI / 180) * Math.cos((point.lon - previous.lon) * Math.PI / 180),
+    ) * 180 / Math.PI + 360) % 360;
+    const headwindMs = input.windSpeedKmh && input.windDirection !== undefined
+      ? getHeadwindMs(headingDeg, input.windDirection, input.windSpeedKmh)
+      : 0;
+    const speedMs = solveSpeedForPower(targetPowerW, gradePct, riderWeightKg, bikeWeightKg, airDensityKgM3, headwindMs);
     movingSeconds += distanceM / speedMs;
+    weightedHeadwindMs += headwindMs * distanceM;
   }
 
   const estimatedDurationSeconds = Math.max(60, Math.round(movingSeconds || route.estimatedDuration));
@@ -88,12 +103,13 @@ export function estimateRouteCompletionTime(input: {
     movingAverageKmh: Number(((route.totalDistance / estimatedDurationSeconds) * 3.6).toFixed(1)),
     targetPowerW,
     intensityFactor,
+    averageHeadwindMs: route.totalDistance > 0 ? weightedHeadwindMs / route.totalDistance : 0,
     confidence,
     factors: [
       `App 自動 FTP ${Math.round(input.ftpW)} W`,
       `總重 ${(riderWeightKg + bikeWeightKg).toFixed(1)} kg`,
       "GPX 逐段距離與坡度",
-      "預設無風與一般公路阻力",
+      input.windSpeedKmh ? `起點風速 ${Math.round(input.windSpeedKmh)} km/h／逐段風向修正` : "預設無風與一般公路阻力",
     ],
   };
 }
