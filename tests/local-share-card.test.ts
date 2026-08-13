@@ -1,0 +1,43 @@
+import { describe, expect, it } from "vitest";
+
+import { createRideShareCardFilename, createRideShareCardSvg } from "../lib/ride-share-card-svg";
+import type { RideRecord } from "../lib/ride-context";
+
+const record = {
+  id: "share-001",
+  date: new Date("2026-08-13T07:30:00+08:00").getTime(),
+  name: "晨騎 <測試>",
+  duration: 7200,
+  distance: 45200,
+  avgSpeed: 22.6,
+  maxSpeed: 46.2,
+  totalAscent: 620,
+  calories: 1560,
+  avgPower: 142,
+  maxPower: 618,
+  powerZones: [1, 2, 3, 4, 5],
+  powerHistory: [],
+  totalSweatMl: 850,
+  refillCount: 2,
+  totalPausedSec: 600,
+  route: [
+    { latitude: 25.0478, longitude: 121.5319, altitude: 12, speed: 4.2, timestamp: 1 },
+    { latitude: 25.055, longitude: 121.545, altitude: 18, speed: 5.4, timestamp: 2 },
+  ],
+  personalBests: [{ metric: "distance", label: "最長距離", value: 45.2, unit: "km" }],
+} as RideRecord;
+
+describe("local ride share card", () => {
+  it("creates a self-contained SVG with route and core activity metrics", () => {
+    const svg = createRideShareCardSvg(record);
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("polyline");
+    expect(svg).toContain("45.20");
+    expect(svg).toContain("晨騎 &lt;測試&gt;");
+    expect(svg).toContain("本機個人紀錄");
+  });
+
+  it("creates a safe local SVG filename", () => {
+    expect(createRideShareCardFilename(record)).toBe("bike-ride-晨騎-測試-share-001.svg");
+  });
+});

@@ -1,8 +1,12 @@
-import React, { useMemo } from "react";
-import { View, Text, Modal, Pressable, ScrollView, Share, Alert } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, Modal, Pressable, ScrollView, Share, Alert, Platform } from "react-native";
+import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system/legacy";
+import { WebView } from "react-native-webview";
 import { useColors } from "@/hooks/use-colors";
 import { RideRecord } from "@/lib/ride-context";
 import { generateShareCard, generateShareText, calculateRideLevel } from "@/lib/garmin-card-generator";
+import { createRideShareCardFilename, createRideShareCardSvg } from "@/lib/ride-share-card-svg";
 
 export interface ShareCardModalProps {
   visible: boolean;
@@ -12,11 +16,33 @@ export interface ShareCardModalProps {
 
 export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) {
   const colors = useColors();
+  const [isPreparingImage, setIsPreparingImage] = useState(false);
 
   const shareCard = useMemo(() => {
     if (!ride) return null;
     return generateShareCard(ride);
   }, [ride]);
+
+  const shareCardSvg = useMemo(() => (ride ? createRideShareCardSvg(ride) : ""), [ride]);
+
+  const imageRendererHtml = useMemo(() => {
+    if (!shareCardSvg) return "";
+    const encodedSvg = encodeURIComponent(shareCardSvg);
+    return `<!doctype html><html><body style="margin:0;background:transparent"><canvas id="card"></canvas><script>
+      const svg = "data:image/svg+xml;charset=utf-8,${encodedSvg}";
+      const image = new Image();
+      image.onload = function () {
+        const canvas = document.getElementById("card");
+        canvas.width = image.naturalWidth || 1080;
+        canvas.height = image.naturalHeight || 1920;
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0);
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: "shareCardPng", base64: canvas.toDataURL("image/png").split(",")[1] }));
+      };
+      image.onerror = function () { window.ReactNativeWebView.postMessage(JSON.stringify({ type: "shareCardError" })); };
+      image.src = svg;
+    </script></body></html>`;
+  }, [shareCardSvg]);
 
   const shareText = useMemo(() => {
     if (!shareCard) return "";
@@ -38,6 +64,41 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
       });
     } catch (error) {
       Alert.alert("分享失敗", "無法分享騎乘記錄");
+    }
+  };
+
+  const handleShareImage = async () => {
+    if (!ride) return;
+    if (Platform.OS === "web") {
+      Alert.alert("此平台不支援", "本機圖像分享需在 Android 或 iOS 裝置上使用。");
+      return;
+    }
+
+    setIsPreparingImage(true);
+  };
+
+  const handleImageRendererMessage = async (event: { nativeEvent: { data: string } }) => {
+    if (!ride || !isPreparingImage) return;
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      if (message.type === "shareCardError" || !message.base64) throw new Error("IMAGE_RENDER_FAILED");
+      if (!FileSystem.cacheDirectory) throw new Error("NO_CACHE_DIRECTORY");
+      if (!(await Sharing.isAvailableAsync())) throw new Error("SHARING_UNAVAILABLE");
+
+      const filename = createRideShareCardFilename(ride).replace(/\.svg$/, ".png");
+      const directory = `${FileSystem.cacheDirectory}ride-share-cards`;
+      const uri = `${directory}/${filename}`;
+      await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+      await FileSystem.writeAsStringAsync(uri, message.base64, { encoding: FileSystem.EncodingType.Base64 });
+      await Sharing.shareAsync(uri, {
+        dialogTitle: "分享騎乘長圖",
+        mimeType: "image/png",
+        UTI: "public.png",
+      });
+    } catch (error) {
+      Alert.alert("產生分享長圖失敗", "無法建立本機分享圖片，請稍後再試。");
+    } finally {
+      setIsPreparingImage(false);
     }
   };
 
@@ -80,6 +141,15 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
           </View>
 
           <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+            {isPreparingImage && imageRendererHtml ? (
+              <WebView
+                source={{ html: imageRendererHtml }}
+                onMessage={handleImageRendererMessage}
+                style={{ position: "absolute", width: 1, height: 1, opacity: 0 }}
+                javaScriptEnabled
+                originWhitelist={["*"]}
+              />
+            ) : null}
             {/* 卡片預覽 */}
             <View
               style={{
@@ -217,6 +287,27 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 分享方式
               </Text>
 
+              {/* 主要分享：完整騎乘長圖 */}
+              <Pressable
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: "#00B96B",
+                    borderRadius: 12,
+                    padding: 14,
+                    opacity: pressed || isPreparingImage ? 0.8 : 1,
+                  },
+                ]}
+                disabled={isPreparingImage}
+                onPress={handleShareImage}
+              >
+                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800", textAlign: "center" }}>
+                  {isPreparingImage ? "正在產生分享長圖…" : "分享完整騎乘長圖"}
+                </Text>
+                <Text style={{ color: "rgba(255,255,255,0.78)", fontSize: 11, textAlign: "center", marginTop: 4 }}>
+                  包含路線概覽、活動名稱、個人最佳與核心成績
+                </Text>
+              </Pressable>
+
               {/* 分享文字 */}
               <Pressable
                 style={({ pressed }) => [
@@ -268,7 +359,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 </Text>
               </Pressable>
 
-              {/* 下載卡片 */}
+              {/* 建立可分享圖檔 */}
               <Pressable
                 style={({ pressed }) => [
                   {
@@ -280,13 +371,11 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                     opacity: pressed ? 0.8 : 1,
                   },
                 ]}
-                onPress={() => {
-                  // TODO: 實現下載功能
-                  Alert.alert("下載", "卡片已保存到相機膠捲");
-                }}
+                disabled={isPreparingImage}
+                onPress={handleShareImage}
               >
                 <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>
-                  💾 下載卡片圖片
+                  🖼️ 產生並分享圖片檔
                 </Text>
               </Pressable>
             </View>

@@ -1306,3 +1306,9 @@
 - [x] 重整為本機優先的活動摘要：路線、標題、核心成績與個人洞察卡：地圖下方新增本機騎乘摘要、活動標題日期、六項核心成績與個人最佳洞察卡
 - [x] 以自然上滑捲動取代手勢底部面板，向下顯示地形、表現與訓練指標：移除 Animated／PanResponder 面板；使用整頁 ScrollView 直接依序上滑查看功率、坡度、心率、核心、地形、進階訓練、表現、補給與路線統計
 - [x] 驗證詳情頁資料、TypeScript、完整測試與 Android Bundle：pnpm check 通過；38 項測試（37 passed、1 skipped）通過；Android Metro Bundle 11,110,809 bytes 完成且服務維持 running
+
+## 本機騎乘分享長圖（2026-08-13）
+- [x] 檢查既有分享卡元件、地圖軌跡資料與本機圖像／檔案輸出能力：既有卡片只可分享文字；專案已有 Expo FileSystem、Expo Sharing 與 WebView，可在裝置快取完成本機圖像處理
+- [x] 設計包含路線、活動名稱、日期、個人最佳與六項核心成績的直式分享長圖：新增 1080×1920 SVG 分享長圖，含路線線條、起訖點、活動摘要、本機個人最佳、距離、爬升、移動時間、平均功率、均速及卡路里
+- [x] 實作本機圖像輸出並透過系統分享介面傳送給好友：在裝置端以隱藏 WebView 將 SVG 轉為 PNG，寫入快取後交由 Expo Sharing 系統分享介面傳送；不建立帳號、不上傳資料或使用社群 API
+- [x] 驗證分享卡資料、TypeScript、完整測試與 Android Bundle：pnpm check 通過；40 項測試（39 passed、1 skipped）通過；Android Metro Bundle 11,124,182 bytes 完成且服務維持 running
