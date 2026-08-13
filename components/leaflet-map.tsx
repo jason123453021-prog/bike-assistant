@@ -24,7 +24,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { POI_ICONS } from "@/lib/poi-types";
 import { StyleSheet, View, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -57,17 +56,6 @@ export interface KilometerMarker {
   elevation: number;
 }
 
-export interface POIMarker {
-  id: string;
-  type: string;
-  name: string;
-  lat: number;
-  lon: number;
-  color: string;
-  icon: string;
-  rating?: number;
-}
-
 export interface LeafletMapProps {
   style?: object;
   initialRegion?: {
@@ -93,8 +81,6 @@ export interface LeafletMapProps {
   onMapCenterChanged?: (lat: number, lon: number) => void;
   onMapMoveEnd?: (bounds: { northEast: { lat: number; lon: number }; southWest: { lat: number; lon: number } }) => void;
   kilometersMarkers?: KilometerMarker[];
-  poiMarkers?: POIMarker[];
-  onPOITap?: (poi: POIMarker) => void;
 }
 
 export interface LeafletMapHandle {
@@ -114,10 +100,7 @@ const LEAFLET_HTML = `<!DOCTYPE html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.7/dist/leaflet-rotate-src.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -172,7 +155,6 @@ const LEAFLET_HTML = `<!DOCTYPE html>
 <body>
 <div id="map"></div>
     <script>
-    var POI_ICONS_MAP = ${JSON.stringify(POI_ICONS)};
     // Init map (with leaflet-rotate plugin)
 var map = L.map('map', {
   zoomControl: false,
@@ -280,33 +262,6 @@ function makeKilometerIcon(km) {
     iconSize: [32, 32],
     iconAnchor: [16, 16],
     className: 'kilometer-marker-icon'
-  });
-}
-
-// POI 標記層
-var poiMarkersLayer = L.markerClusterGroup();
-map.addLayer(poiMarkersLayer);
-var poiColorMap = {
-  'convenience_store': '#FF6B6B',
-  'restaurant': '#FFA500',
-  'cafe': '#8B4513',
-  'water_fountain': '#4A90E2',
-  'restroom': '#9B59B6',
-  'mobile_restroom': '#9B59B6',
-  'photo_spot': '#E74C3C',
-  'viewpoint': '#27AE60',
-  'summit': '#34495E',
-  'peak': '#34495E'
-};
-
-function makePOIIcon(poiType, label, iconUrl) {
-  var iconSize = 32; // Adjust size as needed
-  return L.icon({
-    iconUrl: iconUrl,
-    iconSize: [iconSize, iconSize],
-    iconAnchor: [iconSize / 2, iconSize / 2],
-    popupAnchor: [0, -iconSize / 2],
-    className: 'poi-marker-icon'
   });
 }
 
@@ -700,36 +655,6 @@ function handleMessage(data) {
           kilometerMarkersLayer.push(marker);
         });
         break;
-      case 'setPOIMarkers':
-        // 移除舊的 POI 標記
-        poiMarkersLayer.clearLayers();
-        // 添加新的 POI 標記
-        var poiMarkers = msg.markers || [];
-        poiMarkers.forEach(function(poi) {
-          var marker = L.marker([poi.lat, poi.lon], {
-            icon: makePOIIcon(poi.type, poi.name, POI_ICONS_MAP[poi.type] || poi.icon),
-            title: poi.name
-          });
-          poiMarkersLayer.addLayer(marker);
-          (function(poiData) {
-            marker.on('click', function(e) {
-              L.DomEvent.stopPropagation(e);
-              if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'poiTapped',
-                  poiId: poiData.id,
-                  name: poiData.name,
-                  poiType: poiData.type,
-                  lat: poiData.lat,
-                  lon: poiData.lon,
-                  description: poiData.description || '',
-                  address: poiData.address || ''
-                }));
-              }
-            });
-          })(poi);
-        });
-        break;
       case 'setHeadingUpMode':
         headingUpMode = msg.enabled || false;
         break;
@@ -771,8 +696,6 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       centerPinLocation,
       onMapCenterChanged,
       kilometersMarkers,
-      poiMarkers,
-      onPOITap,
       onMapMoveEnd,
     },
     ref
@@ -932,20 +855,6 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       }
     }, [kilometersMarkers, isReady]);
 
-    // Send POI markers
-    useEffect(() => {
-      if (!isReady || !webViewRef.current) return;
-      if (poiMarkers && poiMarkers.length > 0) {
-        webViewRef.current.postMessage(
-          JSON.stringify({ type: "setPOIMarkers", markers: poiMarkers })
-        );
-      } else {
-        webViewRef.current.postMessage(
-          JSON.stringify({ type: "setPOIMarkers", markers: [] })
-        );
-      }
-    }, [poiMarkers, isReady]);
-
     // Send center pin location
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
@@ -1014,17 +923,6 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
           onMapLongPress?.(msg.lat, msg.lon);
         } else if (msg.type === "mapCenterChanged") {
           onMapCenterChanged?.(msg.lat, msg.lon);
-        } else if (msg.type === "poiTapped") {
-          onPOITap?.({
-            id: msg.poiId,
-            type: msg.poiType,
-            name: msg.name,
-            lat: msg.lat,
-            lon: msg.lon,
-            color: '',
-            icon: '',
-            rating: undefined,
-          });
         } else if (msg.type === "mapMoveEnd") {
           onMapMoveEnd?.({
             northEast: { lat: msg.northEast.lat, lon: msg.northEast.lon },

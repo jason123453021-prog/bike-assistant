@@ -1288,3 +1288,9 @@
 - [x] 檢查 POI 載入模組、地圖呼叫點與 MetroServerError 根因：導航頁對 POI 模組使用執行期動態別名匯入，Expo Go 會向 Metro 額外請求該模組並可能失敗
 - [x] 修正 POI 載入失敗的網路／回應處理，避免 Metro 錯誤訊息直接顯示給使用者：改為頂層靜態匯入；Overpass 暫時不可用時直接使用本機 POI，不再輸出原始 Metro 錯誤
 - [x] 新增 POI 錯誤處理測試並驗證 TypeScript、完整測試與 Android Bundle：pnpm check 通過；37 項測試（36 passed、1 skipped）通過；Android Metro Bundle 1,793 modules、11,144,340 bytes 完成且服務維持 running
+
+## 移除地圖 POI 功能（2026-08-13）
+- [x] 盤點導航頁、Leaflet 地圖與資料模組的 POI 標記、載入與互動引用：涵蓋 POI 動態載入、Overpass、AsyncStorage 快取、Leaflet marker-cluster、WebView 訊息與 POI 導航卡
+- [x] 移除 POI 載入、Overpass 網路請求、本機快取、地圖標記與 POI 導航／卡片：導航頁與 Leaflet 已不再傳遞、載入或處理任何 POI 資料
+- [x] 刪除不再使用的 POI 資料、管理與測試檔案：已刪除 lib/poi-data.ts、lib/poi-manager.ts、lib/poi-types.ts 與 tests/poi-data.test.ts，並移除 marker-cluster 外部資源
+- [x] 驗證 TypeScript、完整測試與 Android Bundle：pnpm check 通過；35 項測試（34 passed、1 skipped）通過；Android Metro Bundle 11,106,990 bytes 完成且服務維持 running

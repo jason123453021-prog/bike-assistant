@@ -126,8 +126,6 @@ import {
 } from "@/lib/pinned-navigation-layers";
 import { shouldTrackRideHeading, shouldTrackRideLocation } from "@/lib/ride-tracking-lifecycle";
 import { shouldEnterIdleMonitor, shouldResumeFromIdleMonitor, type RideLocationTrackingMode } from "@/lib/idle-auto-pause";
-import { getPOIs, SAMPLE_POIS } from "@/lib/poi-data";
-import { calculateDistance, getPOIsAlongRoute } from "@/lib/poi-manager";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -2019,91 +2017,6 @@ export default function MapScreen() {
     return calculateKilometerMarkers(gpxRoute);
   }, [gpxRoute]);
 
-  // POI 標記狀態
-  const [poiMarkers, setPoiMarkers] = useState<any[]>([]);
-  const [mapBounds, setMapBounds] = useState<{ northEast: { lat: number; lon: number }; southWest: { lat: number; lon: number } } | null>(null);
-
-  const handleMapMoveEnd = useCallback((bounds: { northEast: { lat: number; lon: number }; southWest: { lat: number; lon: number } }) => {
-    setMapBounds(bounds);
-  }, []);
-  const [tappedPOI, setTappedPOI] = useState<any | null>(null);
-  const [showPOICard, setShowPOICard] = useState(false);
-  const [isFetchingPOIRoute, setIsFetchingPOIRoute] = useState(false);
-  const [poiRouteInfo, setPoiRouteInfo] = useState<{ distM: number; durSec: number; polyline: { latitude: number; longitude: number }[] } | null>(null);
-
-  // 加載 POI 數據（App 啟動即加載，並根據位置和路線動態更新）
-
-  useEffect(() => {
-    // 避免在組件首次渲染時觸發兩次 POI 加載
-    if (!mapBounds && !currentPos && !gpxRoute) return;
-    const loadPOIs = async () => {
-      const mapPOI = (poi: any) => ({
-        id: poi.id,
-        type: poi.type,
-        name: poi.name,
-        lat: poi.latitude,
-        lon: poi.longitude,
-        color: '#999999',
-        icon: '📍',
-        description: poi.description,
-      });
-      try {
-        // 如果有 GPX 路線，獲取沿路線的 POI
-        if (gpxRoute && gpxRoute.points.length > 0) {
-          const lat = gpxRoute.points[0].lat;
-          const lon = gpxRoute.points[0].lon;
-          const pois = await getPOIs(lat, lon, 10);
-          const routePoints = gpxRoute.points.map(p => ({ lat: p.lat, lon: p.lon }));
-          const nearbyPOIs = getPOIsAlongRoute(pois, routePoints, 0.5);
-          setPoiMarkers(nearbyPOIs.map(mapPOI));
-        } else if (mapBounds) {
-          // 如果有地圖邊界，獲取該區域內的 POI
-          const { northEast, southWest } = mapBounds;
-          const pois = await getPOIs(
-            (northEast.lat + southWest.lat) / 2,
-            (northEast.lon + southWest.lon) / 2,
-            haversineDistance(northEast.lat, northEast.lon, southWest.lat, southWest.lon) / 2000 // 獲取邊界半徑內的 POI (km)
-          );
-          setPoiMarkers(pois.map(mapPOI));
-        } else if (currentPos) {
-          // 有位置時，獲取當前位置附近的 POI（擴大範圍到 5km）
-          const pois = await getPOIs(currentPos.lat, currentPos.lon, 5);
-          const nearbyPOIs = pois.filter(poi => {
-            const dist = calculateDistance(currentPos.lat, currentPos.lon, poi.latitude, poi.longitude);
-            return dist <= 5; // 5km 範圍以確保能看到 POI
-          });
-          if (nearbyPOIs.length > 0) {
-            setPoiMarkers(nearbyPOIs.map(mapPOI));
-          } else {
-            // API 無結果時使用範例數據，但將座標偏移到用戶位置附近
-            setPoiMarkers(SAMPLE_POIS.map((poi, i) => mapPOI({
-              ...poi,
-              latitude: currentPos.lat + (Math.random() - 0.5) * 0.02,
-              longitude: currentPos.lon + (Math.random() - 0.5) * 0.02,
-            })));
-          }
-        } else {
-          // 無位置無路線無邊界時，顯示範例 POI
-          setPoiMarkers(SAMPLE_POIS.map(mapPOI));
-        }
-      } catch (err) {
-        // 網路或資料來源暫時不可用時保持本機 POI，不將 Metro／網路錯誤交給 Expo Go 顯示。
-        console.warn('[POI] 無法更新線上 POI，已使用本機備用資料');
-        if (currentPos) {
-          setPoiMarkers(SAMPLE_POIS.map((poi) => mapPOI({
-            ...poi,
-            latitude: currentPos.lat + (Math.random() - 0.5) * 0.02,
-            longitude: currentPos.lon + (Math.random() - 0.5) * 0.02,
-          })));
-        } else {
-          setPoiMarkers(SAMPLE_POIS.map(mapPOI));
-        }
-      }
-    };
-
-    loadPOIs();
-  }, [currentPos, gpxRoute, mapBounds]);
-
   const avgSpeed = useMemo(() => {
     if (state.elapsed < 5 || state.distance < 10) return 0;
     return (state.distance / 1000) / (state.elapsed / 3600);
@@ -2202,20 +2115,7 @@ export default function MapScreen() {
           }
         }}
         kilometersMarkers={kilometersMarkers}
-        poiMarkers={poiMarkers}
-        onPOITap={(poi) => {
-          setTappedPOI(poi);
-          setShowPOICard(true);
-          scheduleAutoRecenter();
-          mapRef.current?.animateCamera(
-            { center: { latitude: poi.lat, longitude: poi.lon }, zoom: 18 },
-            { duration: 300 }
-          );
-        }}
-        onMapMoveEnd={(bounds) => {
-          handleMapMoveEnd(bounds);
-          scheduleAutoRecenter();
-        }}
+        onMapMoveEnd={scheduleAutoRecenter}
       />
 
       {/* ── 右側工具列 ── */}
@@ -2709,110 +2609,6 @@ export default function MapScreen() {
         fields={settings.simplifiedModeFields}
         fieldOrder={settings.simplifiedModeFieldOrder}
       />
-
-      {/* ── POI 詳細資訊卡片 ── */}
-      {showPOICard && tappedPOI && (
-        <View style={[styles.pinCard, { bottom: dynamicCollapsedH + 16 }]}>
-          <View style={styles.pinCardHeader}>
-            <Text style={styles.pinCardTitle}>{tappedPOI.name}</Text>
-            <Pressable
-              style={styles.pinCardClose}
-              onPress={() => {
-                setShowPOICard(false);
-                setTappedPOI(null);
-                setPoiRouteInfo(null);
-              }}
-            >
-              <IconSymbol name="xmark.circle.fill" size={20} color="#666" />
-            </Pressable>
-          </View>
-          <View style={styles.pinCardBody}>
-            <Text style={styles.pinCardCoord}>
-              {tappedPOI.lat.toFixed(4)}, {tappedPOI.lon.toFixed(4)}
-            </Text>
-            {tappedPOI.description && (
-              <Text style={[styles.pinCardCoord, { marginTop: 8, fontSize: 13 }]}>{tappedPOI.description}</Text>
-            )}
-            {isFetchingPOIRoute && (
-              <Text style={styles.pinCardStatus}>計算路線中…</Text>
-            )}
-            {poiRouteInfo && (
-              <View style={styles.pinCardRoute}>
-                <Text style={styles.pinCardRouteDist}>距離: {(poiRouteInfo.distM / 1000).toFixed(2)} km</Text>
-                <Text style={styles.pinCardRouteDur}>預計: {Math.round(poiRouteInfo.durSec / 60)} 分</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.pinCardBtns}>
-            <Pressable
-              style={[styles.pinCardBtn, { backgroundColor: "#007AFF" }]}
-              onPress={() => {
-                if (!currentPos) return;
-                setIsFetchingPOIRoute(true);
-                fetchBikeRoute(
-                  { latitude: currentPos.lat, longitude: currentPos.lon },
-                  { latitude: tappedPOI.lat, longitude: tappedPOI.lon },
-                  preferCycleway
-                ).then(result => {
-                  if (result) {
-                    setPoiRouteInfo({
-                      distM: result.distanceM,
-                      durSec: result.durationSec,
-                      polyline: result.coordinates
-                    });
-                    speak(`計算完成，${formatRouteDistance(result.distanceM)}，${formatRouteDuration(result.durationSec)}`, settings.ttsEnabled);
-                  }
-                }).catch(() => {
-                  speak("計算路線失敗", settings.ttsEnabled);
-                }).finally(() => {
-                  setIsFetchingPOIRoute(false);
-                });
-              }}
-            >
-              <IconSymbol name="location.fill" size={16} color="#fff" />
-              <Text style={styles.pinCardBtnText}>計算路線</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.pinCardBtn, { backgroundColor: "#34C759" }]}
-              onPress={() => {
-                if (!poiRouteInfo) {
-                  Alert.alert("計算路線", "請先計算路線");
-                  return;
-                }
-                const osmrRoute = {
-                  name: `導航至 ${tappedPOI.name}`,
-                  points: poiRouteInfo.polyline.map(p => ({ lat: p.latitude, lon: p.longitude, ele: 0 })),
-                  totalDistance: poiRouteInfo.distM,
-                  totalAscent: 0,
-                  totalDescent: 0,
-                  estimatedDuration: poiRouteInfo.durSec,
-                  estimatedCalories: 0,
-                  elevationProfile: [],
-                  gradientDistribution: {},
-                  avgGradient: 0,
-                  maxGradient: 0,
-                };
-                startPinnedNavigationRoute(osmrRoute, `開始導航到 ${tappedPOI.name}`);
-                setShowPOICard(false);
-              }}
-            >
-              <IconSymbol name="play.fill" size={16} color="#fff" />
-              <Text style={styles.pinCardBtnText}>開始導航</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.pinCardBtn, { backgroundColor: "#FF3B30" }]}
-              onPress={() => {
-                setShowPOICard(false);
-                setTappedPOI(null);
-                setPoiRouteInfo(null);
-              }}
-            >
-              <IconSymbol name="xmark.circle.fill" size={16} color="#fff" />
-              <Text style={styles.pinCardBtnText}>取消</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
 
       {/* ── 釘選地點卡片 ── */}
       {showPinCard && pinnedLocation && (
