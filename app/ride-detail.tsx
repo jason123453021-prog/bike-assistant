@@ -43,6 +43,7 @@ import { ShareCardModal } from "@/components/share-card-modal";
 import { SpeedCurveChart, type KeyMarker, type SpeedDataPoint } from "@/components/speed-curve-chart";
 import { ActivityElevationChart } from "@/components/activity-elevation-chart";
 import { buildActivitySensorAnalysis } from "@/lib/activity-sensor-estimates";
+import { deriveLocalEstimationCalibration } from "@/lib/activity-estimation-calibration";
 import { createGpxContent } from "@/lib/gpx-export";
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
 import { buildRideSplits } from "@/lib/ride-splits";
@@ -364,6 +365,11 @@ export default function RideDetailScreen() {
     return `${zone.name} (${zone.minBpm}-${zone.maxBpm} bpm)`;
   };
   
+  const estimationCalibration = useMemo(
+    () => deriveLocalEstimationCalibration(state.records, settings.ftp),
+    [settings.ftp, state.records],
+  );
+
   // 活動曲線：未保存感測器資料時，以本次騎乘的 GPS、坡度、FTP 與環境摘要建立明確標示的本機估算。
   const activitySensorAnalysis = useMemo(() => {
     if (!record?.route?.length) return null;
@@ -383,8 +389,11 @@ export default function RideDetailScreen() {
       temperatureC: record.calculationProfile?.environment?.averageTemperatureC,
       humidityPct: record.calculationProfile?.environment?.averageHumidityPct,
       headwindMs: record.calculationProfile?.environment?.averageHeadwindMs,
+      intensityAdjustment: estimationCalibration.intensityAdjustment,
+      confidence: estimationCalibration.confidence,
+      calibrationSampleCount: estimationCalibration.rpeSampleCount,
     });
-  }, [record, settings.age, settings.ftp, settings.maxHeartRate, settings.restingHeartRate]);
+  }, [estimationCalibration.confidence, estimationCalibration.intensityAdjustment, estimationCalibration.rpeSampleCount, record, settings.age, settings.ftp, settings.maxHeartRate, settings.restingHeartRate]);
 
   const speedCurveData = useMemo<SpeedDataPoint[]>(() => {
     if (!record || !activitySensorAnalysis) return [];
@@ -899,6 +908,8 @@ export default function RideDetailScreen() {
               currentIndex={0}
               markers={keyMarkers}
               sources={activitySensorAnalysis?.sources ?? { speed: "measured", power: "estimated", heartRate: "estimated", cadence: "estimated" }}
+              confidence={activitySensorAnalysis?.confidence}
+              confidenceFactors={activitySensorAnalysis?.factors}
             />
           ) : <Text style={styles.activityAnalysisEmpty}>此活動沒有足夠的 GPS 取樣資料可繪製速度曲線。</Text>}
           <ActivityElevationChart route={record.route} />

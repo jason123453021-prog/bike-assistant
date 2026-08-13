@@ -17,6 +17,10 @@ export interface ActivityAnalysisProfile {
   temperatureC?: number;
   humidityPct?: number;
   headwindMs?: number;
+  /** 僅由既有本機 RPE 歷史得出的保守強度修正，限制於 ±8%。 */
+  intensityAdjustment?: number;
+  confidence?: "low" | "medium" | "high";
+  calibrationSampleCount?: number;
 }
 
 export interface ActivityAnalysisPoint extends ActivityAnalysisInputPoint {
@@ -33,6 +37,8 @@ export interface ActivitySensorAnalysis {
     heartRate: AnalysisDataSource;
     cadence: AnalysisDataSource;
   };
+  confidence: "low" | "medium" | "high";
+  factors: string[];
 }
 
 const clamp = (value: number, minimum: number, maximum: number) => Math.max(minimum, Math.min(maximum, value));
@@ -55,6 +61,7 @@ export function buildActivitySensorAnalysis(
   const heatLoad = Math.max(0, (profile.temperatureC ?? 20) - 20) * 0.006
     + Math.max(0, (profile.humidityPct ?? 55) - 55) * 0.0015;
   const headwindLoad = Math.max(0, profile.headwindMs ?? 0) * 0.008;
+  const calibrationAdjustment = clamp(profile.intensityAdjustment ?? 0, -0.08, 0.08);
 
   let previousHeartRate = restingHeartRate;
   let previousCadence: number | undefined;
@@ -69,7 +76,7 @@ export function buildActivitySensorAnalysis(
 
     const intensity = clamp(powerW / ftpW, 0, 1.25);
     const targetHeartRate = isMoving
-      ? clamp(restingHeartRate + heartRateReserve * clamp(0.31 + intensity * 0.52 + heatLoad + headwindLoad, 0.36, 0.94), restingHeartRate, maximumHeartRate)
+      ? clamp(restingHeartRate + heartRateReserve * clamp(0.31 + intensity * 0.52 + heatLoad + headwindLoad + calibrationAdjustment, 0.36, 0.94), restingHeartRate, maximumHeartRate)
       : restingHeartRate;
     const estimatedHeartRate = Math.round(previousHeartRate + clamp(targetHeartRate - previousHeartRate, -4, 5));
     const heartRate = Math.round(hasMeasuredHeartRate && (point.heartRate ?? 0) > 0 ? point.heartRate! : estimatedHeartRate);
@@ -105,5 +112,13 @@ export function buildActivitySensorAnalysis(
       heartRate: hasMeasuredHeartRate ? "measured" : "estimated",
       cadence: hasMeasuredCadence ? "measured" : "estimated",
     },
+    confidence: hasMeasuredHeartRate || hasMeasuredCadence ? "high" : profile.confidence ?? "low",
+    factors: [
+      "GPS 速度與坡度",
+      "FTP 與個人最大／靜息心率",
+      ...(profile.temperatureC !== undefined || profile.humidityPct !== undefined ? ["溫度與濕度"] : []),
+      ...(profile.headwindMs !== undefined ? ["逆風分量"] : []),
+      ...(profile.calibrationSampleCount && profile.calibrationSampleCount > 0 ? [`${profile.calibrationSampleCount} 次本機 RPE 校正`] : []),
+    ],
   };
 }

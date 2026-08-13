@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import { useColors } from "@/hooks/use-colors";
 import type { AnalysisDataSource } from "@/lib/activity-sensor-estimates";
+import { buildActivityChartAxis, type ActivityChartAxisBasis } from "@/lib/activity-chart-axis";
 
 export type ActivityChartMetric = "speed" | "power" | "heartRate" | "cadence";
 
@@ -32,6 +33,8 @@ export interface SpeedCurveChartProps {
   onMarkerPress?: (marker: KeyMarker) => void;
   height?: number;
   sources: Record<ActivityChartMetric, AnalysisDataSource>;
+  confidence?: "low" | "medium" | "high";
+  confidenceFactors?: string[];
 }
 
 const METRICS: { key: ActivityChartMetric; label: string; unit: string; color: string }[] = [
@@ -56,7 +59,7 @@ function formatTime(timestamp: number, fallbackIndex: number): string {
     : `取樣點 ${fallbackIndex + 1}`;
 }
 
-/** 單一指標曲線：切換時不混合單位，並明示每項資料的來源。 */
+/** Strava 風格單一指標曲線：四項資料頁籤、時間／距離基準及來源透明標示。 */
 export function SpeedCurveChart({
   data,
   currentIndex = 0,
@@ -64,9 +67,12 @@ export function SpeedCurveChart({
   onMarkerPress,
   height = 166,
   sources,
+  confidence = "low",
+  confidenceFactors = [],
 }: SpeedCurveChartProps) {
   const colors = useColors();
   const [activeMetric, setActiveMetric] = useState<ActivityChartMetric>("speed");
+  const [axisBasis, setAxisBasis] = useState<ActivityChartAxisBasis>("time");
   const [selectedIndex, setSelectedIndex] = useState(currentIndex);
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -81,6 +87,7 @@ export function SpeedCurveChart({
     if (activeMetric === "heartRate") return Math.max(0, point.heartRate ?? 0);
     return Math.max(0, point.cadence ?? 0);
   }), [activeMetric, data]);
+  const axis = useMemo(() => buildActivityChartAxis(data, axisBasis), [axisBasis, data]);
   const minimum = Math.min(...values, 0);
   const maximum = Math.max(...values, 1);
   const range = Math.max(1, maximum - minimum);
@@ -90,7 +97,7 @@ export function SpeedCurveChart({
   const plotLeft = 5;
   const plotRight = 95;
   const pointPosition = (value: number, index: number) => ({
-    x: plotLeft + (index / Math.max(1, values.length - 1)) * (plotRight - plotLeft),
+    x: plotLeft + (axis.ratios[index] ?? index / Math.max(1, values.length - 1)) * (plotRight - plotLeft),
     y: plotBottom - ((value - minimum) / range) * plotHeight,
   });
   const path = values.map((value, index) => {
@@ -102,11 +109,17 @@ export function SpeedCurveChart({
   const selectedPosition = pointPosition(selectedValue, selectedIndex);
   const sourceLabel = sources[activeMetric] === "measured" ? "實測" : "本機估算";
   const sourceColor = sources[activeMetric] === "measured" ? "#34D399" : "#FBBF24";
+  const confidenceLabels = { low: "信心：低", medium: "信心：中", high: "信心：高" };
+  const confidenceColors = { low: "#FBBF24", medium: "#60A5FA", high: "#34D399" };
   const visibleMarkers = markers.filter((marker) => metricForMarker(marker) === activeMetric);
 
   const selectAt = (locationX: number) => {
     if (containerWidth <= 0 || data.length === 0) return;
-    setSelectedIndex(Math.round(clamp(locationX / containerWidth, 0, 1) * Math.max(0, data.length - 1)));
+    const target = clamp(locationX / containerWidth, 0, 1);
+    const nearest = axis.ratios.reduce((bestIndex, ratio, index) => (
+      Math.abs(ratio - target) < Math.abs((axis.ratios[bestIndex] ?? 0) - target) ? index : bestIndex
+    ), 0);
+    setSelectedIndex(nearest);
   };
 
   if (data.length < 2) {
@@ -119,14 +132,19 @@ export function SpeedCurveChart({
         {METRICS.map((item) => {
           const selectedTab = item.key === activeMetric;
           return (
-            <Pressable
-              key={item.key}
-              onPress={() => setActiveMetric(item.key)}
-              style={[styles.tab, { borderColor: selectedTab ? item.color : colors.border, backgroundColor: selectedTab ? `${item.color}20` : colors.surface }]}
-            >
+            <Pressable key={item.key} onPress={() => setActiveMetric(item.key)} style={[styles.tab, { borderColor: selectedTab ? item.color : colors.border, backgroundColor: selectedTab ? `${item.color}20` : colors.surface }]}>
               <Text style={[styles.tabText, { color: selectedTab ? item.color : colors.muted }]}>{item.label}</Text>
             </Pressable>
           );
+        })}
+      </View>
+
+      <View style={[styles.axisRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        {(["time", "distance"] as ActivityChartAxisBasis[]).map((basis) => {
+          const selectedBasis = axisBasis === basis;
+          return <Pressable key={basis} onPress={() => setAxisBasis(basis)} style={[styles.axisTab, selectedBasis && { backgroundColor: colors.primary }]}>
+            <Text style={[styles.axisText, { color: selectedBasis ? "#fff" : colors.muted }]}>{basis === "time" ? "時間" : "距離"}</Text>
+          </Pressable>;
         })}
       </View>
 
@@ -135,9 +153,16 @@ export function SpeedCurveChart({
           <Text style={[styles.metricTitle, { color: colors.foreground }]}>{metric.label}</Text>
           <Text style={[styles.metricRange, { color: colors.muted }]}>範圍 {minimum.toFixed(0)}–{maximum.toFixed(0)} {metric.unit}</Text>
         </View>
-        <View style={[styles.sourceBadge, { borderColor: `${sourceColor}77`, backgroundColor: `${sourceColor}18` }]}>
-          <View style={[styles.sourceDot, { backgroundColor: sourceColor }]} />
-          <Text style={[styles.sourceText, { color: sourceColor }]}>{sourceLabel}</Text>
+        <View style={styles.badgeRow}>
+          <View style={[styles.sourceBadge, { borderColor: `${sourceColor}77`, backgroundColor: `${sourceColor}18` }]}>
+            <View style={[styles.sourceDot, { backgroundColor: sourceColor }]} />
+            <Text style={[styles.sourceText, { color: sourceColor }]}>{sourceLabel}</Text>
+          </View>
+          {sources[activeMetric] === "estimated" && (
+            <View style={[styles.sourceBadge, { borderColor: `${confidenceColors[confidence]}77`, backgroundColor: `${confidenceColors[confidence]}18` }]}>
+              <Text style={[styles.sourceText, { color: confidenceColors[confidence] }]}>{confidenceLabels[confidence]}</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -163,8 +188,8 @@ export function SpeedCurveChart({
           })}
           <Line x1={selectedPosition.x} x2={selectedPosition.x} y1={plotTop} y2={plotBottom} stroke={metric.color} strokeWidth="1" strokeDasharray="2,2" opacity={0.8} />
           <Circle cx={selectedPosition.x} cy={selectedPosition.y} r="3.2" fill={metric.color} stroke="#fff" strokeWidth="1" />
-          <SvgText x={plotLeft} y={height - 8} fill={colors.muted} fontSize={8}>開始</SvgText>
-          <SvgText x={plotRight - 10} y={height - 8} fill={colors.muted} fontSize={8}>結束</SvgText>
+          <SvgText x={plotLeft} y={height - 8} fill={colors.muted} fontSize={8}>{axis.startLabel}</SvgText>
+          <SvgText x={plotRight - 18} y={height - 8} fill={colors.muted} fontSize={8}>{axis.endLabel}</SvgText>
         </Svg>
       </View>
 
@@ -174,7 +199,7 @@ export function SpeedCurveChart({
           <Text style={[styles.readoutMeta, { color: colors.muted }]}>{formatTime(selected.timestamp, selectedIndex)} · {selected.distanceKm?.toFixed(2) ?? "--"} km · 坡度 {(selected.gradePct ?? 0).toFixed(1)}%</Text>
         </View>
       )}
-      {sources[activeMetric] === "estimated" && <Text style={[styles.estimateNote, { color: colors.muted }]}>依 GPS、坡度、FTP、個人設定與已保存環境摘要推估，僅供趨勢回顧，不等同外接感測器量測。</Text>}
+      {sources[activeMetric] === "estimated" && <Text style={[styles.estimateNote, { color: colors.muted }]}>信心依可用資料與本機校正次數決定。影響因素：{confidenceFactors.join("、") || "GPS 速度與坡度"}。僅供趨勢回顧，不等同外接感測器量測。</Text>}
     </View>
   );
 }
@@ -185,9 +210,13 @@ const styles = StyleSheet.create({
   tabRow: { flexDirection: "row", gap: 7, marginBottom: 12 },
   tab: { flex: 1, minHeight: 36, borderRadius: 9, borderWidth: 1, justifyContent: "center", alignItems: "center" },
   tabText: { fontSize: 12, fontWeight: "800" },
+  axisRow: { alignSelf: "flex-start", flexDirection: "row", borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, padding: 2, marginBottom: 12 },
+  axisTab: { minWidth: 56, minHeight: 30, borderRadius: 7, justifyContent: "center", alignItems: "center", paddingHorizontal: 9 },
+  axisText: { fontSize: 11, fontWeight: "800" },
   metricHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   metricTitle: { fontSize: 15, fontWeight: "800" },
   metricRange: { fontSize: 11, marginTop: 2 },
+  badgeRow: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: 5 },
   sourceBadge: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 99, paddingHorizontal: 8, paddingVertical: 5 },
   sourceDot: { width: 6, height: 6, borderRadius: 3 },
   sourceText: { fontSize: 10, fontWeight: "800" },
