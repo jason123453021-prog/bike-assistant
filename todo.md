@@ -1349,3 +1349,9 @@
 - [x] 實作使用者明確選取照片的本機時間軸與隱私控制：詳情頁透過系統選取器加入最多 10 張使用者明確選取的照片，複製至 App 私有資料夾並依 EXIF 或選取時間排序；可逐張移除，不掃描完整相簿、不上傳或同步
 - [x] 實作僅供使用者確認的 FTP 建議，不自動覆寫 FTP 設定：設定頁僅以最近 90 天至少兩次有效 20 分鐘功率資料顯示候選值、資料量與信心；單次變動限制為目前 FTP 的 ±15%，使用者必須在系統確認視窗主動套用才會更新
 - [x] 完成 TypeScript、全量測試、Android Bundle 與零 NitroModules 回歸驗證：pnpm check 通過；23 個測試檔（64 passed、1 skipped）通過；Expo 設定成功解析；SDK 54 相容 `expo-image-picker@~17.0.11`；Android Metro Bundle 12,571,876 bytes 成功；掃描 0 個 NitroModules、MapLibre 或已移除原生地圖依賴引用；Lint 為 0 errors、86 個既有非阻斷警告
+
+## Android 16（API 36）Google Play 合規修正（2026-08-13）
+- [x] 核對 Expo 設定、Android 預建置輸出、套件版本與舊版上傳產物的 target SDK 差異：目前設定原有 target SDK 36，但上傳至 Play 的既有產物仍是先前 API 35 建置；所有自訂插件均未覆寫 SDK 值
+- [x] 將 Android compile／target SDK 明確固定為 36，並移除會覆寫或降級該設定的建置配置：expo-build-properties 現明確使用 compileSdkVersion 36、targetSdkVersion 36、minSdkVersion 24；App 版號提升至 1.0.3／versionCode 10087
+- [x] 驗證 Expo 設定與 Android 預建置 Manifest／Gradle 輸出，確認新的 APK／AAB 會宣告 target SDK 36：Expo Android 預建置成功；生成 gradle.properties 明確為 android.compileSdkVersion=36、android.targetSdkVersion=36、android.minSdkVersion=24
+- [x] 保存合規版本，提供受管理建置與 Play Console 上傳時應使用的新產物指引：已建立 references/google-play-api36-upload.md；必須以新建置的 versionCode 10087 AAB 取代原 API 35 產物，並在 Bundle Explorer 確認 target SDK 36 後上傳

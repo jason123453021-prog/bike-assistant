@@ -18,7 +18,7 @@ const env = {
 const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
-  version: "1.0.2",
+  version: "1.0.3",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
@@ -46,7 +46,7 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    versionCode: 10086,
+    versionCode: 10087,
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
@@ -135,7 +135,10 @@ const config: ExpoConfig = {
       {
         android: {
           buildArchs: ["armeabi-v7a", "arm64-v8a"],
-          minSdkVersion: 36,
+          // Google Play 的合規條件是 target SDK，而非 min SDK。
+          // 明確設定 compile／target 為 Android 16 (API 36)，並保留 Android 7+ 安裝相容性。
+          compileSdkVersion: 36,
+          minSdkVersion: 24,
           targetSdkVersion: 36,
         },
       },
@@ -146,7 +149,7 @@ const config: ExpoConfig = {
     reactCompiler: false,
   },
   // 明確禁用 NitroModules
-  runtimeVersion: "1.0.2",
+  runtimeVersion: "1.0.3",
 };
 
 export default config;
