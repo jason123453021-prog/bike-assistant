@@ -599,6 +599,8 @@ export default function MapScreen() {
   const isRiding = state.status === "active";
   const isPaused = state.status === "paused";
   const isActive = isRiding || isPaused;
+  const isAutoPauseMonitoring = isPaused && rideLocationTrackingMode === "idle_monitor";
+  const isAutoPausePending = isPaused && rideLocationTrackingMode === "full";
 
   useEffect(() => {
     const manager = powerSavingManagerRef.current;
@@ -2357,12 +2359,52 @@ export default function MapScreen() {
 
       {/* ── 導航中「沿路線前進」提示（無轉彎時顯示簡潔橫條） ── */}
       {isNavigating && !turnDirection && navInstruction === "沿路線前進" && (
-        <View style={[styles.straightBanner, { top: insets.top + 8 }]}>
+        <View style={[styles.straightBanner, { top: insets.top + 8 }]}> 
           <Text style={styles.straightBannerIcon}>⬆️</Text>
           <Text style={styles.straightBannerText}>沿路線前進</Text>
           {distToEnd !== null && (
             <Text style={styles.straightBannerDist}>剩餘 {formatRouteDistance(distToEnd)}</Text>
           )}
+        </View>
+      )}
+
+      {/* ── 騎乘定位狀態：主畫面醒目提示，讓自動暫停不會被誤認為 App 已停止 ── */}
+      {mapRideActive && (
+        <View
+          style={[
+            styles.rideTrackingStatusCard,
+            isAutoPauseMonitoring && styles.rideTrackingStatusAutoPaused,
+            isAutoPausePending && styles.rideTrackingStatusPending,
+            {
+              top: insets.top + (
+                isNavigating && (
+                  (Boolean(turnDirection) && navInstruction !== "沿路線前進")
+                  || (!turnDirection && navInstruction === "沿路線前進")
+                ) ? 78 : 8
+              ),
+            },
+          ]}
+        >
+          <View style={styles.rideTrackingStatusIcon}>
+            <IconSymbol
+              name={isAutoPauseMonitoring || isAutoPausePending ? "pause.circle.fill" : "location.fill"}
+              size={22}
+              color="#FFFFFF"
+            />
+          </View>
+          <View style={styles.rideTrackingStatusContent}>
+            <Text style={styles.rideTrackingStatusTitle}>
+              {isAutoPauseMonitoring ? "已自動暫停" : isAutoPausePending ? "靜止中，準備省電" : "騎乘紀錄中"}
+            </Text>
+            <Text style={styles.rideTrackingStatusSubtitle} numberOfLines={1}>
+              {isAutoPauseMonitoring
+                ? "省電定位監測中 · 重新移動會自動恢復"
+                : isAutoPausePending
+                  ? `靜止達 ${settings.idleAutoPauseSeconds} 秒後將切換省電監測`
+                  : "完整定位與騎乘資料正在記錄"}
+            </Text>
+          </View>
+          <View style={[styles.rideTrackingStatusDot, isAutoPauseMonitoring && styles.rideTrackingStatusDotPaused]} />
         </View>
       )}
 
@@ -3160,6 +3202,53 @@ const styles = StyleSheet.create({
   straightBannerIcon: { fontSize: 16 },
   straightBannerText: { color: "#fff", fontSize: 13, fontWeight: "600", flex: 1 },
   straightBannerDist: { color: "rgba(255,255,255,0.6)", fontSize: 11 },
+
+  // 自動暫停／騎乘定位狀態卡
+  rideTrackingStatusCard: {
+    position: "absolute",
+    left: 16,
+    right: 72,
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(0, 154, 112, 0.94)",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.24,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  rideTrackingStatusAutoPaused: {
+    backgroundColor: "rgba(194, 87, 0, 0.96)",
+    borderColor: "rgba(255, 211, 153, 0.7)",
+  },
+  rideTrackingStatusPending: {
+    backgroundColor: "rgba(120, 92, 0, 0.96)",
+  },
+  rideTrackingStatusIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rideTrackingStatusContent: { flex: 1 },
+  rideTrackingStatusTitle: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
+  rideTrackingStatusSubtitle: { color: "rgba(255,255,255,0.88)", fontSize: 11, marginTop: 2 },
+  rideTrackingStatusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: "#B9FFCF",
+  },
+  rideTrackingStatusDotPaused: { backgroundColor: "#FFE0A8" },
 
   // 底部面板（統計面板移至地圖下方）
   panel: {
