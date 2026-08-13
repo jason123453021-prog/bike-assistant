@@ -371,6 +371,7 @@ export default function MapScreen() {
   // 騎乘狀態與背景監聽
   const [mapRideActive, setMapRideActive] = useState(false);
   const [isAppForeground, setIsAppForeground] = useState(true);
+  const touchGuardHintOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
@@ -640,6 +641,20 @@ export default function MapScreen() {
   const isActive = isRiding || isPaused;
   const isAutoPauseMonitoring = isPaused && rideLocationTrackingMode === "idle_monitor";
   const isAutoPausePending = isPaused && rideLocationTrackingMode === "full";
+
+  useEffect(() => {
+    touchGuardHintOpacity.stopAnimation();
+    touchGuardHintOpacity.setValue(0);
+    if (!touchGuardEnabled || !isActive) return;
+
+    const animation = Animated.sequence([
+      Animated.timing(touchGuardHintOpacity, { toValue: 1, duration: 160, useNativeDriver: true }),
+      Animated.delay(1400),
+      Animated.timing(touchGuardHintOpacity, { toValue: 0, duration: 260, useNativeDriver: true }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [isActive, touchGuardEnabled, touchGuardHintOpacity]);
 
   useEffect(() => {
     const manager = powerSavingManagerRef.current;
@@ -2276,7 +2291,7 @@ export default function MapScreen() {
         </Pressable>
         {isActive && settings.touchGuardEnabled && (
           <Pressable
-            style={[styles.toolBtn, touchGuardEnabled && styles.toolBtnActive]}
+            style={[styles.toolBtn, touchGuardEnabled && styles.touchGuardToolBtnActive]}
             onPress={() => {
               if (!touchGuardEnabled) setTouchGuardEnabled(true);
             }}
@@ -2814,14 +2829,18 @@ export default function MapScreen() {
           delayLongPress={1200}
           {...touchGuardPanResponder.panHandlers}
         >
-          <View style={styles.touchGuardBadge}>
-            <Text style={styles.touchGuardTitle}>觸控已鎖定</Text>
-            <Text style={styles.touchGuardHint}>
-              {settings.touchGuardUnlockMode === "swipe"
-                ? "向右滑動解除；鎖定時仍可直接閱讀資訊"
-                : "長按 1.2 秒解除；鎖定時仍可直接閱讀資訊"}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.touchGuardCornerHint,
+              { top: insets.top + 144, opacity: touchGuardHintOpacity },
+            ]}
+          >
+            <IconSymbol name="lock.fill" size={14} color="#9CFFB5" />
+            <Text style={styles.touchGuardCornerText}>
+              {settings.touchGuardUnlockMode === "swipe" ? "已鎖定 · 向右滑動解除" : "已鎖定 · 長按 1.2 秒解除"}
             </Text>
-          </View>
+          </Animated.View>
         </Pressable>
       )}
 
@@ -2973,24 +2992,26 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "rgba(255,255,255,0.15)",
   },
   toolBtnActive: { backgroundColor: "rgba(0,122,255,0.2)", borderColor: "#007AFF" },
+  touchGuardToolBtnActive: { backgroundColor: "rgba(52,199,89,0.22)", borderColor: "#34C759" },
   touchGuard: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 20,
-    backgroundColor: "rgba(0,0,0,0.03)",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "transparent",
   },
-  touchGuardBadge: {
-    backgroundColor: "rgba(10,34,24,0.9)",
-    borderColor: "rgba(52,199,89,0.8)",
+  touchGuardCornerHint: {
+    position: "absolute",
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(10,34,24,0.92)",
+    borderColor: "rgba(52,199,89,0.72)",
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    alignItems: "center",
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
-  touchGuardTitle: { color: "#fff", fontSize: 15, fontWeight: "800" },
-  touchGuardHint: { color: "rgba(255,255,255,0.72)", fontSize: 11, marginTop: 3 },
+  touchGuardCornerText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
   returnBtn: {
     backgroundColor: "rgba(255,149,0,0.2)",
     borderColor: "#FF9500",
