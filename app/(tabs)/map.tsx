@@ -225,16 +225,6 @@ export default function MapScreen() {
     if (!settings.touchGuardEnabled) setTouchGuardEnabled(false);
   }, [settings.touchGuardEnabled]);
 
-  const touchGuardPanResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => settings.touchGuardUnlockMode === "swipe",
-    onMoveShouldSetPanResponder: (_, gesture) => settings.touchGuardUnlockMode === "swipe" && Math.abs(gesture.dx) > 8,
-    onPanResponderRelease: (_, gesture) => {
-      if (settings.touchGuardUnlockMode === "swipe" && gesture.dx > 110 && Math.abs(gesture.dy) < 80) {
-        setTouchGuardEnabled(false);
-      }
-    },
-  }), [settings.touchGuardUnlockMode]);
-
   useEffect(() => {
     currentPosRef.current = currentPos;
   }, [currentPos]);
@@ -639,6 +629,9 @@ export default function MapScreen() {
   const isRiding = state.status === "active";
   const isPaused = state.status === "paused";
   const isActive = isRiding || isPaused;
+  const touchGuardHoldLabel = settings.touchGuardUnlockHoldMs >= 1000
+    ? `${(settings.touchGuardUnlockHoldMs / 1000).toFixed(settings.touchGuardUnlockHoldMs % 1000 === 0 ? 0 : 1)} 秒`
+    : `${settings.touchGuardUnlockHoldMs} 毫秒`;
   const isAutoPauseMonitoring = isPaused && rideLocationTrackingMode === "idle_monitor";
   const isAutoPausePending = isPaused && rideLocationTrackingMode === "full";
 
@@ -2296,9 +2289,9 @@ export default function MapScreen() {
               if (!touchGuardEnabled) setTouchGuardEnabled(true);
             }}
             onLongPress={() => {
-              if (touchGuardEnabled && settings.touchGuardUnlockMode === "hold") setTouchGuardEnabled(false);
+              if (touchGuardEnabled) setTouchGuardEnabled(false);
             }}
-            delayLongPress={1200}
+            delayLongPress={settings.touchGuardUnlockHoldMs}
           >
             <Text style={{ color: touchGuardEnabled ? "#34C759" : "rgba(255,255,255,0.8)", fontSize: 16, fontWeight: "800" }}>
               {touchGuardEnabled ? "鎖" : "開"}
@@ -2824,10 +2817,9 @@ export default function MapScreen() {
           style={styles.touchGuard}
           onPress={() => {}}
           onLongPress={() => {
-            if (settings.touchGuardUnlockMode === "hold") setTouchGuardEnabled(false);
+            setTouchGuardEnabled(false);
           }}
-          delayLongPress={1200}
-          {...touchGuardPanResponder.panHandlers}
+          delayLongPress={settings.touchGuardUnlockHoldMs}
         >
           <Animated.View
             pointerEvents="none"
@@ -2838,7 +2830,7 @@ export default function MapScreen() {
           >
             <IconSymbol name="lock.fill" size={14} color="#9CFFB5" />
             <Text style={styles.touchGuardCornerText}>
-              {settings.touchGuardUnlockMode === "swipe" ? "已鎖定 · 向右滑動解除" : "已鎖定 · 長按 1.2 秒解除"}
+              {`已鎖定 · 長按 ${touchGuardHoldLabel} 解除`}
             </Text>
           </Animated.View>
         </Pressable>

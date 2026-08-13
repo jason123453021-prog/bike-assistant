@@ -904,32 +904,23 @@ export default function SettingsScreen() {
           />
           <Divider colors={colors} />
           <View style={styles.row}>
+            <IconSymbol name="lock.fill" size={18} color={colors.muted} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>解除方式</Text>
-              <Text style={[styles.rowHint, { color: colors.muted }]}>鎖定時仍能觀看地圖與數據，只會阻擋誤觸控制</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>長按解除時間</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>長按指定時間後解除；鎖定時仍可閱讀地圖與數據</Text>
             </View>
-          </View>
-          <View style={styles.guardModeRow}>
-            {([
-              ["hold", "長按 1.2 秒"],
-              ["swipe", "向右滑動"],
-            ] as const).map(([mode, label]) => (
-              <Pressable
-                key={mode}
-                style={({ pressed }) => [
-                  styles.guardModeChip,
-                  {
-                    backgroundColor: settings.touchGuardUnlockMode === mode ? colors.primary : colors.surface,
-                    borderColor: settings.touchGuardUnlockMode === mode ? colors.primary : colors.border,
-                    opacity: pressed ? 0.75 : 1,
-                  },
-                ]}
-                onPress={() => updateSettings({ touchGuardUnlockMode: mode })}
-                disabled={!settings.touchGuardEnabled}
-              >
-                <Text style={[styles.guardModeChipText, { color: settings.touchGuardUnlockMode === mode ? "#fff" : colors.foreground }]}>{label}</Text>
-              </Pressable>
-            ))}
+            <TextInput
+              style={[styles.numericInput, { color: colors.foreground, borderColor: colors.border }]}
+              value={String(settings.touchGuardUnlockHoldMs)}
+              onChangeText={(value) => {
+                const milliseconds = Math.max(400, Math.min(5000, Number.parseInt(value || "400", 10) || 400));
+                void updateSettings({ touchGuardUnlockHoldMs: milliseconds });
+              }}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              editable={settings.touchGuardEnabled}
+            />
+            <Text style={[styles.rowHint, { color: colors.muted, marginLeft: 6 }]}>毫秒</Text>
           </View>
         </View>}
 
