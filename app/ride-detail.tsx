@@ -29,7 +29,7 @@ import {
 
 import * as Sharing from "expo-sharing";
 import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
-import Svg, { G, Path } from "react-native-svg";
+import Svg, { Circle, Defs, G, LinearGradient, Path, Polyline, Rect, Stop, Text as SvgText } from "react-native-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -71,6 +71,51 @@ const DARK_MAP_STYLE = [
 
 function isVideoMedia(uri: string): boolean {
   return /\.(mp4|mov|m4v|webm)(\?|$)/i.test(uri);
+}
+
+function RideRouteArtwork({ coordinates }: { coordinates: { latitude: number; longitude: number }[] }) {
+  const width = 960;
+  const height = 420;
+  const valid = coordinates.filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
+  const latitudes = valid.map((point) => point.latitude);
+  const longitudes = valid.map((point) => point.longitude);
+  const minLat = Math.min(...latitudes, 0);
+  const maxLat = Math.max(...latitudes, 0);
+  const minLon = Math.min(...longitudes, 0);
+  const maxLon = Math.max(...longitudes, 0);
+  const latRange = Math.max(maxLat - minLat, 0.0001);
+  const lonRange = Math.max(maxLon - minLon, 0.0001);
+  const routePoints = valid.map((point) => {
+    const x = 62 + ((point.longitude - minLon) / lonRange) * (width - 124);
+    const y = 44 + (1 - (point.latitude - minLat) / latRange) * (height - 88);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const start = routePoints.split(" ")[0]?.split(",");
+  const end = routePoints.split(" ").at(-1)?.split(",");
+
+  return (
+    <Svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
+      <Defs>
+        <LinearGradient id="routeCoverBg" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#132C33" />
+          <Stop offset="1" stopColor="#071215" />
+        </LinearGradient>
+      </Defs>
+      <Rect width={width} height={height} fill="url(#routeCoverBg)" />
+      {[110, 250, 390, 530, 670, 810].map((x) => <Path key={`v-${x}`} d={`M${x} 0 L${x - 120} ${height}`} stroke="#88A5A7" strokeOpacity={0.15} strokeWidth={4} />)}
+      {[75, 170, 265, 360].map((y) => <Path key={`h-${y}`} d={`M0 ${y} L${width} ${y - 55}`} stroke="#88A5A7" strokeOpacity={0.12} strokeWidth={3} />)}
+      {valid.length > 1 ? (
+        <>
+          <Polyline points={routePoints} fill="none" stroke="#000000" strokeOpacity={0.36} strokeWidth={23} strokeLinecap="round" strokeLinejoin="round" />
+          <Polyline points={routePoints} fill="none" stroke="#FF6A22" strokeWidth={14} strokeLinecap="round" strokeLinejoin="round" />
+          <Circle cx={Number(start?.[0])} cy={Number(start?.[1])} r={15} fill="#26D07C" stroke="#FFFFFF" strokeWidth={5} />
+          <Circle cx={Number(end?.[0])} cy={Number(end?.[1])} r={15} fill="#FF5A5F" stroke="#FFFFFF" strokeWidth={5} />
+        </>
+      ) : (
+        <SvgText x={width / 2} y={height / 2} fill="#C8D7D3" fontSize={30} textAnchor="middle">沒有足夠的 GPS 軌跡</SvgText>
+      )}
+    </Svg>
+  );
 }
 
 export default function RideDetailScreen() {
@@ -674,21 +719,21 @@ export default function RideDetailScreen() {
       >
         {record.mediaItems?.[0] && !isVideoMedia(record.mediaItems[0]) ? (
           <Image source={{ uri: record.mediaItems[0] }} style={styles.activityMediaHeroImage} />
-        ) : (
+        ) : record.mediaItems?.[0] ? (
           <View style={styles.activityMediaEmptyHero}>
-            <Text style={styles.activityMediaEmptyGlyph}>{record.mediaItems?.[0] ? "▶" : "＋"}</Text>
-            <Text style={styles.activityMediaEmptyTitle}>{record.mediaItems?.[0] ? "活動影片" : "加入活動照片或影片"}</Text>
-            <Text style={styles.activityMediaEmptyCopy}>{record.mediaItems?.[0] ? "點擊編輯活動，管理此影片" : "選取媒體後會顯示於此，僅保存在此裝置"}</Text>
+            <Text style={styles.activityMediaEmptyGlyph}>▶</Text>
+            <Text style={styles.activityMediaEmptyTitle}>活動影片</Text>
+            <Text style={styles.activityMediaEmptyCopy}>點擊編輯活動，管理此影片</Text>
           </View>
-        )}
+        ) : <RideRouteArtwork coordinates={polylineCoords} />}
         <View style={styles.activityMediaScrim} />
         <View style={styles.activityMediaCaption}>
           <View>
-            <Text style={styles.activityMediaCaptionTitle}>{record.mediaItems?.length ? `活動媒體 ${record.mediaItems.length} 項` : "把這次騎乘留下來"}</Text>
-            <Text style={styles.activityMediaCaptionCopy}>{record.description || "點擊加入照片、影片或活動心得"}</Text>
+            <Text style={styles.activityMediaCaptionTitle}>{record.mediaItems?.length ? `活動媒體 ${record.mediaItems.length} 項` : "GPS 活動路線"}</Text>
+            <Text style={styles.activityMediaCaptionCopy}>{record.description || (record.mediaItems?.length ? "點擊編輯活動，管理本機媒體" : "尚未加入照片；顯示本機騎乘軌跡")}</Text>
           </View>
           <View style={styles.activityMediaEditChip}>
-            <Text style={styles.activityMediaEditChipText}>{record.mediaItems?.length ? "編輯" : "加入"}</Text>
+            <Text style={styles.activityMediaEditChipText}>{record.mediaItems?.length ? "編輯" : "加入媒體"}</Text>
           </View>
         </View>
       </Pressable>
