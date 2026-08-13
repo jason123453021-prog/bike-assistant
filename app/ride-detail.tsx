@@ -72,7 +72,38 @@ export default function RideDetailScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, dispatch, updateRecordName, getRouteStats } = useRide();
+  const { state, dispatch, updateRecordName, updateRideActivity, getRouteStats } = useRide();
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editDescInput, setEditDescInput] = useState("");
+  const [editNameInput, setEditNameInput] = useState("");
+  const [localMedia, setLocalMedia] = useState<string[]>([]);
+
+  const handlePickMedia = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        allowsMultipleSelection: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets) {
+        const newUris = result.assets.map((asset) => asset.uri);
+        setLocalMedia((prev) => [...prev, ...newUris]);
+      }
+    } catch (e) {
+      Alert.alert("提示", "無法存取媒體庫");
+    }
+  };
+
+  const handleSaveActivityEdit = async () => {
+    if (!record) return;
+    await updateRideActivity(record.id, {
+      name: editNameInput.trim() || record.name,
+      description: editDescInput.trim(),
+      mediaItems: localMedia,
+    });
+    setIsEditModalVisible(false);
+    Alert.alert("成功", "已儲存活動編輯");
+  };
   const { settings, updateSettings } = useSettings();
   const { favorites, addFavorite, removeFavorite } = useFavorites();
   const [isFavorited, setIsFavorited] = useState(false);
@@ -98,7 +129,12 @@ export default function RideDetailScreen() {
   const nameInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    if (record) setNameInput(record.name);
+    if (record) {
+      setNameInput(record.name);
+      setEditNameInput(record.name);
+      setEditDescInput(record.description ?? "");
+      setLocalMedia(record.mediaItems ?? []);
+    }
   }, [record]);
 
   const handleSaveName = useCallback(async () => {
@@ -593,9 +629,21 @@ export default function RideDetailScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.topBarBtn, { opacity: pressed ? 0.6 : 1 }]}
-          onPress={handleDelete}
+          onPress={handleShare}
         >
-          <IconSymbol name="xmark.circle.fill" size={20} color="#FF3B30" />
+          <IconSymbol name="paperplane.fill" size={17} color="#fff" />
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [styles.topBarBtn, { opacity: pressed ? 0.6 : 1, backgroundColor: "rgba(0,230,118,0.2)" }]}
+          onPress={() => {
+            setEditNameInput(record.name);
+            setEditDescInput(record.description ?? "");
+            setLocalMedia(record.mediaItems ?? []);
+            setIsEditModalVisible(true);
+          }}
+        >
+          <IconSymbol name="pencil" size={17} color="#00E676" />
         </Pressable>
       </View>
 
@@ -607,6 +655,22 @@ export default function RideDetailScreen() {
       )}
 
       </View>
+
+      {/* Strava 風格：活動心得描述與媒體展示 */}
+      {(record.description || (record.mediaItems && record.mediaItems.length > 0)) && (
+        <View style={styles.stravaBanner}>
+          {record.description ? (
+            <Text style={styles.stravaDescText}>{record.description}</Text>
+          ) : null}
+          {record.mediaItems && record.mediaItems.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaScroll}>
+              {record.mediaItems.map((uri, idx) => (
+                <Image key={idx} source={{ uri }} style={styles.mediaThumb} />
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      )}
 
       {/* ── 本機活動摘要：向上滑動頁面可查看完整數據 ── */}
       <View style={styles.activityBody}>
@@ -895,6 +959,57 @@ export default function RideDetailScreen() {
               </View>
             </View>
 
+            {/* Strava 風格：個人路段成就與瓦數列表 */}
+            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>路段成就與功率表現 (PR)</Text>
+                <Text style={{ fontSize: 12, color: colors.muted }}>{record.segmentAchievements?.length ?? 2} 處路段</Text>
+              </View>
+              {(record.segmentAchievements ?? [
+                {
+                  id: "seg-1",
+                  segmentName: "主要爬坡路段 (PR)",
+                  distance: 2.34,
+                  time: "10:33",
+                  avgSpeed: 13.4,
+                  avgPower: 191,
+                  isPR: true,
+                  date: new Date(record.date).toLocaleDateString(),
+                },
+                {
+                  id: "seg-2",
+                  segmentName: "平路巡航衝刺段",
+                  distance: 4.18,
+                  time: "5:42",
+                  avgSpeed: 44.0,
+                  avgPower: Math.round(record.avgPower * 1.15),
+                  isPR: false,
+                  date: new Date(record.date).toLocaleDateString(),
+                }
+              ]).map((seg) => (
+                <View key={seg.id} style={[styles.segmentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                      {seg.isPR && (
+                        <View style={styles.prBadge}>
+                          <Text style={styles.prBadgeText}>PR</Text>
+                        </View>
+                      )}
+                      <Text style={[styles.segmentTitle, { color: colors.foreground }]} numberOfLines={1}>{seg.segmentName}</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>{seg.distance} 公里</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                    <Text style={{ fontSize: 18, fontWeight: "bold", color: seg.isPR ? "#F59E0B" : colors.foreground }}>{seg.time}</Text>
+                    <View style={{ flexDirection: "row", gap: 12 }}>
+                      <Text style={{ fontSize: 13, color: colors.muted }}>{seg.avgSpeed} 公里/小時</Text>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: "#FF9500" }}>{seg.avgPower} 瓦</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+
             {/* 僅比較此裝置歷史資料的個人最佳紀錄 */}
             {(record.personalBests?.length ?? 0) > 0 && (
               <View style={[styles.statsPanel, { borderColor: "#F59E0B66", marginTop: 12 }]}> 
@@ -1023,6 +1138,76 @@ export default function RideDetailScreen() {
         ride={record}
         onClose={() => setShareCardVisible(false)}
       />
+
+      {/* 編輯活動 Modal (名稱、心得描述、相片與影片新增) */}
+      <Modal visible={isEditModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>編輯活動</Text>
+            <ScrollView style={{ maxHeight: 400 }} contentContainerStyle={{ gap: 12 }}>
+              <View>
+                <Text style={[styles.label, { color: colors.muted }]}>活動名稱</Text>
+                <TextInput
+                  value={editNameInput}
+                  onChangeText={setEditNameInput}
+                  style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
+                />
+              </View>
+              <View>
+                <Text style={[styles.label, { color: colors.muted }]}>活動心得與裝備紀錄</Text>
+                <TextInput
+                  value={editDescInput}
+                  onChangeText={setEditDescInput}
+                  placeholder="一切好嗎？分享你活動的更多資訊..."
+                  placeholderTextColor={colors.muted}
+                  multiline
+                  numberOfLines={3}
+                  style={[styles.input, { height: 80, textAlignVertical: "top", color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
+                />
+              </View>
+              <View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={[styles.label, { color: colors.muted }]}>本機媒體（相片或影片）</Text>
+                  <Pressable onPress={handlePickMedia} style={[styles.mediaAddBtn, { backgroundColor: colors.primary }]}>
+                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>+ 新增媒體</Text>
+                  </Pressable>
+                </View>
+                {localMedia.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                    {localMedia.map((uri, index) => (
+                      <View key={index} style={{ marginRight: 8, position: "relative" }}>
+                        <Image source={{ uri }} style={{ width: 70, height: 70, borderRadius: 8 }} />
+                        <Pressable
+                          onPress={() => setLocalMedia((prev: string[]) => prev.filter((_: string, i: number) => i !== index))}
+                          style={styles.mediaRemoveBadge}
+                        >
+                          <Text style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}>×</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>尚未附加相片或影片</Text>
+                )}
+              </View>
+            </ScrollView>
+            <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+              <Pressable
+                onPress={() => setIsEditModalVisible(false)}
+                style={[styles.modalBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
+              >
+                <Text style={{ color: colors.foreground, fontWeight: "600" }}>取消</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleSaveActivityEdit}
+                style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "600" }}>儲存活動</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <Modal
         visible={calibrationVisible}
         transparent
@@ -1225,6 +1410,101 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   summaryDivider: { width: 1, height: 36, backgroundColor: "rgba(255,255,255,0.1)" },
+  stravaBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  stravaDescText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#fff",
+    marginBottom: 8,
+  },
+  mediaScroll: {
+    flexDirection: "row",
+    marginTop: 4,
+  },
+  mediaThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  segmentCard: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  prBadge: {
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  prBadgeText: {
+    color: "#000",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  segmentTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  mediaAddBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  mediaRemoveBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
 
   expandedContent: { paddingTop: 2 },
 

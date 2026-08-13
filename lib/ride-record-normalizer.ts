@@ -223,11 +223,14 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     maxHeartRate: normalizedOptional(source.maxHeartRate),
     avgCadence: normalizedOptional(source.avgCadence),
     maxCadence: normalizedOptional(source.maxCadence),
-    gradeDistribution: Array.isArray(source.gradeDistribution) ? source.gradeDistribution.map(nonNegative) : undefined,
-    gradeAscentDistribution: Array.isArray(source.gradeAscentDistribution) ? source.gradeAscentDistribution.map(nonNegative) : undefined,
+    gradeDistribution: Array.isArray(source.gradeDistribution) ? source.gradeDistribution.map((v) => nonNegative(v)) : [0, 0, 0, 0, 0, 0],
+    gradeAscentDistribution: Array.isArray(source.gradeAscentDistribution) ? source.gradeAscentDistribution.map((v) => nonNegative(v)) : [0, 0, 0, 0, 0, 0],
     personalBests: Array.isArray(source.personalBests) ? source.personalBests : undefined,
     calculationProfile: normalizeCalculationProfile(source.calculationProfile),
     supplyConfirmations: normalizeSupplyConfirmations(source.supplyConfirmations),
+    description: typeof source.description === "string" ? source.description : undefined,
+    mediaItems: Array.isArray(source.mediaItems) ? source.mediaItems.filter((uri): uri is string => typeof uri === "string") : undefined,
+    segmentAchievements: Array.isArray(source.segmentAchievements) ? source.segmentAchievements : undefined,
   };
 }
 
