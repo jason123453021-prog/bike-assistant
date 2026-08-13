@@ -421,6 +421,10 @@ export default function MapScreen() {
     setMapRideActive(false);
     setDistToEnd(null);
     setNavInstruction("");
+    setPinnedLocation(null);
+    setCenterPinLocation(null);
+    setShowPinCard(false);
+    setPinRouteInfo(null);
     arrivedRef.current = false;
   }, [clearSharedRoute]);
 
@@ -2378,46 +2382,6 @@ export default function MapScreen() {
           {distToEnd !== null && (
             <Text style={styles.straightBannerDist}>剩餘 {formatRouteDistance(distToEnd)}</Text>
           )}
-        </View>
-      )}
-
-      {/* ── 騎乘定位狀態：主畫面醒目提示，讓自動暫停不會被誤認為 App 已停止 ── */}
-      {mapRideActive && (
-        <View
-          style={[
-            styles.rideTrackingStatusCard,
-            isAutoPauseMonitoring && styles.rideTrackingStatusAutoPaused,
-            isAutoPausePending && styles.rideTrackingStatusPending,
-            {
-              top: insets.top + (
-                isNavigating && (
-                  (Boolean(turnDirection) && navInstruction !== "沿路線前進")
-                  || (!turnDirection && navInstruction === "沿路線前進")
-                ) ? 78 : 8
-              ),
-            },
-          ]}
-        >
-          <View style={styles.rideTrackingStatusIcon}>
-            <IconSymbol
-              name={isAutoPauseMonitoring || isAutoPausePending ? "pause.circle.fill" : "location.fill"}
-              size={22}
-              color="#FFFFFF"
-            />
-          </View>
-          <View style={styles.rideTrackingStatusContent}>
-            <Text style={styles.rideTrackingStatusTitle}>
-              {isAutoPauseMonitoring ? "已自動暫停" : isAutoPausePending ? "靜止中，準備省電" : "騎乘紀錄中"}
-            </Text>
-            <Text style={styles.rideTrackingStatusSubtitle} numberOfLines={1}>
-              {isAutoPauseMonitoring
-                ? "省電定位監測中 · 重新移動會自動恢復"
-                : isAutoPausePending
-                  ? `靜止達 ${settings.idleAutoPauseSeconds} 秒後將切換省電監測`
-                  : "完整定位與騎乘資料正在記錄"}
-            </Text>
-          </View>
-          <View style={[styles.rideTrackingStatusDot, isAutoPauseMonitoring && styles.rideTrackingStatusDotPaused]} />
         </View>
       )}
 

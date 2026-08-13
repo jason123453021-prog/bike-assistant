@@ -845,14 +845,12 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       }
     }, [returnPolyline, isOffRoute, isReady]);
 
-    // Send kilometer markers
+    // Send kilometer markers (supports clearing when empty)
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
-      if (kilometersMarkers && kilometersMarkers.length > 0) {
-        webViewRef.current.postMessage(
-          JSON.stringify({ type: "setKilometerMarkers", markers: kilometersMarkers })
-        );
-      }
+      webViewRef.current.postMessage(
+        JSON.stringify({ type: "setKilometerMarkers", markers: kilometersMarkers || [] })
+      );
     }, [kilometersMarkers, isReady]);
 
     // Send center pin location
