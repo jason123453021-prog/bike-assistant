@@ -21,6 +21,8 @@ import { RideProvider } from "@/lib/ride-context";
 import { GpxProvider, useGpx } from "@/lib/gpx-context";
 import { isExternalGpxUri } from "@/lib/external-gpx-import";
 import { SettingsProvider } from "@/lib/settings-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { clearLegacyFavoritesCache } from "@/lib/legacy-favorites-cleanup";
 // 移除社群和友誼相關 Provider
 import { setupNotifications } from "@/lib/feedback-service";
 // 必須在頂層引入以確保 TaskManager 任務被定義
@@ -96,6 +98,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     setupNotifications().catch(() => {});
+  }, []);
+
+  // 升級後立即釋放已移除「最愛路線」功能留下的單一舊版快取鍵。
+  useEffect(() => {
+    clearLegacyFavoritesCache(AsyncStorage).catch((error) => {
+      console.warn("[App] 無法清除舊版最愛路線快取:", error);
+    });
   }, []);
 
   useEffect(() => startSupplyNotificationActionListener(), []);

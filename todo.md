@@ -1443,3 +1443,8 @@
 - [x] 移除未使用的最愛路線獨立頁面與 Favorites Context
 - [x] 清理所有最愛路線導航、路由註冊與深層連結入口
 - [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；88 passed、1 skipped；Android Hermes bundle 5.66 MB；最愛路線、NitroModules／MapLibre 掃描 0）
+
+## 舊版最愛路線相容清理（2026-08-13）
+- [x] 清除本機儲存空間中的舊版最愛路線快取資料
+- [x] 將舊版最愛路線網址自動導向至應用程式首頁
+- [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；89 passed、1 skipped；Android Hermes bundle 5.66 MB；最愛路線 Context 依賴掃描 0）
