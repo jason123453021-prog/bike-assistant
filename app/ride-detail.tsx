@@ -14,9 +14,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Animated,
   Dimensions,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -45,12 +43,8 @@ import { createGpxContent } from "@/lib/gpx-export";
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
 
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+const { width: SCREEN_W } = Dimensions.get("window");
 const STORAGE_KEY = "@bike_records";
-
-// 底部面板高度
-const PANEL_COLLAPSED_H = 200;
-const PANEL_EXPANDED_H = Math.min(SCREEN_H * 0.72, 560);
 
 // 深色地圖樣式
 const DARK_MAP_STYLE = [
@@ -118,75 +112,8 @@ export default function RideDetailScreen() {
   // 地圖 ref
   const mapRef = useRef<LeafletMapHandle>(null);
 
-  // 低部面板
-  const [panelExpanded, setPanelExpanded] = useState(false);
+  // 分享卡片
   const [shareCardVisible, setShareCardVisible] = useState(false);
-  
-
-  
-  // 動態計算收縮面板高度（與導航頁面一致）
-  const CELL_H = 60;
-  const HEADER_H = 80;
-  const CTRL_H = 64;
-  const dynamicCollapsedH = Math.min(
-    HEADER_H + CTRL_H,
-    PANEL_COLLAPSED_H
-  );
-  
-  const panelAnim = useRef(new Animated.Value(dynamicCollapsedH)).current;
-  const prevCollapsedH = useRef(dynamicCollapsedH);
-
-  useEffect(() => {
-    if (!panelExpanded && dynamicCollapsedH !== prevCollapsedH.current) {
-      prevCollapsedH.current = dynamicCollapsedH;
-      Animated.timing(panelAnim, {
-        toValue: dynamicCollapsedH,
-        duration: 200,
-        useNativeDriver: false,
-      }).start();
-    }
-  }, [dynamicCollapsedH, panelExpanded, panelAnim]);
-
-  const togglePanel = useCallback((expand: boolean) => {
-    setPanelExpanded(expand);
-    Animated.timing(panelAnim, {
-      toValue: expand ? PANEL_EXPANDED_H : dynamicCollapsedH,
-      duration: 280,
-      useNativeDriver: false,
-    }).start();
-  }, [panelAnim, dynamicCollapsedH]);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (_, gs) => {
-        // 只在拉桿區域（頂部 50px）允許拖動
-        return gs.y0 < 50;
-      },
-      onMoveShouldSetPanResponder: (_, gs) => {
-        return gs.y0 < 50 && Math.abs(gs.dy) > 5;
-      },
-      onPanResponderMove: (_, gs) => {
-        const newHeight = dynamicCollapsedH + (-gs.dy);
-        const clampedHeight = Math.max(dynamicCollapsedH, Math.min(PANEL_EXPANDED_H, newHeight));
-        panelAnim.setValue(clampedHeight);
-      },
-      onPanResponderRelease: (_, gs) => {
-        const currentHeight = (panelAnim as any)._value;
-        const midpoint = (dynamicCollapsedH + PANEL_EXPANDED_H) / 2;
-        const velocity = gs.vy;
-        
-        // 根據速度或位置決定展開或收縮
-        if (velocity < -0.5 || currentHeight > midpoint) {
-          togglePanel(true);
-        } else if (velocity > 0.5 || currentHeight < midpoint) {
-          togglePanel(false);
-        } else {
-          // 保持當前狀態
-          togglePanel(panelExpanded);
-        }
-      },
-    })
-  ).current;
 
   // 地圖適配軌跡
   const polylineCoords = useMemo(() => {
@@ -203,7 +130,7 @@ export default function RideDetailScreen() {
           edgePadding: {
             top: insets.top + 80,
             right: 40,
-            bottom: PANEL_COLLAPSED_H + 40,
+            bottom: 80,
             left: 40,
           },
           animated: true,
@@ -504,8 +431,18 @@ export default function RideDetailScreen() {
     totalZones > 0 ? Math.round((v / totalZones) * 100) : 0
   );
 
+  const movingDuration = Math.max(0, record.duration - (record.totalPausedSec ?? 0));
+  const averageMovingSpeed = movingDuration > 0
+    ? (record.distance / 1000) / (movingDuration / 3600)
+    : 0;
+
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.pageContent, { paddingBottom: insets.bottom + 28 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.mapHero}>
       {/* ── 全螢幕地圖（Leaflet WebView） ── */}
       <LeafletMapView
         ref={mapRef}
@@ -571,20 +508,15 @@ export default function RideDetailScreen() {
         </View>
       )}
 
-      {/* ── 底部面板 ── */}
-      <Animated.View
-        style={[styles.panel, { height: panelAnim, paddingBottom: insets.bottom + 8 }]}
-      >
-        {/* 拖拉把手 */}
-        <View style={styles.handleArea} {...panResponder.panHandlers}>
-          <View style={styles.panelHandle} />
-          <Text style={styles.dateText}>{dateStr}</Text>
-        </View>
+      </View>
 
+      {/* ── 本機活動摘要：向上滑動頁面可查看完整數據 ── */}
+      <View style={styles.activityBody}>
+        <Text style={styles.activityEyebrow}>本機騎乘摘要</Text>
+        <Text style={styles.activityTitle}>{record.name}</Text>
+        <Text style={styles.activityDate}>{dateStr}</Text>
 
-
-        {/* 摘要（距離 + 時間 + 卡洛里） */}
-        <View style={styles.summaryRow}>
+        <View style={styles.summaryGrid}>
           <SummaryCell
             icon="location.fill"
             value={(record.distance / 1000).toFixed(2)}
@@ -592,33 +524,57 @@ export default function RideDetailScreen() {
             label="距離"
             color="#00E676"
           />
-          <View style={styles.summaryDivider} />
           <SummaryCell
             icon="clock.fill"
-            value={formatDuration(record.duration)}
+            value={formatDuration(movingDuration)}
             unit=""
-            label="時間"
+            label="移動時間"
             color="#fff"
           />
-          <View style={styles.summaryDivider} />
           <SummaryCell
             icon="flame.fill"
-            value={`${record.calories}`}
+            value={`${Math.round(record.totalAscent)}`}
+            unit="m"
+            label="爬升海拔"
+            color="#F59E0B"
+          />
+          <SummaryCell
+            icon="location.fill"
+            value={averageMovingSpeed.toFixed(1)}
+            unit="km/h"
+            label="平均速度"
+            color="#60A5FA"
+          />
+          <SummaryCell
+            icon="flame.fill"
+            value={`${Math.round(record.calories)}`}
             unit="kcal"
             label="卡路里"
-            color="#F59E0B"
+            color="#F97316"
+          />
+          <SummaryCell
+            icon="clock.fill"
+            value={`${Math.round(record.avgPower)}`}
+            unit="W"
+            label="平均功率"
+            color="#A78BFA"
           />
         </View>
 
+        {(record.personalBests?.length ?? 0) > 0 && (
+          <View style={styles.localInsightCard}>
+            <IconSymbol name="flame.fill" size={20} color="#F59E0B" />
+            <View style={styles.localInsightText}>
+              <Text style={styles.localInsightTitle}>本機個人紀錄</Text>
+              <Text style={styles.localInsightCopy}>本次騎乘刷新 {record.personalBests?.map((best) => best.label).join("、")}</Text>
+            </View>
+          </View>
+        )}
 
+        <Text style={styles.moreDataHeading}>完整騎乘數據</Text>
+        <Text style={styles.moreDataHint}>繼續上滑查看地形、訓練與補給詳情</Text>
 
-        {/* 展開後的詳細內容 */}
-        {panelExpanded && (
-          <ScrollView
-            style={styles.expandedContent}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-          >
+        <View style={styles.expandedContent}>
 
 
             {/* 功率分布 */}
@@ -778,11 +734,11 @@ export default function RideDetailScreen() {
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>爬升與地形</Text>
               <View style={styles.statsGrid}>
                 <DetailCell label="總爬升高度" value={`${Math.round(record.totalAscent)}`} unit="m" color="#F59E0B" />
-                <DetailCell label="總下降高度" value="0" unit="m" color="#4FC3F7" />
-                <DetailCell label="最大海拔" value="0" unit="m" />
-                <DetailCell label="最小海拔" value="0" unit="m" />
-                <DetailCell label="平均坡度" value="0.0" unit="%" />
-                <DetailCell label="最大坡度" value="0.0" unit="%" />
+                <DetailCell label="總下降高度" value={record.totalDescent !== undefined ? `${Math.round(record.totalDescent)}` : "--"} unit="m" color="#4FC3F7" />
+                <DetailCell label="最大海拔" value={record.maxElevation !== undefined ? `${Math.round(record.maxElevation)}` : "--"} unit="m" />
+                <DetailCell label="最小海拔" value="--" unit="m" />
+                <DetailCell label="平均坡度" value="--" unit="%" />
+                <DetailCell label="最大坡度" value="--" unit="%" />
               </View>
             </View>
 
@@ -794,7 +750,7 @@ export default function RideDetailScreen() {
                 <DetailCell label="最大心率" value={record.maxHeartRate ? `${record.maxHeartRate}` : "--"} unit="bpm" color="#EF4444" />
                 <DetailCell label="平均功率" value={`${record.avgPower}`} unit="W" accent />
                 <DetailCell label="最大功率" value={`${record.maxPower}`} unit="W" accent />
-                <DetailCell label="標準化功率" value="--" unit="W" accent />
+                <DetailCell label="標準化功率" value={record.normalizedPower ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" accent />
                 <DetailCell label="平均踏頻" value={record.avgCadence ? `${record.avgCadence}` : "--"} unit="rpm" />
                 <DetailCell label="最大踏頻" value={record.maxCadence ? `${record.maxCadence}` : "--"} unit="rpm" />
               </View>
@@ -865,22 +821,8 @@ export default function RideDetailScreen() {
                 </View>
               </View>
             )}
-          </ScrollView>
-        )}
-
-        {/* 展開/收縮提示 */}
-        {!panelExpanded && (
-          <Pressable style={styles.expandHint} onPress={() => togglePanel(true)}>
-            <Text style={styles.expandHintText}>上滑查看完整記錄</Text>
-            <IconSymbol
-              name="chevron.right"
-              size={12}
-              color="rgba(255,255,255,0.3)"
-              style={{ transform: [{ rotate: "-90deg" }] }}
-            />
-          </Pressable>
-        )}
-      </Animated.View>
+        </View>
+      </View>
 
       {/* 分享卡片 Modal */}
       <ShareCardModal
@@ -888,7 +830,7 @@ export default function RideDetailScreen() {
         ride={record}
         onClose={() => setShareCardVisible(false)}
       />
-    </View>
+    </ScrollView>
   );
 }
 
@@ -937,7 +879,46 @@ const detailStyles = StyleSheet.create({
 // ─── 樣式 ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0d0d1a" },
-  map: { width: SCREEN_W, height: SCREEN_H },
+  pageContent: { backgroundColor: "#0d0d1a" },
+  mapHero: { height: 360, width: SCREEN_W, position: "relative", overflow: "hidden" },
+  map: { width: SCREEN_W, height: 360 },
+  activityBody: {
+    backgroundColor: "#0d0d1a",
+    marginTop: -20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 22,
+    paddingHorizontal: 20,
+    minHeight: 520,
+  },
+  activityEyebrow: { color: "#00E676", fontSize: 12, fontWeight: "700", letterSpacing: 0.6, marginBottom: 5 },
+  activityTitle: { color: "#fff", fontSize: 27, fontWeight: "800", lineHeight: 34 },
+  activityDate: { color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 5, marginBottom: 18 },
+  summaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.1)",
+    paddingVertical: 14,
+  },
+  localInsightCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(245,158,11,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.28)",
+  },
+  localInsightText: { flex: 1 },
+  localInsightTitle: { color: "#FCD34D", fontSize: 14, fontWeight: "800" },
+  localInsightCopy: { color: "rgba(255,255,255,0.72)", fontSize: 12, lineHeight: 17, marginTop: 3 },
+  moreDataHeading: { color: "#fff", fontSize: 19, fontWeight: "800", marginTop: 24 },
+  moreDataHint: { color: "rgba(255,255,255,0.45)", fontSize: 12, marginTop: 4, marginBottom: 2 },
 
   topBar: {
     position: "absolute",
@@ -1023,7 +1004,7 @@ const styles = StyleSheet.create({
   },
   summaryDivider: { width: 1, height: 36, backgroundColor: "rgba(255,255,255,0.1)" },
 
-  expandedContent: { flex: 1 },
+  expandedContent: { paddingTop: 2 },
 
   statsGrid: {
     flexDirection: "row",
