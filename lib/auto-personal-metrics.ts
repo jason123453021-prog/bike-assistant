@@ -1,5 +1,6 @@
 import { recommendFtp } from "./ftp-recommendation";
 import type { RideRecord } from "./ride-context";
+import { calculateAgeFromBirthday } from "./personal-profile";
 
 export type PersonalMetricSource = "history" | "recorded" | "age-baseline" | "fallback";
 
@@ -23,15 +24,16 @@ const clamp = (value: number, minimum: number, maximum: number) => Math.max(mini
  */
 export function deriveAutoPersonalMetrics(
   records: RideRecord[],
-  fallback: { ftpW: number; age: number; maxHeartRate?: number; restingHeartRate?: number },
+  fallback: { ftpW: number; age: number; birthday?: string; maxHeartRate?: number; restingHeartRate?: number },
 ): AutoPersonalMetrics {
   const ftpRecommendation = recommendFtp(records, fallback.ftpW);
   const recordedMaxima = records
     .map((record) => record.maxHeartRate)
     .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 100 && value < 230);
+  const currentAge = calculateAgeFromBirthday(fallback.birthday) ?? fallback.age;
   const maxHeartRate = recordedMaxima.length
     ? Math.max(...recordedMaxima)
-    : clamp(208 - 0.7 * clamp(fallback.age, 14, 90), 120, 220);
+    : clamp(208 - 0.7 * clamp(currentAge, 14, 90), 120, 220);
   const restingHeartRate = clamp(maxHeartRate * 0.32, 45, 72);
   return {
     ftpW: ftpRecommendation?.recommendedFtpW ?? Math.max(80, fallback.ftpW),

@@ -35,6 +35,7 @@ import { SmartPowerSavingManager, type PowerSavingSettings } from "@/lib/power-s
 import { importLocalRideFile } from "@/lib/local-ride-import";
 import { useRide } from "@/lib/ride-context";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
+import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-profile";
 
 
 import Constants from "expo-constants";
@@ -47,9 +48,11 @@ export default function SettingsScreen() {
   const autoPersonalMetrics = deriveAutoPersonalMetrics(rideState.records, {
     ftpW: settings.ftp,
     age: settings.age,
+    birthday: settings.birthday,
     maxHeartRate: settings.maxHeartRate,
     restingHeartRate: settings.restingHeartRate,
   });
+  const currentAge = calculateAgeFromBirthday(settings.birthday) ?? settings.age;
   const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
   const [powerSavingSettings, setPowerSavingSettings] = useState<PowerSavingSettings>(
     powerSavingManagerRef.current.getSettings(),
@@ -421,8 +424,21 @@ export default function SettingsScreen() {
   const openEdit = (key: string, label: string, value: number, unit: string) => {
     setEditModal({ visible: true, key, label, value: String(value), unit, isNumber: true });
   };
+  const openBirthdayEdit = () => {
+    setEditModal({ visible: true, key: "birthday", label: "生日", value: settings.birthday ?? "", unit: "YYYY-MM-DD", isNumber: false });
+  };
 
   const saveEdit = async () => {
+    if (!editModal.isNumber) {
+      const birthday = normalizeBirthday(editModal.value.trim());
+      if (!birthday) {
+        Alert.alert("生日格式錯誤", "請使用 YYYY-MM-DD，例如 1990-08-15。");
+        return;
+      }
+      await updateSettings({ birthday });
+      setEditModal({ ...editModal, visible: false });
+      return;
+    }
     const num = parseFloat(editModal.value);
     if (isNaN(num) || num <= 0) {
       Alert.alert("錯誤", "請輸入有效的數值");
@@ -440,78 +456,28 @@ export default function SettingsScreen() {
         {/* ── 個人資料 ── */}
         <SectionHeader title="個人資料" colors={colors} onToggle={() => toggleSection("personal")} collapsed={collapsedSections["personal"]} />
         {!collapsedSections["personal"] && <View style={[styles.section, { borderColor: colors.border }]}>
-          <NumberRow
-            icon="person.fill"
-            label="體重"
-            value={settings.weight}
-            unit="kg"
+          <TextRow
+            icon="calendar"
+            label="生日"
+            value={settings.birthday ?? "尚未設定"}
             colors={colors}
-            onPress={() => openEdit("weight", "體重", settings.weight, "kg")}
+            hint={settings.birthday ? `目前 ${currentAge} 歲，App 會在生日後自動更新` : "僅需設定一次；用於自動推定年齡與心率基準"}
+            onPress={openBirthdayEdit}
           />
           <Divider colors={colors} />
-          <NumberRow
-            icon="arrow.up"
-            label="身高"
-            value={settings.height}
-            unit="cm"
-            colors={colors}
-            onPress={() => openEdit("height", "身高", settings.height, "cm")}
-          />
+          <NumberRow icon="person.fill" label="體重" value={settings.weight} unit="kg" colors={colors} onPress={() => openEdit("weight", "體重", settings.weight, "kg")} />
           <Divider colors={colors} />
-          <NumberRow
-            icon="bicycle"
-            label="單車+裝備重量"
-            value={settings.bikeWeight ?? 10}
-            unit="kg"
-            colors={colors}
-            hint="包含單車、水壺、工具等裝備的總重，用於 GPX 卡路里預估"
-            onPress={() => openEdit("bikeWeight", "單車+裝備重量", settings.bikeWeight ?? 10, "kg")}
-          />
+          <NumberRow icon="arrow.up" label="身高" value={settings.height} unit="cm" colors={colors} onPress={() => openEdit("height", "身高", settings.height, "cm")} />
           <Divider colors={colors} />
-          <NumberRow
-            icon="person.fill"
-            label="年齡"
-            value={settings.age ?? 32}
-            unit="歲"
-            colors={colors}
-            hint="用於推算最大心率（MHR）與水分消耗演算"
-            onPress={() => openEdit("age", "年齡", settings.age ?? 32, "歲")}
-          />
-          <Divider colors={colors} />
-          <ToggleRow
-            icon="chart.line.uptrend.xyaxis"
-            label="App 自動推定個人指標"
-            value={settings.autoPersonalMetricsEnabled}
-            colors={colors}
-            onToggle={(enabled) => updateSettings({ autoPersonalMetricsEnabled: enabled })}
-          />
           <View style={styles.autoMetricsNote}>
-            <Text style={[styles.rowHint, { color: colors.muted }]}>開啟時，App 會優先以本機歷史騎乘推定 FTP、最大心率與心率基準；沒有足夠資料時自動使用安全基準。</Text>
+            <Text style={[styles.rowHint, { color: colors.muted }]}>以下訓練與身體數據均由 App 以本機騎乘資料自動推定；不需要逐項填寫。</Text>
           </View>
           <Divider colors={colors} />
-          {settings.autoPersonalMetricsEnabled ? (
-            <View style={styles.autoMetricValues}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>目前 App 推定</Text>
-              <Text style={[styles.rowHint, { color: colors.muted }]}>FTP {autoPersonalMetrics.ftpW} W · 最大心率 {autoPersonalMetrics.maxHeartRate} bpm · 心率基準 {autoPersonalMetrics.restingHeartRate} bpm</Text>
-              <Text style={[styles.rowHint, { color: colors.muted }]}>{autoPersonalMetrics.sourceRideCount ? `依 ${autoPersonalMetrics.sourceRideCount} 次有效本機騎乘更新` : "尚無足夠功率歷史，暫用目前安全基準"}</Text>
-            </View>
-          ) : <>
-            <NumberRow icon="bolt.fill" label="FTP（功能閾值功率）" value={settings.ftp} unit="W" colors={colors} onPress={() => openEdit("ftp", "FTP", settings.ftp, "W")} />
-            <Divider colors={colors} />
-            <NumberRow icon="heart.fill" label="最大心率" value={settings.maxHeartRate ?? autoPersonalMetrics.maxHeartRate} unit="bpm" colors={colors} onPress={() => openEdit("maxHeartRate", "最大心率", settings.maxHeartRate ?? autoPersonalMetrics.maxHeartRate, "bpm")} />
-            <Divider colors={colors} />
-            <NumberRow icon="heart.fill" label="靜息心率" value={settings.restingHeartRate ?? autoPersonalMetrics.restingHeartRate} unit="bpm" colors={colors} onPress={() => openEdit("restingHeartRate", "靜息心率", settings.restingHeartRate ?? autoPersonalMetrics.restingHeartRate, "bpm")} />
-          </>}
-          <Divider colors={colors} />
-          <ToggleRow
-            icon="gauge.with.dots.needle.33percent"
-            label="騎後由 App 推定 RPE"
-            value={settings.autoRpeEnabled}
-            colors={colors}
-            onToggle={(enabled) => updateSettings({ autoRpeEnabled: enabled })}
-          />
-          <View style={styles.autoMetricsNote}>
-            <Text style={[styles.rowHint, { color: colors.muted }]}>依相對 FTP 強度、移動時間、爬升與環境負荷推定；若需要，仍可在活動編輯中手動調整。</Text>
+          <View style={styles.autoMetricValues}>
+            <Text style={[styles.rowLabel, { color: colors.foreground }]}>App 自動推定</Text>
+            <Text style={[styles.rowHint, { color: colors.muted }]}>FTP {autoPersonalMetrics.ftpW} W · 最大心率 {autoPersonalMetrics.maxHeartRate} bpm · 心率基準 {autoPersonalMetrics.restingHeartRate} bpm</Text>
+            <Text style={[styles.rowHint, { color: colors.muted }]}>RPE 會在每次騎乘結束後依強度、時間、爬升與環境自動產生。</Text>
+            <Text style={[styles.rowHint, { color: colors.muted }]}>{autoPersonalMetrics.sourceRideCount ? `依 ${autoPersonalMetrics.sourceRideCount} 次有效本機騎乘更新` : "尚無足夠功率歷史，暫用安全基準並持續校正"}</Text>
           </View>
           <Divider colors={colors} />
           <Pressable
@@ -1254,7 +1220,8 @@ export default function SettingsScreen() {
                 style={[styles.editInput, { color: colors.foreground }]}
                 value={editModal.value}
                 onChangeText={(v) => setEditModal({ ...editModal, value: v })}
-                keyboardType="numeric"
+                keyboardType={editModal.isNumber ? "numeric" : "numbers-and-punctuation"}
+                maxLength={editModal.isNumber ? undefined : 10}
                 autoFocus
                 selectTextOnFocus
                 placeholderTextColor={colors.muted}
@@ -1590,6 +1557,26 @@ function NumberRow({
         <Text style={[styles.rowValue, { color: colors.accent }]}>
           {value} {unit}
         </Text>
+        <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+      </View>
+    </Pressable>
+  );
+}
+
+function TextRow({
+  icon, label, value, colors, hint, onPress,
+}: {
+  icon: string; label: string; value: string; colors: any; hint?: string; onPress: () => void;
+}) {
+  return (
+    <Pressable style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]} onPress={onPress}>
+      <IconSymbol name={icon as any} size={18} color={colors.muted} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
+        {hint ? <Text style={[styles.rowHint, { color: colors.muted }]}>{hint}</Text> : null}
+      </View>
+      <View style={styles.rowRight}>
+        <Text style={[styles.rowValue, { color: colors.accent }]}>{value}</Text>
         <IconSymbol name="chevron.right" size={16} color={colors.muted} />
       </View>
     </Pressable>

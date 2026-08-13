@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { calculateAgeFromBirthday, normalizeBirthday } from "./personal-profile";
 
 // 正常導航模式可顯示的欄位
 export interface NormalModeFields {
@@ -99,6 +100,8 @@ export interface AppSettings {
   // Personal
   weight: number;       // kg 騎手體重
   height: number;       // cm
+  /** 使用者唯一需填寫的出生日期；年齡每次由此值即時計算。 */
+  birthday?: string;
   age: number;          // 騎手年齡（用於推算最大心率 MHR）
   ftp: number;          // Functional Threshold Power (watts)
   bikeWeight: number;   // kg 单軋+裝備總重
@@ -299,6 +302,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setSettings({
           ...DEFAULT_SETTINGS,
           ...saved,
+          birthday: normalizeBirthday(saved.birthday),
+          age: calculateAgeFromBirthday(saved.birthday) ?? saved.age ?? DEFAULT_SETTINGS.age,
+          autoPersonalMetricsEnabled: true,
+          autoRpeEnabled: true,
           normalModeFields: { ...DEFAULT_NORMAL_FIELDS, ...(saved.normalModeFields ?? {}) },
           simplifiedModeFields: { ...DEFAULT_SIMPLIFIED_FIELDS, ...(saved.simplifiedModeFields ?? {}) },
           normalModeFieldOrder: mergedOrder,
@@ -309,7 +316,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateSettings = async (partial: Partial<AppSettings>) => {
-    const next = { ...settings, ...partial };
+    const birthday = partial.birthday !== undefined ? normalizeBirthday(partial.birthday) : settings.birthday;
+    const next = {
+      ...settings,
+      ...partial,
+      birthday,
+      age: calculateAgeFromBirthday(birthday) ?? settings.age,
+      autoPersonalMetricsEnabled: true,
+      autoRpeEnabled: true,
+    };
     setSettings(next);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   };
