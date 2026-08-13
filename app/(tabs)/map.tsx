@@ -254,8 +254,8 @@ export default function MapScreen() {
     }, AUTO_RECENTER_AFTER_INTERACTION_MS);
   }, []);
 
-  // 地圖方向模式：true = 車頭朝前（heading-up），false = 指北（north-up）
-  const [headingUp, setHeadingUp] = useState(false);
+  // 導航固定採車頭朝前：以行進方向優先、低速時以平滑羅盤輔助。
+  const headingUp = true;
   // 俯視角設定（0-60 度）
   const [mapPitch, setMapPitch] = useState(0);
 
@@ -1987,10 +1987,12 @@ export default function MapScreen() {
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {
+    if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
     setFollowUser(true);
     if (currentPos) {
       mapRef.current?.animateCamera(
-        { center: { latitude: currentPos.lat, longitude: currentPos.lon }, zoom: 17 }
+        { center: { latitude: currentPos.lat, longitude: currentPos.lon } },
+        { duration: 300 },
       );
     }
   }, [currentPos]);
@@ -2339,30 +2341,13 @@ export default function MapScreen() {
 
       {/* ── 右側工具列 ── */}
       <View style={[styles.toolBar, { top: insets.top + 8, right: 16 }]}>
-        {/* 車頭朝前/指北切換按鈕（同時回到當前位置） */}
+        {/* 立即回到目前位置：取消等待，但不重設使用者縮放或旋轉。 */}
         <Pressable
-          style={[styles.toolBtn, headingUp && styles.toolBtnActive]}
-          onPress={() => {
-            const next = !headingUp;
-            setHeadingUp(next);
-            setFollowUser(true);
-            const bearing = next ? (currentPos?.heading ?? 0) : 0;
-            mapRef.current?.setBearing(bearing, next);
-            if (currentPos) {
-              mapRef.current?.animateCamera(
-                { center: { latitude: currentPos.lat, longitude: currentPos.lon }, zoom: 17 }
-              );
-            }
-          }}
+          style={[styles.toolBtn, styles.toolBtnActive]}
+          onPress={handleRecenter}
         >
-          {headingUp ? (
-            <IconSymbol name="arrow.up" size={20} color="#34C759" />
-          ) : (
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', lineHeight: 22 }}>N</Text>
-          )}
-          <Text style={[styles.returnBtnLabel, { color: headingUp ? "#34C759" : "rgba(255,255,255,0.8)" }]}> 
-            {headingUp ? "車頭" : "指北"}
-          </Text>
+          <IconSymbol name="location.fill" size={20} color="#34C759" />
+          <Text style={[styles.returnBtnLabel, { color: "#34C759" }]}>定位</Text>
         </Pressable>
         {isActive && settings.touchGuardEnabled && (
           <Pressable

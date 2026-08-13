@@ -27,6 +27,7 @@ export interface DirectionData {
 
 const COMPASS_ACCURACY_THRESHOLD = 30;  // 羅盤精度閾值 (度)
 const GPS_SPEED_THRESHOLD = 0.5;        // GPS 速度閾值 (m/s)
+const GPS_DIRECTION_PRIORITY_SPEED = 1.2; // 穩定行進後優先使用 GPS 行進向量
 const HYBRID_WEIGHT_COMPASS = 0.4;      // 混合模式下羅盤權重
 const HYBRID_WEIGHT_GPS = 0.6;          // 混合模式下 GPS 權重
 
@@ -99,7 +100,12 @@ export function selectDirectionSource(
     return "compass";
   }
 
-  // 兩者都可用，使用混合模式
+  // 單車穩定前進時，行進向量最符合實際車頭方向；不混入手機握持角度。
+  if (gpsVector.speed >= GPS_DIRECTION_PRIORITY_SPEED) {
+    return "gps";
+  }
+
+  // 緩慢起步或短暫減速時才混合兩者，以維持轉向連續性。
   return "hybrid";
 }
 
