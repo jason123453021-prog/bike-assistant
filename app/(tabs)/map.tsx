@@ -675,6 +675,18 @@ export default function MapScreen() {
     }, 33);
   }, [isActive, resetTouchGuardHoldProgress, settings.touchGuardUnlockHoldMs, touchGuardEnabled]);
 
+  const completeTouchGuardUnlock = useCallback(() => {
+    if (!touchGuardEnabled) return;
+    if (touchGuardHoldTimerRef.current) {
+      clearInterval(touchGuardHoldTimerRef.current);
+      touchGuardHoldTimerRef.current = null;
+    }
+    touchGuardHoldStartedAtRef.current = null;
+    setTouchGuardHoldProgress(1);
+    if (settings.vibrationEnabled) vibrateLight();
+    setTouchGuardEnabled(false);
+  }, [settings.vibrationEnabled, touchGuardEnabled]);
+
   useEffect(() => resetTouchGuardHoldProgress, [resetTouchGuardHoldProgress]);
 
   useEffect(() => {
@@ -2321,10 +2333,7 @@ export default function MapScreen() {
             }}
             onPressOut={resetTouchGuardHoldProgress}
             onLongPress={() => {
-              if (touchGuardEnabled) {
-                setTouchGuardHoldProgress(1);
-                setTouchGuardEnabled(false);
-              }
+              completeTouchGuardUnlock();
             }}
             delayLongPress={settings.touchGuardUnlockHoldMs}
           >
@@ -2854,8 +2863,7 @@ export default function MapScreen() {
           onPressIn={beginTouchGuardHoldProgress}
           onPressOut={resetTouchGuardHoldProgress}
           onLongPress={() => {
-            setTouchGuardHoldProgress(1);
-            setTouchGuardEnabled(false);
+            completeTouchGuardUnlock();
           }}
           delayLongPress={settings.touchGuardUnlockHoldMs}
         >
@@ -2889,6 +2897,7 @@ export default function MapScreen() {
                 />
               </Svg>
               <Text style={styles.touchGuardProgressText}>{Math.round(touchGuardHoldProgress * 100)}%</Text>
+              <Text style={styles.touchGuardProgressLabel}>長按中</Text>
             </View>
           )}
         </Pressable>
@@ -3070,7 +3079,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  touchGuardProgressText: { position: "absolute", color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
+  touchGuardProgressText: { position: "absolute", top: 13, color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
+  touchGuardProgressLabel: { position: "absolute", top: 29, color: "rgba(255,255,255,0.76)", fontSize: 8, fontWeight: "700" },
   returnBtn: {
     backgroundColor: "rgba(255,149,0,0.2)",
     borderColor: "#FF9500",
