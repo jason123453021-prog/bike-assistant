@@ -38,7 +38,6 @@ import { useColors } from "@/hooks/use-colors";
 import { useRide, type RideRecord, type RouteStats } from "@/lib/ride-context";
 import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power-calc";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useFavorites } from "@/lib/favorites-context";
 import { ShareCardModal } from "@/components/share-card-modal";
 import { SpeedCurveChart, type KeyMarker, type SpeedDataPoint } from "@/components/speed-curve-chart";
 import { ActivityElevationChart } from "@/components/activity-elevation-chart";
@@ -185,8 +184,6 @@ export default function RideDetailScreen() {
     Alert.alert("成功", "已儲存活動編輯");
   };
   const { settings, updateSettings } = useSettings();
-  const { favorites, addFavorite, removeFavorite } = useFavorites();
-  const [isFavorited, setIsFavorited] = useState(false);
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
 
   // 找到對應記錄
@@ -226,16 +223,6 @@ export default function RideDetailScreen() {
     const trimmed = nameInput.trim();
     await updateRecordName(record.id, trimmed);
     }, [record, nameInput, updateRecordName]);
-
-  // 檢查是否已加入最愛
-  useEffect(() => {
-    if (record) {
-      const isFav = favorites.some((f) => f.name === record.name);
-      setIsFavorited(isFav);
-    }
-  }, [record, favorites]);
-
-  // 加入/移除最愛 (generateGpxContent 定義後會設置)
 
   // 地圖 ref
   const mapRef = useRef<LeafletMapHandle>(null);
@@ -573,35 +560,6 @@ export default function RideDetailScreen() {
       Alert.alert("FIT 匯出失敗", "無法建立本機 FIT 檔，請確認記錄中的 GPS 軌跡完整。");
     }
   }, [record]);
-
-  // 加入/移除最愛
-  const handleToggleFavorite = useCallback(async () => {
-    if (!record) return;
-    try {
-      if (isFavorited) {
-        const fav = favorites.find((f) => f.name === record.name);
-        if (fav) {
-          await removeFavorite(fav.id);
-          setIsFavorited(false);
-          Alert.alert("成功", "已移除最愛");
-        }
-      } else {
-        const gpxContent = createGpxContent(record);
-        if (gpxContent) {
-          await addFavorite({
-            name: record.name,
-            gpxContent,
-            distance: record.distance / 1000,
-            estimatedTime: record.duration,
-          });
-          setIsFavorited(true);
-          Alert.alert("成功", "已加入最愛");
-        }
-      }
-    } catch (err) {
-      Alert.alert("錯誤", isFavorited ? "移除最愛失敗" : "加入最愛失敗");
-    }
-  }, [record, isFavorited, favorites, addFavorite, removeFavorite]);
 
   const handleShare = useCallback(async () => {
     if (!record) return;
@@ -1093,15 +1051,6 @@ export default function RideDetailScreen() {
             >
               <IconSymbol name="arrow.down.doc" size={16} color="#fff" />
               <Text style={styles.shareBtnText}>匯出標準 FIT</Text>
-            </Pressable>
-
-            {/* 加入最愛按鈕 */}
-            <Pressable
-              style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.85 : 1, backgroundColor: isFavorited ? colors.primary : "rgba(255,255,255,0.2)" }]}
-              onPress={handleToggleFavorite}
-            >
-              <IconSymbol name={isFavorited ? "heart.fill" : "heart"} size={16} color="#fff" />
-              <Text style={styles.shareBtnText}>{isFavorited ? "已最愛" : "加入最愛"}</Text>
             </Pressable>
 
             {/* 分享卡片按鈕 */}

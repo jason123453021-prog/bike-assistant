@@ -2113,42 +2113,6 @@ export default function MapScreen() {
     return () => { cancelled = true; clearInterval(interval); };
   }, [mapRideActive, settings.gpsAccuracy]);
 
-  // ─── 智慧速度感知 GPS 精度切換 ──────────────────────────────────────────────────────
-  // 停止/低速(<5 km/h)→省電模式，中速(5-25 km/h)→標準模式，高速(>25 km/h)→高精度模式
-  const speedGpsLevelRef = useRef<GpsAccuracyLevel>("standard");
-  const speedStableCountRef = useRef(0); // 連續相同等級計數，避免頻繁切換
-  useEffect(() => {
-    if (!mapRideActive || Platform.OS === "web" || batteryDegradedRef.current) return;
-    const speed = state.currentSpeed; // km/h
-    let targetLevel: GpsAccuracyLevel;
-    if (speed < 5) {
-      targetLevel = "power_saving";
-    } else if (speed >= 25) {
-      targetLevel = "high_accuracy";
-    } else {
-      targetLevel = "standard";
-    }
-    if (targetLevel === speedGpsLevelRef.current) {
-      speedStableCountRef.current = 0;
-      return;
-    }
-    // 需要連續 3 次（約 3 秒位置更新）相同判斷才切換，避免瞬間速度波動
-    speedStableCountRef.current += 1;
-    if (speedStableCountRef.current < 3) return;
-    speedStableCountRef.current = 0;
-    speedGpsLevelRef.current = targetLevel;
-    (async () => {
-      try {
-        await stopBackgroundLocationTracking();
-        await startBackgroundLocationTracking(targetLevel);
-        console.log(`[GPS] 速度 ${speed.toFixed(1)} km/h，智慧切換為 ${targetLevel}`);
-      } catch (e) {
-        console.warn("[GPS] 速度感知切換失敗:", e);
-      }
-    })();
-  }, [state.currentSpeed, mapRideActive]);
-
-
   // ─── Cleanup ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {

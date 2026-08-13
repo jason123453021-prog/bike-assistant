@@ -25,14 +25,12 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 }
 import Slider from "@react-native-community/slider";
 import { router } from "expo-router";
-import * as DocumentPicker from "expo-document-picker";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, SUPPLY_ITEM_TEMPLATES, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
 import { SensorPairingModal } from "@/components/sensor-pairing-modal";
 import { SmartPowerSavingManager, type PowerSavingSettings } from "@/lib/power-saving/smart-power-saving-system";
-import { importLocalRideFile } from "@/lib/local-ride-import";
 import { useRide } from "@/lib/ride-context";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-profile";
@@ -44,7 +42,7 @@ export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
-  const { loadRecords, state: rideState } = useRide();
+  const { state: rideState } = useRide();
   const autoPersonalMetrics = deriveAutoPersonalMetrics(rideState.records, {
     ftpW: settings.ftp,
     age: settings.age,
@@ -70,23 +68,6 @@ export default function SettingsScreen() {
     const next = { ...powerSavingSettings, ...patch };
     setPowerSavingSettings(next);
     await powerSavingManagerRef.current.saveSettings(patch);
-  };
-
-  const handleManualRideImport = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/gpx+xml", "application/json", "text/xml", "text/plain"],
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-      const file = result.assets[0];
-      const imported = await importLocalRideFile(file.uri, file.name);
-      await loadRecords();
-      Alert.alert("匯入完成", `已匯入 ${imported.importedCount} 筆${imported.sourceType.toUpperCase()}紀錄${imported.skippedCount ? `，略過 ${imported.skippedCount} 筆重複資料` : ""}。`);
-    } catch (error) {
-      Alert.alert("匯入失敗", error instanceof Error ? error.message : "無法讀取選取的檔案。");
-    }
   };
 
   // ── 感測器配對 Modal 狀態 ──
@@ -479,115 +460,13 @@ export default function SettingsScreen() {
             <Text style={[styles.rowHint, { color: colors.muted }]}>RPE 會在每次騎乘結束後依強度、時間、爬升與環境自動產生。</Text>
             <Text style={[styles.rowHint, { color: colors.muted }]}>{autoPersonalMetrics.sourceRideCount ? `依 ${autoPersonalMetrics.sourceRideCount} 次有效本機騎乘更新` : "尚無足夠功率歷史，暫用安全基準並持續校正"}</Text>
           </View>
-          <Divider colors={colors} />
-          <Pressable
-            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.65 : 1 }]}
-            onPress={() => Alert.alert(
-              "重設汗率校正",
-              "將清除使用者騎後確認補水量所建立的本機汗率校正，並恢復為中性基準。此操作不會刪除騎乘歷史。",
-              [
-                { text: "取消", style: "cancel" },
-                { text: "重設", style: "destructive", onPress: () => void updateSettings({ sweatRateCalibrationMultiplier: 1, sweatRateCalibrationCount: 0 }) },
-              ],
-            )}
-          >
-            <IconSymbol name="drop.fill" size={18} color="#4FC3F7" />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>汗率校正</Text>
-              <Text style={[styles.rowHint, { color: colors.muted }]}>本機倍率 {settings.sweatRateCalibrationMultiplier.toFixed(2)} · 已校正 {settings.sweatRateCalibrationCount} 次 · 點擊可重設</Text>
-            </View>
-            <IconSymbol name="arrow.clockwise" size={16} color={colors.muted} />
-          </Pressable>
         </View>}
-
-        {/* ── 本機訓練目標 ── */}
-        <SectionHeader title="本機訓練目標" colors={colors} onToggle={() => toggleSection("trainingGoals")} collapsed={collapsedSections["trainingGoals"]} />
-        {!collapsedSections["trainingGoals"] && <View style={[styles.section, { borderColor: colors.border }]}> 
-          <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 }}>
-            <Text style={[styles.rowHint, { color: colors.muted }]}>只會使用此裝置中的騎乘紀錄計算週進度與連續達標，不會建立帳號或同步至雲端。</Text>
-          </View>
-          <NumberRow
-            icon="bicycle"
-            label="每週騎乘目標"
-            value={settings.weeklyRideGoal}
-            unit="次"
-            colors={colors}
-            hint="活動詳情會顯示本週進度與連續達標週數"
-            onPress={() => openEdit("weeklyRideGoal", "每週騎乘目標", settings.weeklyRideGoal, "次")}
-          />
-          <Divider colors={colors} />
-          <NumberRow
-            icon="location.fill"
-            label="每週距離目標"
-            value={settings.weeklyDistanceGoalKm}
-            unit="km"
-            colors={colors}
-            hint="達成騎乘次數或距離其中一項，即視為完成本機週目標"
-            onPress={() => openEdit("weeklyDistanceGoalKm", "每週距離目標", settings.weeklyDistanceGoalKm, "km")}
-          />
-        </View>}
-
-        {/* ── 效能模式 ── */}
-        <SectionHeader title="效能模式" colors={colors} onToggle={() => toggleSection("performance")} collapsed={collapsedSections["performance"]} />
-        {!collapsedSections["performance"] && <View style={[styles.section, { borderColor: colors.border }]}>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
-            <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>效能模式</Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {(["battery-saver", "balanced", "performance"] as const).map((mode) => (
-                <Pressable
-                  key={mode}
-                  style={({ pressed }) => [{
-                    flex: 1,
-                    paddingVertical: 10,
-                    paddingHorizontal: 12,
-                    borderRadius: 8,
-                    backgroundColor: settings.performanceMode === mode ? colors.primary : colors.surface,
-                    borderWidth: 1,
-                    borderColor: settings.performanceMode === mode ? colors.primary : colors.border,
-                    opacity: pressed ? 0.8 : 1,
-                  }]}
-                  onPress={() => updateSettings({ performanceMode: mode })}
-                >
-                  <Text style={{
-                    color: settings.performanceMode === mode ? "#fff" : colors.foreground,
-                    fontSize: 12,
-                    fontWeight: "600",
-                    textAlign: "center",
-                  }}>
-                    {mode === "battery-saver" ? "🔋 省電" : mode === "balanced" ? "⚖️ 平衡" : "⚡ 性能"}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 8 }}>
-              <Pressable
-                style={({ pressed }) => [{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 4,
-                  backgroundColor: settings.autoPerformanceMode ? colors.primary : colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: pressed ? 0.8 : 1,
-                }]}
-                onPress={() => updateSettings({ autoPerformanceMode: !settings.autoPerformanceMode })}
-              >
-                {settings.autoPerformanceMode && <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>✓</Text>}
-              </Pressable>
-              <Text style={{ color: colors.foreground, fontSize: 12 }}>根據電量自動調整模式</Text>
-            </View>
-          </View>
-        </View>}
-
-
 
         {/* ── 背景 GPS 精度 ── */}
         <SectionHeader title="背景 GPS 精度" colors={colors} onToggle={() => toggleSection("gpsAccuracy")} collapsed={collapsedSections["gpsAccuracy"]} />
-        {!collapsedSections["gpsAccuracy"] && <View style={[styles.section, { borderColor: colors.border }]}>
+        {!collapsedSections["gpsAccuracy"] && <View style={[styles.section, { borderColor: colors.border }]}> 
           <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
-            <Text style={{ color: colors.muted, fontSize: 12 }}>設定背景執行時的 GPS 更新頻率，高精度更耗電但軌跡更精確</Text>
+            <Text style={{ color: colors.muted, fontSize: 12 }}>此選項會在騎乘中重啟背景定位任務。高精度更耗電但軌跡更精確；靜止自動暫停與低電量保護時會暫時降級。</Text>
             <View style={{ flexDirection: "row", gap: 8 }}>
               {(["power_saving", "standard", "high_accuracy"] as const).map((level) => (
                 <Pressable
@@ -920,22 +799,6 @@ export default function SettingsScreen() {
             />
             <Text style={[styles.rowHint, { color: colors.muted, marginLeft: 6 }]}>毫秒</Text>
           </View>
-        </View>}
-
-        {/* ── 本機資料匯入 ── */}
-        <SectionHeader title="本機資料" colors={colors} onToggle={() => toggleSection("localData")} collapsed={collapsedSections["localData"]} />
-        {!collapsedSections["localData"] && <View style={[styles.section, { borderColor: colors.border }]}> 
-          <Pressable
-            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
-            onPress={handleManualRideImport}
-          >
-            <IconSymbol name="arrow.down.circle.fill" size={18} color={colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>匯入／手動同步騎乘紀錄</Text>
-              <Text style={[styles.rowHint, { color: colors.muted }]}>從手機選取 .gpx 或 .json 備份，僅儲存在本機</Text>
-            </View>
-            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-          </Pressable>
         </View>}
 
         {/* ── 精簡導航模式 ── */}

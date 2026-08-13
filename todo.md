@@ -1431,3 +1431,10 @@
 - [x] 移除車頭朝前／朝北切換，導航改為固定車頭朝前
 - [x] 優先以 GPS 行進向量更新箭頭方向，低速時以平滑指南針方向防止靜止亂轉
 - [x] 新增方向與置中流程測試，完成 TypeScript、完整測試與 Android bundle 驗證
+
+## 活動詳情穩定性與介面精簡（2026-08-13）
+- [x] 修正開啟騎乘歷史活動時缺少 FavoritesProvider 的 Render Error
+- [x] 移除設定頁「匯入／手動同步騎乘紀錄」、本機訓練目標、汗率校正與本週訓練負荷旁的問號圖示
+- [x] 移除路線頁「建議補給／休息規劃點」與「最愛路線」欄位
+- [x] 驗證效能模式及背景 GPS 精度是否改變實際定位策略，修正無效或重複的控制項
+- [x] 完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；88 passed、1 skipped；Android Hermes bundle 5.67 MB；NitroModules／MapLibre 掃描 0）

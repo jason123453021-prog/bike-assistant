@@ -14,14 +14,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
-import Svg, { Circle, Polyline, Line, Text as SvgText, Rect } from "react-native-svg";
+import Svg, { Circle, Polyline, Line, Rect, Text as SvgText } from "react-native-svg";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useSettings } from "@/lib/settings-context";
 import { useRide } from "@/lib/ride-context";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
-import { buildRouteEstimateSnapshot, type RoutePlanningPoint } from "@/lib/route-estimate-snapshot";
+import { buildRouteEstimateSnapshot } from "@/lib/route-estimate-snapshot";
 import { calculateAgeFromBirthday } from "@/lib/personal-profile";
 import * as Location from "expo-location";
 import { type GpxRoute } from "@/lib/gpx-parser";
@@ -302,30 +302,6 @@ export default function NavigateScreen() {
             )}
           </Pressable>
 
-          {/* 最愛路線按鈕 */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.importBtn,
-              { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-            ]}
-            onPress={() => router.push("/favorites-list")}
-          >
-            <>
-              <View style={[styles.importIconWrap, { backgroundColor: colors.primary + "15" }]}>
-                <IconSymbol name="heart.fill" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.importTextWrap}>
-                <Text style={[styles.importTitle, { color: colors.foreground }]}>
-                  最愛路線
-                </Text>
-                <Text style={[styles.importSubtitle, { color: colors.muted }]}>
-                  快速套用常用路線
-                </Text>
-              </View>
-              <IconSymbol name="star.fill" size={18} color={colors.muted} />
-            </>
-          </Pressable>
-
           {/* GPX 匹入按鈕 */}
           {/* 匹入 GPX 按鈕已移除 */}
 
@@ -397,7 +373,7 @@ export default function NavigateScreen() {
                 </Text>
               </View>
 
-              <RoutePreview route={route} planningPoints={routeEstimate.planningPoints} colors={colors} />
+              <RoutePreview route={route} colors={colors} />
 
               {/* Basic Stats Grid */}
               <View style={[styles.statsGrid, { borderColor: colors.border }]}> 
@@ -468,25 +444,9 @@ export default function NavigateScreen() {
                   <BreakdownItem label="每次建議能量" sublabel="依預估時長與功率強度" value={routeEstimate.suggestedEnergyKcal} pct={0} color="#F97316" colors={colors} unit="kcal" />
                 </View>
                 <Text style={[styles.calorieNote, { color: colors.muted }]}> 
-                  * {routeEstimate.sourceLabel}；預估補給點為路線規劃位置，不代表現場有商店、飲水機或休息站。
+                  * {routeEstimate.sourceLabel}；請依實際補給條件安排水分與能量。
                 </Text>
               </View>
-
-              {routeEstimate.planningPoints.length > 0 && (
-                <View style={[styles.planningCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>建議補給／休息規劃點</Text>
-                  <Text style={[styles.planningHint, { color: colors.muted }]}>依預估移動時間、補水與能量間隔自動配置；請自行確認現場可停留與補給條件。</Text>
-                  {routeEstimate.planningPoints.map((point) => (
-                    <View key={point.pointIndex} style={[styles.planningRow, { borderTopColor: colors.border }]}>
-                      <View style={[styles.planningDot, { backgroundColor: colors.warning }]} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.planningTitle, { color: colors.foreground }]}>{point.label} · {formatDistance(point.distanceM)}</Text>
-                        <Text style={[styles.planningMeta, { color: colors.muted }]}>建議補水 {point.waterMl} ml · 能量 {point.energyKcal} kcal</Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
 
               {/* Elevation Chart */}
               {renderElevationChart()}
@@ -555,7 +515,7 @@ export default function NavigateScreen() {
 
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
-function RoutePreview({ route, planningPoints, colors }: { route: GpxRoute; planningPoints: RoutePlanningPoint[]; colors: any }) {
+function RoutePreview({ route, colors }: { route: GpxRoute; colors: any }) {
   const lats = route.points.map((point) => point.lat);
   const lons = route.points.map((point) => point.lon);
   const minLat = Math.min(...lats); const maxLat = Math.max(...lats);
@@ -579,17 +539,6 @@ function RoutePreview({ route, planningPoints, colors }: { route: GpxRoute; plan
       <Svg width={width} height={height}>
         <Rect x={0} y={0} width={width} height={height} rx={12} fill={colors.background} />
         <Polyline points={points} fill="none" stroke={colors.accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-        {planningPoints.map((planningPoint, index) => {
-          const point = route.points[planningPoint.pointIndex];
-          if (!point) return null;
-          const marker = project(point);
-          return (
-            <Fragment key={planningPoint.pointIndex}>
-              <Circle cx={marker.x} cy={marker.y} r={7} fill="#F59E0B" />
-              <SvgText x={marker.x} y={marker.y + 3.5} fontSize={8} fontWeight="700" fill="#111827" textAnchor="middle">{index + 1}</SvgText>
-            </Fragment>
-          );
-        })}
         <Circle cx={startPoint.x} cy={startPoint.y} r={5} fill="#22C55E" />
         <Circle cx={endPoint.x} cy={endPoint.y} r={5} fill="#EF4444" />
       </Svg>
