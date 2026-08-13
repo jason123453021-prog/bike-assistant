@@ -2385,14 +2385,6 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* ── GPX 路線提示（無路線時，且無導航指令條顯示時） ── */}
-      {!gpxRoute && !isActive && !isNavigating && navInstruction === "" && (
-        <View style={[styles.noRouteBadge, { top: insets.top + 8, left: 16, right: 72 }]}>
-          <IconSymbol name="map.fill" size={13} color="rgba(255,255,255,0.5)" />
-          <Text style={styles.noRouteText}>前往「路線」頁面匯入 GPX 路線</Text>
-        </View>
-      )}
-
       {/* ── 底部面板（螢幕下方三分之一，可上滑展開） ── */}
       <Animated.View
         {...panResponder.panHandlers}
