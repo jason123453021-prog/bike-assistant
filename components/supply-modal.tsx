@@ -17,6 +17,12 @@ export interface SupplyModalProps {
   waterAlert: boolean;
   /** 建議補水量 ml */
   recommendedMl?: number;
+  /** 建議補充能量 kcal */
+  recommendedEnergyKcal?: number;
+  /** 建議補充碳水化合物 g */
+  recommendedCarbohydrateG?: number;
+  /** 智慧計算本次建議的主要原因 */
+  recommendationReason?: string;
   /** 按下「已補充卡路里」 */
   onConfirmCalorie: () => void;
   /** 按下「已補充水分」 */
@@ -31,6 +37,9 @@ export function SupplyModal({
   calorieAlert,
   waterAlert,
   recommendedMl,
+  recommendedEnergyKcal,
+  recommendedCarbohydrateG,
+  recommendationReason,
   onConfirmCalorie,
   onConfirmWater,
   onDismiss,
@@ -87,11 +96,20 @@ export function SupplyModal({
                 </View>
                 <View style={styles.alertBlockText}>
                   <Text style={[styles.alertBlockTitle, { color: "#F59E0B" }]}>能量補充</Text>
-                  <Text style={[styles.alertBlockSub, { color: colors.muted }]}>
-                    已消耗大量卡路里，建議補充能量棒或食物
+                  <Text style={[styles.alertBlockSub, { color: colors.muted }]}> 
+                    {recommendedEnergyKcal
+                      ? `建議補充約 ${recommendedEnergyKcal} kcal 能量`
+                      : "已消耗大量卡路里，建議補充能量棒或食物"}
                   </Text>
                 </View>
               </View>
+              {recommendedEnergyKcal && (
+                <View style={[styles.tipBox, { backgroundColor: "#F59E0B" + "15", borderColor: "#F59E0B" + "35" }]}> 
+                  <Text style={[styles.tipText, { color: "#F59E0B" }]}> 
+                    建議一次補充約 {recommendedEnergyKcal} kcal{recommendedCarbohydrateG ? `（約 ${recommendedCarbohydrateG} g 碳水）` : ""}
+                  </Text>
+                </View>
+              )}
               <Pressable
                 style={({ pressed }) => [styles.confirmBtn, { backgroundColor: "#F59E0B", opacity: pressed ? 0.8 : 1 }]}
                 onPress={onConfirmCalorie}
@@ -155,6 +173,12 @@ export function SupplyModal({
               </Pressable>
             </View>
           ))}
+
+          {recommendationReason && (calorieAlert || waterAlert) && (
+            <Text style={[styles.safetyHint, { color: colors.muted }]}> 
+              智慧計算依據：{recommendationReason}
+            </Text>
+          )}
 
           <Text style={[styles.safetyHint, { color: colors.muted }]}> 
             為避免改變系統音量行為，實體音量鍵維持調整音量；請直接點選上方放大的「已補給」按鈕快速確認。

@@ -176,15 +176,29 @@ export async function requestNotificationPermission(): Promise<boolean> {
   }
 }
 
-export async function showSupplyNotification(type: SupplyNotificationKind) {
+export interface SupplyNotificationRecommendation {
+  energyKcal?: number;
+  carbohydrateG?: number;
+  waterMl?: number;
+  reason?: string;
+}
+
+export async function showSupplyNotification(
+  type: SupplyNotificationKind,
+  recommendation?: SupplyNotificationRecommendation,
+) {
   const Notifications = await getLocalNotifications();
   if (!Notifications) return;
 
   const title = type === "calorie" ? "🍌 補給提醒" : type === "water" ? "💧 補水提醒" : "補給提醒";
   const body = type === "calorie"
-    ? "已消耗大量卡路里，請補充能量！"
+    ? recommendation?.energyKcal
+      ? `建議補充約 ${recommendation.energyKcal} kcal${recommendation.carbohydrateG ? `（${recommendation.carbohydrateG} g 碳水）` : ""}${recommendation.reason ? `；${recommendation.reason}` : ""}`
+      : "已消耗大量卡路里，請補充能量！"
     : type === "water"
-      ? "水分不足，請補充水分！"
+      ? recommendation?.waterMl
+        ? `建議補充約 ${recommendation.waterMl} ml 水分${recommendation.reason ? `；${recommendation.reason}` : ""}`
+        : "水分不足，請補充水分！"
       : "已達自訂補給間隔，請依騎乘狀況補充能量與水分。";
   try {
     await configureSupplyNotificationActions();

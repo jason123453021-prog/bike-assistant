@@ -90,6 +90,7 @@ export interface SupplyItem {
 
 // 效能模式型別
 export type PerformanceMode = 'battery-saver' | 'balanced' | 'performance';
+export type SupplyCalculationMode = "smart" | "custom";
 
 // 預設補給品樣板已移除
 export const SUPPLY_ITEM_TEMPLATES = []
@@ -111,6 +112,8 @@ export interface AppSettings {
   // Thresholds
   calorieThreshold: number;   // kcal before reminder
   waterThreshold: number;     // ml before reminder
+  /** smart：依個人、騎乘與環境資料調整提醒；custom：完全沿用使用者自訂門檻 */
+  supplyCalculationMode: SupplyCalculationMode;
   supplyReminderRepeatSec: number; // 0 = 不重複；>0 = 每幾秒重複語音提醒
   // 通用補給間隔：可依騎乘時間、距離或兩者提醒，不綁定特定補給品
   supplyIntervalReminderEnabled: boolean;
@@ -208,6 +211,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoPerformanceMode: true,
   calorieThreshold: 300,
   waterThreshold: 500,
+  // 升級後預設維持既有使用者固定門檻，讓使用者自行選擇啟用智慧計算。
+  supplyCalculationMode: "custom",
   supplyReminderRepeatSec: 60,
   // 升級後預設不主動開啟，須由使用者依自身補給策略啟用。
   supplyIntervalReminderEnabled: false,

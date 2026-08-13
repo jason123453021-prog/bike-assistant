@@ -21,12 +21,11 @@ import {
 } from "@/lib/ride-recovery/ride-session-recovery";
 import { calcAirDensity, calcGrade, calculatePower } from "@/lib/power-calc";
 import {
-  calculateAdaptiveCalorieThreshold,
-  calculateAdaptiveHydrationThreshold,
   calculatePersonalizedCalories,
 } from "@/lib/personalized-ride-calculations";
 import { calculateSweatLoss } from "@/lib/hydration-calc";
 import { getHeadwindMs } from "@/lib/weather-service";
+import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
@@ -42,6 +41,7 @@ export interface BackgroundState {
   isRiding: boolean;
   calorieThreshold: number;
   waterThreshold: number;
+  supplyCalculationMode?: "smart" | "custom";
   calorieReminderSent: boolean;
   waterReminderSent: boolean;
   rideStartedAt: number;
@@ -107,6 +107,18 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
 
       let activeCalorieThreshold = state.calorieThreshold;
       let activeWaterThreshold = state.waterThreshold;
+      let latestSupplyPlan: SupplyPlan = createSupplyPlan({
+        mode: state.supplyCalculationMode ?? "custom",
+        calorieThresholdKcal: state.calorieThreshold,
+        waterThresholdMl: state.waterThreshold,
+        elapsedSec: Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000)),
+        riderWeightKg: state.riderProfile?.weightKg ?? 70,
+        ftpW: state.riderProfile?.ftpW ?? 245,
+        intensityFactor: 0.65,
+        sweatRatePerHour: 650,
+        environmentLoad: 0,
+        weatherAvailable: Boolean(state.environment),
+      });
 
       // 處理每個位置更新
       for (const loc of locations) {
@@ -205,8 +217,20 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
             });
             state.calories += calorieResult.kcal;
             state.sweatLossMl += hydrationResult.sweatLossMl;
-            activeCalorieThreshold = calculateAdaptiveCalorieThreshold(state.calorieThreshold, calorieResult);
-            activeWaterThreshold = calculateAdaptiveHydrationThreshold(state.waterThreshold, hydrationResult);
+            latestSupplyPlan = createSupplyPlan({
+              mode: state.supplyCalculationMode ?? "custom",
+              calorieThresholdKcal: state.calorieThreshold,
+              waterThresholdMl: state.waterThreshold,
+              elapsedSec: Math.max(0, Math.floor((timestamp - (state.rideStartedAt || timestamp)) / 1000)),
+              riderWeightKg: profile.weightKg,
+              ftpW: profile.ftpW,
+              intensityFactor: calorieResult.intensityFactor,
+              sweatRatePerHour: hydrationResult.sweatRatePerHour,
+              environmentLoad: hydrationResult.environmentLoad,
+              weatherAvailable: Boolean(state.environment),
+            });
+            activeCalorieThreshold = latestSupplyPlan.calorieTriggerKcal;
+            activeWaterThreshold = latestSupplyPlan.waterTriggerMl;
           }
         }
 
@@ -242,7 +266,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           await Notifications.scheduleNotificationAsync({
             content: {
               title: "🍌 補給提醒",
-              body: "已達個人化能量補給條件，建議補充能量棒或食物",
+              body: `建議補充約 ${latestSupplyPlan.energyRecommendationKcal} kcal（${latestSupplyPlan.carbohydrateRecommendationG} g 碳水）；${latestSupplyPlan.reason}`,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
               data: { type: "supply_reminder", supplyKind: "calorie" },
@@ -260,7 +284,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           await Notifications.scheduleNotificationAsync({
             content: {
               title: "💧 補水提醒",
-              body: "水分流失達個人化補水條件，建議立即補充水分",
+              body: `建議補充約 ${latestSupplyPlan.waterRecommendationMl} ml 水分；${latestSupplyPlan.reason}`,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
               data: { type: "supply_reminder", supplyKind: "water" },
@@ -352,6 +376,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
 export async function initBackgroundState(params: {
   calorieThreshold: number;
   waterThreshold: number;
+  supplyCalculationMode?: "smart" | "custom";
   currentLat: number;
   currentLon: number;
   supplyIntervalReminderEnabled: boolean;
@@ -373,6 +398,7 @@ export async function initBackgroundState(params: {
     isRiding: true,
     calorieThreshold: params.calorieThreshold,
     waterThreshold: params.waterThreshold,
+    supplyCalculationMode: params.supplyCalculationMode ?? "custom",
     calorieReminderSent: false,
     waterReminderSent: false,
     rideStartedAt: startedAt,

@@ -79,10 +79,9 @@ import {
   formatSweatRate,
 } from "@/lib/hydration-calc";
 import {
-  calculateAdaptiveCalorieThreshold,
-  calculateAdaptiveHydrationThreshold,
   calculatePersonalizedCalories,
 } from "@/lib/personalized-ride-calculations";
+import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import {
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
@@ -376,6 +375,7 @@ export default function MapScreen() {
   const [calorieAlert, setCalorieAlert] = useState(false);
   const [waterAlert, setWaterAlert] = useState(false);
   const [supplyRecommendedMl, setSupplyRecommendedMl] = useState<number | undefined>(undefined);
+  const [supplyRecommendation, setSupplyRecommendation] = useState<SupplyPlan | undefined>(undefined);
 
   const calorieReminderSentRef = useRef(false);
   const waterReminderSentRef = useRef(false);
@@ -524,6 +524,7 @@ export default function MapScreen() {
     calorieAnim.setValue(0);
     calorieReminderSentRef.current = false;
     pendingCalorieRef.current = false;
+    if (!pendingWaterRef.current) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.calorie = 0;
     void acknowledgeBackgroundSupplyReminder("calorie");
     if (settings.vibrationEnabled) vibrateSuccess();
@@ -537,6 +538,7 @@ export default function MapScreen() {
     waterAnim.setValue(0);
     waterReminderSentRef.current = false;
     pendingWaterRef.current = false;
+    if (!pendingCalorieRef.current) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.water = 0;
     void acknowledgeBackgroundSupplyReminder("water");
     if (settings.vibrationEnabled) vibrateSuccess();
@@ -697,7 +699,7 @@ export default function MapScreen() {
 
   // ─── 補給提醒 ────────────────────────────────────────────────────────────────
   const triggerSupplyReminder = useCallback(
-    async (type: "calorie" | "water", recommendedMl?: number) => {
+    async (type: "calorie" | "water", recommendation?: SupplyPlan) => {
       if (supplySnoozedUntilRef.current[type] > Date.now()) return;
       powerSavingManagerRef.current.onSupplyReminder();
       setTouchGuardEnabled(false);
@@ -705,14 +707,22 @@ export default function MapScreen() {
         setCalorieAlert(true);
       } else {
         setWaterAlert(true);
-        if (recommendedMl) setSupplyRecommendedMl(recommendedMl);
+        if (recommendation?.waterRecommendationMl) setSupplyRecommendedMl(recommendation.waterRecommendationMl);
       }
+      if (recommendation) setSupplyRecommendation(recommendation);
       if (settings.vibrationEnabled) vibrateWarning();
       if (settings.ttsEnabled) speakSupplyReminder(type, true);
       if (settings.soundEnabled) {
         try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
       }
-      if (settings.notificationEnabled) showSupplyNotification(type);
+      if (settings.notificationEnabled) {
+        void showSupplyNotification(type, recommendation ? {
+          energyKcal: recommendation.energyRecommendationKcal,
+          carbohydrateG: recommendation.carbohydrateRecommendationG,
+          waterMl: recommendation.waterRecommendationMl,
+          reason: recommendation.reason,
+        } : undefined);
+      }
 
       // 記錄尚未確認的補給類型
       if (type === "calorie") pendingCalorieRef.current = true;
@@ -1418,12 +1428,22 @@ export default function MapScreen() {
             void saveRideSessionSnapshot(recoverySession);
           }
 
-          const adaptiveCalorieThreshold = calculateAdaptiveCalorieThreshold(settings.calorieThreshold, calorieResult);
-          const adaptiveHydrationThreshold = calculateAdaptiveHydrationThreshold(hydrationThresholdMl, sweatResult);
+          const supplyPlan = createSupplyPlan({
+            mode: settings.supplyCalculationMode,
+            calorieThresholdKcal: settings.calorieThreshold,
+            waterThresholdMl: hydrationThresholdMl,
+            elapsedSec: currentState.elapsed,
+            riderWeightKg: settings.weight,
+            ftpW: settings.ftp,
+            intensityFactor: calorieResult.intensityFactor,
+            sweatRatePerHour: sweatResult.sweatRatePerHour,
+            environmentLoad: sweatResult.environmentLoad,
+            weatherAvailable: Boolean(currentWeather),
+          });
           const newCalories = currentState.calories + calIncrement;
-          const calPct = Math.min(1, newCalories / adaptiveCalorieThreshold);
+          const calPct = Math.min(1, newCalories / supplyPlan.calorieTriggerKcal);
           const newSweatSince = currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
-          const waterPct = Math.min(1, newSweatSince / adaptiveHydrationThreshold);
+          const waterPct = Math.min(1, newSweatSince / supplyPlan.waterTriggerMl);
 
           Animated.timing(calorieAnim, { toValue: calPct, duration: 500, useNativeDriver: false }).start();
           Animated.timing(waterAnim, { toValue: waterPct, duration: 500, useNativeDriver: false }).start();
@@ -1434,27 +1454,27 @@ export default function MapScreen() {
 
           // 卡路里提醒邏輯
           if (calPct >= 1 && !calorieReminderSentRef.current) {
-            console.log(`[補給] 卡路里達到動態閾值: ${newCalories}/${adaptiveCalorieThreshold} (${(calPct*100).toFixed(1)}%)`);
+            console.log(`[補給] 卡路里達到${supplyPlan.source}閾值: ${newCalories}/${supplyPlan.calorieTriggerKcal} (${(calPct*100).toFixed(1)}%)`);
             if (settings.caloriePauseOnDownhill && isDownhill && !calorieAlert) {
               // 下坡時暫停提醒但仍計數
               console.log('[補給] 下坡時暫停卡路里提醒');
             } else {
               calorieReminderSentRef.current = true;
               console.log('[補給] 觸發卡路里提醒');
-              triggerSupplyReminder("calorie");
+              triggerSupplyReminder("calorie", supplyPlan);
             }
           }
 
           // 水分提醒邏輯
           if (waterPct >= 1 && !waterReminderSentRef.current) {
-            console.log(`[補給] 水分達到動態閾值: ${newSweatSince}/${adaptiveHydrationThreshold} (${(waterPct*100).toFixed(1)}%)`);
+            console.log(`[補給] 水分達到${supplyPlan.source}閾值: ${newSweatSince}/${supplyPlan.waterTriggerMl} (${(waterPct*100).toFixed(1)}%)`);
             if (settings.waterPauseOnDownhill && isDownhill && !waterAlert) {
               // 下坡時暫停提醒但仍計數
               console.log('[補給] 下坡時暫停水分提醒');
             } else {
               waterReminderSentRef.current = true;
               console.log('[補給] 觸發水分提醒');
-              triggerSupplyReminder("water", sweatResult.recommendedRefillMl);
+              triggerSupplyReminder("water", supplyPlan);
             }
           }
 
@@ -1696,6 +1716,7 @@ export default function MapScreen() {
     await initBackgroundState({
       calorieThreshold: settings.calorieThreshold,
       waterThreshold: hydrationThresholdMl,
+      supplyCalculationMode: settings.supplyCalculationMode,
       currentLat: lastPos?.coords.latitude ?? 0,
       currentLon: lastPos?.coords.longitude ?? 0,
       supplyIntervalReminderEnabled: settings.supplyIntervalReminderEnabled,
@@ -2612,6 +2633,9 @@ export default function MapScreen() {
         calorieAlert={calorieAlert}
         waterAlert={waterAlert}
         recommendedMl={supplyRecommendedMl}
+        recommendedEnergyKcal={supplyRecommendation?.energyRecommendationKcal}
+        recommendedCarbohydrateG={supplyRecommendation?.carbohydrateRecommendationG}
+        recommendationReason={supplyRecommendation?.reason}
         customSupplyAlerts={[
           ...sortedActiveAlerts.map(id => {
             const item = settings.supplyItems.find(i => i.id === id);
