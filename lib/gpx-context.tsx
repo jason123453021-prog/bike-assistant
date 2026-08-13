@@ -6,7 +6,7 @@
  */
 
 import React, { createContext, useCallback, useContext, useState } from "react";
-import { type GpxRoute, parseGpx } from "@/lib/gpx-parser";
+import { type GpxRoute } from "@/lib/gpx-parser";
 import { importExternalGpxUri } from "@/lib/external-gpx-import";
 
 interface GpxContextValue {
@@ -16,8 +16,6 @@ interface GpxContextValue {
   setSharedRoute: (route: GpxRoute | null) => void;
   /** 清除共享路線 */
   clearSharedRoute: () => void;
-  /** 從最愛路線的 GPX 內容套用 */
-  applyFavoriteRoute: (gpxContent: string) => Promise<void>;
   /** 從系統「開啟方式」或檔案選取器 URI 匯入；全程只在裝置端讀取。 */
   importExternalRoute: (uri: string, declaredSize?: number) => Promise<GpxRoute>;
 }
@@ -35,20 +33,6 @@ export function GpxProvider({ children }: { children: React.ReactNode }) {
     setSharedRouteState(null);
   }, []);
 
-  const applyFavoriteRoute = useCallback(async (gpxContent: string) => {
-    try {
-      const route = parseGpx(gpxContent);
-      if (route) {
-        setSharedRouteState(route);
-      } else {
-        throw new Error("無法解析 GPX 內容");
-      }
-    } catch (err) {
-      console.error("[GpxContext] 套用最愛路線失敗:", err);
-      throw err;
-    }
-  }, []);
-
   const importExternalRoute = useCallback(async (uri: string, declaredSize?: number) => {
     const route = await importExternalGpxUri(uri, declaredSize);
     setSharedRouteState(route);
@@ -56,7 +40,7 @@ export function GpxProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <GpxContext.Provider value={{ sharedRoute, setSharedRoute, clearSharedRoute, applyFavoriteRoute, importExternalRoute }}>
+    <GpxContext.Provider value={{ sharedRoute, setSharedRoute, clearSharedRoute, importExternalRoute }}>
       {children}
     </GpxContext.Provider>
   );

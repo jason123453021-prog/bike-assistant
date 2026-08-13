@@ -1438,3 +1438,8 @@
 - [x] 移除路線頁「建議補給／休息規劃點」與「最愛路線」欄位
 - [x] 驗證效能模式及背景 GPS 精度是否改變實際定位策略，修正無效或重複的控制項
 - [x] 完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；88 passed、1 skipped；Android Hermes bundle 5.67 MB；NitroModules／MapLibre 掃描 0）
+
+## 最愛路線功能完整移除（2026-08-13）
+- [x] 移除未使用的最愛路線獨立頁面與 Favorites Context
+- [x] 清理所有最愛路線導航、路由註冊與深層連結入口
+- [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；88 passed、1 skipped；Android Hermes bundle 5.66 MB；最愛路線、NitroModules／MapLibre 掃描 0）

@@ -49,7 +49,6 @@ function InnerLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="ride-detail" options={{ headerShown: false, presentation: "fullScreenModal" }} />
-          <Stack.Screen name="favorites-list" options={{ headerShown: false, presentation: "fullScreenModal" }} />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
