@@ -86,6 +86,7 @@ export interface LeafletMapProps {
 export interface LeafletMapHandle {
   animateCamera: (opts: { center: { latitude: number; longitude: number }; zoom?: number }, anim?: { duration: number }) => void;
   fitToCoordinates: (coords: LatLng[], opts?: { edgePadding?: { top: number; right: number; bottom: number; left: number }; animated?: boolean }) => void;
+  clearNavigationGraphics: () => void;
   setBearing: (bearing: number, headingUp: boolean) => void;
   setPitch: (pitch: number) => void; // 俯視角設定 (0-60 度)
   setPlaybackMarker: (lat: number, lon: number, color: string) => void; // 彩色回放標點
@@ -211,6 +212,18 @@ function clearRouteOverlays() {
     if (className === 'gpx-arrow' || className === 'route-direction-arrow') legacyArrows.push(layer);
   });
   legacyArrows.forEach(function(marker) { map.removeLayer(marker); });
+}
+
+// 由 React Native 的「清除所有導航圖層」動作直接呼叫；避免等待 state 渲染期間殘留數字或折線。
+function clearNavigationGraphics() {
+  clearRouteOverlays();
+  passedLayer.setLatLngs([]);
+  returnLayer.setLatLngs([]);
+  if (returnEndMarker) { map.removeLayer(returnEndMarker); returnEndMarker = null; }
+  arrowMarkers.forEach(function(marker) { map.removeLayer(marker); });
+  arrowMarkers = [];
+  kilometerMarkersLayer.forEach(function(marker) { map.removeLayer(marker); });
+  kilometerMarkersLayer = [];
 }
 
 function renderRouteOverlays(layers) {
@@ -477,6 +490,9 @@ function handleMessage(data) {
       case 'setRouteOverlays':
         renderRouteOverlays(msg.layers || []);
         break;
+      case 'clearNavigationGraphics':
+        clearNavigationGraphics();
+        break;
       case 'setPassedPolyline':
         passedLayer.setLatLngs(msg.coords);
         break;
@@ -738,6 +754,10 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             padding: opts?.edgePadding,
           })
         );
+      },
+      clearNavigationGraphics: () => {
+        if (!webViewRef.current) return;
+        webViewRef.current.postMessage(JSON.stringify({ type: "clearNavigationGraphics" }));
       },
       setPitch: (pitch: number) => {
         if (!webViewRef.current) return;

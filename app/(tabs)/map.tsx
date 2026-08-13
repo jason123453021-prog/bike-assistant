@@ -413,6 +413,8 @@ export default function MapScreen() {
   const [pinRouteInfo, setPinRouteInfo] = useState<{ distM: number; durSec: number; polyline: { latitude: number; longitude: number }[] } | null>(null);
 
   const clearAllNavigationLayers = useCallback(() => {
+    // 立即通知 Leaflet 清空已繪製圖層與數字標記，避免等待 React state 更新而短暫殘留。
+    mapRef.current?.clearNavigationGraphics();
     clearSharedRoute();
     setPinnedNavigationLayers([]);
     setActiveNavigationRoute(null);
