@@ -1,5 +1,5 @@
 import { calculateNormalizedPowerFromHistory } from "./tss-calc";
-import type { LocationPoint, RideCalculationProfile, RideRecord, SupplyConfirmation } from "./ride-context";
+import type { LocationPoint, RideActivityType, RideCalculationProfile, RideRecord, SupplyConfirmation } from "./ride-context";
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -155,6 +155,17 @@ function normalizeSupplyConfirmations(value: unknown): SupplyConfirmation[] | un
   return confirmations.sort((a, b) => a.timestamp - b.timestamp).slice(-100);
 }
 
+function normalizeActivityType(value: unknown): RideActivityType {
+  return value === "road" || value === "gravel" || value === "mountain" || value === "commute" || value === "indoor" || value === "other"
+    ? value
+    : "road";
+}
+
+function normalizeRpe(value: unknown): number | undefined {
+  const rpe = normalizedOptional(value);
+  return rpe !== undefined && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : undefined;
+}
+
 /**
  * 將歷史、匯入與新建騎乘資料轉為同一個安全模型。
  * 僅接受具有數值距離與軌跡陣列的記錄；缺失的衍生數據會由本機軌跡補齊。
@@ -229,6 +240,9 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     calculationProfile: normalizeCalculationProfile(source.calculationProfile),
     supplyConfirmations: normalizeSupplyConfirmations(source.supplyConfirmations),
     description: typeof source.description === "string" ? source.description : undefined,
+    activityType: normalizeActivityType(source.activityType),
+    equipment: typeof source.equipment === "string" && source.equipment.trim() ? source.equipment.trim().slice(0, 80) : undefined,
+    perceivedExertion: normalizeRpe(source.perceivedExertion),
     mediaItems: Array.isArray(source.mediaItems) ? source.mediaItems.filter((uri): uri is string => typeof uri === "string") : undefined,
     segmentAchievements: Array.isArray(source.segmentAchievements) ? source.segmentAchievements : undefined,
   };

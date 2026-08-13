@@ -529,6 +529,33 @@ export default function SettingsScreen() {
           </Pressable>
         </View>}
 
+        {/* ── 本機訓練目標 ── */}
+        <SectionHeader title="本機訓練目標" colors={colors} onToggle={() => toggleSection("trainingGoals")} collapsed={collapsedSections["trainingGoals"]} />
+        {!collapsedSections["trainingGoals"] && <View style={[styles.section, { borderColor: colors.border }]}> 
+          <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 }}>
+            <Text style={[styles.rowHint, { color: colors.muted }]}>只會使用此裝置中的騎乘紀錄計算週進度與連續達標，不會建立帳號或同步至雲端。</Text>
+          </View>
+          <NumberRow
+            icon="bicycle"
+            label="每週騎乘目標"
+            value={settings.weeklyRideGoal}
+            unit="次"
+            colors={colors}
+            hint="活動詳情會顯示本週進度與連續達標週數"
+            onPress={() => openEdit("weeklyRideGoal", "每週騎乘目標", settings.weeklyRideGoal, "次")}
+          />
+          <Divider colors={colors} />
+          <NumberRow
+            icon="location.fill"
+            label="每週距離目標"
+            value={settings.weeklyDistanceGoalKm}
+            unit="km"
+            colors={colors}
+            hint="達成騎乘次數或距離其中一項，即視為完成本機週目標"
+            onPress={() => openEdit("weeklyDistanceGoalKm", "每週距離目標", settings.weeklyDistanceGoalKm, "km")}
+          />
+        </View>}
+
         {/* ── 效能模式 ── */}
         <SectionHeader title="效能模式" colors={colors} onToggle={() => toggleSection("performance")} collapsed={collapsedSections["performance"]} />
         {!collapsedSections["performance"] && <View style={[styles.section, { borderColor: colors.border }]}>

@@ -103,4 +103,32 @@ describe("ride record normalizer", () => {
     expect(normalizedPower).toBeGreaterThan(150);
     expect(normalizedPower).toBeLessThan(200);
   });
+
+  it("keeps valid local activity metadata and safely normalizes invalid values", () => {
+    const valid = normalizeRideRecord({
+      id: "metadata-valid",
+      distance: 1_000,
+      duration: 300,
+      route: [],
+      activityType: "gravel",
+      equipment: "  鋁合金礫石車  ",
+      perceivedExertion: 7.4,
+    });
+    const invalid = normalizeRideRecord({
+      id: "metadata-invalid",
+      distance: 1_000,
+      duration: 300,
+      route: [],
+      activityType: "unsupported",
+      equipment: 123,
+      perceivedExertion: 12,
+    });
+
+    expect(valid?.activityType).toBe("gravel");
+    expect(valid?.equipment).toBe("鋁合金礫石車");
+    expect(valid?.perceivedExertion).toBe(7);
+    expect(invalid?.activityType).toBe("road");
+    expect(invalid?.equipment).toBeUndefined();
+    expect(invalid?.perceivedExertion).toBeUndefined();
+  });
 });

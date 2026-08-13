@@ -149,6 +149,9 @@ export interface AppSettings {
   touchGuardEnabled: boolean;
   /** 長按此毫秒數後解除騎乘防誤觸；限定 400–5000 ms。 */
   touchGuardUnlockHoldMs: number;
+  // Local-First 訓練目標：僅以裝置內的騎乘紀錄計算。
+  weeklyRideGoal: number;
+  weeklyDistanceGoalKm: number;
   // 隊伍遙測
   teamTelemetryEnabled: boolean; // 是否開啟隊伍遙測
   showFriendDistance: boolean;   // 顯示隊友距離
@@ -237,6 +240,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   simplifiedNavIdleSec: 30,
   touchGuardEnabled: true,
   touchGuardUnlockHoldMs: 1200,
+  weeklyRideGoal: 3,
+  weeklyDistanceGoalKm: 80,
   teamTelemetryEnabled: false,
   showFriendDistance: true,
   showFriendLocation: true,

@@ -7,6 +7,16 @@ import { normalizeRideRecord, normalizeRideRecords } from "./ride-record-normali
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type RideStatus = "idle" | "active" | "paused" | "finished";
+export type RideActivityType = "road" | "gravel" | "mountain" | "commute" | "indoor" | "other";
+
+export interface RideActivityUpdate {
+  name?: string;
+  description?: string;
+  mediaItems?: string[];
+  activityType?: RideActivityType;
+  equipment?: string;
+  perceivedExertion?: number;
+}
 
 export interface LocationPoint {
   latitude: number;
@@ -103,6 +113,12 @@ export interface RideRecord {
   supplyConfirmations?: SupplyConfirmation[];
   /** Strava 風格活動心得描述 */
   description?: string;
+  /** 完全本機保存的活動分類，不用於任何社群資料交換。 */
+  activityType?: RideActivityType;
+  /** 使用者自行輸入的車輛或裝備備註。 */
+  equipment?: string;
+  /** 主觀用力程度（RPE，1–10）。 */
+  perceivedExertion?: number;
   /** 用戶自行新增的本機相片／影片 URI 清單 */
   mediaItems?: string[];
   /** 路段成就與瓦數統計列表 */
@@ -410,7 +426,7 @@ interface RideContextValue {
   ) => Promise<string | null>;
   loadRecords: () => Promise<void>;
   updateRecordName: (id: string, name: string) => Promise<void>;
-  updateRideActivity: (id: string, updates: { name?: string; description?: string; mediaItems?: string[] }) => Promise<void>;
+  updateRideActivity: (id: string, updates: RideActivityUpdate) => Promise<void>;
   /** 儲存騎乘進度快照（每 10 秒呼叫一次） */
   saveSnapshot: () => Promise<void>;
   /** 清除進度快照（騎乘結束後呼叫） */
@@ -509,6 +525,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       gradeDistribution: state.gradeDistribution,
       gradeAscentDistribution: state.gradeAscentDistribution,
       description: "",
+      activityType: "road",
       mediaItems: [],
       segmentAchievements: [
         {
@@ -584,7 +601,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
 
   const updateRideActivity = useCallback(async (
     id: string,
-    updates: { name?: string; description?: string; mediaItems?: string[] }
+    updates: RideActivityUpdate
   ) => {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEY);
@@ -597,6 +614,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
               ...(updates.name !== undefined ? { name: updates.name } : {}),
               ...(updates.description !== undefined ? { description: updates.description } : {}),
               ...(updates.mediaItems !== undefined ? { mediaItems: updates.mediaItems } : {}),
+              ...(updates.activityType !== undefined ? { activityType: updates.activityType } : {}),
+              ...(updates.equipment !== undefined ? { equipment: updates.equipment } : {}),
+              ...(updates.perceivedExertion !== undefined ? { perceivedExertion: updates.perceivedExertion } : {}),
             };
           }
           return r;

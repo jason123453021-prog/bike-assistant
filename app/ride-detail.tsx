@@ -41,9 +41,11 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFavorites } from "@/lib/favorites-context";
 import { ShareCardModal } from "@/components/share-card-modal";
 import { SpeedCurveChart, type KeyMarker, type SpeedDataPoint } from "@/components/speed-curve-chart";
+import { ActivityElevationChart } from "@/components/activity-elevation-chart";
 import { createGpxContent } from "@/lib/gpx-export";
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
 import { buildRideSplits } from "@/lib/ride-splits";
+import { buildLocalActivityHighlights, calculateBestPowerEfforts, calculateWeeklyGoalProgress, calculateWeeklyGoalStreak } from "@/lib/local-activity-insights";
 import { useSettings } from "@/lib/settings-context";
 import { calibrateSweatRate } from "@/lib/supply-calibration";
 import { writeLocalFitBackup } from "@/lib/local-fit-backup";
@@ -54,6 +56,17 @@ import * as ImagePicker from "expo-image-picker";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const STORAGE_KEY = "@bike_records";
+const ACTIVITY_TYPES = [
+  { value: "road", label: "公路" },
+  { value: "gravel", label: "礫石" },
+  { value: "mountain", label: "登山" },
+  { value: "commute", label: "通勤" },
+  { value: "indoor", label: "室內" },
+] as const;
+
+function activityTypeLabel(value: RideRecord["activityType"]): string {
+  return ACTIVITY_TYPES.find((item) => item.value === value)?.label ?? "其他騎乘";
+}
 
 // 深色地圖樣式
 const DARK_MAP_STYLE = [
@@ -71,6 +84,13 @@ const DARK_MAP_STYLE = [
 
 function isVideoMedia(uri: string): boolean {
   return /\.(mp4|mov|m4v|webm)(\?|$)/i.test(uri);
+}
+
+function formatPowerInterval(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return remainder ? `${minutes}m${remainder}s` : `${minutes}m`;
 }
 
 function RideRouteArtwork({ coordinates }: { coordinates: { latitude: number; longitude: number }[] }) {
@@ -127,6 +147,9 @@ export default function RideDetailScreen() {
   const [editDescInput, setEditDescInput] = useState("");
   const [editNameInput, setEditNameInput] = useState("");
   const [localMedia, setLocalMedia] = useState<string[]>([]);
+  const [editActivityType, setEditActivityType] = useState<RideRecord["activityType"]>("road");
+  const [editEquipmentInput, setEditEquipmentInput] = useState("");
+  const [editRpe, setEditRpe] = useState<number | undefined>(undefined);
 
   const handlePickMedia = async () => {
     try {
@@ -151,6 +174,9 @@ export default function RideDetailScreen() {
       name: editNameInput.trim() || record.name,
       description: editDescInput.trim(),
       mediaItems: localMedia,
+      activityType: editActivityType ?? "road",
+      equipment: editEquipmentInput.trim(),
+      perceivedExertion: editRpe,
     });
     setIsEditModalVisible(false);
     Alert.alert("成功", "已儲存活動編輯");
@@ -185,6 +211,9 @@ export default function RideDetailScreen() {
       setEditNameInput(record.name);
       setEditDescInput(record.description ?? "");
       setLocalMedia(record.mediaItems ?? []);
+      setEditActivityType(record.activityType ?? "road");
+      setEditEquipmentInput(record.equipment ?? "");
+      setEditRpe(record.perceivedExertion);
     }
   }, [record]);
 
@@ -340,8 +369,8 @@ export default function RideDetailScreen() {
     return record.route.map((point, idx) => ({
       index: idx,
       speed: point.speed ? point.speed * 3.6 : 0,
-      power: 0,
-      heartRate: record.avgHeartRate || 0,
+      power: point.power ?? record.powerHistory?.[Math.min(record.powerHistory.length - 1, Math.floor((idx / Math.max(1, record.route.length - 1)) * Math.max(0, record.powerHistory.length - 1)))] ?? 0,
+      heartRate: point.heartRate ?? record.avgHeartRate ?? 0,
       timestamp: point.timestamp,
     }));
   }, [record]);
@@ -620,6 +649,11 @@ export default function RideDetailScreen() {
   const averageMovingSpeed = movingDuration > 0
     ? (record.distance / 1000) / (movingDuration / 3600)
     : 0;
+  const weeklyGoal = { rideTarget: settings.weeklyRideGoal, distanceTargetKm: settings.weeklyDistanceGoalKm };
+  const weeklyGoalProgress = calculateWeeklyGoalProgress(state.records, weeklyGoal, record.date);
+  const weeklyGoalStreak = calculateWeeklyGoalStreak(state.records, weeklyGoal, record.date);
+  const activityHighlights = buildLocalActivityHighlights(record, state.records, weeklyGoal);
+  const bestPowerEfforts = calculateBestPowerEfforts(record);
 
   return (
     <ScrollView
@@ -743,6 +777,17 @@ export default function RideDetailScreen() {
         <Text style={styles.activityEyebrow}>活動摘要</Text>
         <Text style={styles.activityTitle}>{record.name}</Text>
         <Text style={styles.activityDate}>{dateStr}</Text>
+        <View style={styles.activityMetaRow}>
+          <View style={styles.activityMetaChip}>
+            <Text style={styles.activityMetaChipText}>{activityTypeLabel(record.activityType)}</Text>
+          </View>
+          {record.perceivedExertion !== undefined && (
+            <View style={[styles.activityMetaChip, styles.activityMetaRpeChip]}>
+              <Text style={styles.activityMetaRpeText}>RPE {record.perceivedExertion}/10</Text>
+            </View>
+          )}
+          {record.equipment ? <Text style={styles.activityEquipment}>{record.equipment}</Text> : null}
+        </View>
 
         <View style={styles.summaryGrid}>
           <SummaryCell
@@ -787,6 +832,64 @@ export default function RideDetailScreen() {
             label="平均功率"
             color="#A78BFA"
           />
+        </View>
+
+        <View style={styles.localGoalCard}>
+          <View style={styles.localGoalHeader}>
+            <View>
+              <Text style={styles.localGoalTitle}>本機訓練目標</Text>
+              <Text style={styles.localGoalHint}>僅以此裝置儲存的活動計算</Text>
+            </View>
+            <Text style={styles.localGoalStreak}>{weeklyGoalStreak > 0 ? `連續 ${weeklyGoalStreak} 週` : "本週累積中"}</Text>
+          </View>
+          <GoalProgress label="騎乘次數" value={`${weeklyGoalProgress.rideCount}/${weeklyGoalProgress.rideTarget}`} progress={weeklyGoalProgress.rideProgress} color="#00E676" />
+          <GoalProgress label="騎乘距離" value={`${weeklyGoalProgress.distanceKm.toFixed(1)}/${weeklyGoalProgress.distanceTargetKm} km`} progress={weeklyGoalProgress.distanceProgress} color="#60A5FA" />
+        </View>
+
+        {activityHighlights.length > 0 && (
+          <View style={styles.activityHighlightsCard}>
+            <Text style={styles.activityHighlightsTitle}>本機成果</Text>
+            {activityHighlights.map((highlight) => {
+              const color = highlight.accent === "gold" ? "#F6C445" : highlight.accent === "green" ? "#00E676" : "#60A5FA";
+              return (
+                <View key={`${highlight.kind}-${highlight.title}`} style={styles.activityHighlightRow}>
+                  <View style={[styles.activityHighlightDot, { backgroundColor: color }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.activityHighlightTitleText}>{highlight.title}</Text>
+                    <Text style={styles.activityHighlightDetail}>{highlight.detail}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        <View style={styles.activityAnalysisCard}>
+          <Text style={styles.activityAnalysisTitle}>活動分析</Text>
+          <Text style={styles.activityAnalysisHint}>拖曳曲線查看位置讀值；僅使用本次騎乘收集的資料</Text>
+          {speedCurveData.length > 1 ? (
+            <SpeedCurveChart
+              data={speedCurveData}
+              currentIndex={0}
+              markers={keyMarkers}
+              showPower={record.powerHistory.length > 1 || record.route.some((point) => (point.power ?? 0) > 0)}
+              showHeartRate={record.avgHeartRate !== undefined || record.route.some((point) => (point.heartRate ?? 0) > 0)}
+            />
+          ) : <Text style={styles.activityAnalysisEmpty}>此活動沒有足夠的 GPS 取樣資料可繪製速度曲線。</Text>}
+          <ActivityElevationChart route={record.route} />
+          {bestPowerEfforts.length > 0 && (
+            <View style={styles.bestPowerBlock}>
+              <Text style={styles.bestPowerTitle}>最佳平均功率</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestPowerRow}>
+                {bestPowerEfforts.map((effort) => (
+                  <View key={effort.seconds} style={styles.bestPowerChip}>
+                    <Text style={styles.bestPowerDuration}>{formatPowerInterval(effort.seconds)}</Text>
+                    <Text style={styles.bestPowerWatts}>{effort.watts} W</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
 
         {(record.personalBests?.length ?? 0) > 0 && (
@@ -1220,11 +1323,52 @@ export default function RideDetailScreen() {
                 />
               </View>
               <View>
-                <Text style={[styles.label, { color: colors.muted }]}>活動心得與裝備紀錄</Text>
+                <Text style={[styles.label, { color: colors.muted }]}>活動類型</Text>
+                <View style={styles.activityTypePicker}>
+                  {ACTIVITY_TYPES.map((item) => {
+                    const selected = editActivityType === item.value;
+                    return (
+                      <Pressable
+                        key={item.value}
+                        onPress={() => setEditActivityType(item.value)}
+                        style={[styles.activityTypeOption, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? `${colors.primary}22` : colors.surface }]}
+                      >
+                        <Text style={{ color: selected ? colors.primary : colors.muted, fontSize: 12, fontWeight: "700" }}>{item.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+              <View>
+                <Text style={[styles.label, { color: colors.muted }]}>裝備備註</Text>
+                <TextInput
+                  value={editEquipmentInput}
+                  onChangeText={setEditEquipmentInput}
+                  placeholder="例如：公路車、32 mm 胎、備用燈"
+                  placeholderTextColor={colors.muted}
+                  maxLength={80}
+                  style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
+                />
+              </View>
+              <View>
+                <Text style={[styles.label, { color: colors.muted }]}>主觀強度（RPE）</Text>
+                <View style={styles.rpePicker}>
+                  {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => {
+                    const selected = editRpe === value;
+                    return (
+                      <Pressable key={value} onPress={() => setEditRpe(selected ? undefined : value)} style={[styles.rpeOption, { borderColor: selected ? "#F59E0B" : colors.border, backgroundColor: selected ? "rgba(245,158,11,0.18)" : colors.surface }]}>
+                        <Text style={{ color: selected ? "#FCD34D" : colors.muted, fontSize: 12, fontWeight: "800" }}>{value}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+              <View>
+                <Text style={[styles.label, { color: colors.muted }]}>私人備註</Text>
                 <TextInput
                   value={editDescInput}
                   onChangeText={setEditDescInput}
-                  placeholder="一切好嗎？分享你活動的更多資訊..."
+                  placeholder="只保存在此裝置，例如路況、感受與下次調整…"
                   placeholderTextColor={colors.muted}
                   multiline
                   numberOfLines={3}
@@ -1322,6 +1466,20 @@ function SummaryCell({ icon, value, unit, label, color }: {
   );
 }
 
+function GoalProgress({ label, value, progress, color }: { label: string; value: string; progress: number; color: string }) {
+  return (
+    <View style={styles.goalProgressItem}>
+      <View style={styles.goalProgressLabelRow}>
+        <Text style={styles.goalProgressLabel}>{label}</Text>
+        <Text style={styles.goalProgressValue}>{value}</Text>
+      </View>
+      <View style={styles.goalProgressTrack}>
+        <View style={[styles.goalProgressFill, { backgroundColor: color, width: `${Math.max(0, Math.min(1, progress)) * 100}%` }]} />
+      </View>
+    </View>
+  );
+}
+
 const summaryStyles = StyleSheet.create({
   cell: { flex: 1, alignItems: "center", gap: 2 },
   value: { fontSize: 20, fontWeight: "700", fontVariant: ["tabular-nums"] },
@@ -1367,6 +1525,12 @@ const styles = StyleSheet.create({
   activityEyebrow: { color: "#00E676", fontSize: 12, fontWeight: "700", letterSpacing: 0.6, marginBottom: 5 },
   activityTitle: { color: "#fff", fontSize: 27, fontWeight: "800", lineHeight: 34 },
   activityDate: { color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 5, marginBottom: 18 },
+  activityMetaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 7, marginTop: -10, marginBottom: 16 },
+  activityMetaChip: { borderRadius: 99, backgroundColor: "rgba(96,165,250,0.14)", paddingHorizontal: 9, paddingVertical: 5 },
+  activityMetaChipText: { color: "#93C5FD", fontSize: 11, fontWeight: "800" },
+  activityMetaRpeChip: { backgroundColor: "rgba(245,158,11,0.14)" },
+  activityMetaRpeText: { color: "#FCD34D", fontSize: 11, fontWeight: "800" },
+  activityEquipment: { color: "rgba(255,255,255,0.55)", fontSize: 11, flexShrink: 1 },
   summaryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1390,6 +1554,37 @@ const styles = StyleSheet.create({
   localInsightText: { flex: 1 },
   localInsightTitle: { color: "#FCD34D", fontSize: 14, fontWeight: "800" },
   localInsightCopy: { color: "rgba(255,255,255,0.72)", fontSize: 12, lineHeight: 17, marginTop: 3 },
+  localGoalCard: { marginTop: 16, padding: 16, borderRadius: 16, backgroundColor: "rgba(0,230,118,0.07)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(0,230,118,0.28)", gap: 13 },
+  localGoalHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  localGoalTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  localGoalHint: { color: "rgba(255,255,255,0.48)", fontSize: 11, marginTop: 3 },
+  localGoalStreak: { color: "#00E676", fontSize: 12, fontWeight: "800", paddingTop: 2 },
+  goalProgressItem: { gap: 6 },
+  goalProgressLabelRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
+  goalProgressLabel: { color: "rgba(255,255,255,0.72)", fontSize: 12 },
+  goalProgressValue: { color: "#fff", fontSize: 12, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  goalProgressTrack: { height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.12)", overflow: "hidden" },
+  goalProgressFill: { height: "100%", borderRadius: 3 },
+  activityHighlightsCard: { marginTop: 16, padding: 16, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.045)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.1)", gap: 12 },
+  activityHighlightsTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  activityHighlightRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  activityHighlightDot: { width: 9, height: 9, borderRadius: 5 },
+  activityHighlightTitleText: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontWeight: "700" },
+  activityHighlightDetail: { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 2 },
+  activityAnalysisCard: { marginTop: 16, padding: 16, borderRadius: 16, backgroundColor: "rgba(96,165,250,0.07)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(96,165,250,0.22)" },
+  activityAnalysisTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  activityAnalysisHint: { color: "rgba(255,255,255,0.48)", fontSize: 11, lineHeight: 16, marginTop: 4 },
+  activityAnalysisEmpty: { color: "rgba(255,255,255,0.58)", fontSize: 12, lineHeight: 18, marginTop: 14 },
+  bestPowerBlock: { marginTop: 10 },
+  bestPowerTitle: { color: "rgba(255,255,255,0.76)", fontSize: 12, fontWeight: "700", marginBottom: 8 },
+  bestPowerRow: { gap: 8, paddingRight: 8 },
+  bestPowerChip: { minWidth: 66, borderRadius: 10, backgroundColor: "rgba(167,139,250,0.16)", paddingHorizontal: 10, paddingVertical: 9 },
+  bestPowerDuration: { color: "rgba(255,255,255,0.62)", fontSize: 10, fontWeight: "700" },
+  bestPowerWatts: { color: "#C4B5FD", fontSize: 14, fontWeight: "800", marginTop: 2 },
+  activityTypePicker: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  activityTypeOption: { minHeight: 36, paddingHorizontal: 12, justifyContent: "center", alignItems: "center", borderRadius: 10, borderWidth: 1 },
+  rpePicker: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 4 },
+  rpeOption: { width: 34, height: 34, justifyContent: "center", alignItems: "center", borderRadius: 17, borderWidth: 1 },
   moreDataHeading: { color: "#fff", fontSize: 19, fontWeight: "800", marginTop: 24 },
   moreDataHint: { color: "rgba(255,255,255,0.45)", fontSize: 12, marginTop: 4, marginBottom: 2 },
 
