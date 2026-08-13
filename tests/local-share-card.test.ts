@@ -34,7 +34,7 @@ describe("local ride share card", () => {
     expect(svg).toContain("polyline");
     expect(svg).toContain("45.20");
     expect(svg).toContain("晨騎 &lt;測試&gt;");
-    expect(svg).toContain("本機個人紀錄");
+    expect(svg).toContain("活動摘要");
   });
 
   it("creates a safe local SVG filename", () => {

@@ -49,6 +49,8 @@ function metric(x: number, y: number, label: string, value: string, unit: string
 }
 
 export function createRideShareCardSvg(record: RideRecord): string {
+  const hasPhotos = record.mediaItems && record.mediaItems.length > 0;
+  const photoUri = hasPhotos ? record.mediaItems![0] : "";
   const points = routePoints(record);
   const movingTime = Math.max(0, record.duration - (record.totalPausedSec ?? 0));
   const movingSpeed = movingTime > 0 ? (record.distance / 1000) / (movingTime / 3600) : 0;
@@ -67,12 +69,12 @@ export function createRideShareCardSvg(record: RideRecord): string {
 <svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="0 0 ${CARD_WIDTH} ${CARD_HEIGHT}">
   <defs><linearGradient id="hero" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#102F32"/><stop offset="100%" stop-color="#07151A"/></linearGradient><pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse"><path d="M 64 0 L 0 0 0 64" fill="none" stroke="#6B8790" stroke-opacity="0.17" stroke-width="1"/></pattern></defs>
   <rect width="1080" height="1920" fill="#101114"/><rect width="1080" height="700" fill="url(#hero)"/><rect width="1080" height="700" fill="url(#grid)"/>
-  <text x="72" y="78" fill="#D9FFEC" font-size="26" font-weight="700" font-family="sans-serif">單車助手 · 本機騎乘</text>${routeGraphic}
+  <text x="72" y="78" fill="#D9FFEC" font-size="26" font-weight="700" font-family="sans-serif">單車助手 · 騎乘動態</text>${routeGraphic}
   <rect x="0" y="650" width="1080" height="1270" rx="42" fill="#101114"/>
-  <text x="70" y="744" fill="#00E676" font-size="24" font-weight="700" font-family="sans-serif">騎乘摘要</text><text x="70" y="812" fill="#FFFFFF" font-size="54" font-weight="800" font-family="sans-serif">${routeName}</text><text x="70" y="858" fill="#A4ADB9" font-size="25" font-family="sans-serif">${formatDate(record.date)}</text>
-  ${bests ? `<rect x="70" y="894" width="940" height="78" rx="18" fill="#3A2B12"/><text x="105" y="944" fill="#FFD166" font-size="25" font-weight="700" font-family="sans-serif">本機個人紀錄 · ${escapeXml(bests)}</text>` : ""}
-  ${metric(260, 1050, "距離", (record.distance / 1000).toFixed(2), "公里")}${metric(820, 1050, "爬升海拔", `${Math.round(record.totalAscent)}`, "公尺")}${metric(260, 1230, "移動時間", formatDuration(movingTime), "")}${metric(820, 1230, "平均功率", `${Math.round(record.avgPower)}`, "瓦")}${metric(260, 1410, "平均速度", movingSpeed.toFixed(1), "公里／小時")}${metric(820, 1410, "卡路里", `${Math.round(record.calories)}`, "卡")}
-  <line x1="540" y1="1015" x2="540" y2="1460" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/><line x1="120" y1="1140" x2="960" y2="1140" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/><line x1="120" y1="1320" x2="960" y2="1320" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/>
+  <text x="70" y="724" fill="#00E676" font-size="24" font-weight="700" font-family="sans-serif">活動摘要</text><text x="70" y="792" fill="#FFFFFF" font-size="50" font-weight="800" font-family="sans-serif">${routeName}</text><text x="70" y="836" fill="#A4ADB9" font-size="24" font-family="sans-serif">${formatDate(record.date)}</text>
+  ${hasPhotos ? `<rect x="70" y="865" width="940" height="210" rx="20" fill="#1E222A"/><text x="100" y="905" fill="#00E676" font-size="20" font-weight="700" font-family="sans-serif">活動照片</text><text x="100" y="945" fill="#FFFFFF" font-size="22" font-family="sans-serif">已附加本機照片（共 ${record.mediaItems!.length} 張）</text>` : ""}
+  ${metric(260, hasPhotos ? 1140 : 960, "距離", (record.distance / 1000).toFixed(2), "公里")}${metric(820, hasPhotos ? 1140 : 960, "爬升海拔", `${Math.round(record.totalAscent)}`, "公尺")}${metric(260, hasPhotos ? 1320 : 1140, "移動時間", formatDuration(movingTime), "")}${metric(820, hasPhotos ? 1320 : 1140, "平均功率", `${Math.round(record.avgPower)}`, "瓦")}${metric(260, hasPhotos ? 1500 : 1320, "平均速度", movingSpeed.toFixed(1), "公里／小時")}${metric(820, hasPhotos ? 1500 : 1320, "卡路里", `${Math.round(record.calories)}`, "卡")}
+  <line x1="540" y1="${hasPhotos ? 1100 : 920}" x2="540" y2="${hasPhotos ? 1550 : 1370}" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/><line x1="120" y1="${hasPhotos ? 1230 : 1050}" x2="960" y2="${hasPhotos ? 1230 : 1050}" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/><line x1="120" y1="${hasPhotos ? 1410 : 1230}" x2="960" y2="${hasPhotos ? 1410 : 1230}" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/>
   <text x="540" y="1815" fill="#6E7783" font-size="22" font-family="sans-serif" text-anchor="middle">由單車助手在此裝置離線產生</text>
 </svg>`;
 }
