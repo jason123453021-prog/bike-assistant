@@ -68,7 +68,7 @@ function ExternalGpxReceiver() {
     handledUris.current.add(uri);
     try {
       await importExternalRoute(uri);
-      router.replace("/map");
+      router.replace("/navigate");
     } catch (error) {
       Alert.alert("GPX 載入失敗", error instanceof Error ? error.message : "無法讀取這個 GPX 檔案。");
     }

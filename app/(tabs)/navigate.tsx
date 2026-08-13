@@ -14,13 +14,16 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
-import Svg, { Polyline, Line, Text as SvgText, Rect } from "react-native-svg";
+import Svg, { Circle, Polyline, Line, Text as SvgText, Rect } from "react-native-svg";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useSettings } from "@/lib/settings-context";
+import { useRide } from "@/lib/ride-context";
+import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
+import { estimateRouteCompletionTime } from "@/lib/route-time-estimator";
 import * as Location from "expo-location";
-import { parseGpx, estimateRouteCalories, type GpxRoute } from "@/lib/gpx-parser";
+import { estimateRouteCalories, type GpxRoute } from "@/lib/gpx-parser";
 import { useGpx } from "@/lib/gpx-context";
 import { formatDuration, formatDistance, calcAirDensity } from "@/lib/power-calc";
 import { fetchWeather, type WeatherData } from "@/lib/weather-service";
@@ -33,7 +36,8 @@ export default function NavigateScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { settings } = useSettings();
-  const { setSharedRoute, importExternalRoute } = useGpx();
+  const { state: rideState } = useRide();
+  const { sharedRoute, setSharedRoute, importExternalRoute } = useGpx();
 
   const [route, setRoute] = useState<GpxRoute | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,21 +48,34 @@ export default function NavigateScreen() {
   // 是否已將天氣連結到路線起點（GPX 匯入後更新）
   const [weatherLinkedToRoute, setWeatherLinkedToRoute] = useState(false);
 
-  // 重量輸入（從設定預載，可在此頁面臨時覆蓋）
-  const [riderWeightStr, setRiderWeightStr] = useState(String(settings.weight));
-  const [bikeWeightStr, setBikeWeightStr] = useState(String(settings.bikeWeight ?? 10));
-  const [avgSpeedStr, setAvgSpeedStr] = useState("20");
-
-  // 解析後的數値
-  const riderKg = parseFloat(riderWeightStr) || 70;
-  const bikeKg = parseFloat(bikeWeightStr) || 10;
+  // 只使用設定頁必要的手動資料（體重）與 App 自動推定的訓練數據。
+  const riderKg = settings.weight || 70;
+  const bikeKg = settings.bikeWeight ?? 10;
   const totalMassKg = riderKg + bikeKg;
-  const avgSpeedKmh = parseFloat(avgSpeedStr) || 20;
+  const autoMetrics = useMemo(() => deriveAutoPersonalMetrics(rideState.records, {
+    ftpW: settings.ftp,
+    age: settings.age,
+    birthday: settings.birthday,
+    maxHeartRate: settings.maxHeartRate,
+    restingHeartRate: settings.restingHeartRate,
+  }), [rideState.records, settings.age, settings.birthday, settings.ftp, settings.maxHeartRate, settings.restingHeartRate]);
 
   // 天氣連動溫度：如果已取得路線天氣則使用即時溫度，否則預設 25°C
   const routeTempC = routeWeather?.temperature ?? 25;
   // 空氣密度（依溫度計算）
   const routeAirDensity = calcAirDensity(routeTempC);
+  const routeTimeEstimate = useMemo(() => {
+    if (!route) return null;
+    return estimateRouteCompletionTime({
+      route,
+      ftpW: autoMetrics.ftpW,
+      riderWeightKg: riderKg,
+      bikeWeightKg: bikeKg,
+      temperatureC: routeTempC,
+      humidityPct: routeWeather?.humidity,
+    });
+  }, [autoMetrics.ftpW, bikeKg, riderKg, route, routeTempC, routeWeather?.humidity]);
+  const avgSpeedKmh = routeTimeEstimate?.movingAverageKmh ?? 20;
 
   // 即時重算卡路里（天氣連動空氣密度）
   const calorieResult = useMemo(() => {
@@ -145,6 +162,15 @@ export default function NavigateScreen() {
     } finally { setWeatherLoading(false); }
   };
 
+  // 外部「開啟方式」傳入 GPX 時，統一先在此頁顯示預覽與完成時間確認。
+  useEffect(() => {
+    if (!sharedRoute) return;
+    setRoute(sharedRoute);
+    setError(null);
+    const firstPoint = sharedRoute.points[0];
+    if (firstPoint) void fetchRouteWeather(firstPoint.lat, firstPoint.lon);
+  }, [sharedRoute]);
+
   // ─── 高度剖面圖 ──────────────────────────────────────────────────────────────
   const renderElevationChart = () => {
     if (!route || route.elevationProfile.length < 2) return null;
@@ -218,45 +244,17 @@ export default function NavigateScreen() {
             <Text style={[styles.subtitle, { color: colors.muted }]}>匯入 GPX 檔案分析路線與預估消耗</Text>
           </View>
 
-          {/* ── 重量設定卡片 ─────────────────────────────────────────────────── */}
+          {/* ── 自動騎乘條件 ─────────────────────────────────────────────────── */}
           <View style={[styles.weightCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.weightCardTitle, { color: colors.foreground }]}>騎乘參數</Text>
-            <Text style={[styles.weightCardSub, { color: colors.muted }]}>
-              用於科學公式預估卡路里消耗
-            </Text>
-
-            <View style={styles.weightRow}>
-              <WeightInput
-                label="騎手體重"
-                unit="kg"
-                value={riderWeightStr}
-                onChangeText={setRiderWeightStr}
-                colors={colors}
-              />
-              <WeightInput
-                label="單車+裝備"
-                unit="kg"
-                value={bikeWeightStr}
-                onChangeText={setBikeWeightStr}
-                colors={colors}
-              />
-              <WeightInput
-                label="預估均速"
-                unit="km/h"
-                value={avgSpeedStr}
-                onChangeText={setAvgSpeedStr}
-                colors={colors}
-              />
-            </View>
-
-            {/* 總重顯示 */}
+            <Text style={[styles.weightCardTitle, { color: colors.foreground }]}>自動騎乘條件</Text>
+            <Text style={[styles.weightCardSub, { color: colors.muted }]}>使用設定頁體重與 App 本機推定 FTP，不需要另外輸入均速或訓練數據。</Text>
             <View style={[styles.totalMassRow, { borderTopColor: colors.border }]}>
-              <Text style={[styles.totalMassLabel, { color: colors.muted }]}>
-                預估總重（騎手 + 單車裝備）
-              </Text>
-              <Text style={[styles.totalMassValue, { color: colors.accent }]}>
-                {totalMassKg.toFixed(1)} kg
-              </Text>
+              <Text style={[styles.totalMassLabel, { color: colors.muted }]}>體重 + 預設單車裝備</Text>
+              <Text style={[styles.totalMassValue, { color: colors.accent }]}>{totalMassKg.toFixed(1)} kg</Text>
+            </View>
+            <View style={[styles.totalMassRow, { borderTopColor: colors.border }]}> 
+              <Text style={[styles.totalMassLabel, { color: colors.muted }]}>App 自動 FTP</Text>
+              <Text style={[styles.totalMassValue, { color: colors.accent }]}>{autoMetrics.ftpW} W</Text>
             </View>
           </View>
 
@@ -377,21 +375,48 @@ export default function NavigateScreen() {
           {route && calorieResult && (
             <>
               {/* Route Name */}
-              <View style={[styles.routeNameCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.routeNameCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
                 <IconSymbol name="location.fill" size={18} color={colors.accent} />
                 <Text style={[styles.routeName, { color: colors.foreground }]} numberOfLines={1}>
                   {route.name}
                 </Text>
               </View>
 
+              <RoutePreview route={route} colors={colors} />
+
               {/* Basic Stats Grid */}
-              <View style={[styles.statsGrid, { borderColor: colors.border }]}>
+              <View style={[styles.statsGrid, { borderColor: colors.border }]}> 
                 <RouteStatCell label="總距離" value={formatDistance(route.totalDistance)} colors={colors} />
-                <RouteStatCell label="預估時間" value={formatDuration(route.estimatedDuration)} colors={colors} />
+                <RouteStatCell label="移動時間預估" value={formatDuration(routeTimeEstimate?.estimatedDurationSeconds ?? route.estimatedDuration)} colors={colors} accent />
                 <RouteStatCell label="總爬升" value={`${Math.round(route.totalAscent)} m`} colors={colors} />
                 <RouteStatCell label="總下降" value={`${Math.round(route.totalDescent)} m`} colors={colors} />
                 <RouteStatCell label="預估均速" value={`${avgSpeedKmh} km/h`} colors={colors} />
+                <RouteStatCell label="目標功率" value={`${routeTimeEstimate?.targetPowerW ?? autoMetrics.ftpW} W`} colors={colors} />
               </View>
+
+              {routeTimeEstimate && (
+                <View style={[styles.routeConfirmCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={styles.routeConfirmHeading}>
+                    <View style={[styles.routeConfirmIcon, { backgroundColor: colors.accent + "18" }]}>
+                      <IconSymbol name="clock.fill" size={19} color={colors.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 2 }]}>開始前路線確認</Text>
+                      <Text style={[styles.routeConfirmMain, { color: colors.accent }]}>{formatDuration(routeTimeEstimate.estimatedDurationSeconds)}</Text>
+                      <Text style={[styles.routeConfirmSub, { color: colors.muted }]}>移動時間區間 {formatDuration(routeTimeEstimate.lowerDurationSeconds)} – {formatDuration(routeTimeEstimate.upperDurationSeconds)}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.routeConfirmFactors, { color: colors.muted }]}>{routeTimeEstimate.factors.join(" · ")}</Text>
+                  <Text style={[styles.routeConfirmNotice, { color: colors.muted }]}>不含休息、路口、交通、實際風況與路況；此為離線規劃參考。</Text>
+                  <Pressable
+                    style={({ pressed }) => [styles.startRouteBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.82 : 1 }]}
+                    onPress={() => { setSharedRoute(route); router.push("/map"); }}
+                  >
+                    <IconSymbol name="play.fill" size={17} color="#fff" />
+                    <Text style={styles.startRouteBtnText}>確認路線並前往導航</Text>
+                  </Pressable>
+                </View>
+              )}
 
               {/* ── 卡路里分析卡片 ──────────────────────────────────────────── */}
               <View style={[styles.calorieCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -532,26 +557,36 @@ export default function NavigateScreen() {
 
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
-function WeightInput({
-  label, unit, value, onChangeText, colors,
-}: {
-  label: string; unit: string; value: string;
-  onChangeText: (v: string) => void; colors: any;
-}) {
+function RoutePreview({ route, colors }: { route: GpxRoute; colors: any }) {
+  const lats = route.points.map((point) => point.lat);
+  const lons = route.points.map((point) => point.lon);
+  const minLat = Math.min(...lats); const maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons); const maxLon = Math.max(...lons);
+  const width = CHART_WIDTH; const height = 170; const pad = 18;
+  const latSpan = Math.max(maxLat - minLat, 0.0001);
+  const lonSpan = Math.max(maxLon - minLon, 0.0001);
+  const scale = Math.min((width - pad * 2) / lonSpan, (height - pad * 2) / latSpan);
+  const drawWidth = lonSpan * scale; const drawHeight = latSpan * scale;
+  const offsetX = (width - drawWidth) / 2; const offsetY = (height - drawHeight) / 2;
+  const points = route.points.map((point) => `${offsetX + (point.lon - minLon) * scale},${offsetY + (maxLat - point.lat) * scale}`).join(" ");
+  const start = route.points[0]; const end = route.points.at(-1)!;
+  const project = (point: typeof start) => ({ x: offsetX + (point.lon - minLon) * scale, y: offsetY + (maxLat - point.lat) * scale });
+  const startPoint = project(start); const endPoint = project(end);
   return (
-    <View style={styles.weightInputWrap}>
-      <Text style={[styles.weightInputLabel, { color: colors.muted }]}>{label}</Text>
-      <View style={[styles.weightInputBox, { borderColor: colors.border, backgroundColor: colors.background }]}>
-        <TextInput
-          style={[styles.weightInputText, { color: colors.foreground }]}
-          value={value}
-          onChangeText={onChangeText}
-          keyboardType="decimal-pad"
-          returnKeyType="done"
-          selectTextOnFocus
-          maxLength={6}
-        />
-        <Text style={[styles.weightInputUnit, { color: colors.muted }]}>{unit}</Text>
+    <View style={[styles.routePreview, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.routePreviewHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>路線預覽</Text>
+        <Text style={[styles.routePreviewHint, { color: colors.muted }]}>開始導航前請確認距離與爬升</Text>
+      </View>
+      <Svg width={width} height={height}>
+        <Rect x={0} y={0} width={width} height={height} rx={12} fill={colors.background} />
+        <Polyline points={points} fill="none" stroke={colors.accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        <Circle cx={startPoint.x} cy={startPoint.y} r={5} fill="#22C55E" />
+        <Circle cx={endPoint.x} cy={endPoint.y} r={5} fill="#EF4444" />
+      </Svg>
+      <View style={styles.routePreviewLegend}>
+        <Text style={[styles.routePreviewLegendText, { color: colors.muted }]}>● 起點</Text>
+        <Text style={[styles.routePreviewLegendText, { color: colors.muted }]}>● 終點</Text>
       </View>
     </View>
   );
@@ -619,20 +654,6 @@ const styles = StyleSheet.create({
   },
   weightCardTitle: { fontSize: 15, fontWeight: "600", marginBottom: 2 /* internal spacing */ },
   weightCardSub: { fontSize: 12, marginBottom: 14 /* internal spacing */ },
-  weightRow: { flexDirection: "row", gap: 10 },
-  weightInputWrap: { flex: 1 },
-  weightInputLabel: { fontSize: 11, marginBottom: 6 /* internal spacing */ },
-  weightInputBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 4,
-  },
-  weightInputText: { flex: 1, fontSize: 16, fontWeight: "600", padding: 0 },
-  weightInputUnit: { fontSize: 11 },
   totalMassRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -701,6 +722,22 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 18, fontWeight: "600" },
   statLabel: { fontSize: 12, marginTop: 4 },
+
+  routePreview: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 12, marginBottom: 16, overflow: "hidden" },
+  routePreviewHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  routePreviewHint: { fontSize: 10 },
+  routePreviewLegend: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4, marginTop: 4 },
+  routePreviewLegendText: { fontSize: 11 },
+
+  routeConfirmCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 16, marginBottom: 16 },
+  routeConfirmHeading: { flexDirection: "row", gap: 11, alignItems: "center" },
+  routeConfirmIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  routeConfirmMain: { fontSize: 27, fontWeight: "700", letterSpacing: -0.5 },
+  routeConfirmSub: { fontSize: 12, marginTop: 2 },
+  routeConfirmFactors: { fontSize: 11, lineHeight: 16, marginTop: 13 },
+  routeConfirmNotice: { fontSize: 11, lineHeight: 16, marginTop: 7 },
+  startRouteBtn: { marginTop: 15, minHeight: 48, borderRadius: 13, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
+  startRouteBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 
   // Calorie Card
   calorieCard: {
