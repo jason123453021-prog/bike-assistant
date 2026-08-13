@@ -1448,3 +1448,9 @@
 - [x] 清除本機儲存空間中的舊版最愛路線快取資料
 - [x] 將舊版最愛路線網址自動導向至應用程式首頁
 - [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；89 passed、1 skipped；Android Hermes bundle 5.66 MB；最愛路線 Context 依賴掃描 0）
+
+## 全專案精簡與死碼清理（2026-08-13）
+- [x] 盤點並保留 Local-First 核心騎乘、GPX、背景定位、崩潰恢復與活動分析流程
+- [x] 移除無導航入口、已淘汰或與離線定位方向衝突的頁面與功能
+- [x] 清理無效設定、重複欄位、死碼與對應遺留資料模型
+- [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；88 passed、1 skipped；Android Hermes bundle 5.56 MB；NitroModules／MapLibre／社群／OAuth／BLE 掃描 0）

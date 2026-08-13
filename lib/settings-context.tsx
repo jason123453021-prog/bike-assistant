@@ -12,8 +12,6 @@ export interface NormalModeFields {
   showAvgSpeed: boolean;  // 均速
   showCalories: boolean;  // 卡路里
   showPausedTime: boolean; // 暫停時間
-  showHeartRate: boolean; // 心率
-  showCadence: boolean;   // 踏頻
   showTotalAscent: boolean; // 累計爬升
   showCurrentAltitude: boolean; // 目前海拔
   showGradeDistribution: boolean; // 坡度分布
@@ -50,8 +48,6 @@ export const DEFAULT_FIELD_ORDER: NormalFieldKey[] = [
   "showAvgSpeed",
   "showCalories",
   "showPausedTime",
-  "showHeartRate",
-  "showCadence",
   "showTotalAscent",
   "showCurrentAltitude",
 ];
@@ -89,12 +85,7 @@ export interface SupplyItem {
   pauseOnDownhill?: boolean;     // 長下坡暫停提醒
 }
 
-// 效能模式型別
-export type PerformanceMode = 'battery-saver' | 'balanced' | 'performance';
 export type SupplyCalculationMode = "smart" | "custom";
-
-// 預設補給品樣板已移除
-export const SUPPLY_ITEM_TEMPLATES = []
 
 export interface AppSettings {
   // Personal
@@ -112,10 +103,6 @@ export interface AppSettings {
   // 心率區間校準
   maxHeartRate?: number;      // 最大心率（自動偵測或手動設定）
   restingHeartRate?: number;  // 靜息心率（自動估算或手動設定）
-  autoCalibrationEnabled?: boolean; // 是否啟用自動校準
-  // 效能模式
-  performanceMode: PerformanceMode; // 效能模式（省電、平衡、性能）
-  autoPerformanceMode: boolean;      // 是否根據電量自動調整
   // Thresholds
   calorieThreshold: number;   // kcal before reminder
   waterThreshold: number;     // ml before reminder
@@ -145,10 +132,6 @@ export interface AppSettings {
   ttsEnabled: boolean;
   soundEnabled: boolean;
   notificationEnabled: boolean;
-  // UI
-  darkMode: boolean;
-  // Weather
-  weatherApiKey: string;
   // 精簡導航模式
   simplifiedNavMode: "off" | "manual" | "auto"; // off=關閉, manual=手動, auto=自動
   simplifiedNavIdleSec: number; // 自動模式開啟前的閒置秒數（預設 30 秒）
@@ -156,21 +139,11 @@ export interface AppSettings {
   touchGuardEnabled: boolean;
   /** 長按此毫秒數後解除騎乘防誤觸；限定 400–5000 ms。 */
   touchGuardUnlockHoldMs: number;
-  // Local-First 訓練目標：僅以裝置內的騎乘紀錄計算。
-  weeklyRideGoal: number;
-  weeklyDistanceGoalKm: number;
-  // 隊伍遙測
-  teamTelemetryEnabled: boolean; // 是否開啟隊伍遙測
-  showFriendDistance: boolean;   // 顯示隊友距離
-  showFriendLocation: boolean;   // 顯示隊友位置
   // 背景 GPS 精度
   gpsAccuracy: "power_saving" | "standard" | "high_accuracy"; // 背景 GPS 更新頻率
   // 騎乘靜止後的完全自動省電定位：切換為低功耗監測，重新移動時自動恢復。
   idleAutoPauseEnabled: boolean;
   idleAutoPauseSeconds: number;
-  // 隱私
-  ghostMode: boolean;            // 隱身模式：不分享自己位置
-  shareLocation: boolean;        // 是否分享位置給好友
   // 自訂顯示欄位
   normalModeFields: NormalModeFields;
   simplifiedModeFields: SimplifiedModeFields;
@@ -189,8 +162,6 @@ const DEFAULT_NORMAL_FIELDS: NormalModeFields = {
   showAvgSpeed: true,
   showCalories: false,
   showPausedTime: false,
-  showHeartRate: false,
-  showCadence: false,
   showTotalAscent: false,
   showCurrentAltitude: false,
   showGradeDistribution: false,
@@ -222,9 +193,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoRpeEnabled: true,
   maxHeartRate: 200,
   restingHeartRate: 60,
-  autoCalibrationEnabled: true,
-  performanceMode: 'balanced' as PerformanceMode,
-  autoPerformanceMode: true,
   calorieThreshold: 300,
   waterThreshold: 500,
   // 升級後預設維持既有使用者固定門檻，讓使用者自行選擇啟用智慧計算。
@@ -243,22 +211,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   ttsEnabled: true,
   soundEnabled: true,
   notificationEnabled: true,
-  darkMode: true,
-  weatherApiKey: "",
   simplifiedNavMode: "off",
   simplifiedNavIdleSec: 30,
   touchGuardEnabled: true,
   touchGuardUnlockHoldMs: 1200,
-  weeklyRideGoal: 3,
-  weeklyDistanceGoalKm: 80,
-  teamTelemetryEnabled: false,
-  showFriendDistance: true,
-  showFriendLocation: true,
   gpsAccuracy: "standard",
   idleAutoPauseEnabled: true,
   idleAutoPauseSeconds: 120,
-  ghostMode: false,
-  shareLocation: true,
   normalModeFields: DEFAULT_NORMAL_FIELDS,
   simplifiedModeFields: DEFAULT_SIMPLIFIED_FIELDS,
   normalModeFieldOrder: DEFAULT_FIELD_ORDER,
@@ -288,6 +247,26 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.getItem(SETTINGS_KEY).then((data) => {
       if (data) {
         const saved = JSON.parse(data);
+        const {
+          performanceMode: _performanceMode,
+          autoPerformanceMode: _autoPerformanceMode,
+          weeklyRideGoal: _weeklyRideGoal,
+          weeklyDistanceGoalKm: _weeklyDistanceGoalKm,
+          teamTelemetryEnabled: _teamTelemetryEnabled,
+          showFriendDistance: _showFriendDistance,
+          showFriendLocation: _showFriendLocation,
+          ghostMode: _ghostMode,
+          shareLocation: _shareLocation,
+          autoCalibrationEnabled: _autoCalibrationEnabled,
+          darkMode: _darkMode,
+          weatherApiKey: _weatherApiKey,
+          ...savedWithoutRemovedSettings
+        } = saved;
+        const {
+          showHeartRate: _showHeartRate,
+          showCadence: _showCadence,
+          ...savedNormalModeFields
+        } = saved.normalModeFields ?? {};
         // 確保 fieldOrder 包含所有 key（向後相容）
         const savedOrder: NormalFieldKey[] = saved.normalModeFieldOrder ?? [];
         const mergedOrder = [
@@ -299,18 +278,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           ...savedSimplifiedOrder.filter((k: SimplifiedFieldKey) => DEFAULT_SIMPLIFIED_FIELD_ORDER.includes(k)),
           ...DEFAULT_SIMPLIFIED_FIELD_ORDER.filter((k) => !savedSimplifiedOrder.includes(k)),
         ];
-        setSettings({
+        const nextSettings: AppSettings = {
           ...DEFAULT_SETTINGS,
-          ...saved,
+          ...savedWithoutRemovedSettings,
           birthday: normalizeBirthday(saved.birthday),
           age: calculateAgeFromBirthday(saved.birthday) ?? saved.age ?? DEFAULT_SETTINGS.age,
           autoPersonalMetricsEnabled: true,
           autoRpeEnabled: true,
-          normalModeFields: { ...DEFAULT_NORMAL_FIELDS, ...(saved.normalModeFields ?? {}) },
+          normalModeFields: { ...DEFAULT_NORMAL_FIELDS, ...savedNormalModeFields },
           simplifiedModeFields: { ...DEFAULT_SIMPLIFIED_FIELDS, ...(saved.simplifiedModeFields ?? {}) },
           normalModeFieldOrder: mergedOrder,
           simplifiedModeFieldOrder: mergedSimplifiedOrder,
-        });
+        };
+        setSettings(nextSettings);
+        void AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(nextSettings));
       }
     });
   }, []);

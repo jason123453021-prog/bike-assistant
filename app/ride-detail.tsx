@@ -46,7 +46,7 @@ import { deriveLocalEstimationCalibration } from "@/lib/activity-estimation-cali
 import { createGpxContent } from "@/lib/gpx-export";
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
 import { buildRideSplits } from "@/lib/ride-splits";
-import { buildLocalActivityHighlights, calculateBestPowerEfforts, calculateWeeklyGoalProgress, calculateWeeklyGoalStreak } from "@/lib/local-activity-insights";
+import { buildLocalActivityHighlights, calculateBestPowerEfforts } from "@/lib/local-activity-insights";
 import { useSettings } from "@/lib/settings-context";
 import { calibrateSweatRate } from "@/lib/supply-calibration";
 import { writeLocalFitBackup } from "@/lib/local-fit-backup";
@@ -643,10 +643,7 @@ export default function RideDetailScreen() {
   const averageMovingSpeed = movingDuration > 0
     ? (record.distance / 1000) / (movingDuration / 3600)
     : 0;
-  const weeklyGoal = { rideTarget: settings.weeklyRideGoal, distanceTargetKm: settings.weeklyDistanceGoalKm };
-  const weeklyGoalProgress = calculateWeeklyGoalProgress(state.records, weeklyGoal, record.date);
-  const weeklyGoalStreak = calculateWeeklyGoalStreak(state.records, weeklyGoal, record.date);
-  const activityHighlights = buildLocalActivityHighlights(record, state.records, weeklyGoal);
+  const activityHighlights = buildLocalActivityHighlights(record, state.records);
   const bestPowerEfforts = calculateBestPowerEfforts(record);
 
   return (
@@ -826,18 +823,6 @@ export default function RideDetailScreen() {
             label="平均功率"
             color="#A78BFA"
           />
-        </View>
-
-        <View style={styles.localGoalCard}>
-          <View style={styles.localGoalHeader}>
-            <View>
-              <Text style={styles.localGoalTitle}>本機訓練目標</Text>
-              <Text style={styles.localGoalHint}>僅以此裝置儲存的活動計算</Text>
-            </View>
-            <Text style={styles.localGoalStreak}>{weeklyGoalStreak > 0 ? `連續 ${weeklyGoalStreak} 週` : "本週累積中"}</Text>
-          </View>
-          <GoalProgress label="騎乘次數" value={`${weeklyGoalProgress.rideCount}/${weeklyGoalProgress.rideTarget}`} progress={weeklyGoalProgress.rideProgress} color="#00E676" />
-          <GoalProgress label="騎乘距離" value={`${weeklyGoalProgress.distanceKm.toFixed(1)}/${weeklyGoalProgress.distanceTargetKm} km`} progress={weeklyGoalProgress.distanceProgress} color="#60A5FA" />
         </View>
 
         {activityHighlights.length > 0 && (
@@ -1452,19 +1437,6 @@ function SummaryCell({ icon, value, unit, label, color }: {
   );
 }
 
-function GoalProgress({ label, value, progress, color }: { label: string; value: string; progress: number; color: string }) {
-  return (
-    <View style={styles.goalProgressItem}>
-      <View style={styles.goalProgressLabelRow}>
-        <Text style={styles.goalProgressLabel}>{label}</Text>
-        <Text style={styles.goalProgressValue}>{value}</Text>
-      </View>
-      <View style={styles.goalProgressTrack}>
-        <View style={[styles.goalProgressFill, { backgroundColor: color, width: `${Math.max(0, Math.min(1, progress)) * 100}%` }]} />
-      </View>
-    </View>
-  );
-}
 
 const summaryStyles = StyleSheet.create({
   cell: { flex: 1, alignItems: "center", gap: 2 },
@@ -1540,11 +1512,6 @@ const styles = StyleSheet.create({
   localInsightText: { flex: 1 },
   localInsightTitle: { color: "#FCD34D", fontSize: 14, fontWeight: "800" },
   localInsightCopy: { color: "rgba(255,255,255,0.72)", fontSize: 12, lineHeight: 17, marginTop: 3 },
-  localGoalCard: { marginTop: 16, padding: 16, borderRadius: 16, backgroundColor: "rgba(0,230,118,0.07)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(0,230,118,0.28)", gap: 13 },
-  localGoalHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
-  localGoalTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
-  localGoalHint: { color: "rgba(255,255,255,0.48)", fontSize: 11, marginTop: 3 },
-  localGoalStreak: { color: "#00E676", fontSize: 12, fontWeight: "800", paddingTop: 2 },
   goalProgressItem: { gap: 6 },
   goalProgressLabelRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   goalProgressLabel: { color: "rgba(255,255,255,0.72)", fontSize: 12 },

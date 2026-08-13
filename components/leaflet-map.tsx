@@ -40,15 +40,6 @@ export interface NavigationRouteOverlay {
   showDirectionArrows?: boolean;
 }
 
-export interface FriendMarker {
-  userId: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  speed: number; // m/s
-  isMoving: boolean;
-}
-
 export interface KilometerMarker {
   kilometer: number;
   lat: number;
@@ -75,8 +66,6 @@ export interface LeafletMapProps {
   liveTrail?: LatLng[];
   returnPolyline?: LatLng[];
   isOffRoute?: boolean;
-  friendMarkers?: FriendMarker[];
-  onFriendTap?: (friend: FriendMarker & { lat: number; lon: number }) => void;
   centerPinLocation?: { lat: number; lon: number } | null;
   onMapCenterChanged?: (lat: number, lon: number) => void;
   onMapMoveEnd?: (bounds: { northEast: { lat: number; lon: number }; southWest: { lat: number; lon: number } }) => void;
@@ -516,41 +505,6 @@ function handleMessage(data) {
         returnLayer.setLatLngs([]);
         if (returnEndMarker) { map.removeLayer(returnEndMarker); returnEndMarker = null; }
         break;
-      case 'setFriendMarkers':
-        // Remove old friend markers
-        if (!window._friendLayers) window._friendLayers = {};
-        Object.values(window._friendLayers).forEach(function(layer) { map.removeLayer(layer); });
-        window._friendLayers = {};
-        // Add new friend markers
-        if (msg.friends && msg.friends.length > 0) {
-          msg.friends.forEach(function(f) {
-            var color = f.isMoving ? '#34C759' : '#FF9500';
-            // Create custom icon: colored circle + name label
-            var iconHtml = '<div style="position:relative;display:inline-block">' +
-              '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>' +
-              '<div style="position:absolute;top:16px;left:50%;transform:translateX(-50%);white-space:nowrap;background:rgba(0,0,0,0.72);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;pointer-events:none">' + f.name + '</div>' +
-              '</div>';
-            var icon = L.divIcon({ html: iconHtml, className: '', iconAnchor: [7, 7] });
-            var marker = L.marker([f.lat, f.lon], { icon: icon, zIndexOffset: 800 }).addTo(map);
-            // Click event: notify RN layer to show friend detail card
-            (function(friend) {
-              marker.on('click', function(e) {
-                L.DomEvent.stopPropagation(e);
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'friendTapped',
-                  userId: friend.userId,
-                  name: friend.name,
-                  lat: friend.lat,
-                  lon: friend.lon,
-                  speed: friend.speed,
-                  isMoving: friend.isMoving,
-                }));
-              });
-            })(f);
-            window._friendLayers[f.userId] = marker;
-          });
-        }
-        break;
       case 'animateCamera':
         map.setView([msg.lat, msg.lon], msg.zoom || map.getZoom(), { animate: true, duration: 0.6 });
         break;
@@ -707,8 +661,6 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       liveTrail,
       returnPolyline,
       isOffRoute,
-      friendMarkers,
-      onFriendTap,
       centerPinLocation,
       onMapCenterChanged,
       kilometersMarkers,
@@ -887,22 +839,6 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       }
     }, [centerPinLocation, isReady]);
 
-    // Send friend markers
-    useEffect(() => {
-      if (!isReady || !webViewRef.current) return;
-      const friends = (friendMarkers ?? []).map((f) => ({
-        userId: f.userId,
-        name: f.name,
-        lat: f.latitude,
-        lon: f.longitude,
-        speed: f.speed,
-        isMoving: f.isMoving,
-      }));
-      webViewRef.current.postMessage(
-        JSON.stringify({ type: "setFriendMarkers", friends })
-      );
-    }, [friendMarkers, isReady]);
-
     const handleMessage = (event: { nativeEvent: { data: string } }) => {
       try {
         const msg = JSON.parse(event.nativeEvent.data);
@@ -926,17 +862,6 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         } else if (msg.type === "panDrag") {
           followUserRef.current = false;
           onPanDrag?.();
-        } else if (msg.type === "friendTapped") {
-          onFriendTap?.({
-            userId: msg.userId,
-            name: msg.name,
-            latitude: msg.lat,
-            longitude: msg.lon,
-            lat: msg.lat,
-            lon: msg.lon,
-            speed: msg.speed ?? 0,
-            isMoving: msg.isMoving ?? false,
-          });
         } else if (msg.type === "mapLongPress") {
           onMapLongPress?.(msg.lat, msg.lon);
         } else if (msg.type === "mapCenterChanged") {

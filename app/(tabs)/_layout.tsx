@@ -5,9 +5,6 @@ import { Text } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { HapticTab } from "@/components/haptic-tab";
 import { useColors } from "@/hooks/use-colors";
-import { useAuth } from "@/hooks/use-auth";
-import { trpc } from "@/lib/trpc";
-// 移除友誼相關導入
 
 function TabLabel({ label, focused, color }: { label: string; focused: boolean; color: string }) {
   return (

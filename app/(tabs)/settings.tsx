@@ -28,8 +28,7 @@ import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
-import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, SUPPLY_ITEM_TEMPLATES, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
-import { SensorPairingModal } from "@/components/sensor-pairing-modal";
+import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
 import { SmartPowerSavingManager, type PowerSavingSettings } from "@/lib/power-saving/smart-power-saving-system";
 import { useRide } from "@/lib/ride-context";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
@@ -68,117 +67,6 @@ export default function SettingsScreen() {
     const next = { ...powerSavingSettings, ...patch };
     setPowerSavingSettings(next);
     await powerSavingManagerRef.current.saveSettings(patch);
-  };
-
-  // ── 感測器配對 Modal 狀態 ──
-  const [sensorModalVisible, setSensorModalVisible] = useState(false);
-  const [bleScanning, setBleScanning] = useState(false);
-  const [bleDevices, setBleDevices] = useState<any[]>([]);
-  const [bleConnecting, setBleConnecting] = useState<string | null>(null);
-  const [sensorStatus, setSensorStatus] = useState<{
-    connectedCount: number;
-    lastUpdateTimeStr: string;
-    signalQuality: 'excellent' | 'good' | 'poor' | 'disconnected';
-  }>({ connectedCount: 0, lastUpdateTimeStr: '--', signalQuality: 'disconnected' });
-
-  // 定時更新感測器狀態
-  useEffect(() => {
-    const interval = setInterval(() => {
-      try {
-        const { getSensorDataManager } = require('@/lib/sensor-data-manager');
-        const manager = getSensorDataManager();
-        const status = manager.getSensorStatus();
-        setSensorStatus({
-          connectedCount: status.connectedCount,
-          lastUpdateTimeStr: status.lastUpdateTimeStr,
-          signalQuality: status.signalQuality,
-        });
-      } catch (err) {
-        // SensorDataManager 未初始化
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // BLE 掃描與連線
-  const handleBleScan = async () => {
-    setBleScanning(true);
-    try {
-      const { getSensorDataManager } = require('@/lib/sensor-data-manager');
-      const manager = getSensorDataManager();
-      await manager.startBleScanning();
-      
-      // 延遲 5 秒後取得掃描結果
-      setTimeout(() => {
-        const connectedDevices = manager.getBleConnectedDevices();
-        setBleDevices(connectedDevices);
-        setBleScanning(false);
-      }, 5000);
-    } catch (error) {
-      console.error('[Settings] BLE scan error:', error);
-      setBleScanning(false);
-      Alert.alert('掃描失敗', '無法掃描 BLE 設備');
-    }
-  };
-
-  const handleBleConnect = async (deviceId: string) => {
-    setBleConnecting(deviceId);
-    try {
-      const { getSensorDataManager } = require('@/lib/sensor-data-manager');
-      const manager = getSensorDataManager();
-      await manager.connectBleDevice(deviceId);
-      
-      // 更新設備列表
-      const updated = bleDevices.map((d) => (d.id === deviceId ? { ...d, isConnected: true } : d));
-      setBleDevices(updated);
-      Alert.alert('連接成功', '感測器已連接');
-    } catch (error) {
-      console.error('[Settings] BLE connect error:', error);
-      Alert.alert('連接失敗', '無法連接到感測器');
-    } finally {
-      setBleConnecting(null);
-    }
-  };
-
-  const handleBleDisconnect = async (deviceId: string) => {
-    try {
-      const { getSensorDataManager } = require('@/lib/sensor-data-manager');
-      const manager = getSensorDataManager();
-      await manager.disconnectBleDevice(deviceId);
-      
-      // 更新設備列表
-      const updated = bleDevices.map((d) => (d.id === deviceId ? { ...d, isConnected: false } : d));
-      setBleDevices(updated);
-    } catch (error) {
-      console.error('[Settings] BLE disconnect error:', error);
-      Alert.alert('斷開失敗', '無法斷開感測器');
-    }
-  };
-
-  const getSensorEmoji = (serviceType: string) => {
-    switch (serviceType) {
-      case 'heartRate':
-        return '❤️';
-      case 'power':
-        return '⚡';
-      case 'cadence':
-        return '🔄';
-      default:
-        return '📱';
-    }
-  };
-
-  const getSensorLabel = (serviceType: string) => {
-    switch (serviceType) {
-      case 'heartRate':
-        return '心率帶';
-      case 'power':
-        return '功率計';
-      case 'cadence':
-        return '踏頻器';
-      default:
-        return '未知設備';
-    }
   };
 
   const [editModal, setEditModal] = useState<{
@@ -357,8 +245,6 @@ export default function SettingsScreen() {
     showAvgSpeed: "均速",
     showCalories: "卡路里",
     showPausedTime: "暫停時間",
-    showHeartRate: "心率",
-    showCadence: "踏頻",
     showTotalAscent: "累計爬升",
     showCurrentAltitude: "目前海拔",
     showGradeDistribution: "坡度分布",
@@ -1356,11 +1242,6 @@ export default function SettingsScreen() {
           </View>
         </SafeAreaView>
       </Modal>
-      {/* 感測器配對 Modal */}
-      <SensorPairingModal
-        visible={sensorModalVisible}
-        onClose={() => setSensorModalVisible(false)}
-      />
     </ScreenContainer>
   );
 }

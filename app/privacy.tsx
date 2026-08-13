@@ -39,32 +39,32 @@ export default function PrivacyPolicyScreen() {
         {/* 標題區 */}
         <Text style={[styles.title, { color: colors.foreground }]}>智慧單車騎乘助手</Text>
         <Text style={[styles.subtitle, { color: colors.foreground }]}>隱私政策</Text>
-        <Text style={[styles.updated, { color: colors.muted }]}>最後更新日期：2026 年 6 月 19 日</Text>
+        <Text style={[styles.updated, { color: colors.muted }]}>最後更新日期：2026 年 8 月 13 日</Text>
 
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
         <Section title="1. 前言" color={colors.foreground} mutedColor={colors.muted}>
-          {`歡迎使用智慧單車騎乘助手（以下簡稱「本應用程式」或「我們」）。本隱私政策說明我們如何收集、使用、儲存及保護您的個人資料。使用本應用程式即表示您同意本政策所述之資料處理方式。\n\n本應用程式主要面向台灣及香港市場的自行車騎乘愛好者。`}
+          {`智慧單車騎乘助手採 Local-First 設計。本政策說明 App 在您的裝置上處理、保存與刪除資料的方式。App 不提供帳號、社群、好友、雲端同步或遠端推播服務。`}
         </Section>
 
         <Section title="2. 我們收集的資料" color={colors.foreground} mutedColor={colors.muted}>
-          {`我們收集以下類型的資料：\n\n【位置資料】\n• 精確 GPS 位置（緯度、經度、海拔）\n• 移動速度與方向\n• 騎乘路線軌跡\n\n收集目的：提供即時導航、路線追蹤、好友位置共享及偏離路線提示功能。\n\n【帳號資料】\n• 電子郵件地址\n• 顯示名稱\n• 登入方式（OAuth）\n\n收集目的：識別使用者身份、提供好友系統及跨裝置資料同步。\n\n【裝置資料】\n• 裝置電池電量（僅在啟用位置共享時）\n\n收集目的：顯示給好友以利安全確認。\n\n【健康與活動資料】\n• 體重、身高（使用者自行輸入）\n• 騎乘距離、時間、速度、功率估算值\n• 估算消耗卡路里\n\n收集目的：計算騎乘功率、卡路里消耗及補給提醒。此類資料僅儲存於您的裝置本地，不會上傳至伺服器。`}
+          {`App 僅在裝置上處理下列資料：\n\n【位置與路線資料】\n• GPS 位置、海拔、速度與行進方向\n• 騎乘軌跡與已匯入的 GPX 路線\n\n用途：目前位置顯示、離線騎乘紀錄、背景追蹤、路線預覽與導航。\n\n【個人與活動資料】\n• 生日、身高、體重及本機推定的生理指標\n• 騎乘時間、距離、爬升、功率、卡路里與補給估算\n• 使用者主動附加的相片、影片與活動備註\n\n用途：產生本機活動分析、補給提醒與個人化估算。App 不建立帳號，也不收集電子郵件、聯絡人或好友資料。`}
         </Section>
 
         <Section title="3. 資料的使用方式" color={colors.foreground} mutedColor={colors.muted}>
-          {`我們使用您的資料以：\n\n• 提供 GPS 導航與路線追蹤服務\n• 計算騎乘數據（速度、功率、卡路里）\n• 在您授權的情況下，與好友共享即時位置\n• 發送補給提醒及騎乘通知\n• 儲存騎乘記錄供您日後查閱\n• 改善應用程式功能與使用者體驗`}
+          {`資料僅用於裝置內的 GPS 導航、騎乘紀錄、功率與消耗估算、補給提醒、活動分析及 GPX 匯出。騎乘中的通知為本機通知，不會註冊或接收遠端推播。`}
         </Section>
 
         <Section title="4. 資料的儲存與保留" color={colors.foreground} mutedColor={colors.muted}>
-          {`【本地儲存】\n騎乘記錄、個人設定（體重、身高、偏好設定）儲存於您的裝置本地（AsyncStorage），不會自動上傳至伺服器。\n\n【伺服器儲存】\n帳號資料及即時位置共享資料儲存於我們的安全伺服器（TiDB Cloud，位於亞太地區）。\n\n【保留期限】\n• 即時位置資料：5 分鐘未更新後自動標記為離線，不再顯示給好友\n• 帳號資料：保留至您主動刪除帳號為止\n• 騎乘記錄：本地儲存，您可隨時手動刪除\n\n所有伺服器通訊均使用 HTTPS 加密傳輸。`}
+          {`騎乘紀錄、GPX 檔案、設定、媒體與崩潰恢復快照皆儲存於您的裝置。資料會保留至您在 App 內刪除活動、清除快取或解除安裝 App 為止。App 不會自動上傳或跨裝置同步這些資料。`}
         </Section>
 
         <Section title="5. 資料的分享" color={colors.foreground} mutedColor={colors.muted}>
-          {`我們不會將您的個人資料出售給第三方。以下情況可能涉及資料分享：\n\n【好友位置共享】\n當您啟用「分享位置給好友」功能時，您的即時位置、速度及電量資訊將對您的好友可見。您可隨時在設定頁面關閉此功能，或開啟「隱身模式」暫停分享。\n\n【第三方服務】\n• Open-Meteo（天氣資料）：傳送您的 GPS 座標以取得當地天氣，Open-Meteo 為免費開源服務，不儲存個人識別資訊\n• OSRM（路線計算）：傳送 GPS 座標以計算偏離路線的回歸路徑，不儲存個人識別資訊\n• OpenStreetMap（地圖底圖）：地圖顯示服務，不傳送個人資料\n\n【法律要求】\n若依法律要求，我們可能需要揭露您的資料。`}
+          {`App 沒有好友位置共享、社群功能或雲端資料庫。您可透過 Android 系統分享功能主動匯出 GPX、活動卡片或媒體；分享對象與內容完全由您決定。\n\n若您主動在有網路時使用線上路徑或天氣資訊，App 可能會將路徑計算所需的座標傳送至公開地圖或路徑服務。這些服務不是帳號、追蹤或同步機制；離線功能不依賴它們。`}
         </Section>
 
         <Section title="6. 您的權利" color={colors.foreground} mutedColor={colors.muted}>
-          {`您對您的個人資料擁有以下權利：\n\n• 查閱權：您可在應用程式內查看您的帳號資料\n• 更正權：您可在設定頁面修改個人資料\n• 刪除權：您可在設定頁面「帳號與好友」區塊選擇「刪除帳號」，這將永久刪除您的帳號資料及伺服器上的相關記錄\n• 資料可攜性：騎乘記錄可透過應用程式的分享功能匯出\n• 撤回同意：您可隨時在裝置設定中撤銷位置權限，或在應用程式設定中關閉位置共享`}
+          {`您可直接在 App 內編輯個人資料、刪除活動與媒體，並以 GPX 或活動分享卡匯出自己的資料。您也可以隨時在裝置設定中撤銷位置、通知、相片或媒體權限。由於 App 不保存帳號或雲端副本，沒有帳號刪除或伺服器資料刪除程序。`}
         </Section>
 
         <Section title="7. 兒童隱私" color={colors.foreground} mutedColor={colors.muted}>
@@ -80,7 +80,7 @@ export default function PrivacyPolicyScreen() {
         </Section>
 
         <Section title="10. 資料安全" color={colors.foreground} mutedColor={colors.muted}>
-          {`我們採取以下措施保護您的資料：\n\n• 所有網路傳輸使用 HTTPS/TLS 加密\n• 伺服器資料庫採用 TiDB Cloud 託管，具備業界標準安全防護\n• 使用者認證採用 OAuth 2.0 標準，我們不儲存您的密碼\n• 位置資料僅在必要時傳輸，不建立長期歷史軌跡資料庫`}
+          {`App 將資料保存於裝置的應用程式私有儲存空間，並只在您授權後讀取定位、相片或檔案。為保護資料，請為裝置設定螢幕鎖定，並在分享活動、媒體或 GPX 前確認分享內容。`}
         </Section>
 
         <Section title="11. 政策變更" color={colors.foreground} mutedColor={colors.muted}>

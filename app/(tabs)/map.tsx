@@ -66,7 +66,6 @@ import {
   requestNotificationPermission,
   stopSpeech,
 } from "@/lib/feedback-service";
-import { getSensorDataManager } from "@/lib/sensor-data-manager";
 import {
   calculatePower,
   calcAirDensity,
@@ -261,25 +260,6 @@ export default function MapScreen() {
 
   // 功率平滑：5 點滑動平均
   const powerWindowRef = useRef<number[]>([]);
-
-  // 感測器數據管理
-  const sensorManagerRef = useRef(getSensorDataManager());
-  const [sensorData, setSensorData] = useState({
-    heartRate: null as number | null,
-    power: null as number | null,
-    cadence: null as number | null,
-    maxHeartRate: null as number | null,
-    maxPower: null as number | null,
-    maxCadence: null as number | null,
-  });
-  const sensorUpdateIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // 感測器統計數據（用於記錄保存）
-  const sensorStatsRef = useRef({
-    heartRateValues: [] as number[],
-    cadenceValues: [] as number[],
-    maxHeartRate: 0,
-    maxCadence: 0,
-  });
 
   // 自動暫停連續計數（需連續 4 次低速才暫停，避免 GPS 抖動誤觸發）
   const lowSpeedCountRef = useRef(0);
@@ -1478,20 +1458,13 @@ export default function MapScreen() {
             airDensityKgM3: airDensityRef.current,
           });
           prevSpeedMsRef.current = currentSpeedMs;
-          // 優先使用感測器功率，若無則使用計算功率
-          let power = sensorData.power ?? rawPower;
-          // 若使用計算功率，則進行 5 點滑動平均平滑
-          if (sensorData.power === null) {
-            powerWindowRef.current.push(rawPower);
-            if (powerWindowRef.current.length > 5) powerWindowRef.current.shift();
-            power = Math.round(
-              powerWindowRef.current.reduce((a, b) => a + b, 0) / powerWindowRef.current.length
-            );
-          } else {
-            // 使用感測器功率時，清空計算功率緩衝
-            powerWindowRef.current = [];
-          }
-          // 優先使用量測／物理推算功率；缺少功率時以體重、速度與坡度的 MET 模型回退。
+          // 純本機功率：以 GPS 速度、坡度、風況與重量進行五點平滑推算。
+          powerWindowRef.current.push(rawPower);
+          if (powerWindowRef.current.length > 5) powerWindowRef.current.shift();
+          const power = Math.round(
+            powerWindowRef.current.reduce((a, b) => a + b, 0) / powerWindowRef.current.length
+          );
+          // 以物理推算功率；缺少功率時以體重、速度與坡度的 MET 模型回退。
           const calorieResult = calculatePersonalizedCalories({
             powerW: power,
             hasMeasuredPower: power > 0,
@@ -1792,45 +1765,6 @@ export default function MapScreen() {
     setIntervalSupplyAlerts({});
     clearIntervalSupplyRepeatTimer();
 
-    // 感測器初始化
-    setSensorData({
-      heartRate: null,
-      power: null,
-      cadence: null,
-      maxHeartRate: null,
-      maxPower: null,
-      maxCadence: null,
-    });
-    // 清空感測器統計數據
-    sensorStatsRef.current = {
-      heartRateValues: [],
-      cadenceValues: [],
-      maxHeartRate: 0,
-      maxCadence: 0,
-    };
-    // 啟動感測器數據更新迴圈（每 1 秒更新一次）
-    if (sensorUpdateIntervalRef.current) clearInterval(sensorUpdateIntervalRef.current);
-    sensorUpdateIntervalRef.current = setInterval(() => {
-      const data = sensorManagerRef.current.getSensorData();
-      setSensorData({
-        heartRate: data.heartRate,
-        power: data.power,
-        cadence: data.cadence,
-        maxHeartRate: data.maxHeartRate,
-        maxPower: data.maxPower,
-        maxCadence: data.maxCadence,
-      });
-      // 記錄感測器統計數據
-      if (data.heartRate !== null && data.heartRate !== undefined) {
-        sensorStatsRef.current.heartRateValues.push(data.heartRate);
-        sensorStatsRef.current.maxHeartRate = Math.max(sensorStatsRef.current.maxHeartRate, data.heartRate);
-      }
-      if (data.cadence !== null && data.cadence !== undefined) {
-        sensorStatsRef.current.cadenceValues.push(data.cadence);
-        sensorStatsRef.current.maxCadence = Math.max(sensorStatsRef.current.maxCadence, data.cadence);
-      }
-    }, 1000);
-
     if (gpxRoute) {
       setIsNavigating(true);
       setNavInstruction("導航已啟動");
@@ -1922,17 +1856,6 @@ export default function MapScreen() {
           lastBgSyncTsRef.current = 0; // 重置去重時間戳
           
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
-          // 結束騎乘清除感測器更新迴圈
-          if (sensorUpdateIntervalRef.current) clearInterval(sensorUpdateIntervalRef.current);
-          sensorUpdateIntervalRef.current = null;
-          setSensorData({
-            heartRate: null,
-            power: null,
-            cadence: null,
-            maxHeartRate: null,
-            maxPower: null,
-            maxCadence: null,
-          });
           await cancelRidingNotification();
           // 結束騎乘清除補給重複提醒計時器
           clearSupplyRepeatTimer();
@@ -1954,7 +1877,7 @@ export default function MapScreen() {
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新；個人設定與環境摘要只保存在裝置上。
           const environmentSummary = environmentSummaryRef.current;
           const sampleCount = environmentSummary.sampleCount;
-            const savedRecordId = await saveRecord(undefined, sensorStatsRef.current, {
+            const savedRecordId = await saveRecord(undefined, {
               riderWeightKg: settings.weight,
               bikeWeightKg: settings.bikeWeight ?? 10,
               ftpW: estimateFtpW,
@@ -2292,7 +2215,6 @@ export default function MapScreen() {
         liveTrail={liveTrail}
         returnPolyline={[]}
         isOffRoute={false}
-        friendMarkers={[]}
         centerPinLocation={pinSelectMode ? centerPinLocation : null}
         onMapCenterChanged={(lat, lon) => {
           if (pinSelectMode) {
@@ -2475,7 +2397,7 @@ export default function MapScreen() {
         {/* ── 儀表板（依排序動態顯示，前6格在收縮面板） ── */}
         <View style={styles.sixGrid}>
           {dashPanelFields.map((key) => (
-            <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} sensorData={sensorData} />
+            <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} />
           ))}
         </View>
 
@@ -2486,7 +2408,7 @@ export default function MapScreen() {
             {dashOverflowFields.length > 0 && (
               <View style={[styles.sixGrid, { marginBottom: 8 /* internal spacing */ }]}>
                 {dashOverflowFields.map((key) => (
-                  <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} sensorData={sensorData} />
+                  <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} />
                 ))}
               </View>
             )}
@@ -2715,8 +2637,6 @@ export default function MapScreen() {
         }}
       />
 
-      {/* 隊伍遙測橫幅已移除（好友位置資訊已可透過點擊地圖標記查看） */}
-
       {/* ── 精簡導航模式── */}
       <SimplifiedNavOverlay
         visible={simplifiedNavVisible}
@@ -2731,7 +2651,7 @@ export default function MapScreen() {
         currentTime={new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false })}
         elapsedTime={formatDuration(state.elapsed ?? 0)}
         grade={currentGrade}
-        power={sensorData.power ?? state.currentPower}
+        power={state.currentPower}
         avgSpeed={avgSpeed}
         calories={Math.round(state.calories)}
         pausedTime={formatDuration(state.totalPausedSec ?? 0)}
@@ -2921,13 +2841,12 @@ export default function MapScreen() {
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
 // DashMetric: 依 fieldKey 渲染對應的儀表板欄位
-function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed, sensorData }: {
+function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed }: {
   fieldKey: NormalFieldKey;
   state: any;
   isActive: boolean;
   currentGrade: number;
   avgSpeed: number;
-  sensorData?: any;
 }) {
   switch (fieldKey) {
     case "showElapsed":
@@ -2939,26 +2858,13 @@ function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed, sensorD
     case "showGrade":
       return <BigMetric label="坡度" value={isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"} unit="%" warn={currentGrade > 5} />;
     case "showPower":
-      // 優先顯示感測器功率，若無則顯示計算功率
-      const displayPower = sensorData.power ?? state.currentPower;
-      const isSensorPower = sensorData.power !== null && sensorData.power !== undefined;
-      return <BigMetric label={isSensorPower ? "功率 (感測器)" : "功率"} value={`${displayPower}`} unit="W" accent />;
+      return <BigMetric label="功率" value={`${state.currentPower}`} unit="W" accent />;
     case "showAvgSpeed":
       return <BigMetric label="均速" value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"} unit="km/h" />;
     case "showCalories":
       return <BigMetric label="卡路里" value={`${Math.round(state.calories)}`} unit="kcal" />;
     case "showPausedTime":
       return <BigMetric label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" />;
-    case "showHeartRate":
-      // 優先顯示平滑心率，若無則顯示 "--"
-      const displayHR = sensorData?.smoothedHeartRate ?? sensorData?.heartRate ?? null;
-      const isHRSensor = displayHR !== null && displayHR !== undefined;
-      return <BigMetric label={isHRSensor ? "心率 (感測器)" : "心率"} value={displayHR !== null ? `${displayHR}` : "--"} unit="bpm" />;
-    case "showCadence":
-      // 優先顯示平滑踏頻，若無則顯示 "--"
-      const displayCadence = sensorData?.smoothedCadence ?? sensorData?.cadence ?? null;
-      const isCadenceSensor = displayCadence !== null && displayCadence !== undefined;
-      return <BigMetric label={isCadenceSensor ? "踏頻 (感測器)" : "踏頻"} value={displayCadence !== null ? `${displayCadence}` : "--"} unit="rpm" />;
     case "showTotalAscent":
       return <BigMetric label="累計爬升" value={state.totalAscent ? state.totalAscent.toFixed(0) : "0"} unit="m" />;
     case "showCurrentAltitude":
@@ -3534,91 +3440,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // 好友詳細卡片
-  friendCard: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 0,
-    backgroundColor: "rgba(18,18,18,0.96)",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 16 /* internal spacing */, // 基礎邊距，在使用時會動態計算
-    zIndex: 300,
-    borderTopWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  friendCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16 /* internal spacing */,
-  },
-  friendCardDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  friendCardName: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  friendCardClose: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  friendCardCloseText: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 20,
-    lineHeight: 24,
-  },
-  friendCardBody: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  friendCardMetric: {
-    alignItems: "center",
-    gap: 4,
-  },
-  friendCardMetricLabel: {
-    color: "rgba(255,255,255,0.45)",
-    fontSize: 12,
-  },
-  friendCardMetricValue: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  friendCardNavRow: {
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingBottom: 4 /* internal spacing */, // 基礎邊距，在使用時會動態計算
-    paddingTop: 4,
-  },
-  friendCardNavBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "rgba(52,199,89,0.85)",
-    borderRadius: 10,
-    paddingVertical: 10,
-  },
-  friendCardNavBtnText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
-  },
   supplyConfirmBtn: {
     marginTop: 8,
     paddingVertical: 8,

@@ -23,7 +23,6 @@ describe("Expo Go notification compatibility", () => {
       "lib/background-location.ts",
       "lib/foreground-service/foreground-service-manager.ts",
       "lib/permissions-manager.ts",
-      "lib/push-notification-manager.ts",
     ];
 
     for (const file of startupFiles) {

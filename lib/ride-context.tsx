@@ -426,7 +426,6 @@ interface RideContextValue {
   dispatch: React.Dispatch<RideAction>;
   saveRecord: (
     name?: string,
-    sensorStats?: { heartRateValues: number[]; cadenceValues: number[]; maxHeartRate: number; maxCadence: number },
     calculationProfile?: RideCalculationProfile,
   ) => Promise<string | null>;
   loadRecords: () => Promise<void>;
@@ -476,14 +475,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
 
   const saveRecord = useCallback(async (
     name?: string,
-    sensorStats?: { heartRateValues: number[]; cadenceValues: number[]; maxHeartRate: number; maxCadence: number },
     calculationProfile?: RideCalculationProfile,
   ) => {
     if (state.elapsed < 10) return null;
     const now = Date.now();
-    // 計算感測器平均值
-    const avgHeartRate = sensorStats?.heartRateValues.length ? Math.round(sensorStats.heartRateValues.reduce((a, b) => a + b, 0) / sensorStats.heartRateValues.length) : undefined;
-    const avgCadence = sensorStats?.cadenceValues.length ? Math.round(sensorStats.cadenceValues.reduce((a, b) => a + b, 0) / sensorStats.cadenceValues.length) : undefined;
     // 重新計算均速，確保使用最終的 distance 和 elapsed 值
     const finalAvgSpeed = state.elapsed > 0 ? (state.distance / 1000) / (state.elapsed / 3600) : 0;
     
@@ -532,11 +527,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       refillCount: state.refillCount,
       totalPausedSec: state.totalPausedSec,
       movingTime,
-      // 感測器數據（可選）
-      avgHeartRate,
-      maxHeartRate: sensorStats?.maxHeartRate,
-      avgCadence,
-      maxCadence: sensorStats?.maxCadence,
       // 坡度分布數據
       gradeDistribution: state.gradeDistribution,
       gradeAscentDistribution: state.gradeAscentDistribution,
