@@ -1,14 +1,20 @@
-import React, { useMemo, useRef, useState } from "react";
-import { View, Text, Pressable, PanResponder, Animated } from "react-native";
-import Svg, { G, Path, Circle, Line, Defs, Pattern, Rect, Text as SvgText } from "react-native-svg";
+import React, { useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import { useColors } from "@/hooks/use-colors";
+import type { AnalysisDataSource } from "@/lib/activity-sensor-estimates";
+
+export type ActivityChartMetric = "speed" | "power" | "heartRate" | "cadence";
 
 export interface SpeedDataPoint {
   index: number;
   speed: number;
   power?: number;
   heartRate?: number;
+  cadence?: number;
   timestamp: number;
+  distanceKm?: number;
+  gradePct?: number;
 }
 
 export interface KeyMarker {
@@ -21,315 +27,174 @@ export interface KeyMarker {
 
 export interface SpeedCurveChartProps {
   data: SpeedDataPoint[];
-  currentIndex: number;
+  currentIndex?: number;
   markers?: KeyMarker[];
   onMarkerPress?: (marker: KeyMarker) => void;
   height?: number;
-  showPower?: boolean;
-  showHeartRate?: boolean;
+  sources: Record<ActivityChartMetric, AnalysisDataSource>;
 }
 
-/**
- * 速度曲線圖組件
- * 顯示整個騎乘過程的速度變化，支持標記關鍵點
- */
+const METRICS: { key: ActivityChartMetric; label: string; unit: string; color: string }[] = [
+  { key: "speed", label: "速度", unit: "km/h", color: "#35D3B2" },
+  { key: "power", label: "功率", unit: "W", color: "#FF9F0A" },
+  { key: "heartRate", label: "心率", unit: "bpm", color: "#FF5A5F" },
+  { key: "cadence", label: "踏頻", unit: "rpm", color: "#A78BFA" },
+];
+
+const clamp = (value: number, minimum: number, maximum: number) => Math.max(minimum, Math.min(maximum, value));
+
+function metricForMarker(marker: KeyMarker): ActivityChartMetric {
+  if (marker.type === "maxPower") return "power";
+  if (marker.type === "maxHeartRate") return "heartRate";
+  return "speed";
+}
+
+function formatTime(timestamp: number, fallbackIndex: number): string {
+  const date = new Date(timestamp);
+  return Number.isFinite(date.getTime())
+    ? date.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : `取樣點 ${fallbackIndex + 1}`;
+}
+
+/** 單一指標曲線：切換時不混合單位，並明示每項資料的來源。 */
 export function SpeedCurveChart({
   data,
-  currentIndex,
+  currentIndex = 0,
   markers = [],
   onMarkerPress,
-  height = 120,
-  showPower = false,
-  showHeartRate = false,
+  height = 166,
+  sources,
 }: SpeedCurveChartProps) {
   const colors = useColors();
-  const [interactiveIndex, setInteractiveIndex] = useState(currentIndex);
-  const svgContainerRef = useRef<View>(null);
+  const [activeMetric, setActiveMetric] = useState<ActivityChartMetric>("speed");
+  const [selectedIndex, setSelectedIndex] = useState(currentIndex);
   const [containerWidth, setContainerWidth] = useState(0);
-  const panResponderRef = useRef<any>(null);
 
-  // 初始化手勢識別
-  React.useEffect(() => {
-    panResponderRef.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (evt, gestureState) => Math.abs(gestureState.dx) > 5,
-      onPanResponderMove: (evt, { dx }) => {
-        if (containerWidth > 0 && data.length > 0) {
-          const ratio = dx / containerWidth;
-          const newIndex = Math.max(
-            0,
-            Math.min(
-              data.length - 1,
-              Math.round(ratio * data.length) + currentIndex
-            )
-          );
-          setInteractiveIndex(newIndex);
-        }
-      },
-      onPanResponderRelease: () => {
-        if (interactiveIndex !== currentIndex) {
-          const marker: KeyMarker = {
-            type: "maxSpeed",
-            index: interactiveIndex,
-            value: 0,
-            label: "快速導航",
-            color: colors.primary,
-          };
-          onMarkerPress?.(marker);
-        }
-      },
-    });
-  }, [data.length, currentIndex, containerWidth, interactiveIndex, onMarkerPress, colors.primary]);
+  useEffect(() => {
+    setSelectedIndex(clamp(currentIndex, 0, Math.max(0, data.length - 1)));
+  }, [currentIndex, data.length]);
 
-  // 計算圖表數據
-  const chartData = useMemo(() => {
-    if (data.length === 0) return { speeds: [], powers: [], heartRates: [], maxSpeed: 0, maxPower: 0, maxHR: 0 };
+  const metric = METRICS.find((item) => item.key === activeMetric) ?? METRICS[0];
+  const values = useMemo(() => data.map((point) => {
+    if (activeMetric === "speed") return Math.max(0, point.speed ?? 0);
+    if (activeMetric === "power") return Math.max(0, point.power ?? 0);
+    if (activeMetric === "heartRate") return Math.max(0, point.heartRate ?? 0);
+    return Math.max(0, point.cadence ?? 0);
+  }), [activeMetric, data]);
+  const minimum = Math.min(...values, 0);
+  const maximum = Math.max(...values, 1);
+  const range = Math.max(1, maximum - minimum);
+  const plotTop = 14;
+  const plotBottom = height - 28;
+  const plotHeight = Math.max(1, plotBottom - plotTop);
+  const plotLeft = 5;
+  const plotRight = 95;
+  const pointPosition = (value: number, index: number) => ({
+    x: plotLeft + (index / Math.max(1, values.length - 1)) * (plotRight - plotLeft),
+    y: plotBottom - ((value - minimum) / range) * plotHeight,
+  });
+  const path = values.map((value, index) => {
+    const position = pointPosition(value, index);
+    return `${index === 0 ? "M" : "L"} ${position.x} ${position.y}`;
+  }).join(" ");
+  const selected = data[selectedIndex];
+  const selectedValue = values[selectedIndex] ?? 0;
+  const selectedPosition = pointPosition(selectedValue, selectedIndex);
+  const sourceLabel = sources[activeMetric] === "measured" ? "實測" : "本機估算";
+  const sourceColor = sources[activeMetric] === "measured" ? "#34D399" : "#FBBF24";
+  const visibleMarkers = markers.filter((marker) => metricForMarker(marker) === activeMetric);
 
-    const speeds = data.map((d) => d.speed);
-    const powers = data.map((d) => d.power || 0);
-    const heartRates = data.map((d) => d.heartRate || 0);
-
-    const maxSpeed = Math.max(...speeds, 1);
-    const maxPower = Math.max(...powers, 1);
-    const maxHR = Math.max(...heartRates, 1);
-
-    return { speeds, powers, heartRates, maxSpeed, maxPower, maxHR };
-  }, [data]);
-
-  // 計算 SVG 路徑
-  const generatePath = (values: number[], max: number, yOffset: number, yHeight: number) => {
-    if (values.length === 0) return "";
-
-    const xStep = 100 / (values.length - 1 || 1);
-    const points = values.map((val, idx) => {
-      const x = (idx / (values.length - 1 || 1)) * 100;
-      const y = yOffset + yHeight - (val / max) * yHeight;
-      return `${x},${y}`;
-    });
-
-    return `M ${points.join(" L ")}`;
+  const selectAt = (locationX: number) => {
+    if (containerWidth <= 0 || data.length === 0) return;
+    setSelectedIndex(Math.round(clamp(locationX / containerWidth, 0, 1) * Math.max(0, data.length - 1)));
   };
 
-  const speedPath = generatePath(chartData.speeds, chartData.maxSpeed, 0, height * 0.8);
-  const powerPath = showPower ? generatePath(chartData.powers, chartData.maxPower, 0, height * 0.8) : "";
-  const hrPath = showHeartRate ? generatePath(chartData.heartRates, chartData.maxHR, 0, height * 0.8) : "";
-
-  // 計算當前位置指示器
-  const displayIndex = interactiveIndex !== currentIndex ? interactiveIndex : currentIndex;
-  const currentX = data.length > 0 ? (displayIndex / (data.length - 1 || 1)) * 100 : 0;
-  const currentSpeed = data.length > 0 && displayIndex < chartData.speeds.length ? chartData.speeds[displayIndex] : 0;
-  const currentY = chartData.maxSpeed > 0 ? height * 0.8 - (currentSpeed / chartData.maxSpeed) * height * 0.8 : height * 0.8;
+  if (data.length < 2) {
+    return <Text style={[styles.empty, { color: colors.muted }]}>此活動沒有足夠的取樣資料可繪製分析曲線。</Text>;
+  }
 
   return (
-    <View style={{ marginVertical: 8 }}>
-      {/* 圖表標題 */}
-      <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground, marginBottom: 4 }}>
-        速度曲線 ({chartData.maxSpeed.toFixed(1)} km/h)
-      </Text>
+    <View style={styles.wrapper}>
+      <View style={styles.tabRow}>
+        {METRICS.map((item) => {
+          const selectedTab = item.key === activeMetric;
+          return (
+            <Pressable
+              key={item.key}
+              onPress={() => setActiveMetric(item.key)}
+              style={[styles.tab, { borderColor: selectedTab ? item.color : colors.border, backgroundColor: selectedTab ? `${item.color}20` : colors.surface }]}
+            >
+              <Text style={[styles.tabText, { color: selectedTab ? item.color : colors.muted }]}>{item.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
-      {/* SVG 圖表 */}
+      <View style={styles.metricHeader}>
+        <View>
+          <Text style={[styles.metricTitle, { color: colors.foreground }]}>{metric.label}</Text>
+          <Text style={[styles.metricRange, { color: colors.muted }]}>範圍 {minimum.toFixed(0)}–{maximum.toFixed(0)} {metric.unit}</Text>
+        </View>
+        <View style={[styles.sourceBadge, { borderColor: `${sourceColor}77`, backgroundColor: `${sourceColor}18` }]}>
+          <View style={[styles.sourceDot, { backgroundColor: sourceColor }]} />
+          <Text style={[styles.sourceText, { color: sourceColor }]}>{sourceLabel}</Text>
+        </View>
+      </View>
+
       <View
-        ref={svgContainerRef}
-        onLayout={(evt) => setContainerWidth(evt.nativeEvent.layout.width)}
-        {...(panResponderRef.current ? panResponderRef.current.panHandlers : {})}
-        style={{
-          backgroundColor: colors.surface,
-          borderRadius: 8,
-          padding: 8,
-          marginBottom: 8,
-          height: height + 16,
-        }}
+        onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={(event) => selectAt(event.nativeEvent.locationX)}
+        onResponderMove={(event) => selectAt(event.nativeEvent.locationX)}
+        style={[styles.chartFrame, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
         <Svg width="100%" height={height} viewBox={`0 0 100 ${height}`}>
-          {/* 背景網格 */}
-          <Defs>
-            <Pattern
-              id="grid"
-              width="20"
-              height={height / 4}
-              patternUnits="userSpaceOnUse"
-            >
-              <Path
-                d={`M 20 0 L 0 0 0 ${height / 4}`}
-                fill="none"
-                stroke={colors.border}
-                strokeWidth="0.5"
-              />
-            </Pattern>
-          </Defs>
-          <Rect width="100" height={height} fill={`url(#grid)`} />
-
-          {/* 速度曲線 */}
-          {speedPath && (
-            <Path
-              d={speedPath}
-              fill="none"
-              stroke={colors.primary}
-              strokeWidth="1.5"
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
-
-          {/* 功率曲線（可選） */}
-          {showPower && powerPath && (
-            <Path
-              d={powerPath}
-              fill="none"
-              stroke="#FF9500"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-              opacity="0.6"
-            />
-          )}
-
-          {/* 心率曲線（可選） */}
-          {showHeartRate && hrPath && (
-            <Path
-              d={hrPath}
-              fill="none"
-              stroke="#EF4444"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-              opacity="0.6"
-            />
-          )}
-
-          {/* 關鍵點標記 */}
-          {markers.map((marker) => {
-            if (marker.index < 0 || marker.index >= data.length) return null;
-            const markerX = (marker.index / (data.length - 1 || 1)) * 100;
-            const markerValue = marker.type === "maxSpeed" 
-              ? chartData.speeds[marker.index] || 0
-              : marker.type === "maxPower"
-              ? chartData.powers[marker.index] || 0
-              : chartData.heartRates[marker.index] || 0;
-            const markerY = chartData.maxSpeed > 0 ? height * 0.8 - (markerValue / chartData.maxSpeed) * height * 0.8 : height * 0.8;
-
-            return (
-              <G key={`marker-${marker.type}`}>
-                {/* 標記圓點 */}
-                <Circle
-                  cx={markerX}
-                  cy={markerY}
-                  r="2"
-                  fill={marker.color}
-                  stroke="#fff"
-                  strokeWidth="0.5"
-                />
-                {/* 標記標籤 */}
-                <SvgText
-                  x={markerX}
-                  y={markerY - 6}
-                  textAnchor="middle"
-                  fontSize="8"
-                  fill={marker.color}
-                  fontWeight="bold"
-                >
-                  {marker.label.substring(0, 4)}
-                </SvgText>
-              </G>
-            );
+          {[0, 0.5, 1].map((ratio) => {
+            const y = plotBottom - ratio * plotHeight;
+            return <Line key={ratio} x1={plotLeft} x2={plotRight} y1={y} y2={y} stroke={colors.border} strokeWidth="0.5" opacity={0.8} />;
           })}
-
-          {/* 當前位置指示器 */}
-          <Line
-            x1={currentX}
-            y1="0"
-            x2={currentX}
-            y2={height}
-            stroke={colors.primary}
-            strokeWidth="1"
-            strokeDasharray="2,2"
-            opacity="0.5"
-          />
-          <Circle
-            cx={currentX}
-            cy={currentY}
-            r="2.5"
-            fill={colors.primary}
-            stroke="#fff"
-            strokeWidth="1"
-          />
+          <Rect x={plotLeft} y={plotTop} width={plotRight - plotLeft} height={plotHeight} fill="transparent" />
+          <Path d={path} fill="none" stroke={metric.color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          {visibleMarkers.map((marker) => {
+            const markerValue = values[marker.index] ?? 0;
+            const markerPosition = pointPosition(markerValue, marker.index);
+            return <Circle key={marker.type} cx={markerPosition.x} cy={markerPosition.y} r="2.8" fill={marker.color} stroke="#fff" strokeWidth="0.8" onPress={() => onMarkerPress?.(marker)} />;
+          })}
+          <Line x1={selectedPosition.x} x2={selectedPosition.x} y1={plotTop} y2={plotBottom} stroke={metric.color} strokeWidth="1" strokeDasharray="2,2" opacity={0.8} />
+          <Circle cx={selectedPosition.x} cy={selectedPosition.y} r="3.2" fill={metric.color} stroke="#fff" strokeWidth="1" />
+          <SvgText x={plotLeft} y={height - 8} fill={colors.muted} fontSize={8}>開始</SvgText>
+          <SvgText x={plotRight - 10} y={height - 8} fill={colors.muted} fontSize={8}>結束</SvgText>
         </Svg>
       </View>
 
-      {/* 圖例 */}
-      <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <View
-            style={{
-              width: 12,
-              height: 2,
-              backgroundColor: colors.primary,
-              borderRadius: 1,
-            }}
-          />
-          <Text style={{ fontSize: 11, color: colors.muted }}>速度</Text>
-        </View>
-        {showPower && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <View
-              style={{
-                width: 12,
-                height: 2,
-                backgroundColor: "#FF9500",
-                borderRadius: 1,
-              }}
-            />
-            <Text style={{ fontSize: 11, color: colors.muted }}>功率</Text>
-          </View>
-        )}
-        {showHeartRate && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <View
-              style={{
-                width: 12,
-                height: 2,
-                backgroundColor: "#EF4444",
-                borderRadius: 1,
-              }}
-            />
-            <Text style={{ fontSize: 11, color: colors.muted }}>心率</Text>
-          </View>
-        )}
-      </View>
-
-      {/* 關鍵點列表 */}
-      {markers.length > 0 && (
-        <View style={{ marginTop: 8, gap: 4 }}>
-          {markers.map((marker) => (
-            <Pressable
-              key={`marker-item-${marker.type}`}
-              onPress={() => onMarkerPress?.(marker)}
-              style={({ pressed }) => ({
-                flexDirection: "row",
-                alignItems: "center",
-                paddingHorizontal: 8,
-                paddingVertical: 6,
-                backgroundColor: marker.color + "20",
-                borderRadius: 6,
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: marker.color,
-                  marginRight: 8,
-                }}
-              />
-              <Text style={{ fontSize: 12, color: colors.foreground, flex: 1 }}>
-                {marker.label}
-              </Text>
-              <Text style={{ fontSize: 12, color: marker.color, fontWeight: "600" }}>
-                {marker.value.toFixed(1)}
-              </Text>
-            </Pressable>
-          ))}
+      {selected && (
+        <View style={[styles.readout, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.readoutValue, { color: metric.color }]}>{selectedValue.toFixed(0)} <Text style={styles.readoutUnit}>{metric.unit}</Text></Text>
+          <Text style={[styles.readoutMeta, { color: colors.muted }]}>{formatTime(selected.timestamp, selectedIndex)} · {selected.distanceKm?.toFixed(2) ?? "--"} km · 坡度 {(selected.gradePct ?? 0).toFixed(1)}%</Text>
         </View>
       )}
+      {sources[activeMetric] === "estimated" && <Text style={[styles.estimateNote, { color: colors.muted }]}>依 GPS、坡度、FTP、個人設定與已保存環境摘要推估，僅供趨勢回顧，不等同外接感測器量測。</Text>}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrapper: { marginTop: 12 },
+  empty: { fontSize: 12, lineHeight: 18, marginTop: 14 },
+  tabRow: { flexDirection: "row", gap: 7, marginBottom: 12 },
+  tab: { flex: 1, minHeight: 36, borderRadius: 9, borderWidth: 1, justifyContent: "center", alignItems: "center" },
+  tabText: { fontSize: 12, fontWeight: "800" },
+  metricHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  metricTitle: { fontSize: 15, fontWeight: "800" },
+  metricRange: { fontSize: 11, marginTop: 2 },
+  sourceBadge: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 99, paddingHorizontal: 8, paddingVertical: 5 },
+  sourceDot: { width: 6, height: 6, borderRadius: 3 },
+  sourceText: { fontSize: 10, fontWeight: "800" },
+  chartFrame: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 7, paddingTop: 6 },
+  readout: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, paddingVertical: 9, marginTop: 8 },
+  readoutValue: { fontSize: 16, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  readoutUnit: { fontSize: 10, fontWeight: "700" },
+  readoutMeta: { flex: 1, fontSize: 10, textAlign: "right", lineHeight: 14 },
+  estimateNote: { fontSize: 10, lineHeight: 15, marginTop: 7 },
+});

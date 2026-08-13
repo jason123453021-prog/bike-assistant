@@ -42,6 +42,7 @@ import { useFavorites } from "@/lib/favorites-context";
 import { ShareCardModal } from "@/components/share-card-modal";
 import { SpeedCurveChart, type KeyMarker, type SpeedDataPoint } from "@/components/speed-curve-chart";
 import { ActivityElevationChart } from "@/components/activity-elevation-chart";
+import { buildActivitySensorAnalysis } from "@/lib/activity-sensor-estimates";
 import { createGpxContent } from "@/lib/gpx-export";
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
 import { buildRideSplits } from "@/lib/ride-splits";
@@ -363,17 +364,42 @@ export default function RideDetailScreen() {
     return `${zone.name} (${zone.minBpm}-${zone.maxBpm} bpm)`;
   };
   
-  // 計算速度曲線數據
-  const speedCurveData = useMemo(() => {
-    if (!record || !record.route) return [];
-    return record.route.map((point, idx) => ({
-      index: idx,
-      speed: point.speed ? point.speed * 3.6 : 0,
-      power: point.power ?? record.powerHistory?.[Math.min(record.powerHistory.length - 1, Math.floor((idx / Math.max(1, record.route.length - 1)) * Math.max(0, record.powerHistory.length - 1)))] ?? 0,
-      heartRate: point.heartRate ?? record.avgHeartRate ?? 0,
+  // 活動曲線：未保存感測器資料時，以本次騎乘的 GPS、坡度、FTP 與環境摘要建立明確標示的本機估算。
+  const activitySensorAnalysis = useMemo(() => {
+    if (!record?.route?.length) return null;
+    const routeLength = Math.max(1, record.route.length - 1);
+    return buildActivitySensorAnalysis(record.route.map((point, index) => ({
       timestamp: point.timestamp,
+      speedKmh: Math.max(0, (point.speed ?? 0) * 3.6),
+      powerW: point.power ?? record.powerHistory?.[Math.min(record.powerHistory.length - 1, Math.floor((index / routeLength) * Math.max(0, record.powerHistory.length - 1)))],
+      heartRate: point.heartRate,
+      cadence: point.cadence,
+      gradePct: point.slope,
+    })), {
+      ftpW: record.calculationProfile?.ftpW ?? settings.ftp,
+      age: settings.age,
+      maxHeartRate: settings.maxHeartRate,
+      restingHeartRate: settings.restingHeartRate,
+      temperatureC: record.calculationProfile?.environment?.averageTemperatureC,
+      humidityPct: record.calculationProfile?.environment?.averageHumidityPct,
+      headwindMs: record.calculationProfile?.environment?.averageHeadwindMs,
+    });
+  }, [record, settings.age, settings.ftp, settings.maxHeartRate, settings.restingHeartRate]);
+
+  const speedCurveData = useMemo<SpeedDataPoint[]>(() => {
+    if (!record || !activitySensorAnalysis) return [];
+    const routeLength = Math.max(1, record.route.length - 1);
+    return activitySensorAnalysis.points.map((point, index) => ({
+      index,
+      speed: point.speedKmh,
+      power: point.powerW,
+      heartRate: point.heartRate,
+      cadence: point.cadence,
+      timestamp: point.timestamp,
+      distanceKm: (record.distance / 1000) * (index / routeLength),
+      gradePct: point.gradePct,
     }));
-  }, [record]);
+  }, [activitySensorAnalysis, record]);
   
   // 計算關鍵點標記
   const keyMarkers = useMemo(() => {
@@ -872,8 +898,7 @@ export default function RideDetailScreen() {
               data={speedCurveData}
               currentIndex={0}
               markers={keyMarkers}
-              showPower={record.powerHistory.length > 1 || record.route.some((point) => (point.power ?? 0) > 0)}
-              showHeartRate={record.avgHeartRate !== undefined || record.route.some((point) => (point.heartRate ?? 0) > 0)}
+              sources={activitySensorAnalysis?.sources ?? { speed: "measured", power: "estimated", heartRate: "estimated", cadence: "estimated" }}
             />
           ) : <Text style={styles.activityAnalysisEmpty}>此活動沒有足夠的 GPS 取樣資料可繪製速度曲線。</Text>}
           <ActivityElevationChart route={record.route} />

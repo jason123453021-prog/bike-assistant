@@ -1377,8 +1377,14 @@
 - [x] 實作僅供使用者確認的 FTP 建議，不自動覆寫 FTP 設定：設定頁僅以最近 90 天至少兩次有效 20 分鐘功率資料顯示候選值、資料量與信心；單次變動限制為目前 FTP 的 ±15%，使用者必須在系統確認視窗主動套用才會更新
 - [x] 完成 TypeScript、全量測試、Android Bundle 與零 NitroModules 回歸驗證：pnpm check 通過；23 個測試檔（64 passed、1 skipped）通過；Expo 設定成功解析；SDK 54 相容 `expo-image-picker@~17.0.11`；Android Metro Bundle 12,571,876 bytes 成功；掃描 0 個 NitroModules、MapLibre 或已移除原生地圖依賴引用；Lint 為 0 errors、86 個既有非阻斷警告
 
-## Android 16（API 36）Google Play 合規修正（2026-08-13）
+## Android 16（API 36）Google Play 合規（2026-08-13）
 - [x] 核對 Expo 設定、Android 預建置輸出、套件版本與舊版上傳產物的 target SDK 差異：目前設定原有 target SDK 36，但上傳至 Play 的既有產物仍是先前 API 35 建置；所有自訂插件均未覆寫 SDK 值
 - [x] 將 Android compile／target SDK 明確固定為 36，並移除會覆寫或降級該設定的建置配置：expo-build-properties 現明確使用 compileSdkVersion 36、targetSdkVersion 36、minSdkVersion 24；App 版號提升至 1.0.3／versionCode 10087
 - [x] 驗證 Expo 設定與 Android 預建置 Manifest／Gradle 輸出，確認新的 APK／AAB 會宣告 target SDK 36：Expo Android 預建置成功；生成 gradle.properties 明確為 android.compileSdkVersion=36、android.targetSdkVersion=36、android.minSdkVersion=24
 - [x] 保存合規版本，提供受管理建置與 Play Console 上傳時應使用的新產物指引：已建立 references/google-play-api36-upload.md；必須以新建置的 versionCode 10087 AAB 取代原 API 35 產物，並在 Bundle Explorer 確認 target SDK 36 後上傳
+
+## 離線活動分析頁籤與估算資料（2026-08-13）
+- [x] 在活動詳情新增速度、功率、心率與踏頻的明確切換頁籤
+- [x] 以 GPS、坡度、FTP、體重、騎乘時長與環境資料建立可解釋的本機心率與踏頻估算
+- [x] 在圖表與讀值中清楚標示實測或本機估算來源，不將估算誤作感測器讀值
+- [x] 新增估算與頁籤切換測試，完成 TypeScript、完整測試與 Android bundle 驗證
