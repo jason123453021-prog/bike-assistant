@@ -15,6 +15,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Alert,
   Dimensions,
+  Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -41,6 +43,12 @@ import { ShareCardModal } from "@/components/share-card-modal";
 import { SpeedCurveChart, type KeyMarker, type SpeedDataPoint } from "@/components/speed-curve-chart";
 import { createGpxContent } from "@/lib/gpx-export";
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
+import { buildRideSplits } from "@/lib/ride-splits";
+import { useSettings } from "@/lib/settings-context";
+import { calibrateSweatRate } from "@/lib/supply-calibration";
+import { writeLocalFitBackup } from "@/lib/local-fit-backup";
+import { attachRidePhotos, loadRidePhotoTimeline, removeRidePhoto, type RidePhotoTimelineEntry } from "@/lib/local-ride-photos";
+import * as ImagePicker from "expo-image-picker";
 
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -65,6 +73,7 @@ export default function RideDetailScreen() {
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, dispatch, updateRecordName, getRouteStats } = useRide();
+  const { settings, updateSettings } = useSettings();
   const { favorites, addFavorite, removeFavorite } = useFavorites();
   const [isFavorited, setIsFavorited] = useState(false);
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
@@ -114,6 +123,72 @@ export default function RideDetailScreen() {
 
   // 分享卡片
   const [shareCardVisible, setShareCardVisible] = useState(false);
+  const [calibrationVisible, setCalibrationVisible] = useState(false);
+  const [confirmedFluidInput, setConfirmedFluidInput] = useState("");
+  const [photoTimeline, setPhotoTimeline] = useState<RidePhotoTimelineEntry[]>([]);
+
+  const rideSplits = useMemo(() => record ? buildRideSplits(record) : [], [record]);
+
+  const handleApplySweatCalibration = useCallback(async () => {
+    if (!record) return;
+    const result = calibrateSweatRate({
+      estimatedSweatMl: record.totalSweatMl,
+      confirmedFluidMl: Number(confirmedFluidInput),
+      currentMultiplier: settings.sweatRateCalibrationMultiplier,
+      completedCalibrations: settings.sweatRateCalibrationCount,
+    });
+    if (!result.applied) {
+      Alert.alert("無法套用校正", result.reason);
+      return;
+    }
+    await updateSettings({
+      sweatRateCalibrationMultiplier: result.nextMultiplier,
+      sweatRateCalibrationCount: result.nextCount,
+    });
+    setCalibrationVisible(false);
+    setConfirmedFluidInput("");
+    Alert.alert("已套用本機校正", result.reason);
+  }, [confirmedFluidInput, record, settings.sweatRateCalibrationCount, settings.sweatRateCalibrationMultiplier, updateSettings]);
+
+  const storePickedPhotos = useCallback(async (assets: ImagePicker.ImagePickerAsset[]) => {
+    if (!record || assets.length === 0) return;
+    const timeline = await attachRidePhotos(record.id, assets.map((asset) => ({
+      uri: asset.uri,
+      fileName: asset.fileName,
+      exif: asset.exif as Record<string, unknown> | null | undefined,
+    })));
+    setPhotoTimeline(timeline);
+  }, [record]);
+
+  useEffect(() => {
+    if (!record) return;
+    void loadRidePhotoTimeline(record.id).then(setPhotoTimeline);
+  }, [record]);
+
+  useEffect(() => {
+    let active = true;
+    void ImagePicker.getPendingResultAsync().then((result) => {
+      if (active && result && "canceled" in result && !result.canceled) void storePickedPhotos(result.assets);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [storePickedPhotos]);
+
+  const handlePickRidePhotos = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
+      exif: true,
+      quality: 1,
+    });
+    if (!result.canceled) await storePickedPhotos(result.assets);
+  }, [storePickedPhotos]);
+
+  const handleRemoveRidePhoto = useCallback(async (photoId: string) => {
+    if (!record) return;
+    const timeline = await removeRidePhoto(record.id, photoId);
+    setPhotoTimeline(timeline);
+  }, [record]);
 
   // 地圖適配軌跡
   const polylineCoords = useMemo(() => {
@@ -321,6 +396,29 @@ export default function RideDetailScreen() {
     } catch (err) {
       console.error('[RideDetail] GPX export error:', err);
       Alert.alert("匯出失敗", "無法建立 GPX 本機備份，請確認此記錄包含至少兩個有效 GPS 軌跡點。");
+    }
+  }, [record]);
+
+  const handleExportFit = useCallback(async () => {
+    if (!record) return;
+    try {
+      const backup = await writeLocalFitBackup(record);
+      if (!backup) {
+        Alert.alert("無法匯出 FIT", "此記錄至少需要兩個有效 GPS 軌跡點才能建立標準 FIT 活動檔。");
+        return;
+      }
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(backup.uri, {
+          mimeType: "application/octet-stream",
+          dialogTitle: "儲存或分享 FIT 活動檔",
+        });
+      } else {
+        Alert.alert("已建立本機 FIT", `${backup.filename}\n已保存至 App 本機快取資料夾。`);
+      }
+    } catch (error) {
+      console.error("[RideDetail] FIT export error:", error);
+      Alert.alert("FIT 匯出失敗", "無法建立本機 FIT 檔，請確認記錄中的 GPS 軌跡完整。");
     }
   }, [record]);
 
@@ -653,6 +751,29 @@ export default function RideDetailScreen() {
               </View>
             )}
 
+            {rideSplits.length > 0 && (
+              <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>每公里分段</Text>
+                <Text style={[styles.panelHint, { color: colors.muted }]}>依已保存 GPS 軌跡重建；最後一段可能不足 1 km。</Text>
+                <View style={styles.splitHeader}>
+                  <Text style={styles.splitHeaderText}>段</Text>
+                  <Text style={styles.splitHeaderText}>時間</Text>
+                  <Text style={styles.splitHeaderText}>均速</Text>
+                  <Text style={styles.splitHeaderText}>爬／降</Text>
+                  <Text style={styles.splitHeaderText}>功率</Text>
+                </View>
+                {rideSplits.map((split) => (
+                  <View key={split.index} style={styles.splitRow}>
+                    <Text style={styles.splitCell}>{split.distanceM >= 950 ? `${split.index} km` : `${split.index} · ${(split.distanceM / 1000).toFixed(2)} km`}</Text>
+                    <Text style={styles.splitCell}>{formatDuration(split.movingTimeSeconds)}</Text>
+                    <Text style={styles.splitCell}>{split.averageSpeedKmh?.toFixed(1) ?? "--"}</Text>
+                    <Text style={styles.splitCell}>{`${Math.round(split.ascentM)} / ${Math.round(split.descentM)}`}</Text>
+                    <Text style={styles.splitCell}>{split.averagePowerW === undefined ? "--" : `${split.averagePowerW} W`}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
 
 
             {/* 心率區間分布 */}
@@ -694,6 +815,14 @@ export default function RideDetailScreen() {
             >
               <IconSymbol name="arrow.down.doc" size={16} color="#fff" />
               <Text style={styles.shareBtnText}>離線備份 GPX</Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.85 : 1, backgroundColor: "rgba(94,92,230,0.85)" }]}
+              onPress={handleExportFit}
+            >
+              <IconSymbol name="arrow.down.doc" size={16} color="#fff" />
+              <Text style={styles.shareBtnText}>匯出標準 FIT</Text>
             </Pressable>
 
             {/* 加入最愛按鈕 */}
@@ -798,13 +927,77 @@ export default function RideDetailScreen() {
             )}
 
             {/* 补給品記錄面板 */}
-            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}> 
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>补給品記錄</Text>
               <View style={styles.statsGrid}>
                 <DetailCell label="水分流失" value={`${Math.round(record.totalSweatMl)}`} unit="ml" color="#4FC3F7" />
                 <DetailCell label="補水次數" value={`${record.refillCount}`} unit="次" />
                 <DetailCell label="GPS 點數" value={`${record.route.length}`} unit="點" />
               </View>
+              <Pressable
+                style={({ pressed }) => [styles.calibrationButton, { borderColor: colors.primary, opacity: pressed ? 0.72 : 1 }]}
+                onPress={() => setCalibrationVisible(true)}
+              >
+                <IconSymbol name="drop.fill" size={16} color="#4FC3F7" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.calibrationButtonTitle, { color: colors.foreground }]}>騎後校正汗率</Text>
+                  <Text style={[styles.calibrationButtonHint, { color: colors.muted }]}>確認本次補水量後，保守調整未來的本機補水建議。</Text>
+                </View>
+                <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            {record.calculationProfile?.environment && (
+              <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>本次環境與智慧補給</Text>
+                <View style={styles.statsGrid}>
+                  <DetailCell label="環境樣本" value={`${record.calculationProfile.environment.sampleCount}`} unit="筆" />
+                  <DetailCell label="平均溫度" value={record.calculationProfile.environment.averageTemperatureC === undefined ? "--" : record.calculationProfile.environment.averageTemperatureC.toFixed(1)} unit="°C" color="#F97316" />
+                  <DetailCell label="平均濕度" value={record.calculationProfile.environment.averageHumidityPct === undefined ? "--" : record.calculationProfile.environment.averageHumidityPct.toFixed(0)} unit="%" color="#60A5FA" />
+                  <DetailCell label="平均風速" value={record.calculationProfile.environment.averageWindSpeedKmh === undefined ? "--" : record.calculationProfile.environment.averageWindSpeedKmh.toFixed(1)} unit="km/h" />
+                  <DetailCell label="計算來源" value={record.calculationProfile.environment.source === "live-weather" ? "當日天氣" : "離線回退"} unit="" />
+                </View>
+                {(record.supplyConfirmations?.length ?? 0) > 0 && (
+                  <View style={styles.confirmationList}>
+                    <Text style={[styles.confirmationHeading, { color: colors.muted }]}>已確認補給</Text>
+                    {record.supplyConfirmations?.slice(-4).map((entry, index) => (
+                      <Text key={`${entry.timestamp}-${index}`} style={[styles.confirmationText, { color: colors.foreground }]}> 
+                        {entry.type === "water"
+                          ? `補水 ${entry.recommendedWaterMl ?? "--"} ml`
+                          : `能量 ${entry.recommendedEnergyKcal ?? "--"} kcal／碳水 ${entry.recommendedCarbohydrateG ?? "--"} g`}
+                        {entry.source ? ` · ${entry.source === "custom" ? "固定門檻" : entry.source === "smart" ? "智慧計算" : "離線回退"}` : ""}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
+            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+              <View style={styles.photoTimelineHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.panelTitle, { color: colors.foreground, marginBottom: 3 }]}>本機相片時間軸</Text>
+                  <Text style={[styles.photoTimelineHint, { color: colors.muted }]}>只會加入您現在明確選取的相片，不讀取整個相簿，也不會上傳。</Text>
+                </View>
+                <Pressable style={({ pressed }) => [styles.photoAddButton, { backgroundColor: colors.primary, opacity: pressed ? 0.7 : 1 }]} onPress={() => void handlePickRidePhotos()}>
+                  <Text style={styles.photoAddButtonText}>加入相片</Text>
+                </Pressable>
+              </View>
+              {photoTimeline.length === 0 ? (
+                <Text style={[styles.photoEmpty, { color: colors.muted }]}>尚未加入本次騎乘相片。</Text>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoTimelineList}>
+                  {photoTimeline.map((photo) => (
+                    <View key={photo.id} style={styles.photoCard}>
+                      <Image source={{ uri: photo.uri }} style={styles.photoImage} />
+                      <Text style={[styles.photoTime, { color: colors.muted }]}>{new Date(photo.capturedAt ?? photo.selectedAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</Text>
+                      <Pressable style={styles.photoRemoveButton} onPress={() => void handleRemoveRidePhoto(photo.id)}>
+                        <Text style={styles.photoRemoveText}>移除</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
             </View>
 
             {/* 路線統計面板 */}
@@ -830,6 +1023,35 @@ export default function RideDetailScreen() {
         ride={record}
         onClose={() => setShareCardVisible(false)}
       />
+      <Modal
+        visible={calibrationVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCalibrationVisible(false)}
+      >
+        <View style={styles.calibrationOverlay}>
+          <View style={[styles.calibrationModal, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.calibrationModalTitle, { color: colors.foreground }]}>騎後汗率校正</Text>
+            <Text style={[styles.calibrationModalCopy, { color: colors.muted }]}>請輸入本次騎乘期間與結束後補回的總補水量（ml）。系統只會保守調整未來建議，並可隨時在設定頁重設；此功能不作醫療判斷。</Text>
+            <TextInput
+              value={confirmedFluidInput}
+              onChangeText={setConfirmedFluidInput}
+              keyboardType="number-pad"
+              placeholder="例如 900"
+              placeholderTextColor={colors.muted}
+              style={[styles.calibrationInput, { color: colors.foreground, borderColor: colors.border }]}
+            />
+            <View style={styles.calibrationActions}>
+              <Pressable style={[styles.calibrationAction, { borderColor: colors.border }]} onPress={() => setCalibrationVisible(false)}>
+                <Text style={[styles.calibrationActionText, { color: colors.muted }]}>取消</Text>
+              </Pressable>
+              <Pressable style={[styles.calibrationAction, { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => void handleApplySweatCalibration()}>
+                <Text style={[styles.calibrationActionText, { color: "#fff" }]}>確認並套用</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1067,6 +1289,82 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 12,
+  },
+  panelHint: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: -6,
+    marginBottom: 8,
+  },
+  calibrationButton: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  calibrationButtonTitle: { fontSize: 13, fontWeight: "700" },
+  calibrationButtonHint: { fontSize: 11, lineHeight: 16, marginTop: 2 },
+  confirmationList: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    gap: 5,
+  },
+  confirmationHeading: { fontSize: 11, fontWeight: "700" },
+  confirmationText: { fontSize: 12, lineHeight: 17 },
+  photoTimelineHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  photoTimelineHint: { fontSize: 11, lineHeight: 16 },
+  photoAddButton: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  photoAddButtonText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  photoEmpty: { fontSize: 12, marginTop: 14 },
+  photoTimelineList: { gap: 10, paddingTop: 14 },
+  photoCard: { width: 142 },
+  photoImage: { width: 142, height: 106, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.08)" },
+  photoTime: { fontSize: 10, marginTop: 5 },
+  photoRemoveButton: { alignSelf: "flex-start", marginTop: 5, paddingVertical: 3 },
+  photoRemoveText: { color: "#FF6B6B", fontSize: 11, fontWeight: "700" },
+  calibrationOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.58)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  calibrationModal: { borderRadius: 16, borderWidth: 1, padding: 20 },
+  calibrationModalTitle: { fontSize: 18, fontWeight: "800", marginBottom: 9 },
+  calibrationModalCopy: { fontSize: 13, lineHeight: 19 },
+  calibrationInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 11, fontSize: 17, marginTop: 16 },
+  calibrationActions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  calibrationAction: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 11, alignItems: "center" },
+  calibrationActionText: { fontSize: 14, fontWeight: "700" },
+  splitHeader: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.12)",
+    paddingBottom: 7,
+  },
+  splitHeaderText: {
+    flex: 1,
+    color: "rgba(255,255,255,0.58)",
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  splitRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+    paddingVertical: 9,
+  },
+  splitCell: {
+    flex: 1,
+    color: "rgba(255,255,255,0.84)",
+    fontSize: 10,
+    fontVariant: ["tabular-nums"],
+    textAlign: "center",
   },
   personalBestHint: {
     fontSize: 12,

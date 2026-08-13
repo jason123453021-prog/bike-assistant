@@ -50,6 +50,18 @@ export interface RideCalculationProfile {
   };
 }
 
+/** 使用者在騎乘中確認的本機補給事件；不傳送至任何伺服器。 */
+export interface SupplyConfirmation {
+  type: "energy" | "water";
+  timestamp: number;
+  elapsedSec: number;
+  recommendedEnergyKcal?: number;
+  recommendedCarbohydrateG?: number;
+  recommendedWaterMl?: number;
+  source?: "smart" | "smart-offline-fallback" | "custom";
+  reason?: string;
+}
+
 export interface RideRecord {
   id: string;
   date: number;
@@ -87,6 +99,8 @@ export interface RideRecord {
   personalBests?: PersonalBest[];
   /** 儲存時計算 TSS、能量與補給所用的個人設定及環境摘要 */
   calculationProfile?: RideCalculationProfile;
+  /** 本機補給確認紀錄，可解釋歷史中的智慧補給建議。 */
+  supplyConfirmations?: SupplyConfirmation[];
 }
 
 export interface RideState {
@@ -138,6 +152,7 @@ export interface RideState {
   // 自訂補給品計數
   /** 自訂補給品計數 Map: supplyItemId -> { count: 次數, lastTriggeredTime: 上次觸發時間戳 } */
   customSupplyItemCounts: Record<string, { count: number; lastTriggeredTime: number }>;
+  supplyConfirmations: SupplyConfirmation[];
 }
 
 type RideAction =
@@ -152,6 +167,7 @@ type RideAction =
   | { type: "SWEAT_UPDATE"; sweatLossMl: number; sweatRatePerHour: number; intensityLabel: string }
   | { type: "CONSUME_CALORIES" }
   | { type: "CONSUME_WATER" }
+  | { type: "SUPPLY_CONFIRMED"; confirmation: SupplyConfirmation }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
   | { type: "ADD_RECORD"; record: RideRecord }
   | { type: "UPDATE_RECORD_NAME"; id: string; name: string }
@@ -200,6 +216,7 @@ const initialState: RideState = {
   gradeDistribution: [0, 0, 0, 0, 0, 0],
   gradeAscentDistribution: [0, 0, 0, 0, 0, 0],
   customSupplyItemCounts: {},
+  supplyConfirmations: [],
 };
 
 function rideReducer(state: RideState, action: RideAction): RideState {
@@ -331,6 +348,12 @@ function rideReducer(state: RideState, action: RideAction): RideState {
         ...state,
         sweatSinceLastRefill: 0,
         refillCount: state.refillCount + 1,
+      };
+
+    case "SUPPLY_CONFIRMED":
+      return {
+        ...state,
+        supplyConfirmations: [...state.supplyConfirmations, action.confirmation].slice(-100),
       };
 
     case "LOAD_RECORDS":
@@ -476,6 +499,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       calculationProfile: calculationProfile
         ? { ...calculationProfile, ftpW }
         : undefined,
+      supplyConfirmations: state.supplyConfirmations,
     };
     const normalizedRecord = normalizeRideRecord(recordBase) ?? recordBase;
     const record: RideRecord = {
@@ -544,6 +568,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         route: state.route.slice(-100),
         powerHistory: state.powerHistory.slice(-50),
         powerZones: state.powerZones,
+        supplyConfirmations: state.supplyConfirmations,
         savedAt: Date.now(),
       };
       await AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));

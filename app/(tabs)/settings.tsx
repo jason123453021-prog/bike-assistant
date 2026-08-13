@@ -34,6 +34,7 @@ import { SensorPairingModal } from "@/components/sensor-pairing-modal";
 import { SmartPowerSavingManager, type PowerSavingSettings } from "@/lib/power-saving/smart-power-saving-system";
 import { importLocalRideFile } from "@/lib/local-ride-import";
 import { useRide } from "@/lib/ride-context";
+import { recommendFtp } from "@/lib/ftp-recommendation";
 
 
 import Constants from "expo-constants";
@@ -42,7 +43,8 @@ export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
-  const { loadRecords } = useRide();
+  const { loadRecords, state: rideState } = useRide();
+  const ftpRecommendation = recommendFtp(rideState.records, settings.ftp);
   const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
   const [powerSavingSettings, setPowerSavingSettings] = useState<PowerSavingSettings>(
     powerSavingManagerRef.current.getSettings(),
@@ -479,6 +481,52 @@ export default function SettingsScreen() {
             colors={colors}
             onPress={() => openEdit("ftp", "FTP", settings.ftp, "W")}
           />
+          <Divider colors={colors} />
+          <View style={styles.ftpRecommendationRow}>
+            <IconSymbol name="chart.line.uptrend.xyaxis" size={18} color="#A78BFA" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>本機 FTP 建議</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>
+                {ftpRecommendation
+                  ? `${ftpRecommendation.sourceRideCount} 次有效騎乘 · ${ftpRecommendation.confidence === "high" ? "較高" : "中等"}信心 · 不會自動覆寫`
+                  : "需最近 90 天至少 2 次、各含 20 分鐘以上有效功率資料"}
+              </Text>
+            </View>
+            {ftpRecommendation ? (
+              <Pressable
+                style={({ pressed }) => [styles.ftpApplyButton, { backgroundColor: colors.primary, opacity: pressed ? 0.7 : 1 }]}
+                onPress={() => Alert.alert(
+                  "套用 FTP 建議？",
+                  `建議 ${ftpRecommendation.recommendedFtpW} W（目前 ${settings.ftp} W）。\n\n${ftpRecommendation.rationale}\n\n這是本機估計，非正式生理測試；請確認後才會更新。`,
+                  [
+                    { text: "保留目前值", style: "cancel" },
+                    { text: "套用建議", onPress: () => void updateSettings({ ftp: ftpRecommendation.recommendedFtpW }) },
+                  ],
+                )}
+              >
+                <Text style={styles.ftpApplyButtonText}>建議 {ftpRecommendation.recommendedFtpW} W</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <Divider colors={colors} />
+          <Pressable
+            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.65 : 1 }]}
+            onPress={() => Alert.alert(
+              "重設汗率校正",
+              "將清除使用者騎後確認補水量所建立的本機汗率校正，並恢復為中性基準。此操作不會刪除騎乘歷史。",
+              [
+                { text: "取消", style: "cancel" },
+                { text: "重設", style: "destructive", onPress: () => void updateSettings({ sweatRateCalibrationMultiplier: 1, sweatRateCalibrationCount: 0 }) },
+              ],
+            )}
+          >
+            <IconSymbol name="drop.fill" size={18} color="#4FC3F7" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>汗率校正</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>本機倍率 {settings.sweatRateCalibrationMultiplier.toFixed(2)} · 已校正 {settings.sweatRateCalibrationCount} 次 · 點擊可重設</Text>
+            </View>
+            <IconSymbol name="arrow.clockwise" size={16} color={colors.muted} />
+          </Pressable>
         </View>}
 
         {/* ── 效能模式 ── */}
@@ -1573,6 +1621,9 @@ const styles = StyleSheet.create({
   rowHint: { fontSize: 11, marginTop: 2 },
   rowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
   rowValue: { fontSize: 15, fontWeight: "500" },
+  ftpRecommendationRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 13, gap: 10 },
+  ftpApplyButton: { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7 },
+  ftpApplyButtonText: { color: "#fff", fontSize: 11, fontWeight: "700" },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 46 },
   aboutRow: {
     flexDirection: "row",

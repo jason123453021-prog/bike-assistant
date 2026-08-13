@@ -40,6 +40,8 @@ export interface HydrationInput {
   precipitationProb?: number;
   /** 騎士年齡（用於模擬心率區間），預設 32 */
   ageYears?: number;
+  /** 使用者騎後確認補水後的本機校正倍率；保守限制在基準值的 ±25%。 */
+  calibrationMultiplier?: number;
 }
 
 export interface HydrationResult {
@@ -171,6 +173,7 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   headwindMs = 0,
   precipitationProb = 0,
   ageYears = 32,
+  calibrationMultiplier = 1,
   } = input;
 
   // 體表面積（標準人 BSA ≈ 1.7 m²）
@@ -204,6 +207,7 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   let sweatRatePerHour = Math.round(
     BASE_RATE_LPH * 1000 * bsaFactor * hrFactor * tFactor * hFactor * sFactor * aBonusFactor * headwindWorkFactor * windCoolingFactor * rainCoolingFactor
   );
+  sweatRatePerHour = Math.round(sweatRatePerHour * Math.max(0.75, Math.min(1.25, calibrationMultiplier)));
   
   // 限制在合理範圍：100-1500 ml/h
   // 最小值：100 ml/h（靜止或極低強度）

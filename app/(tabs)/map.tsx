@@ -521,6 +521,18 @@ export default function MapScreen() {
   const handleConfirmCalorieSupply = useCallback(() => {
     setCalorieAlert(false);
     dispatch({ type: "CONSUME_CALORIES" });
+    dispatch({
+      type: "SUPPLY_CONFIRMED",
+      confirmation: {
+        type: "energy",
+        timestamp: Date.now(),
+        elapsedSec: stateRef.current.elapsed,
+        recommendedEnergyKcal: supplyRecommendation?.energyRecommendationKcal,
+        recommendedCarbohydrateG: supplyRecommendation?.carbohydrateRecommendationG,
+        source: supplyRecommendation?.source,
+        reason: supplyRecommendation?.reason,
+      },
+    });
     calorieAnim.setValue(0);
     calorieReminderSentRef.current = false;
     pendingCalorieRef.current = false;
@@ -529,12 +541,23 @@ export default function MapScreen() {
     void acknowledgeBackgroundSupplyReminder("calorie");
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!pendingWaterRef.current) clearSupplyRepeatTimer();
-  }, [clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled]);
+  }, [clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, supplyRecommendation]);
 
   const handleConfirmWaterSupply = useCallback(() => {
     setWaterAlert(false);
     setSupplyRecommendedMl(undefined);
     dispatch({ type: "CONSUME_WATER" });
+    dispatch({
+      type: "SUPPLY_CONFIRMED",
+      confirmation: {
+        type: "water",
+        timestamp: Date.now(),
+        elapsedSec: stateRef.current.elapsed,
+        recommendedWaterMl: supplyRecommendation?.waterRecommendationMl ?? supplyRecommendedMl,
+        source: supplyRecommendation?.source,
+        reason: supplyRecommendation?.reason,
+      },
+    });
     waterAnim.setValue(0);
     waterReminderSentRef.current = false;
     pendingWaterRef.current = false;
@@ -543,7 +566,7 @@ export default function MapScreen() {
     void acknowledgeBackgroundSupplyReminder("water");
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!pendingCalorieRef.current) clearSupplyRepeatTimer();
-  }, [clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled]);
+  }, [clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, supplyRecommendation, supplyRecommendedMl]);
 
   const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind) => {
     const until = Date.now() + 5 * 60 * 1000;
@@ -1403,6 +1426,7 @@ export default function MapScreen() {
             headwindMs,
             precipitationProb: currentWeather?.precipitationProb ?? 0,
             ageYears: settings.age ?? 32,
+            calibrationMultiplier: settings.sweatRateCalibrationMultiplier,
           });
           dispatch({
             type: "SWEAT_UPDATE",
@@ -1730,6 +1754,7 @@ export default function MapScreen() {
         ageYears: settings.age ?? 32,
         ftpW: settings.ftp,
         bikeWeightKg: settings.bikeWeight ?? 10,
+        sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
       },
       environment: weatherRef.current
         ? {

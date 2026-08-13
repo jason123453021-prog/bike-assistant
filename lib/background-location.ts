@@ -64,6 +64,7 @@ export interface BackgroundState {
     ageYears: number;
     ftpW: number;
     bikeWeightKg: number;
+    sweatRateCalibrationMultiplier?: number;
   };
   environment?: {
     temperatureC: number;
@@ -214,6 +215,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               weatherCode: environment.weatherCode,
               headwindMs,
               precipitationProb: environment.precipitationProb,
+              calibrationMultiplier: profile.sweatRateCalibrationMultiplier,
             });
             state.calories += calorieResult.kcal;
             state.sweatLossMl += hydrationResult.sweatLossMl;

@@ -1,5 +1,5 @@
 import { calculateNormalizedPowerFromHistory } from "./tss-calc";
-import type { LocationPoint, RideCalculationProfile, RideRecord } from "./ride-context";
+import type { LocationPoint, RideCalculationProfile, RideRecord, SupplyConfirmation } from "./ride-context";
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -129,6 +129,32 @@ function normalizeCalculationProfile(value: unknown): RideCalculationProfile | u
   return { riderWeightKg, bikeWeightKg, ftpW, environment };
 }
 
+function normalizeSupplyConfirmations(value: unknown): SupplyConfirmation[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const confirmations = value.flatMap((candidate): SupplyConfirmation[] => {
+    if (!candidate || typeof candidate !== "object") return [];
+    const item = candidate as Partial<SupplyConfirmation>;
+    if (item.type !== "energy" && item.type !== "water") return [];
+    const timestamp = normalizedOptional(item.timestamp);
+    const elapsedSec = normalizedOptional(item.elapsedSec);
+    if (timestamp === undefined || timestamp <= 0 || elapsedSec === undefined || elapsedSec < 0) return [];
+    const source = item.source === "smart" || item.source === "smart-offline-fallback" || item.source === "custom"
+      ? item.source
+      : undefined;
+    return [{
+      type: item.type,
+      timestamp,
+      elapsedSec,
+      recommendedEnergyKcal: normalizedOptional(item.recommendedEnergyKcal),
+      recommendedCarbohydrateG: normalizedOptional(item.recommendedCarbohydrateG),
+      recommendedWaterMl: normalizedOptional(item.recommendedWaterMl),
+      source,
+      reason: typeof item.reason === "string" && item.reason.trim() ? item.reason.trim().slice(0, 160) : undefined,
+    }];
+  });
+  return confirmations.sort((a, b) => a.timestamp - b.timestamp).slice(-100);
+}
+
 /**
  * 將歷史、匯入與新建騎乘資料轉為同一個安全模型。
  * 僅接受具有數值距離與軌跡陣列的記錄；缺失的衍生數據會由本機軌跡補齊。
@@ -201,6 +227,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     gradeAscentDistribution: Array.isArray(source.gradeAscentDistribution) ? source.gradeAscentDistribution.map(nonNegative) : undefined,
     personalBests: Array.isArray(source.personalBests) ? source.personalBests : undefined,
     calculationProfile: normalizeCalculationProfile(source.calculationProfile),
+    supplyConfirmations: normalizeSupplyConfirmations(source.supplyConfirmations),
   };
 }
 
