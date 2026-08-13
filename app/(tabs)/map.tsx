@@ -45,6 +45,7 @@ import Svg, { Circle } from "react-native-svg";
 
 import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
+import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
 
@@ -1942,10 +1943,18 @@ export default function MapScreen() {
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新；個人設定與環境摘要只保存在裝置上。
           const environmentSummary = environmentSummaryRef.current;
           const sampleCount = environmentSummary.sampleCount;
+          const autoPersonalMetrics = deriveAutoPersonalMetrics(state.records, {
+            ftpW: settings.ftp,
+            age: settings.age,
+            maxHeartRate: settings.maxHeartRate,
+            restingHeartRate: settings.restingHeartRate,
+          });
+          const effectiveFtpW = settings.autoPersonalMetricsEnabled ? autoPersonalMetrics.ftpW : settings.ftp;
           const savedRecordId = await saveRecord(undefined, sensorStatsRef.current, {
             riderWeightKg: settings.weight,
             bikeWeightKg: settings.bikeWeight ?? 10,
-            ftpW: settings.ftp,
+            ftpW: effectiveFtpW,
+            autoRpeEnabled: settings.autoRpeEnabled,
             environment: {
               sampleCount,
               averageTemperatureC: sampleCount ? environmentSummary.temperatureTotal / sampleCount : undefined,
@@ -1970,7 +1979,7 @@ export default function MapScreen() {
         },
       },
     ]);
-  }, [dispatch, saveRecord, clearSnapshot, settings, clearSupplyRepeatTimer]);
+  }, [dispatch, saveRecord, clearSnapshot, settings, state.records, clearSupplyRepeatTimer]);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {

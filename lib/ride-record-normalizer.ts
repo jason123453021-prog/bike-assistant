@@ -243,6 +243,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     activityType: normalizeActivityType(source.activityType),
     equipment: typeof source.equipment === "string" && source.equipment.trim() ? source.equipment.trim().slice(0, 80) : undefined,
     perceivedExertion: normalizeRpe(source.perceivedExertion),
+    perceivedExertionSource: source.perceivedExertionSource === "manual" || source.perceivedExertionSource === "app-estimate" ? source.perceivedExertionSource : undefined,
     mediaItems: Array.isArray(source.mediaItems) ? source.mediaItems.filter((uri): uri is string => typeof uri === "string") : undefined,
     segmentAchievements: Array.isArray(source.segmentAchievements) ? source.segmentAchievements : undefined,
   };

@@ -179,6 +179,7 @@ export default function RideDetailScreen() {
       activityType: editActivityType ?? "road",
       equipment: editEquipmentInput.trim(),
       perceivedExertion: editRpe,
+      perceivedExertionSource: "manual",
     });
     setIsEditModalVisible(false);
     Alert.alert("成功", "已儲存活動編輯");
@@ -818,7 +819,7 @@ export default function RideDetailScreen() {
           </View>
           {record.perceivedExertion !== undefined && (
             <View style={[styles.activityMetaChip, styles.activityMetaRpeChip]}>
-              <Text style={styles.activityMetaRpeText}>RPE {record.perceivedExertion}/10</Text>
+              <Text style={styles.activityMetaRpeText}>{record.perceivedExertionSource === "app-estimate" ? "App 推定 " : ""}RPE {record.perceivedExertion}/10</Text>
             </View>
           )}
           {record.equipment ? <Text style={styles.activityEquipment}>{record.equipment}</Text> : null}
@@ -1387,7 +1388,7 @@ export default function RideDetailScreen() {
                 />
               </View>
               <View>
-                <Text style={[styles.label, { color: colors.muted }]}>主觀強度（RPE）</Text>
+                <Text style={[styles.label, { color: colors.muted }]}>RPE（App 已自動推定，可選手動調整）</Text>
                 <View style={styles.rpePicker}>
                   {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => {
                     const selected = editRpe === value;

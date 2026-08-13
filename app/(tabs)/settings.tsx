@@ -34,7 +34,7 @@ import { SensorPairingModal } from "@/components/sensor-pairing-modal";
 import { SmartPowerSavingManager, type PowerSavingSettings } from "@/lib/power-saving/smart-power-saving-system";
 import { importLocalRideFile } from "@/lib/local-ride-import";
 import { useRide } from "@/lib/ride-context";
-import { recommendFtp } from "@/lib/ftp-recommendation";
+import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 
 
 import Constants from "expo-constants";
@@ -44,7 +44,12 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
   const { loadRecords, state: rideState } = useRide();
-  const ftpRecommendation = recommendFtp(rideState.records, settings.ftp);
+  const autoPersonalMetrics = deriveAutoPersonalMetrics(rideState.records, {
+    ftpW: settings.ftp,
+    age: settings.age,
+    maxHeartRate: settings.maxHeartRate,
+    restingHeartRate: settings.restingHeartRate,
+  });
   const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
   const [powerSavingSettings, setPowerSavingSettings] = useState<PowerSavingSettings>(
     powerSavingManagerRef.current.getSettings(),
@@ -473,40 +478,40 @@ export default function SettingsScreen() {
             onPress={() => openEdit("age", "年齡", settings.age ?? 32, "歲")}
           />
           <Divider colors={colors} />
-          <NumberRow
-            icon="bolt.fill"
-            label="FTP（功能閾值功率）"
-            value={settings.ftp}
-            unit="W"
+          <ToggleRow
+            icon="chart.line.uptrend.xyaxis"
+            label="App 自動推定個人指標"
+            value={settings.autoPersonalMetricsEnabled}
             colors={colors}
-            onPress={() => openEdit("ftp", "FTP", settings.ftp, "W")}
+            onToggle={(enabled) => updateSettings({ autoPersonalMetricsEnabled: enabled })}
           />
+          <View style={styles.autoMetricsNote}>
+            <Text style={[styles.rowHint, { color: colors.muted }]}>開啟時，App 會優先以本機歷史騎乘推定 FTP、最大心率與心率基準；沒有足夠資料時自動使用安全基準。</Text>
+          </View>
           <Divider colors={colors} />
-          <View style={styles.ftpRecommendationRow}>
-            <IconSymbol name="chart.line.uptrend.xyaxis" size={18} color="#A78BFA" />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>本機 FTP 建議</Text>
-              <Text style={[styles.rowHint, { color: colors.muted }]}>
-                {ftpRecommendation
-                  ? `${ftpRecommendation.sourceRideCount} 次有效騎乘 · ${ftpRecommendation.confidence === "high" ? "較高" : "中等"}信心 · 不會自動覆寫`
-                  : "需最近 90 天至少 2 次、各含 20 分鐘以上有效功率資料"}
-              </Text>
+          {settings.autoPersonalMetricsEnabled ? (
+            <View style={styles.autoMetricValues}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>目前 App 推定</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>FTP {autoPersonalMetrics.ftpW} W · 最大心率 {autoPersonalMetrics.maxHeartRate} bpm · 心率基準 {autoPersonalMetrics.restingHeartRate} bpm</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>{autoPersonalMetrics.sourceRideCount ? `依 ${autoPersonalMetrics.sourceRideCount} 次有效本機騎乘更新` : "尚無足夠功率歷史，暫用目前安全基準"}</Text>
             </View>
-            {ftpRecommendation ? (
-              <Pressable
-                style={({ pressed }) => [styles.ftpApplyButton, { backgroundColor: colors.primary, opacity: pressed ? 0.7 : 1 }]}
-                onPress={() => Alert.alert(
-                  "套用 FTP 建議？",
-                  `建議 ${ftpRecommendation.recommendedFtpW} W（目前 ${settings.ftp} W）。\n\n${ftpRecommendation.rationale}\n\n這是本機估計，非正式生理測試；請確認後才會更新。`,
-                  [
-                    { text: "保留目前值", style: "cancel" },
-                    { text: "套用建議", onPress: () => void updateSettings({ ftp: ftpRecommendation.recommendedFtpW }) },
-                  ],
-                )}
-              >
-                <Text style={styles.ftpApplyButtonText}>建議 {ftpRecommendation.recommendedFtpW} W</Text>
-              </Pressable>
-            ) : null}
+          ) : <>
+            <NumberRow icon="bolt.fill" label="FTP（功能閾值功率）" value={settings.ftp} unit="W" colors={colors} onPress={() => openEdit("ftp", "FTP", settings.ftp, "W")} />
+            <Divider colors={colors} />
+            <NumberRow icon="heart.fill" label="最大心率" value={settings.maxHeartRate ?? autoPersonalMetrics.maxHeartRate} unit="bpm" colors={colors} onPress={() => openEdit("maxHeartRate", "最大心率", settings.maxHeartRate ?? autoPersonalMetrics.maxHeartRate, "bpm")} />
+            <Divider colors={colors} />
+            <NumberRow icon="heart.fill" label="靜息心率" value={settings.restingHeartRate ?? autoPersonalMetrics.restingHeartRate} unit="bpm" colors={colors} onPress={() => openEdit("restingHeartRate", "靜息心率", settings.restingHeartRate ?? autoPersonalMetrics.restingHeartRate, "bpm")} />
+          </>}
+          <Divider colors={colors} />
+          <ToggleRow
+            icon="gauge.with.dots.needle.33percent"
+            label="騎後由 App 推定 RPE"
+            value={settings.autoRpeEnabled}
+            colors={colors}
+            onToggle={(enabled) => updateSettings({ autoRpeEnabled: enabled })}
+          />
+          <View style={styles.autoMetricsNote}>
+            <Text style={[styles.rowHint, { color: colors.muted }]}>依相對 FTP 強度、移動時間、爬升與環境負荷推定；若需要，仍可在活動編輯中手動調整。</Text>
           </View>
           <Divider colors={colors} />
           <Pressable
@@ -1640,6 +1645,8 @@ const styles = StyleSheet.create({
   rowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
   rowValue: { fontSize: 15, fontWeight: "500" },
   ftpRecommendationRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 13, gap: 10 },
+  autoMetricsNote: { paddingHorizontal: 16, paddingBottom: 12, paddingLeft: 46 },
+  autoMetricValues: { paddingHorizontal: 16, paddingVertical: 13, gap: 4 },
   ftpApplyButton: { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7 },
   ftpApplyButtonText: { color: "#fff", fontSize: 11, fontWeight: "700" },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 46 },

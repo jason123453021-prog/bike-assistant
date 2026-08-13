@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { analyzeTraining, estimateFTP } from "./tss-calc";
 import { calculatePersonalBests, type PersonalBest } from "./personal-bests";
 import { normalizeRideRecord, normalizeRideRecords } from "./ride-record-normalizer";
+import { estimateAutomaticRpe } from "./automatic-rpe";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,7 @@ export interface RideActivityUpdate {
   activityType?: RideActivityType;
   equipment?: string;
   perceivedExertion?: number;
+  perceivedExertionSource?: "app-estimate" | "manual";
 }
 
 export interface LocationPoint {
@@ -48,6 +50,7 @@ export interface RideCalculationProfile {
   riderWeightKg: number;
   bikeWeightKg: number;
   ftpW: number;
+  autoRpeEnabled?: boolean;
   environment?: {
     sampleCount: number;
     averageTemperatureC?: number;
@@ -119,6 +122,8 @@ export interface RideRecord {
   equipment?: string;
   /** 主觀用力程度（RPE，1–10）。 */
   perceivedExertion?: number;
+  /** App 推定或使用者在活動編輯中覆寫的 RPE 來源。 */
+  perceivedExertionSource?: "app-estimate" | "manual";
   /** 用戶自行新增的本機相片／影片 URI 清單 */
   mediaItems?: string[];
   /** 路段成就與瓦數統計列表 */
@@ -496,6 +501,17 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       ftpW,
       state.powerHistory,
     );
+    const automaticRpe = estimateAutomaticRpe({
+      intensityFactor: trainingAnalysis.intensityFactor,
+      averagePowerW: state.avgPower,
+      ftpW,
+      movingTimeSec: movingTime,
+      distanceMeters: state.distance,
+      totalAscentMeters: state.totalAscent,
+      temperatureC: calculationProfile?.environment?.averageTemperatureC,
+      humidityPct: calculationProfile?.environment?.averageHumidityPct,
+      powerSampleCount: state.powerHistory.length,
+    });
     
     const recordBase: RideRecord = {
       id: now.toString(),
@@ -553,6 +569,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       tss: trainingAnalysis.tss,
       intensityFactor: trainingAnalysis.intensityFactor,
       normalizedPower: trainingAnalysis.normalizedPower,
+      perceivedExertion: calculationProfile?.autoRpeEnabled === false ? undefined : automaticRpe.value,
+      perceivedExertionSource: calculationProfile?.autoRpeEnabled === false ? undefined : "app-estimate",
       calculationProfile: calculationProfile
         ? { ...calculationProfile, ftpW }
         : undefined,
@@ -617,6 +635,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
               ...(updates.activityType !== undefined ? { activityType: updates.activityType } : {}),
               ...(updates.equipment !== undefined ? { equipment: updates.equipment } : {}),
               ...(updates.perceivedExertion !== undefined ? { perceivedExertion: updates.perceivedExertion } : {}),
+              ...(updates.perceivedExertionSource !== undefined ? { perceivedExertionSource: updates.perceivedExertionSource } : {}),
             };
           }
           return r;

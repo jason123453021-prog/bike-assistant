@@ -102,6 +102,10 @@ export interface AppSettings {
   age: number;          // 騎手年齡（用於推算最大心率 MHR）
   ftp: number;          // Functional Threshold Power (watts)
   bikeWeight: number;   // kg 单軋+裝備總重
+  /** 預設使用本機歷史推定 FTP 與心率基準；關閉後才完全採用手動數值。 */
+  autoPersonalMetricsEnabled: boolean;
+  /** 騎乘完成後自動寫入 App 推定 RPE；使用者仍可於活動編輯手動覆寫。 */
+  autoRpeEnabled: boolean;
   // 心率區間校準
   maxHeartRate?: number;      // 最大心率（自動偵測或手動設定）
   restingHeartRate?: number;  // 靜息心率（自動估算或手動設定）
@@ -211,6 +215,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   age: 32,
   ftp: 200,
   bikeWeight: 10,
+  autoPersonalMetricsEnabled: true,
+  autoRpeEnabled: true,
   maxHeartRate: 200,
   restingHeartRate: 60,
   autoCalibrationEnabled: true,

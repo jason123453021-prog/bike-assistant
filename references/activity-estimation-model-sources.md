@@ -10,3 +10,6 @@
 |---|---|
 | 心率儲備公式、估算限制 | [Story et al., 2016](https://pmc.ncbi.nlm.nih.gov/articles/PMC5835965/) |
 | 個人踏頻與長期田野資料的關係及限制 | [Reed et al., 2016](https://pmc.ncbi.nlm.nih.gov/articles/PMC4989856/) |
+| session-RPE 與訓練負荷的關係與強度差異限制 | [Yang et al., 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11155691/) |
+
+> RPE 原本是使用者對努力感受的主觀評分。為減少操作，本 App 可依相對 FTP 強度、移動時間、爬升與環境負荷產生「App 推定 RPE」，但活動頁會保留來源標示，且使用者可選擇手動覆寫；此推定不應被解讀為主觀自評、醫療量測或訓練處方。
