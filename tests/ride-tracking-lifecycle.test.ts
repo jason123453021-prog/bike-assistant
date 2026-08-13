@@ -5,8 +5,9 @@ import {
 } from "../lib/ride-tracking-lifecycle";
 
 describe("ride tracking lifecycle", () => {
-  it("does not subscribe to GPS while waiting to start a ride", () => {
-    expect(shouldTrackRideLocation(false)).toBe(false);
+  it("allows foreground GPS when waiting to start a ride, but suppresses background GPS until ride starts", () => {
+    expect(shouldTrackRideLocation(false, true)).toBe(true);
+    expect(shouldTrackRideLocation(false, false)).toBe(false);
   });
 
   it("keeps GPS active for an ongoing ride session", () => {

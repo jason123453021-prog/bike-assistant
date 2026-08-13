@@ -368,8 +368,16 @@ export default function MapScreen() {
   const targetBearingRef = useRef<number>(0);
   const lastMapBearingRef = useRef<number>(0);
 
-  // 騎乘狀態
+  // 騎乘狀態與背景監聽
   const [mapRideActive, setMapRideActive] = useState(false);
+  const [isAppForeground, setIsAppForeground] = useState(true);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      setIsAppForeground(nextState === "active");
+    });
+    return () => subscription.remove();
+  }, []);
   const [showSummary, setShowSummary] = useState(false);
   // 補給提醒分別管理（支援兩種同時顯示）
   const [calorieAlert, setCalorieAlert] = useState(false);
@@ -1101,9 +1109,9 @@ export default function MapScreen() {
 
   // ─── GPS 訂閱 ──────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    // 待機畫面不請求定位權限、不建立 GPS 訂閱，也不更新速度；
-    // 使用者開始騎乘後才啟用，以避免無謂耗電。
-    if (!shouldTrackRideLocation(mapRideActive)) {
+    // 依據 lifecycle 規則：未開始騎乘時僅在 App 前台定位（支援釘選導航與目前位置）；
+    // 開始騎乘後不論前台、背景或鎖屏皆持續定位紀錄軌跡。
+    if (!shouldTrackRideLocation(mapRideActive, isAppForeground)) {
       locationSubRef.current?.remove();
       locationSubRef.current = null;
       return;
