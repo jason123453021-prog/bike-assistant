@@ -1283,3 +1283,8 @@
 - [x] 檢查主導航轉彎提示、地圖控制與底部儀表板的可用狀態提示位置：狀態卡置於頂部導航橫幅下方，避免遮蔽轉彎指示與底部儀表板
 - [x] 實作醒目的自動暫停／省電監測中狀態卡，並在恢復完整追蹤時同步更新：綠色「騎乘紀錄中」、黃褐色「靜止中，準備省電」、橙色「已自動暫停」三態；卡片說明重新移動會自動恢復
 - [x] 驗證主畫面版面、TypeScript、測試與 Android Bundle：pnpm check 通過；35 項測試（34 passed、1 skipped）通過；Android Metro Bundle 1,798 modules、11,129,059 bytes 完成且 Metro 保持 running
+
+## POI 載入錯誤修正（2026-08-13）
+- [x] 檢查 POI 載入模組、地圖呼叫點與 MetroServerError 根因：導航頁對 POI 模組使用執行期動態別名匯入，Expo Go 會向 Metro 額外請求該模組並可能失敗
+- [x] 修正 POI 載入失敗的網路／回應處理，避免 Metro 錯誤訊息直接顯示給使用者：改為頂層靜態匯入；Overpass 暫時不可用時直接使用本機 POI，不再輸出原始 Metro 錯誤
+- [x] 新增 POI 錯誤處理測試並驗證 TypeScript、完整測試與 Android Bundle：pnpm check 通過；37 項測試（36 passed、1 skipped）通過；Android Metro Bundle 1,793 modules、11,144,340 bytes 完成且服務維持 running

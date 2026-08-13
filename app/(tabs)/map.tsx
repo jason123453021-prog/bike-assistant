@@ -126,6 +126,8 @@ import {
 } from "@/lib/pinned-navigation-layers";
 import { shouldTrackRideHeading, shouldTrackRideLocation } from "@/lib/ride-tracking-lifecycle";
 import { shouldEnterIdleMonitor, shouldResumeFromIdleMonitor, type RideLocationTrackingMode } from "@/lib/idle-auto-pause";
+import { getPOIs, SAMPLE_POIS } from "@/lib/poi-data";
+import { calculateDistance, getPOIsAlongRoute } from "@/lib/poi-manager";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -2035,21 +2037,17 @@ export default function MapScreen() {
     // 避免在組件首次渲染時觸發兩次 POI 加載
     if (!mapBounds && !currentPos && !gpxRoute) return;
     const loadPOIs = async () => {
+      const mapPOI = (poi: any) => ({
+        id: poi.id,
+        type: poi.type,
+        name: poi.name,
+        lat: poi.latitude,
+        lon: poi.longitude,
+        color: '#999999',
+        icon: '📍',
+        description: poi.description,
+      });
       try {
-        const { getPOIsAlongRoute, calculateDistance } = await import('@/lib/poi-manager');
-        const { getPOIs, SAMPLE_POIS } = await import('@/lib/poi-data');
-
-        const mapPOI = (poi: any) => ({
-          id: poi.id,
-          type: poi.type,
-          name: poi.name,
-          lat: poi.latitude,
-          lon: poi.longitude,
-          color: '#999999',
-          icon: '📍',
-          description: poi.description,
-        });
-
         // 如果有 GPX 路線，獲取沿路線的 POI
         if (gpxRoute && gpxRoute.points.length > 0) {
           const lat = gpxRoute.points[0].lat;
@@ -2089,25 +2087,17 @@ export default function MapScreen() {
           setPoiMarkers(SAMPLE_POIS.map(mapPOI));
         }
       } catch (err) {
-        console.error('Failed to load POIs:', err);
-        // 錯誤時仍顯示範例 POI
-        try {
-          const { SAMPLE_POIS } = await import('@/lib/poi-data');
-          if (currentPos) {
-            setPoiMarkers(SAMPLE_POIS.map((poi, i) => ({
-              id: poi.id, type: poi.type, name: poi.name,
-              lat: currentPos.lat + (Math.random() - 0.5) * 0.02,
-              lon: currentPos.lon + (Math.random() - 0.5) * 0.02,
-              color: '#999999', icon: '📍', description: poi.description,
-            })));
-          } else {
-            setPoiMarkers(SAMPLE_POIS.map(poi => ({
-              id: poi.id, type: poi.type, name: poi.name,
-              lat: poi.latitude, lon: poi.longitude,
-              color: '#999999', icon: '📍', description: poi.description,
-            })));
-          }
-        } catch {}
+        // 網路或資料來源暫時不可用時保持本機 POI，不將 Metro／網路錯誤交給 Expo Go 顯示。
+        console.warn('[POI] 無法更新線上 POI，已使用本機備用資料');
+        if (currentPos) {
+          setPoiMarkers(SAMPLE_POIS.map((poi) => mapPOI({
+            ...poi,
+            latitude: currentPos.lat + (Math.random() - 0.5) * 0.02,
+            longitude: currentPos.lon + (Math.random() - 0.5) * 0.02,
+          })));
+        } else {
+          setPoiMarkers(SAMPLE_POIS.map(mapPOI));
+        }
       }
     };
 
