@@ -66,7 +66,6 @@ import {
 import { getSensorDataManager } from "@/lib/sensor-data-manager";
 import {
   calculatePower,
-  calculateCalories,
   calcAirDensity,
   calcGrade,
   haversineDistance,
@@ -80,12 +79,18 @@ import {
   formatSweatRate,
 } from "@/lib/hydration-calc";
 import {
+  calculateAdaptiveCalorieThreshold,
+  calculateAdaptiveHydrationThreshold,
+  calculatePersonalizedCalories,
+} from "@/lib/personalized-ride-calculations";
+import {
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
   setBackgroundLocationTrackingMode,
   initBackgroundState,
   getBackgroundTrackPoints,
   getBackgroundState,
+  updateBackgroundEnvironment,
   clearBackgroundData,
   acknowledgeBackgroundSupplyInterval,
   acknowledgeBackgroundSupplyReminder,
@@ -342,6 +347,16 @@ export default function MapScreen() {
   const weatherTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const windDataRef = useRef<{ speed: number; direction: number }>({ speed: 0, direction: 0 });
   const airDensityRef = useRef<number>(calcAirDensity(25));
+  const environmentSummaryRef = useRef({
+    sampleCount: 0,
+    temperatureTotal: 0,
+    humidityTotal: 0,
+    windSpeedTotal: 0,
+    headwindTotal: 0,
+    precipitationTotal: 0,
+    latestWeatherCode: undefined as number | undefined,
+    hadLiveWeather: false,
+  });
   const prevSpeedMsRef = useRef<number>(0); // 用於計算加速阻力
   const headingRef = useRef<number>(0);
   // 車頭朝前精度改善：自適應循環平均（消除 GPS heading 抖動）
@@ -669,6 +684,14 @@ export default function MapScreen() {
       windDataRef.current = { speed: w.windSpeed / 3.6, direction: w.windDirection };
       airDensityRef.current = calcAirDensity(w.temperature);
       setRelativeWindInfo(getRelativeWindInfo(headingRef.current, w.windDirection, w.windSpeed));
+      void updateBackgroundEnvironment({
+        temperatureC: w.temperature,
+        humidityPct: w.humidity,
+        windSpeedKmh: w.windSpeed,
+        windDirection: w.windDirection,
+        weatherCode: w.weatherCode,
+        precipitationProb: w.precipitationProb,
+      });
     }
   }, []);
 
@@ -1282,19 +1305,32 @@ export default function MapScreen() {
           // ─── 騎乘計算 ─────────────────────────────────────────────────────
           let grade = 0;
           let ascent = 0;
+          let distanceM = 0;
           if (lastLocationRef.current) {
-            const dist = haversineDistance(
+            distanceM = haversineDistance(
               lastLocationRef.current.coords.latitude,
               lastLocationRef.current.coords.longitude,
               latitude, longitude
             );
             const altDiff = (altitude ?? 0) - (lastLocationRef.current.coords.altitude ?? 0);
-            grade = calcGrade(altDiff, dist);
+            grade = calcGrade(altDiff, distanceM);
             ascent = Math.max(0, altDiff);
           }
           lastLocationRef.current = loc;
 
           const headwindMs = getHeadwindMs(headingRef.current, windDataRef.current.direction, windDataRef.current.speed * 3.6);
+          const currentWeather = weatherRef.current;
+          if (currentWeather) {
+            const summary = environmentSummaryRef.current;
+            summary.sampleCount += 1;
+            summary.temperatureTotal += currentWeather.temperature;
+            summary.humidityTotal += currentWeather.humidity;
+            summary.windSpeedTotal += currentWeather.windSpeed;
+            summary.headwindTotal += headwindMs;
+            summary.precipitationTotal += currentWeather.precipitationProb;
+            summary.latestWeatherCode = currentWeather.weatherCode;
+            summary.hadLiveWeather = true;
+          }
           const currentSpeedMs = speed ?? 0;
           const rawPower = calculatePower({
             speedMs: currentSpeedMs,
@@ -1320,22 +1356,22 @@ export default function MapScreen() {
             // 使用感測器功率時，清空計算功率緩衝
             powerWindowRef.current = [];
           }
-          // 使用基於功率的卡路里計算（修正後的效率係數）
-          const calIncrement = calculateCalories(power, LOCATION_INTERVAL_SEC);
-          
-          // 備選：基於 MET 的卡路里計算（更準確，但需要體重）
-          // const calIncrementMET = calculateCaloriesMET(speedKmh, settings.weight, LOCATION_INTERVAL_SEC, calcGrade(ascent, distanceM));
-          // 當前使用功率法，因為功率已包含所有物理因素
-
-          // 計算真實 GPS 距離（米）
-          let distanceM = 0;
-          if (lastLocationRef.current) {
-            distanceM = haversineDistance(
-              lastLocationRef.current.coords.latitude,
-              lastLocationRef.current.coords.longitude,
-              latitude, longitude
-            );
-          }
+          // 優先使用量測／物理推算功率；缺少功率時以體重、速度與坡度的 MET 模型回退。
+          const calorieResult = calculatePersonalizedCalories({
+            powerW: power,
+            hasMeasuredPower: power > 0,
+            speedKmh,
+            gradePct: grade,
+            riderWeightKg: settings.weight,
+            ftpW: settings.ftp,
+            intervalSec: LOCATION_INTERVAL_SEC,
+            temperatureC: currentWeather?.temperature,
+            humidityPct: currentWeather?.humidity,
+            weatherCode: currentWeather?.weatherCode,
+            precipitationProb: currentWeather?.precipitationProb,
+            headwindMs,
+          });
+          const calIncrement = calorieResult.kcal;
 
           dispatch({
             type: "LOCATION_UPDATE",
@@ -1353,6 +1389,9 @@ export default function MapScreen() {
             temperatureC: weatherRef.current?.temperature ?? 25,
             humidityPct: weatherRef.current?.humidity ?? 60,
             weatherCode: weatherRef.current?.weatherCode ?? 1,
+            ftpW: settings.ftp,
+            headwindMs,
+            precipitationProb: currentWeather?.precipitationProb ?? 0,
             ageYears: settings.age ?? 32,
           });
           dispatch({
@@ -1379,10 +1418,12 @@ export default function MapScreen() {
             void saveRideSessionSnapshot(recoverySession);
           }
 
+          const adaptiveCalorieThreshold = calculateAdaptiveCalorieThreshold(settings.calorieThreshold, calorieResult);
+          const adaptiveHydrationThreshold = calculateAdaptiveHydrationThreshold(hydrationThresholdMl, sweatResult);
           const newCalories = currentState.calories + calIncrement;
-          const calPct = Math.min(1, newCalories / settings.calorieThreshold);
+          const calPct = Math.min(1, newCalories / adaptiveCalorieThreshold);
           const newSweatSince = currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
-          const waterPct = Math.min(1, newSweatSince / hydrationThresholdMl);
+          const waterPct = Math.min(1, newSweatSince / adaptiveHydrationThreshold);
 
           Animated.timing(calorieAnim, { toValue: calPct, duration: 500, useNativeDriver: false }).start();
           Animated.timing(waterAnim, { toValue: waterPct, duration: 500, useNativeDriver: false }).start();
@@ -1393,7 +1434,7 @@ export default function MapScreen() {
 
           // 卡路里提醒邏輯
           if (calPct >= 1 && !calorieReminderSentRef.current) {
-            console.log(`[補給] 卡路里達到閾值: ${newCalories}/${settings.calorieThreshold} (${(calPct*100).toFixed(1)}%)`);
+            console.log(`[補給] 卡路里達到動態閾值: ${newCalories}/${adaptiveCalorieThreshold} (${(calPct*100).toFixed(1)}%)`);
             if (settings.caloriePauseOnDownhill && isDownhill && !calorieAlert) {
               // 下坡時暫停提醒但仍計數
               console.log('[補給] 下坡時暫停卡路里提醒');
@@ -1406,7 +1447,7 @@ export default function MapScreen() {
 
           // 水分提醒邏輯
           if (waterPct >= 1 && !waterReminderSentRef.current) {
-            console.log(`[補給] 水分達到閾值: ${newSweatSince}/${hydrationThresholdMl} (${(waterPct*100).toFixed(1)}%)`);
+            console.log(`[補給] 水分達到動態閾值: ${newSweatSince}/${adaptiveHydrationThreshold} (${(waterPct*100).toFixed(1)}%)`);
             if (settings.waterPauseOnDownhill && isDownhill && !waterAlert) {
               // 下坡時暫停提醒但仍計數
               console.log('[補給] 下坡時暫停水分提醒');
@@ -1567,6 +1608,16 @@ export default function MapScreen() {
     prevPosRef.current = null;
     powerWindowRef.current = [];
     gradeWindowRef.current = [];
+    environmentSummaryRef.current = {
+      sampleCount: 0,
+      temperatureTotal: 0,
+      humidityTotal: 0,
+      windSpeedTotal: 0,
+      headwindTotal: 0,
+      precipitationTotal: 0,
+      latestWeatherCode: undefined,
+      hadLiveWeather: false,
+    };
     lowSpeedCountRef.current = 0;
     arrivedRef.current = false;
     setMapRideActive(true);
@@ -1652,6 +1703,23 @@ export default function MapScreen() {
       supplyTimeIntervalMinutes: settings.supplyTimeIntervalMinutes,
       supplyDistanceIntervalEnabled: settings.supplyDistanceIntervalEnabled,
       supplyDistanceIntervalKm: settings.supplyDistanceIntervalKm,
+      riderProfile: {
+        weightKg: settings.weight,
+        heightCm: settings.height,
+        ageYears: settings.age ?? 32,
+        ftpW: settings.ftp,
+        bikeWeightKg: settings.bikeWeight ?? 10,
+      },
+      environment: weatherRef.current
+        ? {
+          temperatureC: weatherRef.current.temperature,
+          humidityPct: weatherRef.current.humidity,
+          windSpeedKmh: weatherRef.current.windSpeed,
+          windDirection: weatherRef.current.windDirection,
+          weatherCode: weatherRef.current.weatherCode,
+          precipitationProb: weatherRef.current.precipitationProb,
+        }
+        : undefined,
     });
     await startBackgroundLocationTracking(settings.gpsAccuracy || "standard");
 
@@ -1672,7 +1740,7 @@ export default function MapScreen() {
       const l = await Location.getLastKnownPositionAsync();
       if (l) updateWeather(l.coords.latitude, l.coords.longitude);
     }, WEATHER_INTERVAL);
-  }, [dispatch, hydrationThresholdMl, gpxRoute, settings.ttsEnabled, updateWeather, calorieAnim, waterAnim]);
+  }, [dispatch, hydrationThresholdMl, gpxRoute, settings, updateWeather, calorieAnim, waterAnim]);
 
   const handlePause = useCallback(() => {
     pausedElapsedRef.current = state.elapsed;
@@ -1735,8 +1803,24 @@ export default function MapScreen() {
             await completeRideSession(recoverySessionRef.current);
             recoverySessionRef.current = null;
           }
-          // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新
-          await saveRecord(undefined, sensorStatsRef.current);
+          // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新；個人設定與環境摘要只保存在裝置上。
+          const environmentSummary = environmentSummaryRef.current;
+          const sampleCount = environmentSummary.sampleCount;
+          await saveRecord(undefined, sensorStatsRef.current, {
+            riderWeightKg: settings.weight,
+            bikeWeightKg: settings.bikeWeight ?? 10,
+            ftpW: settings.ftp,
+            environment: {
+              sampleCount,
+              averageTemperatureC: sampleCount ? environmentSummary.temperatureTotal / sampleCount : undefined,
+              averageHumidityPct: sampleCount ? environmentSummary.humidityTotal / sampleCount : undefined,
+              averageWindSpeedKmh: sampleCount ? environmentSummary.windSpeedTotal / sampleCount : undefined,
+              averageHeadwindMs: sampleCount ? environmentSummary.headwindTotal / sampleCount : undefined,
+              averagePrecipitationProb: sampleCount ? environmentSummary.precipitationTotal / sampleCount : undefined,
+              weatherCode: environmentSummary.latestWeatherCode,
+              source: environmentSummary.hadLiveWeather ? "live-weather" : "offline-fallback",
+            },
+          });
           setShowSummary(true);
           if (settings.vibrationEnabled) vibrateSuccess();
           
@@ -1749,7 +1833,7 @@ export default function MapScreen() {
         },
       },
     ]);
-  }, [dispatch, saveRecord, clearSnapshot, settings.vibrationEnabled, clearSupplyRepeatTimer]);
+  }, [dispatch, saveRecord, clearSnapshot, settings, clearSupplyRepeatTimer]);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {

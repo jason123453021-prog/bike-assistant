@@ -20,6 +20,8 @@ export interface HydrationInput {
   heightCm: number;
   /** 當前功率 W（用於計算強度） */
   powerW: number;
+  /** 使用者設定的 FTP W；缺漏時才以體重推估 */
+  ftpW?: number;
   /** 當前速度 km/h */
   speedKmh: number;
   /** 最近 N 秒的爬升 m（用於計算額外強度） */
@@ -32,6 +34,10 @@ export interface HydrationInput {
   humidityPct?: number;
   /** 天氣代碼（WMO），用於判斷日照強度 */
   weatherCode?: number;
+  /** 逆風分量 m/s；較強逆風會提高工作量，同時帶來部分蒸發冷卻 */
+  headwindMs?: number;
+  /** 降雨機率 %；雨天通常降低日照與皮膚表面熱負荷 */
+  precipitationProb?: number;
   /** 騎士年齡（用於模擬心率區間），預設 32 */
   ageYears?: number;
 }
@@ -45,6 +51,8 @@ export interface HydrationResult {
   intensityLabel: string;
   /** 建議補水量 ml（每次提醒） */
   recommendedRefillMl: number;
+  /** 0–1 的環境熱負荷，供補給提醒調整間隔 */
+  environmentLoad: number;
 }
 
 // ─── 體表面積（Du Bois formula）────────────────────────────────────────────────
@@ -99,12 +107,13 @@ function calcMHR(ageYears: number): number {
 function estimateHRZone(
   powerW: number,
   riderMassKg: number,
-  ageYears: number
+  ageYears: number,
+  configuredFtpW?: number,
 ): { zone: number; hrBpm: number } {
   const mhr = calcMHR(ageYears);
   const restHR = 60;
   const hrReserve = mhr - restHR;
-  const ftpEstimate = riderMassKg * 3.5;
+  const ftpEstimate = configuredFtpW && configuredFtpW > 0 ? configuredFtpW : riderMassKg * 3.5;
   const powerRatio = powerW > 0 ? powerW / ftpEstimate : 0;
   let hrPct: number;
   let zone: number;
@@ -155,10 +164,13 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
     speedKmh,
     ascentPerInterval,
     intervalSec,
-    temperatureC,
-    humidityPct = 60,
-    weatherCode = 1,
-    ageYears = 32,
+  temperatureC,
+  humidityPct = 60,
+  weatherCode = 1,
+  ftpW,
+  headwindMs = 0,
+  precipitationProb = 0,
+  ageYears = 32,
   } = input;
 
   // 體表面積（標準人 BSA ≈ 1.7 m²）
@@ -169,7 +181,7 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   const { factor: intFactor, label: intensityLabel } = intensityFactor(powerW, speedKmh);
 
   // 心率區間模擬（依年齡推算 MHR，由功率估算心率區間）
-  const { zone: hrZone } = estimateHRZone(powerW, weightKg, ageYears);
+  const { zone: hrZone } = estimateHRZone(powerW, weightKg, ageYears, ftpW);
   const hrFactor = hrZoneSweatFactor(hrZone);
 
   // 各環境修正係數
@@ -177,6 +189,10 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   const hFactor = humidityFactor(humidityPct);
   const sFactor = solarFactor(weatherCode);
   const aBonusFactor = 1 + ascentBonus(ascentPerInterval, intervalSec);
+  // 逆風增加工作量，但也提高蒸發冷卻；雨勢／降雨機率則降低日照熱負荷。
+  const headwindWorkFactor = 1 + Math.min(0.12, Math.max(0, headwindMs) * 0.025);
+  const windCoolingFactor = 1 - Math.min(0.1, Math.abs(headwindMs) * 0.012);
+  const rainCoolingFactor = 1 - Math.min(0.08, Math.max(0, precipitationProb) / 100 * 0.08);
 
   // 基礎汗液流失率 L/h（標準人、Zone2 強度、20°C、60%濕度）
   // 注意：intFactor 與 hrFactor 同樣基於功率推算，直接相乘會造成強度雙重計算
@@ -186,7 +202,7 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
 
   // 最終汗液流失率 ml/h（移除 intFactor，使用 hrFactor 作為強度代理）
   let sweatRatePerHour = Math.round(
-    BASE_RATE_LPH * 1000 * bsaFactor * hrFactor * tFactor * hFactor * sFactor * aBonusFactor
+    BASE_RATE_LPH * 1000 * bsaFactor * hrFactor * tFactor * hFactor * sFactor * aBonusFactor * headwindWorkFactor * windCoolingFactor * rainCoolingFactor
   );
   
   // 限制在合理範圍：100-1500 ml/h
@@ -199,12 +215,17 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
 
   // 建議補水量：最少 150ml，最多 500ml
   const recommendedRefillMl = Math.min(500, Math.max(150, Math.round(sweatRatePerHour * 0.25)));
+  const environmentLoad = Math.max(
+    0,
+    Math.min(1, ((Math.max(0, temperatureC - 20) / 18) * 0.55) + ((Math.max(0, humidityPct - 60) / 40) * 0.3) + (weatherCode <= 2 ? 0.15 : 0)),
+  );
 
   return {
     sweatLossMl,
     sweatRatePerHour,
     intensityLabel,
     recommendedRefillMl,
+    environmentLoad,
   };
 }
 

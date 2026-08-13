@@ -33,6 +33,23 @@ export interface RouteStats {
   lastRideDate: number;   // 上次騎乘日期
 }
 
+/** 本次騎乘使用的個人設定與環境摘要；僅保存於裝置端，用於解釋歷史數據來源。 */
+export interface RideCalculationProfile {
+  riderWeightKg: number;
+  bikeWeightKg: number;
+  ftpW: number;
+  environment?: {
+    sampleCount: number;
+    averageTemperatureC?: number;
+    averageHumidityPct?: number;
+    averageWindSpeedKmh?: number;
+    averageHeadwindMs?: number;
+    averagePrecipitationProb?: number;
+    weatherCode?: number;
+    source: "live-weather" | "offline-fallback";
+  };
+}
+
 export interface RideRecord {
   id: string;
   date: number;
@@ -68,6 +85,8 @@ export interface RideRecord {
   gradeAscentDistribution?: number[];  // 坡度區間爬升統計 [1-5%, 6-10%, 11-15%, 16-20%, 21-25%, 26%+]
   /** 僅與裝置內既有騎乘紀錄比較後得到的個人最佳成績 */
   personalBests?: PersonalBest[];
+  /** 儲存時計算 TSS、能量與補給所用的個人設定及環境摘要 */
+  calculationProfile?: RideCalculationProfile;
 }
 
 export interface RideState {
@@ -346,7 +365,11 @@ function rideReducer(state: RideState, action: RideAction): RideState {
 interface RideContextValue {
   state: RideState;
   dispatch: React.Dispatch<RideAction>;
-  saveRecord: (name?: string, sensorStats?: { heartRateValues: number[]; cadenceValues: number[]; maxHeartRate: number; maxCadence: number }) => Promise<void>;
+  saveRecord: (
+    name?: string,
+    sensorStats?: { heartRateValues: number[]; cadenceValues: number[]; maxHeartRate: number; maxCadence: number },
+    calculationProfile?: RideCalculationProfile,
+  ) => Promise<void>;
   loadRecords: () => Promise<void>;
   updateRecordName: (id: string, name: string) => Promise<void>;
   /** 儲存騎乘進度快照（每 10 秒呼叫一次） */
@@ -391,7 +414,11 @@ function generateDefaultName(date: number): string {
 export function RideProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(rideReducer, initialState);
 
-  const saveRecord = useCallback(async (name?: string, sensorStats?: { heartRateValues: number[]; cadenceValues: number[]; maxHeartRate: number; maxCadence: number }) => {
+  const saveRecord = useCallback(async (
+    name?: string,
+    sensorStats?: { heartRateValues: number[]; cadenceValues: number[]; maxHeartRate: number; maxCadence: number },
+    calculationProfile?: RideCalculationProfile,
+  ) => {
     if (state.elapsed < 10) return;
     const now = Date.now();
     // 計算感測器平均值
@@ -400,9 +427,12 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     // 重新計算均速，確保使用最終的 distance 和 elapsed 值
     const finalAvgSpeed = state.elapsed > 0 ? (state.distance / 1000) / (state.elapsed / 3600) : 0;
     
-    // 計算訓練壓力分數（TSS）和訓練效果分析
-    // 假設用戶為中級騎士，根據體重估算 FTP（預設 70kg 体重）
-    const ftpW = estimateFTP(70, 'intermediate');
+    // 優先使用使用者設定 FTP；只有舊流程缺少設定時才以體重做相容性估算。
+    const ftpW = Math.max(
+      1,
+      calculationProfile?.ftpW
+        ?? estimateFTP(calculationProfile?.riderWeightKg ?? 70, "intermediate"),
+    );
     const movingTime = Math.max(0, state.elapsed - state.totalPausedSec);
     const trainingAnalysis = analyzeTraining(
       movingTime,
@@ -443,6 +473,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       tss: trainingAnalysis.tss,
       intensityFactor: trainingAnalysis.intensityFactor,
       normalizedPower: trainingAnalysis.normalizedPower,
+      calculationProfile: calculationProfile
+        ? { ...calculationProfile, ftpW }
+        : undefined,
     };
     const normalizedRecord = normalizeRideRecord(recordBase) ?? recordBase;
     const record: RideRecord = {

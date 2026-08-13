@@ -22,6 +22,21 @@ describe("ride record normalizer", () => {
       totalPausedSec: 600,
       totalSweatMl: 800,
       refillCount: 1,
+      calculationProfile: {
+        riderWeightKg: 68,
+        bikeWeightKg: 9,
+        ftpW: 245,
+        environment: {
+          sampleCount: 12,
+          averageTemperatureC: 31,
+          averageHumidityPct: 78,
+          averageWindSpeedKmh: 18,
+          averageHeadwindMs: 2,
+          averagePrecipitationProb: 15,
+          weatherCode: 1,
+          source: "live-weather",
+        },
+      },
       route: [
         { latitude: 25.0, longitude: 121.0, altitude: 100, speed: 4, timestamp: 1 },
         { latitude: 25.001, longitude: 121.0, altitude: 120, speed: 4, timestamp: 2 },
@@ -40,6 +55,8 @@ describe("ride record normalizer", () => {
     expect(record?.averageGrade).toBeGreaterThan(14);
     expect(record?.maxGrade).toBeGreaterThan(25);
     expect(record?.normalizedPower).toBe(150);
+    expect(record?.calculationProfile?.ftpW).toBe(245);
+    expect(record?.calculationProfile?.environment?.averageTemperatureC).toBe(31);
   });
 
   it("keeps valid local records only, fills safe defaults, deduplicates IDs and sorts newest first", () => {

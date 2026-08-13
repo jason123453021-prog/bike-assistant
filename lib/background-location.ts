@@ -19,6 +19,14 @@ import {
   initializeRideSession,
   saveRideSessionSnapshot,
 } from "@/lib/ride-recovery/ride-session-recovery";
+import { calcAirDensity, calcGrade, calculatePower } from "@/lib/power-calc";
+import {
+  calculateAdaptiveCalorieThreshold,
+  calculateAdaptiveHydrationThreshold,
+  calculatePersonalizedCalories,
+} from "@/lib/personalized-ride-calculations";
+import { calculateSweatLoss } from "@/lib/hydration-calc";
+import { getHeadwindMs } from "@/lib/weather-service";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
@@ -48,6 +56,23 @@ export interface BackgroundState {
   intervalDistanceReminderSent: boolean;
   trackingMode?: "full" | "idle_monitor";
   gpsAccuracy?: GpsAccuracyLevel;
+  lastSpeedMs?: number;
+  lastAltitude?: number | null;
+  riderProfile?: {
+    weightKg: number;
+    heightCm: number;
+    ageYears: number;
+    ftpW: number;
+    bikeWeightKg: number;
+  };
+  environment?: {
+    temperatureC: number;
+    humidityPct: number;
+    windSpeedKmh: number;
+    windDirection: number;
+    weatherCode: number;
+    precipitationProb: number;
+  };
 }
 
 // Haversine 距離計算（背景任務中不能 import 其他模組的函數）
@@ -79,6 +104,9 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       const state: BackgroundState = JSON.parse(stateStr);
       if (!state.isRiding) return;
       const recoverySession = (await initializeRideSession()) ?? createNewRideSession();
+
+      let activeCalorieThreshold = state.calorieThreshold;
+      let activeWaterThreshold = state.waterThreshold;
 
       // 處理每個位置更新
       for (const loc of locations) {
@@ -117,24 +145,76 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           }
         }
 
-        // 簡化的卡路里估算（背景中使用簡化公式）
+        // 鎖屏期間沿用前景的個人 FTP、體重與最近環境摘要；沒有天氣資料時安全回退為預設環境。
         if (speedKmh > 3) {
           const dt = state.lastTimestamp > 0 ? (timestamp - state.lastTimestamp) / 1000 : 0;
           if (dt > 0 && dt < 30) {
-            // 簡化功率估算：P ≈ 0.5 * CdA * ρ * v³ + Crr * m * g * v
-            const v = speedMs;
-            const m = 80; // 預設體重
-            const power = Math.max(0, 0.5 * 0.4 * 1.2 * v * v * v + 0.005 * m * 9.81 * v);
-            const calPerSec = power / 4.184 / 0.25; // 機械效率 25%
-            state.calories += calPerSec * dt / 1000; // kcal
-            // 簡化汗液估算
-            state.sweatLossMl += (0.8 * dt / 3600) * 1000; // ~800ml/hr
+            const profile = state.riderProfile ?? { weightKg: 70, heightCm: 175, ageYears: 32, ftpW: 245, bikeWeightKg: 10 };
+            const environment = state.environment ?? {
+              temperatureC: 25,
+              humidityPct: 60,
+              windSpeedKmh: 0,
+              windDirection: 0,
+              weatherCode: 3,
+              precipitationProb: 0,
+            };
+            const distanceM = state.lastLat !== 0 && state.lastLon !== 0
+              ? bgHaversine(state.lastLat, state.lastLon, latitude, longitude)
+              : 0;
+            const gradePct = calcGrade((loc.coords.altitude ?? 0) - (state.lastAltitude ?? loc.coords.altitude ?? 0), distanceM);
+            const heading = loc.coords.heading ?? 0;
+            const headwindMs = getHeadwindMs(heading, environment.windDirection, environment.windSpeedKmh);
+            const power = calculatePower({
+              speedMs,
+              prevSpeedMs: state.lastSpeedMs,
+              intervalSec: dt,
+              gradePct,
+              windSpeedMs: headwindMs,
+              riderMassKg: profile.weightKg,
+              bikeMassKg: profile.bikeWeightKg,
+              airDensityKgM3: calcAirDensity(environment.temperatureC, environment.humidityPct),
+            });
+            const calorieResult = calculatePersonalizedCalories({
+              powerW: power,
+              hasMeasuredPower: power > 0,
+              speedKmh,
+              gradePct,
+              riderWeightKg: profile.weightKg,
+              ftpW: profile.ftpW,
+              intervalSec: dt,
+              temperatureC: environment.temperatureC,
+              humidityPct: environment.humidityPct,
+              weatherCode: environment.weatherCode,
+              precipitationProb: environment.precipitationProb,
+              headwindMs,
+            });
+            const hydrationResult = calculateSweatLoss({
+              weightKg: profile.weightKg,
+              heightCm: profile.heightCm,
+              ageYears: profile.ageYears,
+              ftpW: profile.ftpW,
+              powerW: power,
+              speedKmh,
+              ascentPerInterval: Math.max(0, (loc.coords.altitude ?? 0) - (state.lastAltitude ?? loc.coords.altitude ?? 0)),
+              intervalSec: dt,
+              temperatureC: environment.temperatureC,
+              humidityPct: environment.humidityPct,
+              weatherCode: environment.weatherCode,
+              headwindMs,
+              precipitationProb: environment.precipitationProb,
+            });
+            state.calories += calorieResult.kcal;
+            state.sweatLossMl += hydrationResult.sweatLossMl;
+            activeCalorieThreshold = calculateAdaptiveCalorieThreshold(state.calorieThreshold, calorieResult);
+            activeWaterThreshold = calculateAdaptiveHydrationThreshold(state.waterThreshold, hydrationResult);
           }
         }
 
         state.lastLat = latitude;
         state.lastLon = longitude;
         state.lastTimestamp = timestamp;
+        state.lastSpeedMs = speedMs;
+        state.lastAltitude = loc.coords.altitude;
 
         addTrackPoint(
           recoverySession,
@@ -155,14 +235,14 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       }
 
       // 檢查補給提醒
-      if (state.calories >= state.calorieThreshold && !state.calorieReminderSent) {
+      if (state.calories >= activeCalorieThreshold && !state.calorieReminderSent) {
         state.calorieReminderSent = true;
         const Notifications = await getLocalNotifications();
         if (Notifications) {
           await Notifications.scheduleNotificationAsync({
             content: {
               title: "🍌 補給提醒",
-              body: "已消耗大量卡路里，建議補充能量棒或食物",
+              body: "已達個人化能量補給條件，建議補充能量棒或食物",
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
               data: { type: "supply_reminder", supplyKind: "calorie" },
@@ -173,14 +253,14 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         }
       }
 
-      if (state.sweatLossMl >= state.waterThreshold && !state.waterReminderSent) {
+      if (state.sweatLossMl >= activeWaterThreshold && !state.waterReminderSent) {
         state.waterReminderSent = true;
         const Notifications = await getLocalNotifications();
         if (Notifications) {
           await Notifications.scheduleNotificationAsync({
             content: {
               title: "💧 補水提醒",
-              body: "水分流失達到補水條件，建議立即補充水分",
+              body: "水分流失達個人化補水條件，建議立即補充水分",
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
               data: { type: "supply_reminder", supplyKind: "water" },
@@ -279,6 +359,8 @@ export async function initBackgroundState(params: {
   supplyTimeIntervalMinutes: number;
   supplyDistanceIntervalEnabled: boolean;
   supplyDistanceIntervalKm: number;
+  riderProfile?: BackgroundState["riderProfile"];
+  environment?: BackgroundState["environment"];
 }) {
   const startedAt = Date.now();
   const state: BackgroundState = {
@@ -305,10 +387,24 @@ export async function initBackgroundState(params: {
     intervalDistanceReminderSent: false,
     trackingMode: "full",
     gpsAccuracy: "standard",
+    riderProfile: params.riderProfile,
+    environment: params.environment,
   };
   await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   // 清空舊軌跡
   await AsyncStorage.setItem(BG_TRACK_KEY, JSON.stringify([]));
+}
+
+/** 前景取得新天氣時，更新背景任務的本機環境摘要；不需在背景額外發起網路請求。 */
+export async function updateBackgroundEnvironment(environment: NonNullable<BackgroundState["environment"]>) {
+  try {
+    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+    if (!stateStr) return;
+    const state: BackgroundState = JSON.parse(stateStr);
+    if (!state.isRiding) return;
+    state.environment = environment;
+    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+  } catch {}
 }
 
 /**

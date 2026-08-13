@@ -1,5 +1,5 @@
 import { calculateNormalizedPowerFromHistory } from "./tss-calc";
-import type { LocationPoint, RideRecord } from "./ride-context";
+import type { LocationPoint, RideCalculationProfile, RideRecord } from "./ride-context";
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -101,6 +101,34 @@ function normalizedOptional(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function normalizeCalculationProfile(value: unknown): RideCalculationProfile | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const profile = value as Partial<RideCalculationProfile>;
+  const riderWeightKg = normalizedOptional(profile.riderWeightKg);
+  const bikeWeightKg = normalizedOptional(profile.bikeWeightKg);
+  const ftpW = normalizedOptional(profile.ftpW);
+  if (!riderWeightKg || !bikeWeightKg || !ftpW || riderWeightKg <= 0 || bikeWeightKg <= 0 || ftpW <= 0) return undefined;
+
+  const environmentValue = profile.environment;
+  const environment = environmentValue && typeof environmentValue === "object"
+    ? (() => {
+      const source = environmentValue.source === "live-weather" ? "live-weather" : "offline-fallback";
+      return {
+        sampleCount: Math.round(nonNegative(environmentValue.sampleCount)),
+        averageTemperatureC: normalizedOptional(environmentValue.averageTemperatureC),
+        averageHumidityPct: normalizedOptional(environmentValue.averageHumidityPct),
+        averageWindSpeedKmh: normalizedOptional(environmentValue.averageWindSpeedKmh),
+        averageHeadwindMs: normalizedOptional(environmentValue.averageHeadwindMs),
+        averagePrecipitationProb: normalizedOptional(environmentValue.averagePrecipitationProb),
+        weatherCode: normalizedOptional(environmentValue.weatherCode),
+        source,
+      } as RideCalculationProfile["environment"];
+    })()
+    : undefined;
+
+  return { riderWeightKg, bikeWeightKg, ftpW, environment };
+}
+
 /**
  * 將歷史、匯入與新建騎乘資料轉為同一個安全模型。
  * 僅接受具有數值距離與軌跡陣列的記錄；缺失的衍生數據會由本機軌跡補齊。
@@ -172,6 +200,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     gradeDistribution: Array.isArray(source.gradeDistribution) ? source.gradeDistribution.map(nonNegative) : undefined,
     gradeAscentDistribution: Array.isArray(source.gradeAscentDistribution) ? source.gradeAscentDistribution.map(nonNegative) : undefined,
     personalBests: Array.isArray(source.personalBests) ? source.personalBests : undefined,
+    calculationProfile: normalizeCalculationProfile(source.calculationProfile),
   };
 }
 

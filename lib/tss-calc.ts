@@ -2,8 +2,8 @@
  * 訓練壓力分數（TSS - Training Stress Score）計算模組
  *
  * TSS 是衡量訓練強度和持續時間的綜合指標
- * 公式：TSS = (秒數 × 平均功率 × IF) / (FTP × 3600) × 100
- * 其中 IF (Intensity Factor) = 平均功率 / FTP
+ * 公式：TSS = (秒數 × 標準化功率 × IF) / (FTP × 3600) × 100
+ * 其中 IF (Intensity Factor) = 標準化功率 / FTP
  *
  * 參考資料：TrainingPeaks TSS 計算方法
  */
@@ -25,7 +25,7 @@ export function estimateFTP(weightKg: number, level: 'beginner' | 'intermediate'
 
 /**
  * 計算強度係數（IF - Intensity Factor）
- * IF = 平均功率 / FTP
+ * IF = 標準化功率 / FTP；沒有功率序列時以平均功率相容回退。
  * IF < 0.75：恢復訓練（Zone 1）
  * IF 0.75-0.85：耐力訓練（Zone 2）
  * IF 0.85-1.0：節奏訓練（Zone 3）
@@ -94,13 +94,13 @@ export function calculateNormalizedPowerFromHistory(powerHistory: number[], movi
  */
 export function calculateTSS(
   durationSeconds: number,
-  avgPowerW: number,
+  normalizedPowerW: number,
   ftpW: number
 ): number {
   if (durationSeconds <= 0 || ftpW <= 0) return 0;
 
-  const if_ = calculateIntensityFactor(avgPowerW, ftpW);
-  const tss = (durationSeconds * avgPowerW * if_) / (ftpW * 3600) * 100;
+  const if_ = calculateIntensityFactor(normalizedPowerW, ftpW);
+  const tss = (durationSeconds * normalizedPowerW * if_) / (ftpW * 3600) * 100;
 
   return Math.round(tss * 10) / 10; // 保留一位小數
 }
@@ -197,10 +197,10 @@ export function analyzeTraining(
   ftpW: number,
   powerHistory?: number[]
 ): TrainingAnalysis {
-  const if_ = calculateIntensityFactor(avgPowerW, ftpW);
   const np = calculateNormalizedPowerFromHistory(powerHistory ?? [], durationSeconds)
     ?? calculateNormalizedPower(avgPowerW, maxPowerW);
-  const tss = calculateTSS(durationSeconds, avgPowerW, ftpW);
+  const if_ = calculateIntensityFactor(np, ftpW);
+  const tss = calculateTSS(durationSeconds, np, ftpW);
   const trainingEffect = calculateTrainingEffect(tss, if_);
   const trainingLoad = calculateTrainingLoad(tss, durationSeconds / 60);
 
