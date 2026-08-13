@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
 import Svg, { Polyline, Line, Text as SvgText, Rect } from "react-native-svg";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -34,7 +33,7 @@ export default function NavigateScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { settings } = useSettings();
-  const { setSharedRoute } = useGpx();
+  const { setSharedRoute, importExternalRoute } = useGpx();
 
   const [route, setRoute] = useState<GpxRoute | null>(null);
   const [loading, setLoading] = useState(false);
@@ -78,18 +77,13 @@ export default function NavigateScreen() {
       if (result.canceled) return;
       setLoading(true);
       const file = result.assets[0];
-      const content = await FileSystem.readAsStringAsync(file.uri);
-      const parsed = parseGpx(content);
-      if (!parsed) {
-        setError("無法解析 GPX 檔案，請確認格式正確");
-      } else {
-        setRoute(parsed);
-        setSharedRoute(parsed);  // 同步至導航頁共享 Context
-        // 自動取得路線起點天氣（優先用 GPX 第一點座標）
-        fetchRouteWeather(parsed.points[0].lat, parsed.points[0].lon);
-      }
-    } catch {
-      setError("匯入失敗，請重試");
+      const parsed = await importExternalRoute(file.uri, file.size);
+      setRoute(parsed);
+      setSharedRoute(parsed);
+      // 自動取得路線起點天氣（優先用 GPX 第一點座標）
+      fetchRouteWeather(parsed.points[0].lat, parsed.points[0].lon);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "匯入失敗，請重試");
     } finally {
       setLoading(false);
     }

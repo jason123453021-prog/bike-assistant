@@ -79,6 +79,18 @@ const config: ExpoConfig = {
     intentFilters: [
       {
         action: "VIEW",
+        data: [
+          { scheme: "content", mimeType: "application/gpx+xml" },
+          { scheme: "content", mimeType: "application/xml", pathPattern: ".*\\.gpx" },
+          { scheme: "content", mimeType: "text/xml", pathPattern: ".*\\.gpx" },
+          { scheme: "content", mimeType: "application/octet-stream", pathPattern: ".*\\.gpx" },
+          { scheme: "file", mimeType: "application/gpx+xml" },
+          { scheme: "file", mimeType: "application/octet-stream", pathPattern: ".*\\.gpx" },
+        ],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+      {
+        action: "VIEW",
         autoVerify: true,
         data: [{ scheme: env.scheme, host: "*" }],
         category: ["BROWSABLE", "DEFAULT"],

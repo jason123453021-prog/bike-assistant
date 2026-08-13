@@ -1,10 +1,11 @@
 import "@/global.css";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
+import * as Linking from "expo-linking";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider, useThemeContext } from "@/lib/theme-provider";
 import {
@@ -17,7 +18,8 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from "@react-navigation/native";
 import { RideProvider } from "@/lib/ride-context";
-import { GpxProvider } from "@/lib/gpx-context";
+import { GpxProvider, useGpx } from "@/lib/gpx-context";
+import { isExternalGpxUri } from "@/lib/external-gpx-import";
 import { SettingsProvider } from "@/lib/settings-context";
 // 移除社群和友誼相關 Provider
 import { setupNotifications } from "@/lib/feedback-service";
@@ -54,6 +56,31 @@ function InnerLayout() {
       </NavThemeProvider>
     </>
   );
+}
+
+/** 接收 Android 系統「開啟方式」傳入的 content:// 或 file:// GPX URI。 */
+function ExternalGpxReceiver() {
+  const { importExternalRoute } = useGpx();
+  const handledUris = useRef(new Set<string>());
+
+  const handleUri = useCallback(async (uri: string | null) => {
+    if (!uri || !isExternalGpxUri(uri) || handledUris.current.has(uri)) return;
+    handledUris.current.add(uri);
+    try {
+      await importExternalRoute(uri);
+      router.replace("/map");
+    } catch (error) {
+      Alert.alert("GPX 載入失敗", error instanceof Error ? error.message : "無法讀取這個 GPX 檔案。");
+    }
+  }, [importExternalRoute]);
+
+  useEffect(() => {
+    Linking.getInitialURL().then(handleUri).catch(() => {});
+    const subscription = Linking.addEventListener("url", ({ url }) => { void handleUri(url); });
+    return () => subscription.remove();
+  }, [handleUri]);
+
+  return null;
 }
 
 // ─── Root layout ──────────────────────────────────────────────────────────────
@@ -119,6 +146,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SettingsProvider>
         <GpxProvider>
+          <ExternalGpxReceiver />
           <RideProvider>
             <ThemeProvider>
               <InnerLayout />
