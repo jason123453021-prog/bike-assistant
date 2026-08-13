@@ -366,6 +366,9 @@ export default function MapScreen() {
   const [touchGuardHoldProgress, setTouchGuardHoldProgress] = useState(0);
   const touchGuardHoldStartedAtRef = useRef<number | null>(null);
   const touchGuardHoldTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [showTouchGuardUnlockSuccess, setShowTouchGuardUnlockSuccess] = useState(false);
+  const touchGuardUnlockSuccessOpacity = useRef(new Animated.Value(0)).current;
+  const touchGuardUnlockSuccessScale = useRef(new Animated.Value(0.82)).current;
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
@@ -675,6 +678,25 @@ export default function MapScreen() {
     }, 33);
   }, [isActive, resetTouchGuardHoldProgress, settings.touchGuardUnlockHoldMs, touchGuardEnabled]);
 
+  const showTouchGuardUnlockSuccessFeedback = useCallback(() => {
+    touchGuardUnlockSuccessOpacity.stopAnimation();
+    touchGuardUnlockSuccessScale.stopAnimation();
+    touchGuardUnlockSuccessOpacity.setValue(0);
+    touchGuardUnlockSuccessScale.setValue(0.82);
+    setShowTouchGuardUnlockSuccess(true);
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(touchGuardUnlockSuccessOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.timing(touchGuardUnlockSuccessScale, { toValue: 1, duration: 150, useNativeDriver: true }),
+      ]),
+      Animated.delay(420),
+      Animated.parallel([
+        Animated.timing(touchGuardUnlockSuccessOpacity, { toValue: 0, duration: 260, useNativeDriver: true }),
+        Animated.timing(touchGuardUnlockSuccessScale, { toValue: 1.08, duration: 260, useNativeDriver: true }),
+      ]),
+    ]).start(() => setShowTouchGuardUnlockSuccess(false));
+  }, [touchGuardUnlockSuccessOpacity, touchGuardUnlockSuccessScale]);
+
   const completeTouchGuardUnlock = useCallback(() => {
     if (!touchGuardEnabled) return;
     if (touchGuardHoldTimerRef.current) {
@@ -684,10 +706,15 @@ export default function MapScreen() {
     touchGuardHoldStartedAtRef.current = null;
     setTouchGuardHoldProgress(1);
     if (settings.vibrationEnabled) vibrateLight();
+    showTouchGuardUnlockSuccessFeedback();
     setTouchGuardEnabled(false);
-  }, [settings.vibrationEnabled, touchGuardEnabled]);
+  }, [settings.vibrationEnabled, showTouchGuardUnlockSuccessFeedback, touchGuardEnabled]);
 
-  useEffect(() => resetTouchGuardHoldProgress, [resetTouchGuardHoldProgress]);
+  useEffect(() => () => {
+    resetTouchGuardHoldProgress();
+    touchGuardUnlockSuccessOpacity.stopAnimation();
+    touchGuardUnlockSuccessScale.stopAnimation();
+  }, [resetTouchGuardHoldProgress, touchGuardUnlockSuccessOpacity, touchGuardUnlockSuccessScale]);
 
   useEffect(() => {
     const manager = powerSavingManagerRef.current;
@@ -2903,6 +2930,22 @@ export default function MapScreen() {
         </Pressable>
       )}
 
+      {showTouchGuardUnlockSuccess && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.touchGuardUnlockSuccess,
+            {
+              top: insets.top + 56,
+              opacity: touchGuardUnlockSuccessOpacity,
+              transform: [{ scale: touchGuardUnlockSuccessScale }],
+            },
+          ]}
+        >
+          <Text style={styles.touchGuardUnlockSuccessCheck}>✓</Text>
+        </Animated.View>
+      )}
+
     </View>
   );
 }
@@ -3081,6 +3124,24 @@ const styles = StyleSheet.create({
   },
   touchGuardProgressText: { position: "absolute", top: 13, color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   touchGuardProgressLabel: { position: "absolute", top: 29, color: "rgba(255,255,255,0.76)", fontSize: 8, fontWeight: "700" },
+  touchGuardUnlockSuccess: {
+    position: "absolute",
+    right: 10,
+    zIndex: 36,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(12, 91, 41, 0.96)",
+    borderWidth: 2,
+    borderColor: "#9CFFB5",
+    shadowColor: "#34C759",
+    shadowOpacity: 0.42,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  touchGuardUnlockSuccessCheck: { color: "#FFFFFF", fontSize: 31, fontWeight: "900", lineHeight: 36 },
   returnBtn: {
     backgroundColor: "rgba(255,149,0,0.2)",
     borderColor: "#FF9500",
