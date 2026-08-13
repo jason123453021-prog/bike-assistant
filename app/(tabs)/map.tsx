@@ -2658,9 +2658,18 @@ export default function MapScreen() {
                       polyline: result.coordinates
                     });
                     speak(`計算完成，${formatRouteDistance(result.distanceM)}，${formatRouteDuration(result.durationSec)}`, settings.ttsEnabled);
+                  } else {
+                    setPinRouteInfo(null);
+                    Alert.alert(
+                      "找不到可通行路線",
+                      "釘選位置可能位於封閉區、匝道、河川或無法通過的路口。請將圖釘移到可騎行道路後重新規劃。",
+                    );
+                    speak("找不到可通行路線，請重新釘選到可騎行道路", settings.ttsEnabled);
                   }
                 }).catch(() => {
-                  speak("計算路線失敗", settings.ttsEnabled);
+                  setPinRouteInfo(null);
+                  Alert.alert("路徑規劃暫時不可用", "請確認網路後重試；系統會以最新道路資料重新規劃。");
+                  speak("路徑規劃暫時不可用，請稍後重試", settings.ttsEnabled);
                 }).finally(() => {
                   setIsFetchingPinRoute(false);
                 });

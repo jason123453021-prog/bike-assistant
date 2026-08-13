@@ -8,9 +8,9 @@
  *    - Profile：trekking（對 highway=cycleway 有最高路權）
  *    - 回傳格式：GeoJSON FeatureCollection
  *
- * 2. OSRM（一般道路模式）
- *    - 端點：https://router.project-osrm.org
- *    - Profile：cycling（一般自行車路由）
+ * 2. OSM Bike Router（一般道路自行車模式）
+ *    - 端點：https://routing.openstreetmap.de/routed-bike
+ *    - 使用 OSM 的自行車設定檔，遵守自行車可通行性、單行與轉向限制
  *    - 回傳格式：OSRM JSON + polyline6 幾何
  *
  * 注意：兩個公開端點均有流量限制，僅供開發/示範用途。
@@ -47,11 +47,14 @@ const BROUTER_HOST = "https://brouter.de/brouter";
 // 同時也接受 highway=footway bicycle=yes，適合台灣自行車道環境
 const BROUTER_CYCLEWAY_PROFILE = "trekking";
 
-// ── OSRM 設定 ─────────────────────────────────────────────────
-const OSRM_HOST = "https://router.project-osrm.org/route/v1";
+// ── OSM 專用自行車路由設定 ──────────────────────────────────────
+// routed-bike 的 URL profile 名稱固定為 driving；伺服器實際載入的是自行車設定檔。
+const OSM_BIKE_ROUTE_HOST = "https://routing.openstreetmap.de/routed-bike/route/v1/driving";
 
 // 請求逾時（ms）
 const FETCH_TIMEOUT_MS = 10000;
+// 端點被吸附到道路時可接受的最遠距離；超出即視為目標落在不可通行區域。
+const MAX_ENDPOINT_SNAP_DISTANCE_M = 120;
 
 // ── OSRM 輔助函數 ─────────────────────────────────────────────
 
@@ -211,6 +214,25 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/**
+ * 確認路由引擎將起訖點吸附到合理距離內的可通行道路。
+ * 避免端點落在河川、封閉區、匝道或無法進出的路段時繪製誤導性的直連線。
+ */
+export function hasUsableRouteEndpoints(
+  coordinates: RouteCoordinate[],
+  from: RouteCoordinate,
+  to: RouteCoordinate,
+  maxSnapDistanceM: number = MAX_ENDPOINT_SNAP_DISTANCE_M,
+): boolean {
+  if (coordinates.length < 2) return false;
+  const first = coordinates[0];
+  const last = coordinates[coordinates.length - 1];
+  return (
+    haversine(from.latitude, from.longitude, first.latitude, first.longitude) <= maxSnapDistanceM &&
+    haversine(to.latitude, to.longitude, last.latitude, last.longitude) <= maxSnapDistanceM
+  );
+}
+
 // ── 主要路由函數 ──────────────────────────────────────────────
 
 /**
@@ -258,6 +280,11 @@ async function fetchBrouterRoute(
     const messages: string[][] = props["messages"] ?? [];
     const steps = parseBrouterMessages(messages);
 
+    if (!hasUsableRouteEndpoints(coordinates, from, to)) {
+      console.warn("[RouteService] Brouter endpoint snap is too far from a routable road");
+      return null;
+    }
+
     return { coordinates, distanceM, durationSec, steps };
   } catch (err) {
     clearTimeout(timeoutId);
@@ -271,21 +298,25 @@ async function fetchBrouterRoute(
 }
 
 /**
- * 使用 OSRM cycling profile 計算一般道路路由
+ * 使用 OSM 專用自行車路由服務計算一般道路路由。
+ * 請求禁止使用本機／代理快取，讓新規劃優先採用服務端最新 OSM 道路資料。
  */
 async function fetchOsrmRoute(
   from: RouteCoordinate,
   to: RouteCoordinate
 ): Promise<RouteResult | null> {
   const url =
-    `${OSRM_HOST}/cycling/${from.longitude},${from.latitude};${to.longitude},${to.latitude}` +
-    `?overview=full&geometries=polyline6&steps=true`;
+    `${OSM_BIKE_ROUTE_HOST}/${from.longitude},${from.latitude};${to.longitude},${to.latitude}` +
+    `?overview=full&geometries=polyline6&steps=true&alternatives=false&continue_straight=false`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+    });
     clearTimeout(timeoutId);
 
     if (!response.ok) {
@@ -302,6 +333,10 @@ async function fetchOsrmRoute(
 
     const route = data.routes[0];
     const coordinates = decodePolyline6(route.geometry);
+    if (!hasUsableRouteEndpoints(coordinates, from, to)) {
+      console.warn("[RouteService] OSM bike endpoint snap is too far from a routable road");
+      return null;
+    }
     const allSteps: any[] = [];
     for (const leg of route.legs ?? []) {
       if (leg.steps) allSteps.push(...leg.steps);

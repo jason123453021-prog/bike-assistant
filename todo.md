@@ -1294,3 +1294,9 @@
 - [x] 移除 POI 載入、Overpass 網路請求、本機快取、地圖標記與 POI 導航／卡片：導航頁與 Leaflet 已不再傳遞、載入或處理任何 POI 資料
 - [x] 刪除不再使用的 POI 資料、管理與測試檔案：已刪除 lib/poi-data.ts、lib/poi-manager.ts、lib/poi-types.ts 與 tests/poi-data.test.ts，並移除 marker-cluster 外部資源
 - [x] 驗證 TypeScript、完整測試與 Android Bundle：pnpm check 通過；35 項測試（34 passed、1 skipped）通過；Android Metro Bundle 11,106,990 bytes 完成且服務維持 running
+
+## 釘選導航道路可通行性（2026-08-13）
+- [x] 檢查 OSRM 釘選導航請求、設定檔與地圖底圖更新來源：原本使用公開 OSRM 的 cycling 路徑，可能沒有採用專用自行車可通行性設定；已確認 OSM routed-bike 端點可回應
+- [x] 強化路徑規劃的可通行性參數、端點吸附與資料新鮮度策略：一般道路回退改用 OSM routed-bike；請求使用 no-cache，並拒絕起訖吸附距道路超過 120 公尺的路線
+- [x] 為路徑無法規劃或資料可能過舊建立清楚的回退提示：明確提示封閉區、匝道、河川或無法通過路口，要求重新釘選至可騎行道路；暫時無法連線時提示系統會以最新道路資料重試
+- [x] 新增路徑請求與回退邏輯測試，驗證 TypeScript、完整測試與 Android Bundle：pnpm check 通過；38 項測試（37 passed、1 skipped）通過；Android Metro Bundle 11,109,397 bytes 完成且服務維持 running
