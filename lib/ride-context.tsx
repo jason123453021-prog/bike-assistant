@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useReducer } from "react
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { analyzeTraining, estimateFTP } from "./tss-calc";
 import { calculatePersonalBests, type PersonalBest } from "./personal-bests";
+import { normalizeRideRecord, normalizeRideRecords } from "./ride-record-normalizer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,9 @@ export interface RideRecord {
   totalAscent: number;    // meters
   totalDescent?: number;  // 總下降高度 meters
   maxElevation?: number;  // 最大海拔 meters
+  minElevation?: number;  // 最小海拔 meters
+  averageGrade?: number;  // 平均上坡坡度 percent
+  maxGrade?: number;      // 最大上坡坡度 percent
   movingTime?: number;    // 移動時間 seconds
   calories: number;
   avgPower: number;       // watts
@@ -399,11 +403,13 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     // 計算訓練壓力分數（TSS）和訓練效果分析
     // 假設用戶為中級騎士，根據體重估算 FTP（預設 70kg 体重）
     const ftpW = estimateFTP(70, 'intermediate');
+    const movingTime = Math.max(0, state.elapsed - state.totalPausedSec);
     const trainingAnalysis = analyzeTraining(
-      state.elapsed,
+      movingTime,
       state.avgPower,
       state.maxPower,
-      ftpW
+      ftpW,
+      state.powerHistory,
     );
     
     const recordBase: RideRecord = {
@@ -424,6 +430,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       totalSweatMl: Math.round(state.totalSweatMl),
       refillCount: state.refillCount,
       totalPausedSec: state.totalPausedSec,
+      movingTime,
       // 感測器數據（可選）
       avgHeartRate,
       maxHeartRate: sensorStats?.maxHeartRate,
@@ -437,9 +444,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       intensityFactor: trainingAnalysis.intensityFactor,
       normalizedPower: trainingAnalysis.normalizedPower,
     };
+    const normalizedRecord = normalizeRideRecord(recordBase) ?? recordBase;
     const record: RideRecord = {
-      ...recordBase,
-      personalBests: calculatePersonalBests(recordBase, state.records),
+      ...normalizedRecord,
+      personalBests: calculatePersonalBests(normalizedRecord, state.records),
     };
     dispatch({ type: "ADD_RECORD", record });
     const existing = await AsyncStorage.getItem(STORAGE_KEY);
@@ -452,12 +460,13 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEY);
       if (data) {
-        const records: RideRecord[] = JSON.parse(data);
-        // 向後相容：補充缺少 name 欄位的舊記錄
-        const migrated = records.map((r) => ({
-          ...r,
-          name: r.name ?? generateDefaultName(r.date),
+        const migrated = normalizeRideRecords(JSON.parse(data)).map((record) => ({
+          ...record,
+          name: record.name || generateDefaultName(record.date),
         }));
+        if (JSON.stringify(migrated) !== data) {
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(migrated.slice(0, 100)));
+        }
         dispatch({ type: "LOAD_RECORDS", records: migrated });
       }
     } catch (_) {}

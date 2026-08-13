@@ -2,7 +2,7 @@
  * LeafletMapView
  *
  * WebView-based map component using Leaflet.js + OpenStreetMap.
- * Replaces react-native-maps for Expo Go compatibility.
+ * Uses Leaflet in a WebView for Expo Go compatibility.
  *
  * Supports:
  * - Dark tile layer (CartoDB Dark Matter)

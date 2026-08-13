@@ -13,7 +13,7 @@ export interface ActivityStats {
   averageSpeed: number;       // 平均速度 (km/h)
   averagePace: number;        // 平均配速 (分鐘/km)
   maxSpeed: number;           // 最高速度 (km/h)
-  maxElevation: number;       // 最大單次爬升 (m)
+  maxElevation: number;       // 最高海拔 (m)
   rideCount: number;          // 騎乘次數
 }
 
@@ -78,12 +78,13 @@ function calculateStats(rides: RideRecord[]): ActivityStats {
     };
   }
 
-  const totalDistance = rides.reduce((sum, r) => sum + r.distance, 0);
+  const totalDistanceM = rides.reduce((sum, r) => sum + r.distance, 0);
+  const totalDistance = totalDistanceM / 1000;
   const totalTime = rides.reduce((sum, r) => sum + r.duration, 0);
   const totalElevation = rides.reduce((sum, r) => sum + r.totalAscent, 0);
   const totalCalories = rides.reduce((sum, r) => sum + (r.calories || 0), 0);
   const maxSpeed = Math.max(...rides.map((r) => r.maxSpeed || 0));
-  const maxElevation = Math.max(...rides.map((r) => r.totalAscent || 0));
+  const maxElevation = Math.max(...rides.map((r) => r.maxElevation ?? 0));
 
   const averageSpeed = totalTime > 0 ? (totalDistance / (totalTime / 3600)) : 0;
   const averagePace = totalDistance > 0 ? (totalTime / 60) / totalDistance : 0;
@@ -120,7 +121,7 @@ export function calculateRouteRankings(rides: RideRecord[]): RouteRanking[] {
   const rankings: RouteRanking[] = [];
   routeMap.forEach((rideList, routeName) => {
     const bestTime = Math.min(...rideList.map((r) => r.duration));
-    const totalDistance = rideList.reduce((sum, r) => sum + r.distance, 0);
+    const totalDistance = rideList.reduce((sum, r) => sum + r.distance, 0) / 1000;
     const averageSpeed = rideList.reduce((sum, r) => sum + r.avgSpeed, 0) / rideList.length;
     const lastRideDate = Math.max(...rideList.map((r) => r.date));
 

@@ -81,6 +81,35 @@ export function CustomElevationChart({
     };
   }, [statistics.trackPoints]);
 
+  const minElevation = chartData ? Math.min(...chartData.elevations) : 0;
+  const maxElevation = chartData ? Math.max(...chartData.elevations) : 0;
+  const elevationRange = maxElevation - minElevation;
+
+  // 生成 Y 軸標籤。必須在資料不足的早期回傳前呼叫，確保每次 render 的 Hook 順序一致。
+  const yAxisLabels = useMemo(() => {
+    const labels = [];
+    const step = Math.max(1, Math.ceil(elevationRange / 4 / 10) * 10);
+
+    for (let i = 0; i <= 4; i++) {
+      labels.push(Math.round(minElevation + i * step));
+    }
+
+    return labels;
+  }, [minElevation, elevationRange]);
+
+  // 生成 X 軸標籤；資料缺失時以 0 為安全基準。
+  const xAxisLabels = useMemo(() => {
+    const labels = [];
+    const totalDistance = chartData?.totalDistance ?? 0;
+    const step = totalDistance > 0 ? totalDistance / 4 : 0;
+
+    for (let i = 0; i <= 4; i++) {
+      labels.push((i * step).toFixed(1));
+    }
+
+    return labels;
+  }, [chartData?.totalDistance]);
+
   if (!chartData) {
     return (
       <View className={`bg-surface rounded-xl p-4 ${className || ''}`}>
@@ -88,10 +117,6 @@ export function CustomElevationChart({
       </View>
     );
   }
-
-  const minElevation = Math.min(...chartData.elevations);
-  const maxElevation = Math.max(...chartData.elevations);
-  const elevationRange = maxElevation - minElevation;
 
   // 計算地形難度
   const getTerrainDifficulty = (): string => {
@@ -139,30 +164,6 @@ export function CustomElevationChart({
 
     return path;
   };
-
-  // 生成 Y 軸標籤
-  const yAxisLabels = useMemo(() => {
-    const labels = [];
-    const step = Math.ceil(elevationRange / 4 / 10) * 10; // 四個刻度
-
-    for (let i = 0; i <= 4; i++) {
-      labels.push(Math.round(minElevation + i * step));
-    }
-
-    return labels;
-  }, [minElevation, elevationRange]);
-
-  // 生成 X 軸標籤
-  const xAxisLabels = useMemo(() => {
-    const labels = [];
-    const step = Math.ceil(chartData.totalDistance / 4);
-
-    for (let i = 0; i <= 4; i++) {
-      labels.push((i * step).toFixed(1));
-    }
-
-    return labels;
-  }, [chartData.totalDistance]);
 
   return (
     <View className={`bg-surface rounded-xl p-4 ${className || ''}`}>

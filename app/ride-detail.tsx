@@ -721,7 +721,7 @@ export default function RideDetailScreen() {
                 <DetailCell label="距離" value={`${(record.distance / 1000).toFixed(2)}`} unit="km" />
                 <DetailCell label="總時間" value={formatDuration(record.duration)} unit="" />
                 <DetailCell label="移動時間" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" />
-                <DetailCell label="平均速度" value={`${((record.distance / 1000) / ((record.duration - (record.totalPausedSec ?? 0)) / 3600)).toFixed(1)}`} unit="km/h" />
+                <DetailCell label="平均速度" value={record.avgSpeed.toFixed(1)} unit="km/h" />
                 <DetailCell label="最高速度" value={`${record.maxSpeed.toFixed(1)}`} unit="km/h" />
                 <DetailCell label="消耗熱量" value={`${Math.round(record.calories)}`} unit="kcal" />
                 <DetailCell label="有效騎乘" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" color="#4ADE80" />
@@ -736,9 +736,9 @@ export default function RideDetailScreen() {
                 <DetailCell label="總爬升高度" value={`${Math.round(record.totalAscent)}`} unit="m" color="#F59E0B" />
                 <DetailCell label="總下降高度" value={record.totalDescent !== undefined ? `${Math.round(record.totalDescent)}` : "--"} unit="m" color="#4FC3F7" />
                 <DetailCell label="最大海拔" value={record.maxElevation !== undefined ? `${Math.round(record.maxElevation)}` : "--"} unit="m" />
-                <DetailCell label="最小海拔" value="--" unit="m" />
-                <DetailCell label="平均坡度" value="--" unit="%" />
-                <DetailCell label="最大坡度" value="--" unit="%" />
+                <DetailCell label="最小海拔" value={record.minElevation !== undefined ? `${Math.round(record.minElevation)}` : "--"} unit="m" />
+                <DetailCell label="平均坡度" value={record.averageGrade !== undefined ? record.averageGrade.toFixed(1) : "--"} unit="%" />
+                <DetailCell label="最大坡度" value={record.maxGrade !== undefined ? record.maxGrade.toFixed(1) : "--"} unit="%" />
               </View>
             </View>
 
@@ -750,7 +750,7 @@ export default function RideDetailScreen() {
                 <DetailCell label="最大心率" value={record.maxHeartRate ? `${record.maxHeartRate}` : "--"} unit="bpm" color="#EF4444" />
                 <DetailCell label="平均功率" value={`${record.avgPower}`} unit="W" accent />
                 <DetailCell label="最大功率" value={`${record.maxPower}`} unit="W" accent />
-                <DetailCell label="標準化功率" value={record.normalizedPower ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" accent />
+                <DetailCell label="標準化功率" value={record.normalizedPower !== undefined ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" accent />
                 <DetailCell label="平均踏頻" value={record.avgCadence ? `${record.avgCadence}` : "--"} unit="rpm" />
                 <DetailCell label="最大踏頻" value={record.maxCadence ? `${record.maxCadence}` : "--"} unit="rpm" />
               </View>
@@ -760,9 +760,9 @@ export default function RideDetailScreen() {
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}> 
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>表現指標</Text>
               <View style={styles.statsGrid}>
-                <DetailCell label="訓練壓力分數" value={record.tss ? `${record.tss.toFixed(1)}` : "--"} unit="" color="#9C27B0" />
-                <DetailCell label="強度係數" value={record.intensityFactor ? `${record.intensityFactor.toFixed(2)}` : "--"} unit="" />
-                <DetailCell label="標準化功率" value={record.normalizedPower ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" />
+                <DetailCell label="訓練壓力分數" value={record.tss !== undefined ? `${record.tss.toFixed(1)}` : "--"} unit="" color="#9C27B0" />
+                <DetailCell label="強度係數" value={record.intensityFactor !== undefined ? `${record.intensityFactor.toFixed(2)}` : "--"} unit="" />
+                <DetailCell label="標準化功率" value={record.normalizedPower !== undefined ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" />
               </View>
             </View>
 

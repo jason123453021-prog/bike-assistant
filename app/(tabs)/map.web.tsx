@@ -1,6 +1,6 @@
 /**
  * Web 平台替代頁面
- * react-native-maps 僅支援 Android/iOS，web 平台顯示提示
+ * 網頁平台顯示精簡提示；完整騎乘導航使用行動版 Leaflet 地圖。
  */
 import { View, Text, StyleSheet } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";

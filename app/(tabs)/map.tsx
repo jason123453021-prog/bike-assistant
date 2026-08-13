@@ -2,7 +2,7 @@
  * 導航頁面（整合版）
  *
  * 功能：
- * - 全螢幕深色地圖（react-native-maps）
+ * - 全螢幕深色 Leaflet 地圖
  * - 即時位置標記（藍點）
  * - GPX 路線疊加（從路線頁共享 Context 讀取，紅色軌跡）
  * - 自由騎乘即時軌跡繪製（綠色）
@@ -177,21 +177,6 @@ function findNearestPointIndex(lat: number, lon: number, points: GpxPoint[]): nu
   }
   return minIdx;
 }
-
-// ─── 深色地圖樣式 ─────────────────────────────────────────────────────────────
-const DARK_MAP_STYLE = [
-  { elementType: "geometry", stylers: [{ color: "#1a1a2e" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#8a8a9a" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1a2e" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2d2d44" }] },
-  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#373755" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#484870" }] },
-  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#b0b0cc" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0d1b2a" }] },
-  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#1a2e1a" }] },
-  { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
-  { featureType: "transit", stylers: [{ visibility: "off" }] },
-];
 
 // ─── 主元件 ───────────────────────────────────────────────────────────────────
 

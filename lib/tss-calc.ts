@@ -42,19 +42,43 @@ export function calculateIntensityFactor(avgPowerW: number, ftpW: number): numbe
  * 考慮功率波動的更準確指標
  * 公式：NP = (所有 30 秒功率值的 4 次方平均)^(1/4)
  *
- * 簡化版本：使用平均功率的加權計算
- * 當功率波動大時，NP > 平均功率
- * 當功率穩定時，NP ≈ 平均功率
+ * 若有完整功率序列，請使用 calculateNormalizedPowerFromHistory。
+ * 此函式只保留給沒有原始序列的舊版紀錄作相容性回退，不以最大功率推測 NP。
  */
 export function calculateNormalizedPower(
   avgPowerW: number,
-  maxPowerW: number,
-  variabilityIndex: number = 1.0
+  _maxPowerW: number,
+  _variabilityIndex: number = 1.0
 ): number {
-  // variabilityIndex：功率變異性指數（1.0 = 穩定，1.2-1.5 = 波動大）
-  // 簡化計算：NP = 平均功率 × (1 + 功率變異性係數)
-  const variabilityFactor = Math.min(0.3, (maxPowerW - avgPowerW) / (avgPowerW + 1) * 0.2);
-  return avgPowerW * (1 + variabilityFactor);
+  return Math.max(0, avgPowerW);
+}
+
+/**
+ * 依標準 30 秒滾動平均與四次方平均法計算 NP。
+ * GPS 功率序列未必是 1 秒取樣，因此使用有效騎乘時間推估取樣間距。
+ */
+export function calculateNormalizedPowerFromHistory(powerHistory: number[], movingTimeSeconds: number): number | undefined {
+  const samples = powerHistory.filter((power) => Number.isFinite(power) && power >= 0);
+  if (samples.length === 0) return undefined;
+  const average = samples.reduce((sum, power) => sum + power, 0) / samples.length;
+  if (samples.length < 2 || movingTimeSeconds <= 0) return Math.round(average);
+
+  const secondsPerSample = movingTimeSeconds / samples.length;
+  const windowSize = Math.max(1, Math.round(30 / Math.max(secondsPerSample, 0.1)));
+  if (samples.length < windowSize) return Math.round(average);
+
+  let windowSum = 0;
+  let fourthPowerSum = 0;
+  let rollingCount = 0;
+  for (let index = 0; index < samples.length; index += 1) {
+    windowSum += samples[index];
+    if (index >= windowSize) windowSum -= samples[index - windowSize];
+    if (index >= windowSize - 1) {
+      fourthPowerSum += (windowSum / windowSize) ** 4;
+      rollingCount += 1;
+    }
+  }
+  return rollingCount > 0 ? Math.round((fourthPowerSum / rollingCount) ** 0.25) : Math.round(average);
 }
 
 /**
@@ -170,10 +194,12 @@ export function analyzeTraining(
   durationSeconds: number,
   avgPowerW: number,
   maxPowerW: number,
-  ftpW: number
+  ftpW: number,
+  powerHistory?: number[]
 ): TrainingAnalysis {
   const if_ = calculateIntensityFactor(avgPowerW, ftpW);
-  const np = calculateNormalizedPower(avgPowerW, maxPowerW);
+  const np = calculateNormalizedPowerFromHistory(powerHistory ?? [], durationSeconds)
+    ?? calculateNormalizedPower(avgPowerW, maxPowerW);
   const tss = calculateTSS(durationSeconds, avgPowerW, ftpW);
   const trainingEffect = calculateTrainingEffect(tss, if_);
   const trainingLoad = calculateTrainingLoad(tss, durationSeconds / 60);

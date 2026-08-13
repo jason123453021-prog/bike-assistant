@@ -32,7 +32,7 @@ const config: ExpoConfig = {
       ITSAppUsesNonExemptEncryption: false,
       // iOS 位置權限說明（App Store 審查必填）
       NSLocationWhenInUseUsageDescription:
-        "單車助手需要存取您的位置，以提供 GPS 導航、騎乘路線追蹤及好友位置共享功能。",
+        "單車助手需要存取您的位置，以提供 GPS 導航、速度計算及騎乘路線追蹤功能。",
       NSLocationAlwaysAndWhenInUseUsageDescription:
         "單車助手需要在背景存取您的位置，以便在螢幕關閉時持續追蹤騎乘路線並更新通知欄資訊。",
       NSLocationAlwaysUsageDescription:
@@ -99,7 +99,7 @@ const config: ExpoConfig = {
       "expo-location",
       {
         locationAlwaysAndWhenInUsePermission:
-          "單車助手需要位置權限以追蹤您的騎乘路線、提供 GPS 導航及好友位置共享功能。",
+          "單車助手需要位置權限以追蹤您的騎乘路線，並在螢幕關閉時持續完成本機紀錄。",
         locationWhenInUsePermission:
           "單車助手需要位置權限以追蹤您的騎乘路線及提供 GPS 導航功能。",
         isAndroidBackgroundLocationEnabled: true,
@@ -110,13 +110,6 @@ const config: ExpoConfig = {
       "expo-audio",
       {
         microphonePermission: "單車助手需要麥克風權限以支援語音功能。",
-      },
-    ],
-    [
-      "expo-video",
-      {
-        supportsBackgroundPlayback: true,
-        supportsPictureInPicture: true,
       },
     ],
     [
