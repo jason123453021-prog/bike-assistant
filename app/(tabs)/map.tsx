@@ -41,6 +41,7 @@ import * as Battery from "expo-battery";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
+import Svg, { Circle } from "react-native-svg";
 
 import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
@@ -362,6 +363,9 @@ export default function MapScreen() {
   const [mapRideActive, setMapRideActive] = useState(false);
   const [isAppForeground, setIsAppForeground] = useState(true);
   const touchGuardHintOpacity = useRef(new Animated.Value(0)).current;
+  const [touchGuardHoldProgress, setTouchGuardHoldProgress] = useState(0);
+  const touchGuardHoldStartedAtRef = useRef<number | null>(null);
+  const touchGuardHoldTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
@@ -648,6 +652,30 @@ export default function MapScreen() {
     animation.start();
     return () => animation.stop();
   }, [isActive, touchGuardEnabled, touchGuardHintOpacity]);
+
+  const resetTouchGuardHoldProgress = useCallback(() => {
+    if (touchGuardHoldTimerRef.current) {
+      clearInterval(touchGuardHoldTimerRef.current);
+      touchGuardHoldTimerRef.current = null;
+    }
+    touchGuardHoldStartedAtRef.current = null;
+    setTouchGuardHoldProgress(0);
+  }, []);
+
+  const beginTouchGuardHoldProgress = useCallback(() => {
+    if (!touchGuardEnabled || !isActive) return;
+    resetTouchGuardHoldProgress();
+    touchGuardHoldStartedAtRef.current = Date.now();
+    setTouchGuardHoldProgress(0.001);
+    touchGuardHoldTimerRef.current = setInterval(() => {
+      const startedAt = touchGuardHoldStartedAtRef.current;
+      if (!startedAt) return;
+      const progress = Math.min(1, (Date.now() - startedAt) / settings.touchGuardUnlockHoldMs);
+      setTouchGuardHoldProgress(progress);
+    }, 33);
+  }, [isActive, resetTouchGuardHoldProgress, settings.touchGuardUnlockHoldMs, touchGuardEnabled]);
+
+  useEffect(() => resetTouchGuardHoldProgress, [resetTouchGuardHoldProgress]);
 
   useEffect(() => {
     const manager = powerSavingManagerRef.current;
@@ -2288,8 +2316,15 @@ export default function MapScreen() {
             onPress={() => {
               if (!touchGuardEnabled) setTouchGuardEnabled(true);
             }}
+            onPressIn={() => {
+              if (touchGuardEnabled) beginTouchGuardHoldProgress();
+            }}
+            onPressOut={resetTouchGuardHoldProgress}
             onLongPress={() => {
-              if (touchGuardEnabled) setTouchGuardEnabled(false);
+              if (touchGuardEnabled) {
+                setTouchGuardHoldProgress(1);
+                setTouchGuardEnabled(false);
+              }
             }}
             delayLongPress={settings.touchGuardUnlockHoldMs}
           >
@@ -2816,7 +2851,10 @@ export default function MapScreen() {
         <Pressable
           style={styles.touchGuard}
           onPress={() => {}}
+          onPressIn={beginTouchGuardHoldProgress}
+          onPressOut={resetTouchGuardHoldProgress}
           onLongPress={() => {
+            setTouchGuardHoldProgress(1);
             setTouchGuardEnabled(false);
           }}
           delayLongPress={settings.touchGuardUnlockHoldMs}
@@ -2833,6 +2871,26 @@ export default function MapScreen() {
               {`已鎖定 · 長按 ${touchGuardHoldLabel} 解除`}
             </Text>
           </Animated.View>
+          {touchGuardHoldProgress > 0 && (
+            <View pointerEvents="none" style={[styles.touchGuardProgressRing, { top: insets.top + 56 }]}> 
+              <Svg width={56} height={56} viewBox="0 0 56 56">
+                <Circle cx="28" cy="28" r="23" stroke="rgba(255,255,255,0.18)" strokeWidth="4" fill="rgba(5, 21, 14, 0.62)" />
+                <Circle
+                  cx="28"
+                  cy="28"
+                  r="23"
+                  stroke="#9CFFB5"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  fill="transparent"
+                  strokeDasharray="144.5 144.5"
+                  strokeDashoffset={144.5 * (1 - touchGuardHoldProgress)}
+                  transform="rotate(-90 28 28)"
+                />
+              </Svg>
+              <Text style={styles.touchGuardProgressText}>{Math.round(touchGuardHoldProgress * 100)}%</Text>
+            </View>
+          )}
         </Pressable>
       )}
 
@@ -3004,6 +3062,15 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   touchGuardCornerText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
+  touchGuardProgressRing: {
+    position: "absolute",
+    right: 10,
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  touchGuardProgressText: { position: "absolute", color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   returnBtn: {
     backgroundColor: "rgba(255,149,0,0.2)",
     borderColor: "#FF9500",
