@@ -187,7 +187,7 @@ function findNearestPointIndex(lat: number, lon: number, points: GpxPoint[]): nu
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { state, dispatch, saveRecord, updateRecordName, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
+  const { state, dispatch, saveRecord, updateRideActivity, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
   const { settings } = useSettings();
   const { sharedRoute, clearSharedRoute } = useGpx();
 
@@ -377,6 +377,7 @@ export default function MapScreen() {
     return () => subscription.remove();
   }, []);
   const [showSummary, setShowSummary] = useState(false);
+  const [summaryRecordId, setSummaryRecordId] = useState<string | null>(null);
   // 補給提醒分別管理（支援兩種同時顯示）
   const [calorieAlert, setCalorieAlert] = useState(false);
   const [waterAlert, setWaterAlert] = useState(false);
@@ -1941,7 +1942,7 @@ export default function MapScreen() {
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新；個人設定與環境摘要只保存在裝置上。
           const environmentSummary = environmentSummaryRef.current;
           const sampleCount = environmentSummary.sampleCount;
-          await saveRecord(undefined, sensorStatsRef.current, {
+          const savedRecordId = await saveRecord(undefined, sensorStatsRef.current, {
             riderWeightKg: settings.weight,
             bikeWeightKg: settings.bikeWeight ?? 10,
             ftpW: settings.ftp,
@@ -1956,6 +1957,7 @@ export default function MapScreen() {
               source: environmentSummary.hadLiveWeather ? "live-weather" : "offline-fallback",
             },
           });
+          setSummaryRecordId(savedRecordId);
           setShowSummary(true);
           if (settings.vibrationEnabled) vibrateSuccess();
           
@@ -2737,12 +2739,16 @@ export default function MapScreen() {
       {/* ── 騎乘摘要 Modal ── */}
       <RideSummaryModal
         visible={showSummary}
-        onClose={(routeName) => {
+        recordId={summaryRecordId}
+        onClose={async (routeName, mediaItems) => {
           setShowSummary(false);
-          if (routeName && routeName.trim() && state.records.length > 0) {
-            const latestRecord = state.records[0];
-            updateRecordName(latestRecord.id, routeName.trim());
+          if (summaryRecordId) {
+            await updateRideActivity(summaryRecordId, {
+              ...(routeName?.trim() ? { name: routeName.trim() } : {}),
+              ...(mediaItems !== undefined ? { mediaItems } : {}),
+            });
           }
+          setSummaryRecordId(null);
           dispatch({ type: "RESET" });
         }}
       />

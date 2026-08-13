@@ -3,6 +3,8 @@ import {
   Modal,
   View,
   Text,
+  Image,
+  Alert,
   Pressable,
   StyleSheet,
   ScrollView,
@@ -12,15 +14,18 @@ import {
   Platform,
 } from "react-native";
 import Svg, { G, Path, Circle } from "react-native-svg";
+import * as ImagePicker from "expo-image-picker";
 import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
+import { persistRideMedia } from "@/lib/local-ride-media";
 import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power-calc";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
 interface RideSummaryModalProps {
   visible: boolean;
+  recordId?: string | null;
   /** 關閉時傳入使用者輸入的路線名稱（空字串代表使用預設名稱） */
-  onClose: (routeName?: string) => void;
+  onClose: (routeName?: string, mediaItems?: string[]) => void | Promise<void>;
 }
 
 // ─── 圓餅圖（純 SVG）────────────────────────────────────────────────────────────
@@ -67,16 +72,19 @@ function generateDefaultName(): string {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function RideSummaryModal({ visible, onClose }: RideSummaryModalProps) {
+export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModalProps) {
   const colors = useColors();
   const { state } = useRide();
 
   const [routeName, setRouteName] = useState("");
+  const [mediaItems, setMediaItems] = useState<string[]>([]);
+  const [isPickingMedia, setIsPickingMedia] = useState(false);
 
   // 每次 Modal 開啟時重設為預設名稱
   useEffect(() => {
     if (visible) {
       setRouteName(generateDefaultName());
+      setMediaItems([]);
     }
   }, [visible]);
 
@@ -106,8 +114,32 @@ export function RideSummaryModal({ visible, onClose }: RideSummaryModalProps) {
     try { await Share.share({ message: msg }); } catch {}
   };
 
-  const handleSave = () => {
-    onClose(routeName.trim() || generateDefaultName());
+  const handlePickMedia = async () => {
+    if (!recordId) {
+      Alert.alert("請稍候", "騎乘紀錄尚在準備中，請稍後再加入媒體。");
+      return;
+    }
+    try {
+      setIsPickingMedia(true);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
+        quality: 0.9,
+      });
+      if (!result.canceled) {
+        const saved = await persistRideMedia(recordId, result.assets);
+        setMediaItems((previous) => [...previous, ...saved].slice(0, 10));
+      }
+    } catch {
+      Alert.alert("無法加入媒體", "請確認已允許選取相片或影片。");
+    } finally {
+      setIsPickingMedia(false);
+    }
+  };
+
+  const handleSave = async () => {
+    await onClose(routeName.trim() || generateDefaultName(), mediaItems);
   };
 
   return (
@@ -149,9 +181,51 @@ export function RideSummaryModal({ visible, onClose }: RideSummaryModalProps) {
                 maxLength={40}
                 selectTextOnFocus
               />
-              <Text style={[styles.nameHint, { color: colors.muted }]}>
-                儲存後可在歷史記錄中查看與修改
+              <Text style={[styles.nameHint, { color: colors.muted }]}> 
+                儲存後可在歷史記錄中查看、修改與分享
               </Text>
+            </View>
+
+            <View style={[styles.mediaSection, { borderColor: colors.border, backgroundColor: colors.surface }]}> 
+              <View style={styles.mediaHeader}>
+                <View>
+                  <Text style={[styles.panelTitle, { color: colors.foreground, marginBottom: 2 }]}>活動媒體</Text>
+                  <Text style={[styles.nameHint, { color: colors.muted }]}>相片或影片只會保存於此裝置</Text>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [styles.addMediaButton, { backgroundColor: colors.accent, opacity: pressed || isPickingMedia ? 0.72 : 1 }]}
+                  onPress={handlePickMedia}
+                  disabled={isPickingMedia}
+                >
+                  <IconSymbol name="plus" size={17} color="#fff" />
+                  <Text style={styles.addMediaButtonText}>{isPickingMedia ? "處理中" : "加入"}</Text>
+                </Pressable>
+              </View>
+              {mediaItems.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaPreviewRow}>
+                  {mediaItems.map((uri, index) => (
+                    <View key={`${uri}-${index}`} style={styles.mediaPreviewItem}>
+                      {/(\.mp4|\.mov|\.m4v|\.webm)(\?|$)/i.test(uri) ? (
+                        <View style={[styles.videoPreview, { backgroundColor: colors.background }]}>
+                          <Text style={styles.videoPlayGlyph}>▶</Text>
+                          <Text style={[styles.videoPreviewLabel, { color: colors.muted }]}>影片</Text>
+                        </View>
+                      ) : <Image source={{ uri }} style={styles.mediaPreviewImage} />}
+                      <Pressable
+                        style={styles.removeMediaButton}
+                        onPress={() => setMediaItems((previous) => previous.filter((_, itemIndex) => itemIndex !== index))}
+                      >
+                        <Text style={styles.removeMediaButtonText}>×</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : (
+                <Pressable style={[styles.mediaEmptyState, { borderColor: colors.border }]} onPress={handlePickMedia}>
+                  <Text style={[styles.mediaEmptyIcon, { color: colors.accent }]}>＋</Text>
+                  <Text style={[styles.mediaEmptyText, { color: colors.muted }]}>為這次騎乘加入照片或影片</Text>
+                </Pressable>
+              )}
             </View>
 
             {/* 核心數據面板 */}
@@ -285,6 +359,22 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   nameHint: { fontSize: 11, marginTop: 2 },
+
+  mediaSection: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, marginBottom: 16 },
+  mediaHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  addMediaButton: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  addMediaButtonText: { color: "#fff", fontSize: 12, fontWeight: "800" },
+  mediaPreviewRow: { gap: 10, paddingRight: 4 },
+  mediaPreviewItem: { width: 114, height: 88, borderRadius: 11, overflow: "visible" },
+  mediaPreviewImage: { width: "100%", height: "100%", borderRadius: 11, backgroundColor: "#111" },
+  videoPreview: { width: "100%", height: "100%", borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  videoPlayGlyph: { color: "#fff", fontSize: 24, marginBottom: 3 },
+  videoPreviewLabel: { fontSize: 11, fontWeight: "700" },
+  removeMediaButton: { position: "absolute", top: -7, right: -7, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "#F04438" },
+  removeMediaButtonText: { color: "#fff", fontSize: 17, lineHeight: 19, fontWeight: "700" },
+  mediaEmptyState: { height: 76, borderWidth: StyleSheet.hairlineWidth, borderStyle: "dashed", borderRadius: 11, alignItems: "center", justifyContent: "center", gap: 3 },
+  mediaEmptyIcon: { fontSize: 22, lineHeight: 24, fontWeight: "300" },
+  mediaEmptyText: { fontSize: 12 },
 
   // Stats
   statsPanel: {

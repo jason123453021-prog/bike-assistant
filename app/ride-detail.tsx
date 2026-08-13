@@ -48,6 +48,7 @@ import { useSettings } from "@/lib/settings-context";
 import { calibrateSweatRate } from "@/lib/supply-calibration";
 import { writeLocalFitBackup } from "@/lib/local-fit-backup";
 import { attachRidePhotos, loadRidePhotoTimeline, removeRidePhoto, type RidePhotoTimelineEntry } from "@/lib/local-ride-photos";
+import { persistRideMedia } from "@/lib/local-ride-media";
 import * as ImagePicker from "expo-image-picker";
 
 
@@ -68,6 +69,10 @@ const DARK_MAP_STYLE = [
   { featureType: "transit", stylers: [{ visibility: "off" }] },
 ];
 
+function isVideoMedia(uri: string): boolean {
+  return /\.(mp4|mov|m4v|webm)(\?|$)/i.test(uri);
+}
+
 export default function RideDetailScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
@@ -86,7 +91,8 @@ export default function RideDetailScreen() {
         quality: 0.8,
       });
       if (!result.canceled && result.assets) {
-        const newUris = result.assets.map((asset) => asset.uri);
+        if (!record) return;
+        const newUris = await persistRideMedia(record.id, result.assets);
         setLocalMedia((prev) => [...prev, ...newUris]);
       }
     } catch (e) {
@@ -656,25 +662,40 @@ export default function RideDetailScreen() {
 
       </View>
 
-      {/* Strava 風格：活動心得描述與媒體展示 */}
-      {(record.description || (record.mediaItems && record.mediaItems.length > 0)) && (
-        <View style={styles.stravaBanner}>
-          {record.description ? (
-            <Text style={styles.stravaDescText}>{record.description}</Text>
-          ) : null}
-          {record.mediaItems && record.mediaItems.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaScroll}>
-              {record.mediaItems.map((uri, idx) => (
-                <Image key={idx} source={{ uri }} style={styles.mediaThumb} />
-              ))}
-            </ScrollView>
-          )}
+      {/* ── 活動主視覺媒體：由使用者選取的首張相片／影片 ── */}
+      <Pressable
+        style={({ pressed }) => [styles.activityMediaHero, { opacity: pressed ? 0.9 : 1 }]}
+        onPress={() => {
+          setEditNameInput(record.name);
+          setEditDescInput(record.description ?? "");
+          setLocalMedia(record.mediaItems ?? []);
+          setIsEditModalVisible(true);
+        }}
+      >
+        {record.mediaItems?.[0] && !isVideoMedia(record.mediaItems[0]) ? (
+          <Image source={{ uri: record.mediaItems[0] }} style={styles.activityMediaHeroImage} />
+        ) : (
+          <View style={styles.activityMediaEmptyHero}>
+            <Text style={styles.activityMediaEmptyGlyph}>{record.mediaItems?.[0] ? "▶" : "＋"}</Text>
+            <Text style={styles.activityMediaEmptyTitle}>{record.mediaItems?.[0] ? "活動影片" : "加入活動照片或影片"}</Text>
+            <Text style={styles.activityMediaEmptyCopy}>{record.mediaItems?.[0] ? "點擊編輯活動，管理此影片" : "選取媒體後會顯示於此，僅保存在此裝置"}</Text>
+          </View>
+        )}
+        <View style={styles.activityMediaScrim} />
+        <View style={styles.activityMediaCaption}>
+          <View>
+            <Text style={styles.activityMediaCaptionTitle}>{record.mediaItems?.length ? `活動媒體 ${record.mediaItems.length} 項` : "把這次騎乘留下來"}</Text>
+            <Text style={styles.activityMediaCaptionCopy}>{record.description || "點擊加入照片、影片或活動心得"}</Text>
+          </View>
+          <View style={styles.activityMediaEditChip}>
+            <Text style={styles.activityMediaEditChipText}>{record.mediaItems?.length ? "編輯" : "加入"}</Text>
+          </View>
         </View>
-      )}
+      </Pressable>
 
       {/* ── 本機活動摘要：向上滑動頁面可查看完整數據 ── */}
       <View style={styles.activityBody}>
-        <Text style={styles.activityEyebrow}>本機騎乘摘要</Text>
+        <Text style={styles.activityEyebrow}>活動摘要</Text>
         <Text style={styles.activityTitle}>{record.name}</Text>
         <Text style={styles.activityDate}>{dateStr}</Text>
 
@@ -1435,6 +1456,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 8,
   },
+  activityMediaHero: {
+    height: 196,
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "#17221D",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  activityMediaHeroImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  activityMediaEmptyHero: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 26, backgroundColor: "#15251E" },
+  activityMediaEmptyGlyph: { color: "#60E78E", fontSize: 30, fontWeight: "300", lineHeight: 34, marginBottom: 7 },
+  activityMediaEmptyTitle: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
+  activityMediaEmptyCopy: { color: "rgba(255,255,255,0.62)", fontSize: 12, textAlign: "center", lineHeight: 17, marginTop: 5 },
+  activityMediaScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.16)" },
+  activityMediaCaption: { position: "absolute", left: 14, right: 14, bottom: 13, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 12 },
+  activityMediaCaptionTitle: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
+  activityMediaCaptionCopy: { color: "rgba(255,255,255,0.82)", fontSize: 11, marginTop: 3, maxWidth: SCREEN_W - 150 },
+  activityMediaEditChip: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.52)", borderWidth: 1, borderColor: "rgba(255,255,255,0.34)" },
+  activityMediaEditChipText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   segmentCard: {
     padding: 12,
     borderRadius: 10,

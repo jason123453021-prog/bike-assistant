@@ -407,7 +407,7 @@ interface RideContextValue {
     name?: string,
     sensorStats?: { heartRateValues: number[]; cadenceValues: number[]; maxHeartRate: number; maxCadence: number },
     calculationProfile?: RideCalculationProfile,
-  ) => Promise<void>;
+  ) => Promise<string | null>;
   loadRecords: () => Promise<void>;
   updateRecordName: (id: string, name: string) => Promise<void>;
   updateRideActivity: (id: string, updates: { name?: string; description?: string; mediaItems?: string[] }) => Promise<void>;
@@ -458,7 +458,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     sensorStats?: { heartRateValues: number[]; cadenceValues: number[]; maxHeartRate: number; maxCadence: number },
     calculationProfile?: RideCalculationProfile,
   ) => {
-    if (state.elapsed < 10) return;
+    if (state.elapsed < 10) return null;
     const now = Date.now();
     // 計算感測器平均值
     const avgHeartRate = sensorStats?.heartRateValues.length ? Math.round(sensorStats.heartRateValues.reduce((a, b) => a + b, 0) / sensorStats.heartRateValues.length) : undefined;
@@ -551,6 +551,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     const records: RideRecord[] = existing ? JSON.parse(existing) : [];
     records.unshift(record);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(records.slice(0, 100)));
+    return record.id;
   }, [state]);
 
   const loadRecords = useCallback(async () => {
