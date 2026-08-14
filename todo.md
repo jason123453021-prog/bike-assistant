@@ -1498,3 +1498,10 @@
 - [x] 在放大後的全螢幕照片加入單指拖曳平移與超出範圍回彈限制
 - [x] 保持全螢幕路線地圖的平移、縮放與旋轉手勢，且不對照片開放旋轉
 - [x] 補強手勢邊界回歸測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；97 passed、1 skipped；Android Hermes bundle 5.59 MB；NitroModules／MapLibre 掃描 0）
+
+## 活動詳情全螢幕檢視器重構（2026-08-14）
+- [x] 修正活動詳情中的「Text strings must be rendered within a Text component」錯誤並補強防護測試
+- [x] 將主視覺左下的照片入口改為照片縮圖，移除問號樣式並保留可直接開啟照片的操作
+- [x] 點擊上方路線主視覺可直接進入全螢幕；全螢幕路線地圖不參與左右滑動換頁，保留地圖手勢
+- [x] 將全螢幕底部資訊改為可上拉／下拉的活動摘要抽屜，拖曳時同步調整媒體可視高度
+- [x] 完成互動結構回歸測試、TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；98 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）

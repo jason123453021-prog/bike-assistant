@@ -36,4 +36,14 @@ describe("activity media presentation", () => {
     expect(source).toContain("rotate: true");
     expect(source).toContain("touchRotate: true");
   });
+
+  it("uses a thumbnail photo entry and a separate route viewer instead of paging the map with photos", () => {
+    const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
+    const source = fs.readFileSync(filePath, "utf8");
+
+    expect(source).toContain("routeMapPhotoThumbButton");
+    expect(source).toContain("activityViewerMode === \"route\"");
+    expect(source).toContain("activityViewerDrawerHeight.interpolate");
+    expect(source).toContain("fillContainer");
+  });
 });

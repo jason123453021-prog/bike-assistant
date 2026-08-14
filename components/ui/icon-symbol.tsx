@@ -88,6 +88,8 @@ const MAPPING = {
   "arrow.counterclockwise":                "replay",
   "arrow.down.doc":                        "file-download",
   "chevron.left":                          "chevron-left",
+  "photo.fill":                            "photo",
+  "arrow.up.left.and.arrow.down.right":    "fullscreen",
 } as IconMapping;
 
 export function IconSymbol({

@@ -31,6 +31,7 @@ function maxVerticalTranslation(scale: number) {
 interface ZoomableActivityPhotoProps {
   uri: string;
   resetKey: string;
+  fillContainer?: boolean;
 }
 
 /**
@@ -38,7 +39,7 @@ interface ZoomableActivityPhotoProps {
  * 僅使用專案既有的 Gesture Handler 與 Reanimated，避免新增原生模組；
  * 以雙指縮放與雙擊切換 1× / 2.4×，並在切換照片時自動還原。
  */
-export function ZoomableActivityPhoto({ uri, resetKey }: ZoomableActivityPhotoProps) {
+export function ZoomableActivityPhoto({ uri, resetKey, fillContainer = false }: ZoomableActivityPhotoProps) {
   const scale = useSharedValue(MIN_SCALE);
   const savedScale = useSharedValue(MIN_SCALE);
   const translationX = useSharedValue(0);
@@ -116,7 +117,7 @@ export function ZoomableActivityPhoto({ uri, resetKey }: ZoomableActivityPhotoPr
   }));
 
   return (
-    <View style={styles.container} accessible accessibilityLabel="活動照片；雙擊可放大或還原，雙指可縮放，放大後可單指拖曳平移">
+    <View style={[styles.container, fillContainer && styles.containerFill]} accessible accessibilityLabel="活動照片；雙擊可放大或還原，雙指可縮放，放大後可單指拖曳平移">
       <GestureDetector gesture={Gesture.Simultaneous(pinchGesture, doubleTapGesture, panGesture)}>
         <Animated.View style={[styles.imageContainer, imageAnimationStyle]}>
           <Image source={{ uri }} style={styles.image} resizeMode="contain" />
@@ -134,6 +135,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  containerFill: { height: "100%" },
   imageContainer: {
     width: "100%",
     height: "100%",
