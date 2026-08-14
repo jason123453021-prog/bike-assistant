@@ -1687,6 +1687,8 @@
 - [x] 依科學化耐受度將智慧補水改為 10–15 分鐘的小量分次建議，避免一次補充過多造成腸胃不適
 - [x] 隔離活動詳情地圖手勢與外層捲動，並降低地圖傳遞與重繪負載
 - [x] 新增小量補水回歸測試，完成 TypeScript、零 lint advisory、140 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
+- [x] 將多次騎乘的汗率校正改為完全自動化本機學習，移除人工補水量輸入
+- [x] 新增自動汗率校正回歸測試，完成 TypeScript、零 lint advisory、139 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
 - [ ] 新增回歸測試、完成 TypeScript、完整測試與 Android bundle 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）

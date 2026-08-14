@@ -109,9 +109,11 @@ export interface AppSettings {
   waterThreshold: number;
   /** smart：依個人、騎乘與環境資料全自動調整提醒；custom：採用保守本機預設。 */
   supplyCalculationMode: SupplyCalculationMode;
-  /** 騎後由使用者明確確認才更新的本機汗率倍率，限制為保守範圍。 */
+  /** 由本機多次有效騎乘與智慧補水確認自動更新的汗率倍率，限制為保守範圍。 */
   sweatRateCalibrationMultiplier: number;
   sweatRateCalibrationCount: number;
+  /** 防止同一筆已完成活動重複觸發自動汗率校正。 */
+  sweatRateCalibrationLastRideId?: string;
   supplyReminderRepeatSec: number; // 0 = 不重複；>0 = 每幾秒重複語音提醒
   // 通用補給間隔：可依騎乘時間、距離或兩者提醒，不綁定特定補給品
   supplyIntervalReminderEnabled: boolean;

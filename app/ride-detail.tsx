@@ -51,7 +51,6 @@ import { buildPhotoRouteMarkers } from "@/lib/photo-route-markers";
 import { compareLocalSplitPersonalBests } from "@/lib/local-split-personal-bests";
 import { buildLocalActivityHighlights, calculateBestPowerEfforts } from "@/lib/local-activity-insights";
 import { useSettings } from "@/lib/settings-context";
-import { calibrateSweatRate } from "@/lib/supply-calibration";
 import { writeLocalFitBackup } from "@/lib/local-fit-backup";
 import { attachRidePhotos, loadRidePhotoTimeline, removeRidePhoto, type RidePhotoTimelineEntry } from "@/lib/local-ride-photos";
 import { persistRideMedia } from "@/lib/local-ride-media";
@@ -147,7 +146,7 @@ export default function RideDetailScreen() {
     setIsEditModalVisible(false);
     Alert.alert("成功", "已儲存活動編輯");
   };
-  const { settings, updateSettings } = useSettings();
+  const { settings } = useSettings();
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
 
   // 找到對應記錄
@@ -195,8 +194,6 @@ export default function RideDetailScreen() {
 
   // 分享卡片
   const [shareCardVisible, setShareCardVisible] = useState(false);
-  const [calibrationVisible, setCalibrationVisible] = useState(false);
-  const [confirmedFluidInput, setConfirmedFluidInput] = useState("");
   const [photoTimeline, setPhotoTimeline] = useState<RidePhotoTimelineEntry[]>([]);
   const [isActivityViewerVisible, setIsActivityViewerVisible] = useState(false);
   const [, setActivityViewerIndex] = useState(0);
@@ -212,27 +209,6 @@ export default function RideDetailScreen() {
   const rideSplits = useMemo(() => record ? buildRideSplits(record) : [], [record]);
   const sportType = record?.sportType ?? "cycling";
   const elevationBands = useMemo(() => record && (sportType === "hiking" || sportType === "trail_running") ? buildElevationBands(record) : [], [record, sportType]);
-
-  const handleApplySweatCalibration = useCallback(async () => {
-    if (!record) return;
-    const result = calibrateSweatRate({
-      estimatedSweatMl: record.totalSweatMl,
-      confirmedFluidMl: Number(confirmedFluidInput),
-      currentMultiplier: settings.sweatRateCalibrationMultiplier,
-      completedCalibrations: settings.sweatRateCalibrationCount,
-    });
-    if (!result.applied) {
-      Alert.alert("無法套用校正", result.reason);
-      return;
-    }
-    await updateSettings({
-      sweatRateCalibrationMultiplier: result.nextMultiplier,
-      sweatRateCalibrationCount: result.nextCount,
-    });
-    setCalibrationVisible(false);
-    setConfirmedFluidInput("");
-    Alert.alert("已套用本機校正", result.reason);
-  }, [confirmedFluidInput, record, settings.sweatRateCalibrationCount, settings.sweatRateCalibrationMultiplier, updateSettings]);
 
   const storePickedPhotos = useCallback(async (assets: ImagePicker.ImagePickerAsset[]) => {
     if (!record || assets.length === 0) return;
@@ -1315,17 +1291,6 @@ export default function RideDetailScreen() {
                 <DetailCell label="補水次數" value={`${record.refillCount}`} unit="次" />
                 <DetailCell label="GPS 點數" value={`${record.route.length}`} unit="點" />
               </View>
-              <Pressable
-                style={({ pressed }) => [styles.calibrationButton, { borderColor: colors.primary, opacity: pressed ? 0.72 : 1 }]}
-                onPress={() => setCalibrationVisible(true)}
-              >
-                <IconSymbol name="drop.fill" size={16} color="#4FC3F7" />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.calibrationButtonTitle, { color: colors.foreground }]}>騎後校正汗率</Text>
-                  <Text style={[styles.calibrationButtonHint, { color: colors.muted }]}>確認本次補水量後，保守調整未來的本機補水建議。</Text>
-                </View>
-                <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-              </Pressable>
             </View>
 
             {record.calculationProfile?.environment && (
@@ -1598,35 +1563,6 @@ export default function RideDetailScreen() {
                 style={[styles.modalBtn, { backgroundColor: colors.primary }]}
               >
                 <Text style={{ color: "#fff", fontWeight: "600" }}>儲存活動</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      <Modal
-        visible={calibrationVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCalibrationVisible(false)}
-      >
-        <View style={styles.calibrationOverlay}>
-          <View style={[styles.calibrationModal, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.calibrationModalTitle, { color: colors.foreground }]}>騎後汗率校正</Text>
-            <Text style={[styles.calibrationModalCopy, { color: colors.muted }]}>請輸入本次騎乘期間與結束後補回的總補水量（ml）。系統只會保守調整未來建議，並可隨時在設定頁重設；此功能不作醫療判斷。</Text>
-            <TextInput
-              value={confirmedFluidInput}
-              onChangeText={setConfirmedFluidInput}
-              keyboardType="number-pad"
-              placeholder="例如 900"
-              placeholderTextColor={colors.muted}
-              style={[styles.calibrationInput, { color: colors.foreground, borderColor: colors.border }]}
-            />
-            <View style={styles.calibrationActions}>
-              <Pressable style={[styles.calibrationAction, { borderColor: colors.border }]} onPress={() => setCalibrationVisible(false)}>
-                <Text style={[styles.calibrationActionText, { color: colors.muted }]}>取消</Text>
-              </Pressable>
-              <Pressable style={[styles.calibrationAction, { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => void handleApplySweatCalibration()}>
-                <Text style={[styles.calibrationActionText, { color: "#fff" }]}>確認並套用</Text>
               </Pressable>
             </View>
           </View>
@@ -2096,17 +2032,6 @@ const styles = StyleSheet.create({
     marginTop: -6,
     marginBottom: 8,
   },
-  calibrationButton: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-  calibrationButtonTitle: { fontSize: 13, fontWeight: "700" },
-  calibrationButtonHint: { fontSize: 11, lineHeight: 16, marginTop: 2 },
   confirmationList: {
     marginTop: 12,
     paddingTop: 10,
@@ -2127,19 +2052,6 @@ const styles = StyleSheet.create({
   photoTime: { fontSize: 10, marginTop: 5 },
   photoRemoveButton: { alignSelf: "flex-start", marginTop: 5, paddingVertical: 3 },
   photoRemoveText: { color: "#FF6B6B", fontSize: 11, fontWeight: "700" },
-  calibrationOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.58)",
-    justifyContent: "center",
-    padding: 24,
-  },
-  calibrationModal: { borderRadius: 16, borderWidth: 1, padding: 20 },
-  calibrationModalTitle: { fontSize: 18, fontWeight: "800", marginBottom: 9 },
-  calibrationModalCopy: { fontSize: 13, lineHeight: 19 },
-  calibrationInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 11, fontSize: 17, marginTop: 16 },
-  calibrationActions: { flexDirection: "row", gap: 10, marginTop: 16 },
-  calibrationAction: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 11, alignItems: "center" },
-  calibrationActionText: { fontSize: 14, fontWeight: "700" },
   mediaViewer: { flex: 1, backgroundColor: "#050505", justifyContent: "flex-start" },
   mediaViewerClose: { position: "absolute", top: 56, left: 18, zIndex: 2, width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.58)" },
   activityViewerStage: { width: "100%", overflow: "hidden", backgroundColor: "#050505" },

@@ -103,6 +103,7 @@ import {
   calculatePersonalizedCalories,
 } from "@/lib/personalized-ride-calculations";
 import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
+import { deriveAutomaticSweatCalibration } from "@/lib/supply-calibration";
 import {
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
@@ -208,7 +209,7 @@ function findNearestPointIndex(lat: number, lon: number, points: GpxPoint[]): nu
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { state, dispatch, saveRecord, updateRideActivity, setSportType, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const { sharedRoute, clearSharedRoute } = useGpx();
   const autoPersonalMetrics = useMemo(() => deriveAutoPersonalMetrics(state.records, {
     ftpW: settings.ftp,
@@ -2163,6 +2164,45 @@ export default function MapScreen() {
               },
             });
             setSummaryRecordId(savedRecordId);
+            if (savedRecordId) {
+              const calibrationResult = deriveAutomaticSweatCalibration({
+                rides: [
+                  ...stateRef.current.records.filter((record) => record.id !== savedRecordId),
+                  {
+                    id: savedRecordId,
+                    date: Date.now(),
+                    duration: stateRef.current.elapsed,
+                    movingTime: Math.max(0, stateRef.current.elapsed - stateRef.current.totalPausedSec),
+                    totalSweatMl: stateRef.current.totalSweatMl,
+                    avgPower: stateRef.current.avgPower,
+                    avgSpeed: stateRef.current.avgSpeed,
+                    totalAscent: stateRef.current.totalAscent,
+                    calculationProfile: {
+                      riderWeightKg: settings.weight,
+                      ftpW: estimateFtpW,
+                      environment: {
+                        averageTemperatureC: sampleCount ? environmentSummary.temperatureTotal / sampleCount : undefined,
+                        averageHumidityPct: sampleCount ? environmentSummary.humidityTotal / sampleCount : undefined,
+                        averageHeadwindMs: sampleCount ? environmentSummary.headwindTotal / sampleCount : undefined,
+                        averagePrecipitationProb: sampleCount ? environmentSummary.precipitationTotal / sampleCount : undefined,
+                        weatherCode: environmentSummary.latestWeatherCode,
+                      },
+                    },
+                    supplyConfirmations: stateRef.current.supplyConfirmations,
+                  },
+                ],
+                currentMultiplier: settings.sweatRateCalibrationMultiplier,
+                completedCalibrations: settings.sweatRateCalibrationCount,
+                lastProcessedRideId: settings.sweatRateCalibrationLastRideId,
+              });
+              if (calibrationResult.applied) {
+                await updateSettings({
+                  sweatRateCalibrationMultiplier: calibrationResult.nextMultiplier,
+                  sweatRateCalibrationCount: calibrationResult.nextCount,
+                  sweatRateCalibrationLastRideId: savedRecordId,
+                });
+              }
+            }
             setShowSummary(true);
             if (settings.vibrationEnabled) vibrateSuccess();
           } catch {
@@ -2181,7 +2221,7 @@ export default function MapScreen() {
         },
       },
     ]);
-  }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, state.distance, state.elapsed]);
+  }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, state.distance, state.elapsed, updateSettings]);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {
