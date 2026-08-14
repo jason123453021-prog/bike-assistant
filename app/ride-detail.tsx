@@ -18,7 +18,6 @@ import {
   Dimensions,
   Image,
   Modal,
-  Platform,
   PanResponder,
   Pressable,
   ScrollView,
@@ -31,7 +30,7 @@ import {
 
 import * as Sharing from "expo-sharing";
 import LeafletMapView, { type LeafletMapHandle, type PhotoMapMarker } from "@/components/leaflet-map";
-import Svg, { Circle, Defs, G, LinearGradient, Path, Polyline, Rect, Stop, Text as SvgText } from "react-native-svg";
+import Svg, { G, Path } from "react-native-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -45,7 +44,6 @@ import { SpeedCurveChart, type KeyMarker, type SpeedDataPoint } from "@/componen
 import { ActivityElevationChart } from "@/components/activity-elevation-chart";
 import { buildActivitySensorAnalysis } from "@/lib/activity-sensor-estimates";
 import { deriveLocalEstimationCalibration } from "@/lib/activity-estimation-calibration";
-import { createGpxContent } from "@/lib/gpx-export";
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
 import { buildRideSplits } from "@/lib/ride-splits";
 import { buildElevationBands } from "@/lib/elevation-bands";
@@ -90,20 +88,6 @@ function activityTypeLabel(value: RideRecord["activityType"]): string {
   return ACTIVITY_TYPES.find((item) => item.value === value)?.label ?? "其他騎乘";
 }
 
-// 深色地圖樣式
-const DARK_MAP_STYLE = [
-  { elementType: "geometry", stylers: [{ color: "#1a1a2e" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#8a8a9a" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1a2e" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2d2d44" }] },
-  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#373755" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#484870" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0d1b2a" }] },
-  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#1a2e1a" }] },
-  { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
-  { featureType: "transit", stylers: [{ visibility: "off" }] },
-];
-
 function isVideoMedia(uri: string): boolean {
   return /\.(mp4|mov|m4v|webm)(\?|$)/i.test(uri);
 }
@@ -123,51 +107,6 @@ function formatPowerInterval(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return remainder ? `${minutes}m${remainder}s` : `${minutes}m`;
-}
-
-function RideRouteArtwork({ coordinates }: { coordinates: { latitude: number; longitude: number }[] }) {
-  const width = 960;
-  const height = 420;
-  const valid = coordinates.filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
-  const latitudes = valid.map((point) => point.latitude);
-  const longitudes = valid.map((point) => point.longitude);
-  const minLat = Math.min(...latitudes, 0);
-  const maxLat = Math.max(...latitudes, 0);
-  const minLon = Math.min(...longitudes, 0);
-  const maxLon = Math.max(...longitudes, 0);
-  const latRange = Math.max(maxLat - minLat, 0.0001);
-  const lonRange = Math.max(maxLon - minLon, 0.0001);
-  const routePoints = valid.map((point) => {
-    const x = 62 + ((point.longitude - minLon) / lonRange) * (width - 124);
-    const y = 44 + (1 - (point.latitude - minLat) / latRange) * (height - 88);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-  const start = routePoints.split(" ")[0]?.split(",");
-  const end = routePoints.split(" ").at(-1)?.split(",");
-
-  return (
-    <Svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
-      <Defs>
-        <LinearGradient id="routeCoverBg" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#132C33" />
-          <Stop offset="1" stopColor="#071215" />
-        </LinearGradient>
-      </Defs>
-      <Rect width={width} height={height} fill="url(#routeCoverBg)" />
-      {[110, 250, 390, 530, 670, 810].map((x) => <Path key={`v-${x}`} d={`M${x} 0 L${x - 120} ${height}`} stroke="#88A5A7" strokeOpacity={0.15} strokeWidth={4} />)}
-      {[75, 170, 265, 360].map((y) => <Path key={`h-${y}`} d={`M0 ${y} L${width} ${y - 55}`} stroke="#88A5A7" strokeOpacity={0.12} strokeWidth={3} />)}
-      {valid.length > 1 ? (
-        <>
-          <Polyline points={routePoints} fill="none" stroke="#000000" strokeOpacity={0.36} strokeWidth={23} strokeLinecap="round" strokeLinejoin="round" />
-          <Polyline points={routePoints} fill="none" stroke="#FF6A22" strokeWidth={14} strokeLinecap="round" strokeLinejoin="round" />
-          <Circle cx={Number(start?.[0])} cy={Number(start?.[1])} r={15} fill="#26D07C" stroke="#FFFFFF" strokeWidth={5} />
-          <Circle cx={Number(end?.[0])} cy={Number(end?.[1])} r={15} fill="#FF5A5F" stroke="#FFFFFF" strokeWidth={5} />
-        </>
-      ) : (
-        <SvgText x={width / 2} y={height / 2} fill="#C8D7D3" fontSize={30} textAnchor="middle">沒有足夠的 GPS 軌跡</SvgText>
-      )}
-    </Svg>
-  );
 }
 
 export default function RideDetailScreen() {

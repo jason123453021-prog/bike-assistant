@@ -62,7 +62,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
         message: shareText,
         title: "分享騎乘記錄",
       });
-    } catch (error) {
+    } catch {
       Alert.alert("分享失敗", "無法分享騎乘記錄");
     }
   };
@@ -95,7 +95,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
         mimeType: "image/png",
         UTI: "public.png",
       });
-    } catch (error) {
+    } catch {
       Alert.alert("產生分享長圖失敗", "無法建立本機分享圖片，請稍後再試。");
     } finally {
       setIsPreparingImage(false);

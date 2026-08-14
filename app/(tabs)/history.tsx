@@ -21,7 +21,7 @@ import { buildLocalTrainingLog, shiftTrainingLogMonth } from "@/lib/local-traini
 import { formatPaceFromKmh, SPORT_META, type SportType } from "@/lib/sport-metrics";
 
 const STORAGE_KEY = "@bike_records";
-const SPORT_FILTERS: Array<"all" | SportType> = ["all", "cycling", "running", "hiking", "trail_running"];
+const SPORT_FILTERS: ("all" | SportType)[] = ["all", "cycling", "running", "hiking", "trail_running"];
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
@@ -52,7 +52,7 @@ export default function HistoryScreen() {
 
   useEffect(() => {
     loadRecords();
-  }, []);
+  }, [loadRecords]);
 
   // 依關鍵字過濾記錄（搜尋路線名稱、日期、距離、時間）
   const filteredRecords = useMemo(() => {

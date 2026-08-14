@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,17 +14,9 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  ActivityIndicator,
 } from "react-native";
-import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
-
-
-// 啟用 Android LayoutAnimation
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import { SafeAreaView } from "react-native-safe-area-context";
 import Slider from "@react-native-community/slider";
-import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -37,9 +29,14 @@ import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-prof
 
 import Constants from "expo-constants";
 
+
+// 啟用 Android LayoutAnimation
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 export default function SettingsScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
   const { state: rideState } = useRide();
   const autoPersonalMetrics = deriveAutoPersonalMetrics(rideState.records, {

@@ -1,7 +1,6 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform, StyleSheet } from "react-native";
-import { Text } from "react-native";
+import { Platform, StyleSheet , Text } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { HapticTab } from "@/components/haptic-tab";
 import { useColors } from "@/hooks/use-colors";

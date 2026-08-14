@@ -38,7 +38,6 @@
     "drizzle-orm": "^0.44.7",
     "expo": "~54.0.29",
     "expo-audio": "~1.1.0",
-    "expo-background-fetch": "~14.0.9",
     "expo-battery": "^10.0.8",
     "expo-brightness": "~14.0.8",
     "expo-build-properties": "^1.0.10",
@@ -63,7 +62,6 @@
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
     "expo-task-manager": "~14.0.9",
-    "expo-web-browser": "~15.0.10",
     "express": "^4.22.1",
     "jose": "6.1.0",
     "mysql2": "^3.16.0",
@@ -81,7 +79,6 @@
     "react-native-worklets": "0.5.1",
     "superjson": "^1.13.3",
     "tailwind-merge": "^2.6.0",
-    "victory-native": "^41",
     "zod": "^4.2.1"
   },
   "devDependencies": {

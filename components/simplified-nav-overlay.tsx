@@ -11,7 +11,7 @@ import {
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import type { SimplifiedModeFields, SimplifiedFieldKey } from "@/lib/settings-context";
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+const { width: SCREEN_W } = Dimensions.get("window");
 
 export interface SimplifiedNavOverlayProps {
   visible: boolean;

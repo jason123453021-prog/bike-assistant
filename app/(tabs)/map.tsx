@@ -19,7 +19,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useReducer,
   useRef,
   useState,
 } from "react";
@@ -46,7 +45,6 @@ import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import Svg, { Circle } from "react-native-svg";
 
-import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
 import {
   buildSportDashboardMetrics,
@@ -64,6 +62,7 @@ import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/set
 import { useGpx } from "@/lib/gpx-context";
 
 import { type GpxPoint, type GpxRoute } from "@/lib/gpx-parser";
+import { calculateKilometerMarkers } from "@/lib/kilometer-markers";
 import {
   speak,
   vibrateLight,
@@ -78,7 +77,6 @@ import {
   showRidingNotification,
   cancelRidingNotification,
   requestNotificationPermission,
-  stopSpeech,
 } from "@/lib/feedback-service";
 import {
   calculatePower,
@@ -88,7 +86,7 @@ import {
   formatDuration,
 } from "@/lib/power-calc";
 import { fetchWeather, getHeadwindMs, getRelativeWindInfo, type WeatherData } from "@/lib/weather-service";
-import { fetchBikeRoute, formatRouteDistance, formatRouteDuration, type RouteCoordinate, type TurnStep } from "@/lib/route-service";
+import { fetchBikeRoute, formatRouteDistance, formatRouteDuration } from "@/lib/route-service";
 import {
   formatNavigationDataFreshness,
   loadRecentAddressSearches,
@@ -160,7 +158,6 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const ARRIVAL_THRESHOLD_M = 30;
 const TURN_LOOKAHEAD_M = 150;
 const TURN_ANGLE_DEG = 30;
-const AUTO_PAUSE_THRESHOLD = 1.5; // 自動暫停速度閾值（km/h）
 const AUTO_PAUSE_RESUME_THRESHOLD = 3; // 自動恢復速度閾值（km/h）- 高於暫停閾值，避免頻繁切換
 const WEATHER_INTERVAL = 10 * 60 * 1000;
 const LOCATION_INTERVAL_SEC = 3;
@@ -235,7 +232,7 @@ export default function MapScreen() {
       shouldPlayInBackground: false,
     }).catch(() => {});
     return () => { alertPlayer.release(); };
-  }, []);
+  }, [alertPlayer]);
 
   // 地圖 ref
   const mapRef = useRef<LeafletMapHandle>(null);
@@ -249,10 +246,14 @@ export default function MapScreen() {
   const idleMonitorLastPositionRef = useRef<{ lat: number; lon: number } | null>(null);
   const [rideLocationTrackingMode, setRideLocationTrackingMode] = useState<RideLocationTrackingMode>("full");
   const recoverySessionRef = useRef<RideSession | null>(null);
+  const pendingRecoverySnapshotRef = useRef<RideSession | null>(null);
+  const recoverySnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRecoverySnapshotAtRef = useRef(0);
   const [followUser, setFollowUser] = useState(true);
   const [touchGuardEnabled, setTouchGuardEnabled] = useState(false);
   const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
   const autoRecenterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const routePaddingBottomRef = useRef(PANEL_COLLAPSED_H);
 
   useEffect(() => {
     if (!settings.touchGuardEnabled) setTouchGuardEnabled(false);
@@ -273,6 +274,39 @@ export default function MapScreen() {
       setFollowUser(true);
     }, AUTO_RECENTER_AFTER_INTERACTION_MS);
   }, []);
+
+  const flushRecoverySnapshot = useCallback(async () => {
+    if (recoverySnapshotTimerRef.current) {
+      clearTimeout(recoverySnapshotTimerRef.current);
+      recoverySnapshotTimerRef.current = null;
+    }
+    const session = pendingRecoverySnapshotRef.current;
+    if (!session) return;
+    pendingRecoverySnapshotRef.current = null;
+    lastRecoverySnapshotAtRef.current = Date.now();
+    await saveRideSessionSnapshot(session);
+  }, []);
+
+  const queueRecoverySnapshot = useCallback((session: RideSession) => {
+    pendingRecoverySnapshotRef.current = session;
+    const remainingMs = Math.max(0, 3_000 - (Date.now() - lastRecoverySnapshotAtRef.current));
+    if (remainingMs === 0) {
+      void flushRecoverySnapshot();
+      return;
+    }
+    if (!recoverySnapshotTimerRef.current) {
+      recoverySnapshotTimerRef.current = setTimeout(() => {
+        recoverySnapshotTimerRef.current = null;
+        void flushRecoverySnapshot();
+      }, remainingMs);
+    }
+  }, [flushRecoverySnapshot]);
+
+  useEffect(() => () => {
+    if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
+    if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+    void flushRecoverySnapshot();
+  }, [flushRecoverySnapshot]);
 
   // 導航固定採車頭朝前：以行進方向優先、低速時以平滑羅盤輔助。
   const headingUp = true;
@@ -322,13 +356,14 @@ export default function MapScreen() {
       arrivedRef.current = false;
       setNavInstruction("路線已載入，點擊開始即可啟動導航");
       const coords = gpxRoute.points.map((p) => ({ latitude: p.lat, longitude: p.lon }));
-      setTimeout(() => {
+      const fitTimer = setTimeout(() => {
         mapRef.current?.fitToCoordinates(coords, {
-          edgePadding: { top: 80, right: 40, bottom: dynamicCollapsedH + 40, left: 40 },
+          edgePadding: { top: 80, right: 40, bottom: routePaddingBottomRef.current + 40, left: 40 },
           animated: true,
         });
         setFollowUser(false);
       }, 400);
+      return () => clearTimeout(fitTimer);
     } else {
       setNavInstruction("");
       setIsNavigating(false);
@@ -368,7 +403,6 @@ export default function MapScreen() {
   // 車頭朝前精度改善：自適應循環平均（消除 GPS heading 抖動）
   // 低速時用 11 點平均（更平滑），高速時用 7 點平均（更靈敏）
   const headingWindowRef = useRef<number[]>([]);
-  const prevSpeedRef = useRef<number>(0); // 用於判斷速度變化
   // 上一個 GPS 位置（用於低速時計算方位角）
   const prevGpsForBearingRef = useRef<{ lat: number; lon: number } | null>(null);
   // 地圖旋轉動畫（平滑過渡）
@@ -612,6 +646,12 @@ export default function MapScreen() {
       intervalSupplyRepeatTimerRef.current = null;
     }
   }, []);
+
+  useEffect(() => () => {
+    clearSupplyRepeatTimer();
+    clearIntervalSupplyRepeatTimer();
+  }, [clearIntervalSupplyRepeatTimer, clearSupplyRepeatTimer]);
+
   const lastLocationRef = useRef<Location.LocationObject | null>(null);
   const lastBgSyncTsRef = useRef<number>(0); // 背景軌跡去重：記錄上次同步的最大時間戳
   const stateRef = useRef(state);
@@ -677,7 +717,7 @@ export default function MapScreen() {
     void acknowledgeBackgroundSupplyReminder("calorie");
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!pendingWaterRef.current) clearSupplyRepeatTimer();
-  }, [clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, supplyRecommendation]);
+  }, [calorieAnim, clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, supplyRecommendation]);
 
   const handleConfirmWaterSupply = useCallback(() => {
     setWaterAlert(false);
@@ -704,7 +744,7 @@ export default function MapScreen() {
     void acknowledgeBackgroundSupplyReminder("water");
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!pendingCalorieRef.current) clearSupplyRepeatTimer();
-  }, [clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, supplyRecommendation, supplyRecommendedMl]);
+  }, [clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, supplyRecommendation, supplyRecommendedMl, waterAnim]);
 
   const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind) => {
     const until = Date.now() + 5 * 60 * 1000;
@@ -747,7 +787,7 @@ export default function MapScreen() {
   }, [processSupplyNotificationAction]);
 
   const sortedActiveAlerts = useMemo(() => {
-    return activeSupplyAlerts.sort((a, b) => {
+    return [...activeSupplyAlerts].sort((a, b) => {
       const indexA = settings.supplyItems.findIndex(item => item.id === a);
       const indexB = settings.supplyItems.findIndex(item => item.id === b);
       return indexA - indexB;
@@ -765,8 +805,6 @@ export default function MapScreen() {
   const touchGuardHoldLabel = settings.touchGuardUnlockHoldMs >= 1000
     ? `${(settings.touchGuardUnlockHoldMs / 1000).toFixed(settings.touchGuardUnlockHoldMs % 1000 === 0 ? 0 : 1)} 秒`
     : `${settings.touchGuardUnlockHoldMs} 毫秒`;
-  const isAutoPauseMonitoring = isPaused && rideLocationTrackingMode === "idle_monitor";
-  const isAutoPausePending = isPaused && rideLocationTrackingMode === "full";
 
   useEffect(() => {
     touchGuardHintOpacity.stopAnimation();
@@ -893,6 +931,7 @@ export default function MapScreen() {
     HEADER_H + dashGridH + CTRL_H,
     PANEL_COLLAPSED_H
   );
+  routePaddingBottomRef.current = dynamicCollapsedH;
   const sportPickerOptions = useMemo(() => {
     const query = sportPickerQuery.trim().toLowerCase();
     return (Object.keys(SPORT_META) as SportType[]).filter((type) => {
@@ -1739,7 +1778,7 @@ export default function MapScreen() {
             addTrackPoint(recoverySession, trackPoint, recoverySession.trackPoints.at(-1));
             recoverySession.stats.caloriesBurned += calIncrement;
             recoverySession.stats.waterLoss += sweatResult.sweatLossMl;
-            void saveRideSessionSnapshot(recoverySession);
+            queueRecoverySnapshot(recoverySession);
           }
 
           const supplyPlan = createSupplyPlan({
@@ -1858,7 +1897,6 @@ export default function MapScreen() {
       const idx = findNearestPointIndex(lat, lon, pts);
       setNearestIdx(idx);
 
-      const distToNearest = haversine(lat, lon, pts[idx].lat, pts[idx].lon);
       const endPt = pts[pts.length - 1];
       const dEnd = haversine(lat, lon, endPt.lat, endPt.lon);
       setDistToEnd(dEnd);
@@ -1962,6 +2000,7 @@ export default function MapScreen() {
     setTouchGuardEnabled(settings.touchGuardEnabled);
     setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
     recoverySessionRef.current = createNewRideSession();
+    lastRecoverySnapshotAtRef.current = Date.now();
     void saveRideSessionSnapshot(recoverySessionRef.current);
 
     // 記錄騎乘開始座標（用於「回起點」功能）
@@ -2086,6 +2125,8 @@ export default function MapScreen() {
           setIntervalSupplyAlerts({});
           clearIntervalSupplyRepeatTimer();
 
+          // 結束騎乘前先保存節流中的最新恢復快照，再清除恢復資料。
+          await flushRecoverySnapshot();
           // 結束騎乘清除崩潰恢復快照
           await clearSnapshot();
           if (recoverySessionRef.current) {
@@ -2093,27 +2134,34 @@ export default function MapScreen() {
             recoverySessionRef.current = null;
           }
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新；個人設定與環境摘要只保存在裝置上。
-          const environmentSummary = environmentSummaryRef.current;
-          const sampleCount = environmentSummary.sampleCount;
+          try {
+            const environmentSummary = environmentSummaryRef.current;
+            const sampleCount = environmentSummary.sampleCount;
             const savedRecordId = await saveRecord(undefined, {
               riderWeightKg: settings.weight,
               bikeWeightKg: settings.bikeWeight ?? 10,
               ftpW: estimateFtpW,
-            autoRpeEnabled: settings.autoRpeEnabled,
-            environment: {
-              sampleCount,
-              averageTemperatureC: sampleCount ? environmentSummary.temperatureTotal / sampleCount : undefined,
-              averageHumidityPct: sampleCount ? environmentSummary.humidityTotal / sampleCount : undefined,
-              averageWindSpeedKmh: sampleCount ? environmentSummary.windSpeedTotal / sampleCount : undefined,
-              averageHeadwindMs: sampleCount ? environmentSummary.headwindTotal / sampleCount : undefined,
-              averagePrecipitationProb: sampleCount ? environmentSummary.precipitationTotal / sampleCount : undefined,
-              weatherCode: environmentSummary.latestWeatherCode,
-              source: environmentSummary.hadLiveWeather ? "live-weather" : "offline-fallback",
-            },
-          });
-          setSummaryRecordId(savedRecordId);
-          setShowSummary(true);
-          if (settings.vibrationEnabled) vibrateSuccess();
+              autoRpeEnabled: settings.autoRpeEnabled,
+              environment: {
+                sampleCount,
+                averageTemperatureC: sampleCount ? environmentSummary.temperatureTotal / sampleCount : undefined,
+                averageHumidityPct: sampleCount ? environmentSummary.humidityTotal / sampleCount : undefined,
+                averageWindSpeedKmh: sampleCount ? environmentSummary.windSpeedTotal / sampleCount : undefined,
+                averageHeadwindMs: sampleCount ? environmentSummary.headwindTotal / sampleCount : undefined,
+                averagePrecipitationProb: sampleCount ? environmentSummary.precipitationTotal / sampleCount : undefined,
+                weatherCode: environmentSummary.latestWeatherCode,
+                source: environmentSummary.hadLiveWeather ? "live-weather" : "offline-fallback",
+              },
+            });
+            setSummaryRecordId(savedRecordId);
+            setShowSummary(true);
+            if (settings.vibrationEnabled) vibrateSuccess();
+          } catch {
+            Alert.alert(
+              "本機儲存失敗",
+              "本次騎乘無法寫入裝置儲存空間。請確認可用空間後重新開啟 App，並避免在釋放空間前移除應用程式。",
+            );
+          }
           
           // 集成情感化 UX - 騎乘完成反饋
           try {
@@ -2124,7 +2172,7 @@ export default function MapScreen() {
         },
       },
     ]);
-  }, [dispatch, saveRecord, clearSnapshot, settings, state.records, clearSupplyRepeatTimer]);
+  }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, state.records]);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {
@@ -2339,7 +2387,6 @@ export default function MapScreen() {
   // 計算里程標記（每 1 公里一個）
   const kilometersMarkers = useMemo(() => {
     if (!gpxRoute || gpxRoute.points.length === 0) return [];
-    const { calculateKilometerMarkers } = require('@/lib/kilometer-markers');
     return calculateKilometerMarkers(gpxRoute);
   }, [gpxRoute]);
 

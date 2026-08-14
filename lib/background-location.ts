@@ -30,6 +30,38 @@ import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
 const BG_STATE_KEY = "@bike_bg_state";
+const BG_TRACK_FLUSH_INTERVAL_MS = 5_000;
+const BG_TRACK_MAX_POINTS = 10_000;
+
+type BackgroundTrackPoint = { lat: number; lon: number; ts: number };
+
+let backgroundTrackCache: BackgroundTrackPoint[] | null = null;
+let lastBackgroundTrackFlushAt = 0;
+
+/**
+ * 背景任務在同一 JS 執行個體內保留軌跡快取，避免每個位置批次都讀取並重寫完整 JSON。
+ * 每次背景任務仍會保存完整騎乘快照；軌跡則在五秒內合併寫入，重新啟動時會安全從本機資料重建。
+ */
+async function appendBackgroundTrackBatch(points: BackgroundTrackPoint[], force = false): Promise<void> {
+  if (!points.length) return;
+  if (!backgroundTrackCache) {
+    try {
+      const stored = await AsyncStorage.getItem(BG_TRACK_KEY);
+      backgroundTrackCache = stored ? (JSON.parse(stored) as BackgroundTrackPoint[]) : [];
+    } catch {
+      backgroundTrackCache = [];
+    }
+  }
+  backgroundTrackCache.push(...points);
+  if (backgroundTrackCache.length > BG_TRACK_MAX_POINTS) {
+    backgroundTrackCache.splice(0, backgroundTrackCache.length - BG_TRACK_MAX_POINTS);
+  }
+
+  const now = Date.now();
+  if (!force && now - lastBackgroundTrackFlushAt < BG_TRACK_FLUSH_INTERVAL_MS) return;
+  await AsyncStorage.setItem(BG_TRACK_KEY, JSON.stringify(backgroundTrackCache));
+  lastBackgroundTrackFlushAt = now;
+}
 
 export interface BackgroundState {
   totalDistanceM: number;
@@ -257,8 +289,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         );
         recoverySession.stats.caloriesBurned = state.calories;
         recoverySession.stats.waterLoss = state.sweatLossMl;
-        await saveRideSessionSnapshot(recoverySession);
       }
+
+      // 一個背景回呼可能包含多個位置點；只需保存該批次最新完整快照即可。
+      await saveRideSessionSnapshot(recoverySession);
 
       // 檢查補給提醒
       if (state.calories >= activeCalorieThreshold && !state.calorieReminderSent) {
@@ -351,21 +385,14 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       // 保存背景狀態
       await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
 
-      // 保存軌跡點（追加模式）
-      const trackStr = await AsyncStorage.getItem(BG_TRACK_KEY);
-      const trackPoints: Array<{ lat: number; lon: number; ts: number }> = trackStr ? JSON.parse(trackStr) : [];
-      for (const loc of locations) {
-        trackPoints.push({
+      // 以記憶體快取合併軌跡批次，避免每次背景回呼讀取和重寫全部歷史軌跡。
+      await appendBackgroundTrackBatch(locations.map((loc) => (
+        {
           lat: loc.coords.latitude,
           lon: loc.coords.longitude,
           ts: loc.timestamp,
-        });
-      }
-      // 限制最多保存 10000 點（約 14 小時，每 5 秒一點）
-      if (trackPoints.length > 10000) {
-        trackPoints.splice(0, trackPoints.length - 10000);
-      }
-      await AsyncStorage.setItem(BG_TRACK_KEY, JSON.stringify(trackPoints));
+        }
+      )));
     } catch (e) {
       console.warn("[BackgroundLocation] Processing error:", e);
     }

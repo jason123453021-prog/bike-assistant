@@ -28,7 +28,6 @@ import { setupNotifications } from "@/lib/feedback-service";
 // 必須在頂層引入以確保 TaskManager 任務被定義
 import "@/lib/background-location";
 import { RideTrackingNative } from "@/lib/ride-tracking-native";
-import { PermissionsManager } from "@/lib/permissions-manager";
 import { usePermissionMonitoring } from "@/lib/use-permission-monitoring";
 import { startSupplyNotificationActionListener } from "@/lib/supply-notification-actions";
 

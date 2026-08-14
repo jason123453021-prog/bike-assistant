@@ -44,6 +44,7 @@ interface ZoomableActivityPhotoProps {
 interface PhotoDimensions {
   width: number;
   height: number;
+  orientation?: PhotoOrientation;
 }
 
 /**
@@ -59,7 +60,6 @@ export function ZoomableActivityPhoto({ uri, resetKey, fillContainer = false }: 
   const savedTranslationX = useSharedValue(0);
   const savedTranslationY = useSharedValue(0);
   const focusAdjusting = useSharedValue(false);
-  const [orientation, setOrientation] = useState<PhotoOrientation>("landscape");
   const [photoSize, setPhotoSize] = useState<PhotoDimensions | null>(null);
   const [containerSize, setContainerSize] = useState<PhotoDimensions>({
     width: VIEWPORT_WIDTH,
@@ -75,14 +75,12 @@ export function ZoomableActivityPhoto({ uri, resetKey, fillContainer = false }: 
       uri,
       (width, height) => {
         if (active) {
-          setPhotoSize({ width, height });
-          setOrientation(resolvePhotoOrientation(width, height));
+          setPhotoSize({ width, height, orientation: resolvePhotoOrientation(width, height) });
         }
       },
       () => {
         if (active) {
           setPhotoSize(null);
-          setOrientation("landscape");
         }
       },
     );

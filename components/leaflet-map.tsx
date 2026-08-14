@@ -24,7 +24,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { StyleSheet, View, Platform } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 
 export interface LatLng {

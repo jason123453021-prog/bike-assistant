@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from "react";
 import {
-  Modal,
   View,
   Text,
   Pressable,
@@ -30,7 +29,7 @@ export interface SupplyModalProps {
   /** 按下「稍後」（關閉但不重置） */
   onDismiss: () => void;
   /** 自訂補給品提醒清單（優先級排序） */
-  customSupplyAlerts?: Array<{ id: string; name: string; onConfirm: () => void }>;
+  customSupplyAlerts?: { id: string; name: string; onConfirm: () => void }[];
 }
 
 export function SupplyModal({
@@ -60,7 +59,7 @@ export function SupplyModal({
       scaleAnim.setValue(0.85);
       opacityAnim.setValue(0);
     }
-  }, [visible]);
+  }, [opacityAnim, scaleAnim, visible]);
 
   const bothAlert = calorieAlert && waterAlert;
 
