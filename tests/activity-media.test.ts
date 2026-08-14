@@ -33,8 +33,9 @@ describe("activity media presentation", () => {
     expect(source).toContain("commitManualFocus");
     expect(source).toContain("完整照片");
     expect(source).toContain("裁切滿版");
-    expect(source).toContain("const [isFullPhotoMode, setIsFullPhotoMode] = useState(true)");
-    expect(source).toContain("setIsFullPhotoMode(true)");
+    expect(source).toContain("const [isFullPhotoMode, setIsFullPhotoMode] = useState(false)");
+    expect(source).toContain("setIsFullPhotoMode(false)");
+    expect(source).toContain("const usingCoverCrop = fillContainer && !isFullPhotoMode");
   });
 
   it("keeps full-screen route map gestures separate from photo gestures", () => {

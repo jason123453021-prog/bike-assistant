@@ -1580,6 +1580,11 @@
 - [x] 維持摘要依內容自然收合，後續活動資訊可直接向下捲動，不以固定高度製造空白
 - [x] 補強主頁與媒體摘要上緣對齊回歸測試，完成 TypeScript 0 errors、101 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
 
+## 全螢幕照片自動填滿留白（2026-08-14）
+- [x] 保持照片等比例，偵測到舞台留白時自動放大至填滿可用舞台
+- [x] 以中央焦點處理必要的溢出裁切，避免畫面變形與大面積黑色空白
+- [x] 補強自動填滿留白回歸測試，完成 TypeScript 0 errors、101 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑
