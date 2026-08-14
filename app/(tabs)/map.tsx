@@ -866,7 +866,7 @@ export default function MapScreen() {
   const dashRows = Math.ceil(dashFieldCount / 3) || 1;
   const dashGridH = dashRows * CELL_H;
   const dynamicCollapsedH = Math.min(
-    HEADER_H + dashGridH + CTRL_H + insets.bottom + 8,
+    HEADER_H + dashGridH + CTRL_H,
     PANEL_COLLAPSED_H
   );
   const sportPickerOptions = useMemo(() => {
@@ -2597,7 +2597,7 @@ export default function MapScreen() {
       {/* ── 底部面板（螢幕下方三分之一，可上滑展開） ── */}
       <Animated.View
         {...panResponder.panHandlers}
-        style={[styles.panel, { height: panelAnim, paddingBottom: insets.bottom + 8 }]}
+        style={[styles.panel, { height: panelAnim, paddingBottom: 0 }]}
       >
         {/* 拖拉把手 */}
         <View style={styles.handleArea}>

@@ -13,8 +13,9 @@ describe("sport picker presentation", () => {
     expect(mapSource).not.toContain("<View style={styles.sportSelector}>");
   });
 
-  it("includes bottom safe area in collapsed panel height and keeps a full-height start control", () => {
-    expect(mapSource).toContain("CTRL_H + insets.bottom + 8");
+  it("avoids duplicate bottom safe-area height and keeps a full-height start control", () => {
+    expect(mapSource).toContain("HEADER_H + dashGridH + CTRL_H");
+    expect(mapSource).toContain("paddingBottom: 0");
     expect(mapSource).toContain("height: 52");
     expect(mapSource).toContain("marginBottom: 8");
   });

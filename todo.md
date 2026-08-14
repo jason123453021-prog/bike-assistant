@@ -1616,6 +1616,11 @@
 - [x] 實作 Strava 風格底部運動選擇頁，提供搜尋與四種本機運動選項
 - [x] 補強版面與模式選擇回歸測試，完成 TypeScript 0 errors、116 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
 
+## 收合儀表板底部對齊（2026-08-14）
+- [x] 移除開始按鈕下方因面板高度與安全區重複計算產生的多餘空白
+- [x] 將收合儀表板與開始控制貼齊底部導覽列上緣，並在不同螢幕尺寸保留完整可點擊面積
+- [x] 補強底部對齊回歸測試，完成 TypeScript 0 errors、116 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑
