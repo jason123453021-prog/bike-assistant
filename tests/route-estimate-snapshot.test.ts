@@ -14,7 +14,7 @@ const route: GpxRoute = {
 };
 
 describe("route estimate snapshot", () => {
-  it("uses one FTP and environment snapshot for time, calories, water and planning points", () => {
+  it("uses one FTP and environment snapshot for time, calories and water", () => {
     const snapshot = buildRouteEstimateSnapshot({
       route, ftpW: 210, riderWeightKg: 70, bikeWeightKg: 10, heightCm: 175, ageYears: 35,
       temperatureC: 31, humidityPct: 75, windSpeedKmh: 15, windDirection: 90,
@@ -22,7 +22,7 @@ describe("route estimate snapshot", () => {
     expect(snapshot.time.targetPowerW).toBeGreaterThan(0);
     expect(snapshot.estimatedCaloriesKcal).toBeGreaterThan(0);
     expect(snapshot.estimatedWaterLossMl).toBeGreaterThan(0);
-    expect(snapshot.planningPoints.length).toBeGreaterThan(0);
-    expect(snapshot.planningPoints[0].distanceM).toBeGreaterThan(0);
+    expect(snapshot.suggestedWaterMl).toBeGreaterThan(0);
+    expect(snapshot.suggestedEnergyKcal).toBeGreaterThan(0);
   });
 });

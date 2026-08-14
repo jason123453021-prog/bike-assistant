@@ -1454,3 +1454,12 @@
 - [x] 移除無導航入口、已淘汰或與離線定位方向衝突的頁面與功能
 - [x] 清理無效設定、重複欄位、死碼與對應遺留資料模型
 - [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；88 passed、1 skipped；Android Hermes bundle 5.56 MB；NitroModules／MapLibre／社群／OAuth／BLE 掃描 0）
+
+## 指定設定與路線項目復核（2026-08-14）
+- [x] 復核並移除「匯入／手動同步騎乘紀錄」欄位及遺留入口
+- [x] 復核汗率校正問號圖示與本機訓練目標欄位皆已移除
+- [x] 復核活動詳情開啟不再觸發錯誤（新增 JSX 裸文字節點安全測試）
+- [x] 驗證效能模式已移除且背景 GPS 精度仍會實際改變定位任務
+- [x] 復核本週訓練負荷 TSS 說明入口不使用問號圖示
+- [x] 復核路線頁的建議補給／休息規劃點與最愛路線欄位均已移除
+- [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；89 passed、1 skipped；Android Hermes bundle 5.56 MB）
