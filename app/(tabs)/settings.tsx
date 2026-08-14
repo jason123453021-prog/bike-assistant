@@ -411,32 +411,17 @@ export default function SettingsScreen() {
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
             <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
               {settings.supplyCalculationMode === "smart"
-                ? "已依 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨調整提醒；無環境資料時會使用下方基準值回退。"
-                : "使用下方自訂固定門檻。開啟智慧計算後，系統會保留它們作為離線或資料不足時的安全回退。"}
+                ? "智慧門檻完全由 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨決定；不會使用下方自訂值。離線時仍以本機個人與騎乘資料安全計算。"
+                : "使用下方自訂固定門檻；這些數值只會在手動模式生效。"}
             </Text>
           </View>
           <Divider colors={colors} />
-          <NumberRow
-            icon="flame.fill"
-            label={settings.supplyCalculationMode === "smart" ? "能量門檻基準" : "卡路里提醒閾值"}
-            value={settings.calorieThreshold}
-            unit="kcal"
-            colors={colors}
-            iconColor={colors.warning}
-            hint={settings.supplyCalculationMode === "smart" ? "智慧模式會依條件提前提醒；無資料時使用此值" : undefined}
-            onPress={() => openEdit("calorieThreshold", "卡路里提醒閾值", settings.calorieThreshold, "kcal")}
-          />
-          <Divider colors={colors} />
-          <NumberRow
-            icon="drop.fill"
-            label="汗液流失提醒閾值"
-            value={settings.waterThreshold}
-            unit="ml"
-            colors={colors}
-            iconColor="#4FC3F7"
-            hint={settings.supplyCalculationMode === "smart" ? "智慧模式會依汗率與環境熱負荷提前提醒；無資料時使用此值" : "每流失此量汗液即提醒補水"}
-            onPress={() => openEdit("waterThreshold", "汗液流失提醒閾值 (ml)", settings.waterThreshold, "ml")}
-          />
+          <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+            <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "700" }}>不需要設定能量或補水門檻</Text>
+            <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 4 }}>
+              系統會依 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨，自動在導航儀表板更新能量與水分計畫。
+            </Text>
+          </View>
           <Divider colors={colors} />
           <ToggleRow
             icon="bell.badge.fill"

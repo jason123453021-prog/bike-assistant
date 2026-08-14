@@ -43,6 +43,31 @@ describe("smart supply plan", () => {
     expect(heatStress.waterRecommendationMl).toBeLessThanOrEqual(500);
   });
 
+  it("keeps smart triggers independent from any manual custom thresholds", () => {
+    const normalManualValues = createSupplyPlan({ ...baseInput, mode: "smart" });
+    const invalidManualValues = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      calorieThresholdKcal: 30_000,
+      waterThresholdMl: 300_000,
+    });
+
+    expect(invalidManualValues.calorieTriggerKcal).toBe(normalManualValues.calorieTriggerKcal);
+    expect(invalidManualValues.waterTriggerMl).toBe(normalManualValues.waterTriggerMl);
+    expect(invalidManualValues.energyRecommendationKcal).toBe(normalManualValues.energyRecommendationKcal);
+    expect(invalidManualValues.waterRecommendationMl).toBe(normalManualValues.waterRecommendationMl);
+  });
+
+  it("scales automatic carbohydrate guidance by duration and intensity without user-entered targets", () => {
+    const shortEasy = createSupplyPlan({ ...baseInput, mode: "smart", elapsedSec: 30 * 60, intensityFactor: 0.5 });
+    const longHard = createSupplyPlan({ ...baseInput, mode: "smart", elapsedSec: 4 * 60 * 60, intensityFactor: 1.05, environmentLoad: 0.8 });
+
+    expect(shortEasy.carbohydrateRecommendationG).toBe(0);
+    expect(longHard.carbohydrateRecommendationG).toBeGreaterThanOrEqual(80);
+    expect(longHard.carbohydrateRecommendationG).toBeLessThanOrEqual(90);
+    expect(longHard.reason).toContain("全自動智慧計畫");
+  });
+
   it("uses an explainable offline fallback when environment data is unavailable", () => {
     const plan = createSupplyPlan({ ...baseInput, mode: "smart", weatherAvailable: false });
 

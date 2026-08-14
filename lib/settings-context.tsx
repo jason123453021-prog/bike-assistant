@@ -103,10 +103,11 @@ export interface AppSettings {
   // 心率區間校準
   maxHeartRate?: number;      // 最大心率（自動偵測或手動設定）
   restingHeartRate?: number;  // 靜息心率（自動估算或手動設定）
-  // Thresholds
-  calorieThreshold: number;   // kcal before reminder
-  waterThreshold: number;     // ml before reminder
-  /** smart：依個人、騎乘與環境資料調整提醒；custom：完全沿用使用者自訂門檻 */
+  /** 內部安全預設，僅供非智慧相容流程使用；不對使用者開放輸入。 */
+  calorieThreshold: number;
+  /** 內部安全預設，僅供非智慧相容流程使用；不對使用者開放輸入。 */
+  waterThreshold: number;
+  /** smart：依個人、騎乘與環境資料全自動調整提醒；custom：採用保守本機預設。 */
   supplyCalculationMode: SupplyCalculationMode;
   /** 騎後由使用者明確確認才更新的本機汗率倍率，限制為保守範圍。 */
   sweatRateCalibrationMultiplier: number;
@@ -195,8 +196,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   restingHeartRate: 60,
   calorieThreshold: 300,
   waterThreshold: 500,
-  // 升級後預設維持既有使用者固定門檻，讓使用者自行選擇啟用智慧計算。
-  supplyCalculationMode: "custom",
+  // 新安裝預設使用全自動智慧計畫；舊自訂值只保留供相容性遷移，永不影響智慧模式。
+  supplyCalculationMode: "smart",
   sweatRateCalibrationMultiplier: 1,
   sweatRateCalibrationCount: 0,
   supplyReminderRepeatSec: 60,
@@ -260,6 +261,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           autoCalibrationEnabled: _autoCalibrationEnabled,
           darkMode: _darkMode,
           weatherApiKey: _weatherApiKey,
+          calorieThreshold: _legacyCalorieThreshold,
+          waterThreshold: _legacyWaterThreshold,
           ...savedWithoutRemovedSettings
         } = saved;
         const {
