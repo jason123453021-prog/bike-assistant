@@ -1475,3 +1475,9 @@
 - [x] 將本機照片依拍攝時間對應至騎乘軌跡並顯示位置標記
 - [x] 以本機歷史騎乘資料建立真實的個人最佳分段比較
 - [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；92 passed、1 skipped；Android Hermes bundle 5.58 MB；NitroModules／MapLibre 掃描 0）
+
+## 單一路線主視覺與媒體水平瀏覽（2026-08-14）
+- [x] 首屏預設只顯示完整騎乘路線，不與照片卡重複堆疊
+- [x] 建立明確的照片入口並在全螢幕中呈現路線與照片項目
+- [x] 支援左右滑動切換路線與照片，照片可連續左右輪換
+- [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；93 passed、1 skipped；Android Hermes bundle 5.57 MB；NitroModules／MapLibre 掃描 0）

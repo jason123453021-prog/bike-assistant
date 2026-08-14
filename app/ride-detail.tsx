@@ -235,11 +235,12 @@ export default function RideDetailScreen() {
   const [calibrationVisible, setCalibrationVisible] = useState(false);
   const [confirmedFluidInput, setConfirmedFluidInput] = useState("");
   const [photoTimeline, setPhotoTimeline] = useState<RidePhotoTimelineEntry[]>([]);
-  const [selectedMediaIndex, setSelectedMediaIndex] = useState<number | null>(null);
+  const [isActivityViewerVisible, setIsActivityViewerVisible] = useState(false);
+  const [activityViewerIndex, setActivityViewerIndex] = useState(0);
+  const activityViewerRef = useRef<ScrollView>(null);
   const [replayIndex, setReplayIndex] = useState(0);
   const [isReplayPlaying, setIsReplayPlaying] = useState(false);
   const [replaySpeed, setReplaySpeed] = useState<1 | 2 | 4>(1);
-  const [isMapDetailVisible, setIsMapDetailVisible] = useState(false);
 
   const rideSplits = useMemo(() => record ? buildRideSplits(record) : [], [record]);
 
@@ -317,14 +318,28 @@ export default function RideDetailScreen() {
     label: marker.label,
     source: marker.source,
   })), [photoTimeline, record?.route]);
+  const activityPhotos = useMemo(() => {
+    const timelinePhotos = photoTimeline.map((photo) => ({ id: photo.id, uri: photo.uri }));
+    const knownUris = new Set(timelinePhotos.map((photo) => photo.uri));
+    const storedPhotos = (record?.mediaItems ?? [])
+      .filter((uri) => !isVideoMedia(uri) && !knownUris.has(uri))
+      .map((uri, index) => ({ id: `stored-media-${index}-${uri}`, uri }));
+    return [...timelinePhotos, ...storedPhotos];
+  }, [photoTimeline, record?.mediaItems]);
   const localSplitPersonalBests = useMemo(
     () => record ? compareLocalSplitPersonalBests(record, state.records) : [],
     [record, state.records],
   );
+  const openActivityViewer = useCallback((index: number) => {
+    const safeIndex = Math.max(0, Math.min(index, activityPhotos.length));
+    setActivityViewerIndex(safeIndex);
+    setIsActivityViewerVisible(true);
+    setTimeout(() => activityViewerRef.current?.scrollTo({ x: safeIndex * SCREEN_W, animated: false }), 80);
+  }, [activityPhotos.length]);
   const openPhotoFromMarker = useCallback((photoId: string) => {
-    const index = photoTimeline.findIndex((photo) => photo.id === photoId);
-    if (index >= 0) setSelectedMediaIndex(index);
-  }, [photoTimeline]);
+    const index = activityPhotos.findIndex((photo) => photo.id === photoId);
+    if (index >= 0) openActivityViewer(index + 1);
+  }, [activityPhotos, openActivityViewer]);
 
   const [mapReady, setMapReady] = useState(false);
 
@@ -798,44 +813,20 @@ export default function RideDetailScreen() {
       )}
 
       {polylineCoords.length > 1 && (
-        <Pressable style={({ pressed }) => [styles.routeMapFocusButton, { opacity: pressed ? 0.74 : 1 }]} onPress={() => setIsMapDetailVisible(true)}>
+        <Pressable style={({ pressed }) => [styles.routeMapFocusButton, { opacity: pressed ? 0.74 : 1 }]} onPress={() => openActivityViewer(0)}>
           <IconSymbol name="arrow.up.left.and.arrow.down.right" size={14} color="#fff" />
           <Text style={styles.routeMapFocusText}>檢視路線</Text>
         </Pressable>
       )}
 
-      </View>
+      {photoTimeline.length > 0 && (
+        <Pressable style={({ pressed }) => [styles.routeMapPhotoButton, { opacity: pressed ? 0.74 : 1 }]} onPress={() => openActivityViewer(1)}>
+          <IconSymbol name="photo.fill" size={14} color="#fff" />
+          <Text style={styles.routeMapFocusText}>照片 {photoTimeline.length}</Text>
+        </Pressable>
+      )}
 
-      {/* ── 活動主視覺媒體：由使用者選取的首張相片／影片 ── */}
-      <Pressable
-        style={({ pressed }) => [styles.activityMediaHero, { opacity: pressed ? 0.9 : 1 }]}
-        onPress={() => {
-          setEditNameInput(record.name);
-          setEditDescInput(record.description ?? "");
-          setLocalMedia(record.mediaItems ?? []);
-          setIsEditModalVisible(true);
-        }}
-      >
-        {record.mediaItems?.[0] && !isVideoMedia(record.mediaItems[0]) ? (
-          <Image source={{ uri: record.mediaItems[0] }} style={styles.activityMediaHeroImage} />
-        ) : record.mediaItems?.[0] ? (
-          <View style={styles.activityMediaEmptyHero}>
-            <Text style={styles.activityMediaEmptyGlyph}>▶</Text>
-            <Text style={styles.activityMediaEmptyTitle}>活動影片</Text>
-            <Text style={styles.activityMediaEmptyCopy}>點擊編輯活動，管理此影片</Text>
-          </View>
-        ) : <RideRouteArtwork coordinates={polylineCoords} />}
-        <View style={styles.activityMediaScrim} />
-        <View style={styles.activityMediaCaption}>
-          <View>
-            <Text style={styles.activityMediaCaptionTitle}>{record.mediaItems?.length ? `活動媒體 ${record.mediaItems.length} 項` : "GPS 活動路線"}</Text>
-            <Text style={styles.activityMediaCaptionCopy}>{record.description || (record.mediaItems?.length ? "點擊編輯活動，管理本機媒體" : "尚未加入照片；顯示本機騎乘軌跡")}</Text>
-          </View>
-          <View style={styles.activityMediaEditChip}>
-            <Text style={styles.activityMediaEditChipText}>{record.mediaItems?.length ? "編輯" : "加入媒體"}</Text>
-          </View>
-        </View>
-      </Pressable>
+      </View>
 
       {/* ── 本機活動摘要：向上滑動頁面可查看完整數據 ── */}
       <View style={styles.activityBody}>
@@ -946,7 +937,7 @@ export default function RideDetailScreen() {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topMediaRail}>
               {photoTimeline.map((photo, index) => (
-                <Pressable key={photo.id} style={({ pressed }) => [styles.topMediaThumbWrap, { opacity: pressed ? 0.76 : 1 }]} onPress={() => setSelectedMediaIndex(index)}>
+                <Pressable key={photo.id} style={({ pressed }) => [styles.topMediaThumbWrap, { opacity: pressed ? 0.76 : 1 }]} onPress={() => openActivityViewer(index + 1)}>
                   <Image source={{ uri: photo.uri }} style={styles.topMediaThumb} />
                   {photoRouteMarkers.some((marker) => marker.id === photo.id) ? <View style={styles.topMediaPrimaryBadge}><Text style={styles.topMediaPrimaryText}>已定位</Text></View> : null}
                 </Pressable>
@@ -1401,61 +1392,48 @@ export default function RideDetailScreen() {
         onClose={() => setShareCardVisible(false)}
       />
 
-      <Modal visible={isMapDetailVisible} animationType="slide" onRequestClose={() => setIsMapDetailVisible(false)}>
-        <View style={styles.mapDetailScreen}>
-          <LeafletMapView
-            style={styles.mapDetailMap}
-            initialRegion={{
-              latitude: polylineCoords[0]?.latitude ?? 25.0478,
-              longitude: polylineCoords[0]?.longitude ?? 121.5319,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-            gpxPolyline={polylineCoords}
-            photoMarkers={photoRouteMarkers}
-            onPhotoMarkerPress={(photoId) => {
-              setIsMapDetailVisible(false);
-              openPhotoFromMarker(photoId);
-            }}
-          />
-          <Pressable style={styles.mapDetailClose} onPress={() => setIsMapDetailVisible(false)}>
-            <IconSymbol name="xmark" size={20} color="#fff" />
-          </Pressable>
-          <View style={styles.mapDetailStatsCard}>
-            <Text style={styles.mapDetailTitle}>{record.name}</Text>
-            <View style={styles.mapDetailMetrics}>
-              <View><Text style={styles.mapDetailValue}>{(record.distance / 1000).toFixed(2)} km</Text><Text style={styles.mapDetailLabel}>距離</Text></View>
-              <View><Text style={styles.mapDetailValue}>{Math.round(record.totalAscent)} m</Text><Text style={styles.mapDetailLabel}>總爬升</Text></View>
-              <View><Text style={styles.mapDetailValue}>{formatDuration(movingDuration)}</Text><Text style={styles.mapDetailLabel}>移動時間</Text></View>
-              <View><Text style={styles.mapDetailValue}>{averageMovingSpeed.toFixed(1)} km/h</Text><Text style={styles.mapDetailLabel}>平均速度</Text></View>
-            </View>
-            <Pressable style={styles.mapDetailReplayButton} onPress={() => { setIsMapDetailVisible(false); setIsReplayPlaying(true); }}>
-              <IconSymbol name="play.fill" size={14} color="#07120E" />
-              <Text style={styles.mapDetailReplayText}>開始軌跡回放</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={selectedMediaIndex !== null} animationType="fade" onRequestClose={() => setSelectedMediaIndex(null)}>
+      <Modal visible={isActivityViewerVisible} animationType="fade" onRequestClose={() => setIsActivityViewerVisible(false)}>
         <View style={styles.mediaViewer}>
-          <Pressable style={styles.mediaViewerClose} onPress={() => setSelectedMediaIndex(null)}>
-            <IconSymbol name="xmark" size={20} color="#fff" />
-          </Pressable>
           <ScrollView
+            ref={activityViewerRef}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            contentOffset={{ x: Math.max(0, selectedMediaIndex ?? 0) * SCREEN_W, y: 0 }}
-            onMomentumScrollEnd={(event) => setSelectedMediaIndex(Math.round(event.nativeEvent.contentOffset.x / SCREEN_W))}
+            onMomentumScrollEnd={(event) => setActivityViewerIndex(Math.round(event.nativeEvent.contentOffset.x / SCREEN_W))}
           >
-            {photoTimeline.map((photo) => (
+            <View style={[styles.mediaViewerPage, styles.activityViewerRoutePage]}>
+              <LeafletMapView
+                style={styles.activityViewerRouteMap}
+                initialRegion={{
+                  latitude: polylineCoords[0]?.latitude ?? 25.0478,
+                  longitude: polylineCoords[0]?.longitude ?? 121.5319,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }}
+                gpxPolyline={polylineCoords}
+                photoMarkers={photoRouteMarkers}
+                onPhotoMarkerPress={openPhotoFromMarker}
+              />
+              <View style={styles.activityViewerRouteInfo}>
+                <Text style={styles.activityViewerRouteTitle}>{record.name}</Text>
+                <Text style={styles.activityViewerRouteCopy}>完整騎乘路線 · 向左滑動查看 {activityPhotos.length} 張照片</Text>
+              </View>
+            </View>
+            {activityPhotos.map((photo, index) => (
               <View key={photo.id} style={styles.mediaViewerPage}>
                 <Image source={{ uri: photo.uri }} style={styles.mediaViewerImage} resizeMode="contain" />
+                <View style={styles.activityViewerPhotoInfo}>
+                  <Text style={styles.activityViewerPhotoText}>照片 {index + 1} · 向左或向右滑動切換</Text>
+                </View>
               </View>
             ))}
           </ScrollView>
-          <Text style={styles.mediaViewerCounter}>{(selectedMediaIndex ?? 0) + 1} / {photoTimeline.length}</Text>
+          <Pressable style={styles.mediaViewerClose} onPress={() => setIsActivityViewerVisible(false)}>
+            <IconSymbol name="xmark" size={20} color="#fff" />
+          </Pressable>
+          <View style={styles.activityViewerCounterPill}>
+            <Text style={styles.mediaViewerCounter}>{activityViewerIndex === 0 ? "路線軌跡" : `照片 ${activityViewerIndex} / ${activityPhotos.length}`}</Text>
+          </View>
         </View>
       </Modal>
 
@@ -1807,17 +1785,8 @@ const styles = StyleSheet.create({
   mapPlaybackDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#FF8A4C" },
   mapPlaybackText: { color: "rgba(255,255,255,0.84)", fontSize: 10, fontWeight: "700" },
   routeMapFocusButton: { position: "absolute", left: 14, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.68)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.2)" },
+  routeMapPhotoButton: { position: "absolute", left: 126, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.68)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.2)" },
   routeMapFocusText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  mapDetailScreen: { flex: 1, backgroundColor: "#08110D" },
-  mapDetailMap: { flex: 1 },
-  mapDetailClose: { position: "absolute", top: 58, left: 18, width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.64)" },
-  mapDetailStatsCard: { position: "absolute", left: 14, right: 14, bottom: 20, borderRadius: 18, padding: 16, backgroundColor: "rgba(8,17,13,0.96)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.14)" },
-  mapDetailTitle: { color: "#fff", fontSize: 17, fontWeight: "800" },
-  mapDetailMetrics: { flexDirection: "row", flexWrap: "wrap", rowGap: 12, marginTop: 14 },
-  mapDetailValue: { color: "#fff", fontSize: 13, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  mapDetailLabel: { color: "rgba(255,255,255,0.46)", fontSize: 10, marginTop: 2 },
-  mapDetailReplayButton: { marginTop: 16, backgroundColor: "#FF8A4C", borderRadius: 11, paddingVertical: 11, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 7 },
-  mapDetailReplayText: { color: "#07120E", fontSize: 13, fontWeight: "900" },
 
   // 底部面板
   panel: {
@@ -1874,27 +1843,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 8,
   },
-  activityMediaHero: {
-    height: 196,
-    marginHorizontal: 16,
-    marginTop: 14,
-    borderRadius: 18,
-    overflow: "hidden",
-    backgroundColor: "#17221D",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  activityMediaHeroImage: { width: "100%", height: "100%", resizeMode: "cover" },
-  activityMediaEmptyHero: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 26, backgroundColor: "#15251E" },
-  activityMediaEmptyGlyph: { color: "#60E78E", fontSize: 30, fontWeight: "300", lineHeight: 34, marginBottom: 7 },
-  activityMediaEmptyTitle: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
-  activityMediaEmptyCopy: { color: "rgba(255,255,255,0.62)", fontSize: 12, textAlign: "center", lineHeight: 17, marginTop: 5 },
-  activityMediaScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.16)" },
-  activityMediaCaption: { position: "absolute", left: 14, right: 14, bottom: 13, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 12 },
-  activityMediaCaptionTitle: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
-  activityMediaCaptionCopy: { color: "rgba(255,255,255,0.82)", fontSize: 11, marginTop: 3, maxWidth: SCREEN_W - 150 },
-  activityMediaEditChip: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.52)", borderWidth: 1, borderColor: "rgba(255,255,255,0.34)" },
-  activityMediaEditChipText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   segmentCard: {
     padding: 12,
     borderRadius: 10,
@@ -2084,7 +2032,15 @@ const styles = StyleSheet.create({
   mediaViewerClose: { position: "absolute", top: 56, left: 18, zIndex: 2, width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.58)" },
   mediaViewerPage: { width: SCREEN_W, flex: 1, justifyContent: "center", alignItems: "center" },
   mediaViewerImage: { width: SCREEN_W, height: "82%" },
-  mediaViewerCounter: { position: "absolute", bottom: 42, alignSelf: "center", color: "rgba(255,255,255,0.78)", fontSize: 12, fontWeight: "800" },
+  activityViewerRoutePage: { backgroundColor: "#08110D" },
+  activityViewerRouteMap: { width: SCREEN_W, flex: 1 },
+  activityViewerRouteInfo: { position: "absolute", left: 18, right: 18, bottom: 82, padding: 14, borderRadius: 16, backgroundColor: "rgba(7,18,14,0.9)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.16)" },
+  activityViewerRouteTitle: { color: "#fff", fontSize: 17, fontWeight: "800" },
+  activityViewerRouteCopy: { color: "rgba(255,255,255,0.68)", fontSize: 12, marginTop: 4 },
+  activityViewerPhotoInfo: { position: "absolute", left: 18, right: 18, bottom: 84, alignItems: "center" },
+  activityViewerPhotoText: { color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: "700", backgroundColor: "rgba(0,0,0,0.58)", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, overflow: "hidden" },
+  activityViewerCounterPill: { position: "absolute", bottom: 34, alignSelf: "center", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 15, backgroundColor: "rgba(0,0,0,0.62)" },
+  mediaViewerCounter: { color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: "800" },
   splitHeader: {
     flexDirection: "row",
     borderBottomWidth: 1,

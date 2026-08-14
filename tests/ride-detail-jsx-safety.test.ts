@@ -28,4 +28,16 @@ describe("ride detail JSX safety", () => {
     expect(rawTextNodes).toEqual([]);
     expect(source).not.toContain("90m/*");
   });
+
+  it("uses one route hero with a unified route-and-photo horizontal viewer", () => {
+    const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
+    const source = fs.readFileSync(filePath, "utf8");
+
+    expect(source).toContain("isActivityViewerVisible");
+    expect(source).toContain("activityViewerRoutePage");
+    expect(source).toContain("pagingEnabled");
+    expect(source).toContain("openActivityViewer(0)");
+    expect(source).not.toContain("activityMediaHero");
+    expect(source).not.toContain("isMapDetailVisible");
+  });
 });
