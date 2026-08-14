@@ -44,6 +44,7 @@ const MAPPING = {
   "checkmark.circle.fill":               "check-circle",
   "xmark.circle.fill":                   "cancel",
   "plus.circle.fill":                    "add-circle",
+  "plus":                                "add",
   "minus.circle.fill":                   "remove-circle",
   "info.circle.fill":                    "info",
   "exclamationmark.triangle.fill":       "warning",
@@ -104,6 +105,7 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
-  const mappedName = MAPPING[name as string] ?? "help-outline";
+  // 動態圖示若缺少映射，使用中性的更多選項，而非 Android 會被理解為不明狀態的問號圖示。
+  const mappedName = MAPPING[name as string] ?? "more-horiz";
   return <MaterialIcons color={color} size={size} name={mappedName} style={style} />;
 }

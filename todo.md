@@ -1664,6 +1664,11 @@
 - [x] 從設定頁移除能量門檻基準與汗液流失提醒閾值，清理相關手動設定遷移與資料流
 - [x] 新增全自動補給與設定頁移除回歸測試，完成 TypeScript 0 errors、130 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
 
+## 全系統問號圖示清理（2026-08-14）
+- [x] 掃描導航、設定、路線、歷史與活動詳情頁內的問號字元、問號圖示與不明圖示回退
+- [x] 依功能語意替換所有問號圖示，並確保 Material／SF 圖示映射完整
+- [x] 新增全系統問號圖示回歸檢查，完成 TypeScript 0 errors、132 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑
