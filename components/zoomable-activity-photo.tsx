@@ -177,7 +177,7 @@ export function ZoomableActivityPhoto({ uri, resetKey, fillContainer = false }: 
     ],
   }));
 
-  const defaultFocusY = orientation === "portrait" ? 0.28 : orientation === "square" ? 0.42 : 0.5;
+  const defaultFocusY = 0.5;
   const usingCoverCrop = fillContainer && !isFullPhotoMode;
 
   const commitManualFocus = (dragY: number) => {

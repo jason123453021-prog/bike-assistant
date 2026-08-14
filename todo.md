@@ -1554,3 +1554,13 @@
 - [x] 重新配置全螢幕上方媒體舞台，減少無內容黑色區域並優先顯示照片主體
 - [x] 支援長按照片手動調整裁切焦點，並提供可切換的無裁切完整照片檢視模式
 - [x] 補強起始頁精簡、焦點調整與完整照片模式測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）
+
+## 起始頁標題日期與中央滿版照片（2026-08-14）
+- [x] 起始頁保留活動標題、日期與六項核心數據；活動類型、RPE、回放與分析等其餘資訊移至捲動後
+- [x] 修正全螢幕照片舞台的上方黑色空白，以照片中央為焦點自動裁切填滿可用舞台
+- [x] 補強起始摘要與中央滿版照片回歸測試，完成 TypeScript 0 errors、101 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
+
+## Expo Go 啟動失敗修正（2026-08-14）
+- [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
+- [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑
+- [ ] 完成 Expo Go 啟動、TypeScript、完整測試與 Android bundle 回歸驗證

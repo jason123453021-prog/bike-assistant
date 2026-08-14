@@ -28,8 +28,7 @@ describe("activity media presentation", () => {
     expect(source).toContain('resizeMode={usingCoverCrop ? "cover" : "contain"}');
     expect(source).toContain("Image.getSize(");
     expect(source).toContain("resolvePhotoOrientation");
-    expect(source).toContain('orientation === "portrait" ? 0.28');
-    expect(source).toContain('orientation === "square" ? 0.42 : 0.5');
+    expect(source).toContain("const defaultFocusY = 0.5");
     expect(source).toContain("Gesture.LongPress()");
     expect(source).toContain("commitManualFocus");
     expect(source).toContain("完整照片");
@@ -57,7 +56,24 @@ describe("activity media presentation", () => {
     expect(source).not.toContain("騎乘瞬間");
     expect(source).toContain("activityViewerPhotoPagerContent");
     expect(source).toContain('activityViewerPhotoPagerContent: { height: "100%" }');
+    expect(source).toContain('mediaViewerPage: { width: SCREEN_W, height: SCREEN_H, justifyContent: "flex-start"');
     expect(source).toContain("fillContainer");
+  });
+
+  it("keeps the activity title and date above the initial six-metric summary", () => {
+    const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
+    const source = fs.readFileSync(filePath, "utf8");
+    const initialSummaryIndex = source.indexOf('<View style={styles.activityInitialSummary}>');
+    const initialHeadingIndex = source.indexOf('<View style={styles.activityInitialHeading}>');
+    const summaryGridIndex = source.indexOf("<CoreActivitySummaryGrid", initialHeadingIndex);
+
+    expect(initialSummaryIndex).toBeGreaterThanOrEqual(0);
+    expect(initialHeadingIndex).toBeGreaterThan(initialSummaryIndex);
+    expect(summaryGridIndex).toBeGreaterThan(initialHeadingIndex);
+    expect(source).toContain("<Text style={styles.activityTitle}>{record.name}</Text>");
+    expect(source).toContain("<Text style={styles.activityDate}>{dateStr}</Text>");
+    expect(source).toContain("activityInitialHeading: { paddingBottom: 20 }");
+    expect(source).toContain("<Text style={styles.activityEyebrow}>活動詳情</Text>");
   });
 
   it("keeps a fixed summary available for routes and every photo", () => {

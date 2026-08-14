@@ -953,6 +953,10 @@ export default function RideDetailScreen() {
       {/* ── 本機活動摘要：向上滑動頁面可查看完整數據 ── */}
       <View style={styles.activityBody}>
         <View style={styles.activityInitialSummary}>
+          <View style={styles.activityInitialHeading}>
+            <Text style={styles.activityTitle}>{record.name}</Text>
+            <Text style={styles.activityDate}>{dateStr}</Text>
+          </View>
           <CoreActivitySummaryGrid
             distanceKm={record.distance / 1000}
             ascentM={record.totalAscent}
@@ -964,9 +968,7 @@ export default function RideDetailScreen() {
         </View>
 
         <View style={styles.activityDetailsAfterInitial}>
-          <Text style={styles.activityEyebrow}>活動摘要</Text>
-          <Text style={styles.activityTitle}>{record.name}</Text>
-          <Text style={styles.activityDate}>{dateStr}</Text>
+          <Text style={styles.activityEyebrow}>活動詳情</Text>
           <View style={styles.activityMetaRow}>
             <View style={styles.activityMetaChip}>
               <Text style={styles.activityMetaChipText}>{activityTypeLabel(record.activityType)}</Text>
@@ -1810,6 +1812,7 @@ const styles = StyleSheet.create({
   activityMetaRpeText: { color: "#FCD34D", fontSize: 11, fontWeight: "800" },
   activityEquipment: { color: "rgba(255,255,255,0.55)", fontSize: 11, flexShrink: 1 },
   activityInitialSummary: { paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM },
+  activityInitialHeading: { paddingBottom: 20 },
   activityDetailsAfterInitial: { paddingTop: 18 },
   summaryGrid: {
     flexDirection: "row",
@@ -2214,7 +2217,7 @@ const styles = StyleSheet.create({
   mediaViewer: { flex: 1, backgroundColor: "#050505", justifyContent: "center" },
   mediaViewerClose: { position: "absolute", top: 56, left: 18, zIndex: 2, width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.58)" },
   activityViewerStage: { width: "100%", overflow: "hidden", backgroundColor: "#050505" },
-  mediaViewerPage: { width: SCREEN_W, height: "100%", justifyContent: "center", alignItems: "center" },
+  mediaViewerPage: { width: SCREEN_W, height: SCREEN_H, justifyContent: "flex-start", alignItems: "center" },
   activityViewerPhotoPager: { width: SCREEN_W, height: "100%" },
   activityViewerPhotoPagerContent: { height: "100%" },
   mediaViewerImage: { width: SCREEN_W, height: "82%" },
