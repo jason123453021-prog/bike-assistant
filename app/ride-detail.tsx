@@ -68,7 +68,6 @@ const ACTIVITY_SUMMARY_CONTENT_TOP = 22;
 const ACTIVITY_SUMMARY_CONTENT_BOTTOM = 20;
 const ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.46), 360);
 const ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.78), 620);
-const ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT = Math.max(0, SCREEN_H - 400);
 
 function clampActivityViewerDrawerHeight(value: number): number {
   return Math.min(ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT, Math.max(ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT, value));
@@ -1821,7 +1820,7 @@ const styles = StyleSheet.create({
   activityMetaRpeChip: { backgroundColor: "rgba(245,158,11,0.14)" },
   activityMetaRpeText: { color: "#FCD34D", fontSize: 11, fontWeight: "800" },
   activityEquipment: { color: "rgba(255,255,255,0.55)", fontSize: 11, flexShrink: 1 },
-  activityInitialSummary: { minHeight: ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT, paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM },
+  activityInitialSummary: { paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM },
   activityDetailsAfterInitial: { paddingTop: 18 },
   summaryGrid: {
     flexDirection: "row",

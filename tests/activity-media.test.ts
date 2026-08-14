@@ -76,8 +76,9 @@ describe("activity media presentation", () => {
     expect(mediaHeaderIndex).toBeGreaterThan(mediaDrawerIndex);
     expect(mediaGridIndex).toBeGreaterThan(mediaHeaderIndex);
     expect(source).toContain("function ActivitySummaryHeader");
-    expect(source).toContain("ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT");
-    expect(source).toContain("minHeight: ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT");
+    expect(source).toContain("activityInitialSummary: { paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM }");
+    expect(source).not.toContain("ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT");
+    expect(source).not.toContain("activityInitialSummary: { minHeight:");
     expect(source).toContain("<Text style={styles.activityEyebrow}>活動詳情</Text>");
   });
 

@@ -1565,6 +1565,11 @@
 - [x] 修正全螢幕照片舞台頂部黑色空白，令照片自舞台頂端開始以中央焦點滿版顯示
 - [x] 補強首屏邊界回歸測試，完成 TypeScript 0 errors、101 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
 
+## 活動摘要內容高度自適應修正（2026-08-14）
+- [x] 移除主頁摘要的固定最小高度，避免為隱藏延伸資訊而產生大面積黑色空白
+- [x] 讓摘要容器僅依活動摘要、標題、日期／類型與六項核心數據的實際內容高度自適應
+- [x] 補強摘要自然高度回歸測試，完成 TypeScript 0 errors、101 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑
