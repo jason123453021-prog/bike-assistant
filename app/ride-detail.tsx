@@ -1560,15 +1560,11 @@ export default function RideDetailScreen() {
           </Pressable>
 
           <Animated.View style={[styles.activityViewerDrawer, { height: activityViewerDrawerHeight }]} {...activityViewerDrawerResponder.panHandlers}>
-            <View style={styles.activityViewerDrawerGrabArea}>
-              <View style={styles.activityViewerDrawerHandle} />
-              <View style={styles.activityViewerDrawerHeader}>
-                <View style={styles.activityViewerDrawerTitleBlock}>
-                  <Text style={styles.activityViewerDrawerEyebrow}>活動摘要</Text>
-                  <Text style={styles.activityViewerDrawerTitle} numberOfLines={1}>{record.name}</Text>
-                  <Text style={styles.activityViewerDrawerSubtitle} numberOfLines={2}>{dateStr} · {activityTypeLabel(record.activityType)} · {activityPhotos.length} 張本機照片</Text>
-                </View>
-                <Text style={styles.activityViewerDrawerHint}>{activityViewerDrawerExpanded ? "捲動資訊" : "上滑查看"}</Text>
+            <View style={styles.activityViewerDrawerHeader}>
+              <View style={styles.activityViewerDrawerTitleBlock}>
+                <Text style={styles.activityViewerDrawerEyebrow}>活動摘要</Text>
+                <Text style={styles.activityViewerDrawerTitle} numberOfLines={1}>{record.name}</Text>
+                <Text style={styles.activityViewerDrawerSubtitle} numberOfLines={2}>{dateStr} · {activityTypeLabel(record.activityType)}</Text>
               </View>
             </View>
 
@@ -1582,52 +1578,25 @@ export default function RideDetailScreen() {
                 <Text style={styles.activityViewerDrawerMetricLabel}>爬升 m</Text>
               </View>
               <View style={styles.activityViewerDrawerMetric}>
-                <Text style={styles.activityViewerDrawerMetricValue}>{formatDuration(movingDuration)}</Text>
-                <Text style={styles.activityViewerDrawerMetricLabel}>移動時間</Text>
+                <Text style={styles.activityViewerDrawerMetricValue}>{Math.round(record.calories)}</Text>
+                <Text style={styles.activityViewerDrawerMetricLabel}>卡路里 kcal</Text>
               </View>
             </View>
 
-            {activityViewerDrawerExpanded ? (
-              <ScrollView style={styles.activityViewerDrawerExpandedContent} contentContainerStyle={styles.activityViewerDrawerExpandedScrollContent} showsVerticalScrollIndicator={false}>
-                <View style={styles.activityViewerDrawerDetailGrid}>
-                  <View style={styles.activityViewerDrawerDetailCell}>
-                    <Text style={styles.activityViewerDrawerDetailValue}>{averageMovingSpeed.toFixed(1)} km/h</Text>
-                    <Text style={styles.activityViewerDrawerDetailLabel}>平均速度</Text>
-                  </View>
-                  <View style={styles.activityViewerDrawerDetailCell}>
-                    <Text style={styles.activityViewerDrawerDetailValue}>{record.avgPower} W</Text>
-                    <Text style={styles.activityViewerDrawerDetailLabel}>平均功率</Text>
-                  </View>
-                  <View style={styles.activityViewerDrawerDetailCell}>
-                    <Text style={styles.activityViewerDrawerDetailValue}>{Math.round(record.calories)} kcal</Text>
-                    <Text style={styles.activityViewerDrawerDetailLabel}>消耗熱量</Text>
-                  </View>
-                  <View style={styles.activityViewerDrawerDetailCell}>
-                    <Text style={styles.activityViewerDrawerDetailValue}>{activityTypeLabel(record.activityType)}</Text>
-                    <Text style={styles.activityViewerDrawerDetailLabel}>活動類型</Text>
-                  </View>
-                </View>
-                <Text style={styles.activityViewerDrawerSectionTitle}>騎乘瞬間</Text>
-                {activityPhotos.length > 0 ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.activityViewerRoutePhotoRail}>
-                    {activityPhotos.map((photo, index) => {
-                      const details = photoCaptureDetails.get(photo.id);
-                      return (
-                        <Pressable key={photo.id} style={({ pressed }) => [styles.activityViewerRoutePhotoCard, { opacity: pressed ? 0.72 : 1 }]} onPress={() => openActivityViewer(index + 1)}>
-                          <Image source={{ uri: photo.uri }} style={styles.activityViewerRoutePhotoThumb} />
-                          <Text style={styles.activityViewerRoutePhotoMeta} numberOfLines={2}>{formatActivityPhotoRouteMeta(details?.capturedAt, details?.altitude)}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                ) : <Text style={styles.activityViewerRouteEmpty}>此活動尚未附加本機照片。</Text>}
-                <View style={styles.activityViewerDrawerLongMetrics}>
-                  <Text style={styles.activityViewerDrawerLongMetric}>最高速度 {record.maxSpeed.toFixed(1)} km/h</Text>
-                  <Text style={styles.activityViewerDrawerLongMetric}>總下降 {Math.round(record.totalDescent ?? 0)} m</Text>
-                  <Text style={styles.activityViewerDrawerLongMetric}>水分流失 {Math.round(record.totalSweatMl)} ml</Text>
-                </View>
-              </ScrollView>
-            ) : <Text style={styles.activityViewerDrawerScrollHint}>在此區上滑即可展開並捲動完整騎乘資訊；切換照片不會重設此活動頁面。</Text>}
+            <View style={[styles.activityViewerDrawerMetrics, styles.activityViewerDrawerMetricsSecondary]}>
+              <View style={styles.activityViewerDrawerMetric}>
+                <Text style={styles.activityViewerDrawerMetricValue}>{formatDuration(movingDuration)}</Text>
+                <Text style={styles.activityViewerDrawerMetricLabel}>移動時間</Text>
+              </View>
+              <View style={styles.activityViewerDrawerMetric}>
+                <Text style={styles.activityViewerDrawerMetricValue}>{averageMovingSpeed.toFixed(1)}</Text>
+                <Text style={styles.activityViewerDrawerMetricLabel}>平均速度 km/h</Text>
+              </View>
+              <View style={styles.activityViewerDrawerMetric}>
+                <Text style={styles.activityViewerDrawerMetricValue}>{record.avgPower}</Text>
+                <Text style={styles.activityViewerDrawerMetricLabel}>平均功率 W</Text>
+              </View>
+            </View>
           </Animated.View>
         </View>
       </Modal>
@@ -2272,29 +2241,16 @@ const styles = StyleSheet.create({
   activityViewerRoutePage: { backgroundColor: "#08110D" },
   activityViewerRouteMap: { width: SCREEN_W, flex: 1 },
   activityViewerDrawer: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingBottom: 24, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: "#101012", borderTopWidth: 1, borderColor: "rgba(255,255,255,0.13)", overflow: "hidden" },
-  activityViewerDrawerGrabArea: { marginHorizontal: -20, paddingHorizontal: 20 },
-  activityViewerDrawerHandle: { width: 42, height: 5, alignSelf: "center", marginTop: 9, marginBottom: 12, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.42)" },
   activityViewerDrawerHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   activityViewerDrawerTitleBlock: { flex: 1 },
   activityViewerDrawerEyebrow: { color: "#00E676", fontSize: 11, fontWeight: "800", letterSpacing: 0.7 },
   activityViewerDrawerTitle: { color: "#fff", fontSize: 21, fontWeight: "800", marginTop: 3 },
   activityViewerDrawerSubtitle: { color: "rgba(255,255,255,0.62)", fontSize: 12, lineHeight: 17, marginTop: 5 },
-  activityViewerDrawerHint: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", paddingTop: 5 },
   activityViewerDrawerMetrics: { flexDirection: "row", marginTop: 15, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.06)", paddingVertical: 11 },
+  activityViewerDrawerMetricsSecondary: { marginTop: 10 },
   activityViewerDrawerMetric: { flex: 1, alignItems: "center" },
   activityViewerDrawerMetricValue: { color: "#fff", fontSize: 16, fontWeight: "800", fontVariant: ["tabular-nums"] },
   activityViewerDrawerMetricLabel: { color: "rgba(255,255,255,0.55)", fontSize: 10, marginTop: 3 },
-  activityViewerDrawerExpandedContent: { flex: 1, marginTop: 5 },
-  activityViewerDrawerExpandedScrollContent: { paddingBottom: 8 },
-  activityViewerDrawerDetailGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 12, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.055)", paddingVertical: 6 },
-  activityViewerDrawerDetailCell: { width: "50%", alignItems: "center", paddingVertical: 10 },
-  activityViewerDrawerDetailValue: { color: "#fff", fontSize: 15, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  activityViewerDrawerDetailLabel: { color: "rgba(255,255,255,0.55)", fontSize: 10, marginTop: 3 },
-  activityViewerDrawerSectionTitle: { color: "#fff", fontSize: 15, fontWeight: "800", marginTop: 16 },
-  activityViewerDrawerLongMetrics: { marginTop: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(255,255,255,0.12)", paddingTop: 10, gap: 7 },
-  activityViewerDrawerLongMetric: { color: "rgba(255,255,255,0.72)", fontSize: 13, fontVariant: ["tabular-nums"] },
-  activityViewerDrawerScrollHint: { color: "rgba(255,255,255,0.58)", fontSize: 12, lineHeight: 18, marginTop: 10 },
-  activityViewerDrawerGestureCopy: { color: "rgba(255,255,255,0.72)", fontSize: 12, lineHeight: 18, marginTop: 10 },
   activityViewerRouteInfo: { position: "absolute", left: 18, right: 18, bottom: 82, padding: 14, borderRadius: 16, backgroundColor: "rgba(7,18,14,0.9)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.16)" },
   activityViewerRouteTitle: { color: "#fff", fontSize: 17, fontWeight: "800" },
   activityViewerRouteCopy: { color: "rgba(255,255,255,0.68)", fontSize: 12, marginTop: 4 },

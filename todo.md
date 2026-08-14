@@ -1517,3 +1517,9 @@
 - [x] 讓滑桿以下的抽屜內容區可直接上滑／下滑捲動完整活動資訊，且不干擾上方媒體手勢
 - [x] 讓路線、縮圖入口與任一照片都使用同一個全螢幕媒體頁面及相同活動資訊抽屜
 - [x] 補強 Strava 式手勢與媒體一致性測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）
+
+## 活動媒體頁摘要精簡（2026-08-14）
+- [x] 移除媒體頁抽屜頂端的白色滑桿圖示與右側「上滑查看」文字
+- [x] 將下方內容收斂為活動摘要，對齊參考畫面的名稱、日期、類型與核心騎乘數據
+- [x] 移除摘要中的額外手勢說明與媒體細節區塊，保留清楚且穩定的單一資訊版面
+- [x] 補強摘要結構測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）

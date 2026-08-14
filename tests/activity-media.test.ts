@@ -47,25 +47,22 @@ describe("activity media presentation", () => {
     expect(source).toContain("fillContainer");
   });
 
-  it("keeps a fixed activity drawer available for routes and every photo", () => {
+  it("keeps a fixed summary available for routes and every photo", () => {
     const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
     const source = fs.readFileSync(filePath, "utf8");
 
-    expect(source).toContain("activityViewerDrawerGrabArea");
     expect(source).toContain("onPanResponderMove");
     expect(source).toContain("clampActivityViewerDrawerHeight");
-    expect(source).toContain("activityViewerDrawerDetailGrid");
+    expect(source).toContain("activityViewerDrawerMetricsSecondary");
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
   });
 
-  it("keeps the drawer content scrollable and identical across route thumbnails and photos", () => {
+  it("keeps the summary identical across route thumbnails and photos", () => {
     const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
     const source = fs.readFileSync(filePath, "utf8");
 
-    expect(source).toContain("activityViewerDrawerScrollHint");
-    expect(source).toContain("activityViewerDrawerSectionTitle");
-    expect(source).toContain("在此區上滑即可展開並捲動完整騎乘資訊");
     expect(source).toContain("活動摘要");
-    expect(source).toContain("!activityViewerDrawerExpandedRef.current");
+    expect(source).not.toContain("styles.activityViewerDrawerHandle");
+    expect(source).not.toContain("styles.activityViewerDrawerHint");
   });
 });
