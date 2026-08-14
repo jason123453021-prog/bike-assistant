@@ -1569,3 +1569,8 @@
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑
 - [ ] 完成 Expo Go 啟動、TypeScript、完整測試與 Android bundle 回歸驗證
+
+## Expo Go 預覽載入卡住修正（2026-08-14）
+- [x] 檢查並清除造成 Expo Go 停在「正在載入預覽」的卡住服務、Metro 快取或啟動程序
+- [x] 重新啟動開發服務並確認 Metro 回應正常
+- [x] 驗證 Expo Go Android bundle 端點以 HTTP 200 回應；首次冷啟動編譯約 64 秒，後續 bundle 已回到約 600 ms
