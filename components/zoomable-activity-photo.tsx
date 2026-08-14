@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Dimensions, Image, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -7,6 +7,13 @@ const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 const DOUBLE_TAP_SCALE = 2.4;
 const { width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT } = Dimensions.get("window");
+type PhotoOrientation = "portrait" | "landscape" | "square";
+
+function resolvePhotoOrientation(width: number, height: number): PhotoOrientation {
+  if (height > width * 1.08) return "portrait";
+  if (width > height * 1.08) return "landscape";
+  return "square";
+}
 
 function clampScale(value: number) {
   "worklet";
@@ -34,6 +41,11 @@ interface ZoomableActivityPhotoProps {
   fillContainer?: boolean;
 }
 
+interface PhotoDimensions {
+  width: number;
+  height: number;
+}
+
 /**
  * 全螢幕活動照片的純手勢縮放容器。
  * 僅使用專案既有的 Gesture Handler 與 Reanimated，避免新增原生模組；
@@ -46,6 +58,32 @@ export function ZoomableActivityPhoto({ uri, resetKey, fillContainer = false }: 
   const translationY = useSharedValue(0);
   const savedTranslationX = useSharedValue(0);
   const savedTranslationY = useSharedValue(0);
+  const [orientation, setOrientation] = useState<PhotoOrientation>("landscape");
+  const [photoSize, setPhotoSize] = useState<PhotoDimensions | null>(null);
+  const [containerSize, setContainerSize] = useState<PhotoDimensions>({
+    width: VIEWPORT_WIDTH,
+    height: VIEWPORT_HEIGHT,
+  });
+
+  useEffect(() => {
+    let active = true;
+    Image.getSize(
+      uri,
+      (width, height) => {
+        if (active) {
+          setPhotoSize({ width, height });
+          setOrientation(resolvePhotoOrientation(width, height));
+        }
+      },
+      () => {
+        if (active) {
+          setPhotoSize(null);
+          setOrientation("landscape");
+        }
+      },
+    );
+    return () => { active = false; };
+  }, [uri]);
 
   useEffect(() => {
     scale.value = withTiming(MIN_SCALE, { duration: 160 });
@@ -116,11 +154,44 @@ export function ZoomableActivityPhoto({ uri, resetKey, fillContainer = false }: 
     ],
   }));
 
+  const coverImageStyle = (() => {
+    if (!fillContainer || !photoSize || photoSize.width <= 0 || photoSize.height <= 0) return null;
+    const scaleToFill = Math.max(containerSize.width / photoSize.width, containerSize.height / photoSize.height);
+    const width = photoSize.width * scaleToFill;
+    const height = photoSize.height * scaleToFill;
+    const verticalExcess = Math.max(0, height - containerSize.height);
+    const horizontalExcess = Math.max(0, width - containerSize.width);
+    const verticalFocus = orientation === "portrait" ? 0.28 : orientation === "square" ? 0.42 : 0.5;
+    return {
+      position: "absolute" as const,
+      width,
+      height,
+      left: -horizontalExcess / 2,
+      top: -verticalExcess * verticalFocus,
+    };
+  })();
+
   return (
-    <View style={[styles.container, fillContainer && styles.containerFill]} accessible accessibilityLabel="活動照片；雙擊可放大或還原，雙指可縮放，放大後可單指拖曳平移">
+    <View
+      style={[styles.container, fillContainer && styles.containerFill]}
+      accessible
+      accessibilityLabel="活動照片；雙擊可放大或還原，雙指可縮放，放大後可單指拖曳平移"
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        if (width > 0 && height > 0) setContainerSize({ width, height });
+      }}
+    >
       <GestureDetector gesture={Gesture.Simultaneous(pinchGesture, doubleTapGesture, panGesture)}>
         <Animated.View style={[styles.imageContainer, imageAnimationStyle]}>
-          <Image source={{ uri }} style={styles.image} resizeMode={fillContainer ? "cover" : "contain"} />
+          <Image
+            source={{ uri }}
+            style={[
+              styles.image,
+              fillContainer && styles.imageFill,
+              coverImageStyle,
+            ]}
+            resizeMode={fillContainer ? "cover" : "contain"}
+          />
         </Animated.View>
       </GestureDetector>
     </View>
@@ -146,4 +217,5 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  imageFill: { width: "100%", height: "100%" },
 });

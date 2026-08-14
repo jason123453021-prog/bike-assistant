@@ -26,6 +26,10 @@ describe("activity media presentation", () => {
     expect(source).toContain("maxVerticalTranslation");
     expect(source).toContain("放大後可單指拖曳平移");
     expect(source).toContain('resizeMode={fillContainer ? "cover" : "contain"}');
+    expect(source).toContain("Image.getSize(");
+    expect(source).toContain("resolvePhotoOrientation");
+    expect(source).toContain('orientation === "portrait" ? 0.28');
+    expect(source).toContain('orientation === "square" ? 0.42 : 0.5');
   });
 
   it("keeps full-screen route map gestures separate from photo gestures", () => {

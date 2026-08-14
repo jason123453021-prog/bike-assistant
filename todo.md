@@ -1543,3 +1543,8 @@
 - [x] 讓全螢幕照片以裁切填滿方式覆蓋上方媒體空白區，保留既有縮放與平移操作
 - [x] 以全螢幕路線／照片下方活動摘要為基準，反向調整主頁起始摘要的高度、間距與兩欄三列比例
 - [x] 補強滿版照片與主頁／媒體摘要一致性測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.59 MB；NitroModules／MapLibre 掃描 0）
+
+## 方向感知照片滿版裁切（2026-08-14）
+- [x] 讀取本機照片原始長寬比，區分直式、橫式與近方形照片
+- [x] 對直式照片採中央偏上裁切焦點，對橫式照片採中央主體裁切焦點，保留滿版縮放與平移手勢
+- [x] 補強方向裁切策略測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）
