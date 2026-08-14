@@ -91,7 +91,10 @@ describe("activity media presentation", () => {
     expect(source).toContain("onPanResponderMove");
     expect(source).toContain("clampActivityViewerDrawerHeight");
     expect(source).toContain("CoreActivitySummaryGrid");
-    expect(source).toContain("mapHero: { height: 420");
+    expect(source).toContain("ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT");
+    expect(source).toContain("ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT + 20");
+    expect(source).toContain("mapHero: { height: ACTIVITY_DETAIL_MAIN_HERO_HEIGHT");
+    expect(source).toContain("map: { width: SCREEN_W, height: ACTIVITY_DETAIL_MAIN_HERO_HEIGHT }");
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
     expect(source).toContain('mediaViewer: { flex: 1, backgroundColor: "#050505", justifyContent: "flex-start" }');
   });

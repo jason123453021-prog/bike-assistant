@@ -68,6 +68,9 @@ const ACTIVITY_SUMMARY_CONTENT_TOP = 22;
 const ACTIVITY_SUMMARY_CONTENT_BOTTOM = 20;
 const ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.46), 360);
 const ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.78), 620);
+const ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT = SCREEN_H - ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT;
+const ACTIVITY_VIEWER_STAGE_EXPANDED_HEIGHT = SCREEN_H - ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT;
+const ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT + 20;
 
 function clampActivityViewerDrawerHeight(value: number): number {
   return Math.min(ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT, Math.max(ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT, value));
@@ -1481,7 +1484,7 @@ export default function RideDetailScreen() {
               {
                 height: activityViewerDrawerHeight.interpolate({
                   inputRange: [ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT, ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT],
-                  outputRange: [SCREEN_H - ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT, SCREEN_H - ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT],
+                  outputRange: [ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT, ACTIVITY_VIEWER_STAGE_EXPANDED_HEIGHT],
                   extrapolate: "clamp",
                 }),
               },
@@ -1798,8 +1801,8 @@ const detailStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0d0d1a" },
   pageContent: { backgroundColor: "#0d0d1a" },
-  mapHero: { height: 420, width: SCREEN_W, position: "relative", overflow: "hidden" },
-  map: { width: SCREEN_W, height: 420 },
+  mapHero: { height: ACTIVITY_DETAIL_MAIN_HERO_HEIGHT, width: SCREEN_W, position: "relative", overflow: "hidden" },
+  map: { width: SCREEN_W, height: ACTIVITY_DETAIL_MAIN_HERO_HEIGHT },
   activityBody: {
     backgroundColor: "#0d0d1a",
     marginTop: -20,

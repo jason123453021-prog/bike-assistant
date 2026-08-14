@@ -1575,6 +1575,11 @@
 - [x] 保留雙擊、雙指縮放與放大後平移，另保留使用者可選的裁切滿版模式
 - [x] 補強完整照片預設模式回歸測試，完成 TypeScript 0 errors、101 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
 
+## 主頁與媒體摘要起始位置對齊（2026-08-14）
+- [x] 以全螢幕媒體收合舞台高度為基準，對齊主頁地圖舞台與黑色摘要卡片的起始位置
+- [x] 維持摘要依內容自然收合，後續活動資訊可直接向下捲動，不以固定高度製造空白
+- [x] 補強主頁與媒體摘要上緣對齊回歸測試，完成 TypeScript 0 errors、101 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑
