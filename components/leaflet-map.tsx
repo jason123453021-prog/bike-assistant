@@ -94,6 +94,7 @@ export interface LeafletMapHandle {
   animatePlaybackMarker: (lat: number, lon: number, color: string, duration: number) => void; // 平滑動畫回放標點
   highlightPlayedTrail: (coords: LatLng[], color?: string) => void; // 高亮已走過的軌跡
   addDirectionArrows: (coords: LatLng[], color?: string, interval?: number) => void; // 添加方向箭头
+  refreshBaseTiles: () => void;
 }
 
 const LEAFLET_HTML = `<!DOCTYPE html>
@@ -176,10 +177,16 @@ var currentBearing = 0;
 var headingUpMode = false;
 
 // Tile layer: CartoDB Voyager (bright roads, good contrast for cycling)
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+var baseTileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+var baseTileLayer = L.tileLayer(baseTileUrl, {
   maxZoom: 19,
   subdomains: 'abcd',
 }).addTo(map);
+
+function refreshBaseTiles() {
+  // 重新抓取上游圖磚，保留目前中心點、縮放及旋轉角度。
+  baseTileLayer.setUrl(baseTileUrl + '?refresh=' + Date.now());
+}
 
 // Layers
 var gpxLayer = L.polyline([], { color: '#FF3B30', weight: 4, opacity: 0.9 }).addTo(map);
@@ -664,6 +671,9 @@ function handleMessage(data) {
       case 'setHeadingUpMode':
         headingUpMode = msg.enabled || false;
         break;
+      case 'refreshBaseTiles':
+        refreshBaseTiles();
+        break;
     }
   } catch(e) {}
 }
@@ -780,6 +790,10 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         webViewRef.current.postMessage(
           JSON.stringify({ type: "addDirectionArrows", coords: mapped, color, interval })
         );
+      },
+      refreshBaseTiles: () => {
+        if (!webViewRef.current) return;
+        webViewRef.current.postMessage(JSON.stringify({ type: "refreshBaseTiles" }));
       },
     }));
 
