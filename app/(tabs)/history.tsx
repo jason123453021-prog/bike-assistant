@@ -18,14 +18,17 @@ import { useRide, type RideRecord } from "@/lib/ride-context";
 import { formatDuration } from "@/lib/power-calc";
 import { calculateWeeklyTrainingStats, calculateMonthlyTrainingStats } from "@/lib/activity-stats";
 import { buildLocalTrainingLog, shiftTrainingLogMonth } from "@/lib/local-training-log";
+import { formatPaceFromKmh, SPORT_META, type SportType } from "@/lib/sport-metrics";
 
 const STORAGE_KEY = "@bike_records";
+const SPORT_FILTERS: Array<"all" | SportType> = ["all", "cycling", "running", "hiking", "trail_running"];
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { state, dispatch, loadRecords } = useRide();
   const [searchQuery, setSearchQuery] = useState("");
+  const [sportFilter, setSportFilter] = useState<"all" | SportType>("all");
   const [showStats, setShowStats] = useState(false);
   const [trainingLogMonth, setTrainingLogMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
@@ -48,8 +51,9 @@ export default function HistoryScreen() {
   // 依關鍵字過濾記錄（搜尋路線名稱、日期、距離、時間）
   const filteredRecords = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return state.records;
     return state.records.filter((r) => {
+      if (sportFilter !== "all" && (r.sportType ?? "cycling") !== sportFilter) return false;
+      if (!q) return true;
       const date = new Date(r.date);
       const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
       const distKm = (r.distance / 1000).toFixed(2);
@@ -66,7 +70,7 @@ export default function HistoryScreen() {
         speed.includes(q)
       );
     });
-  }, [state.records, searchQuery]);
+  }, [state.records, searchQuery, sportFilter]);
 
   const handleDelete = (id: string) => {
     Alert.alert("刪除記錄", "確定要刪除這筆騎乘記錄嗎？", [
@@ -92,6 +96,13 @@ export default function HistoryScreen() {
     const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
     const timeStr = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
     const distKm = (item.distance / 1000).toFixed(2);
+    const sportType = item.sportType ?? "cycling";
+    const sportMeta = SPORT_META[sportType];
+    const footerMetric = sportType === "running"
+      ? { value: formatPaceFromKmh(item.avgSpeed), unit: "平均配速 /km" }
+      : sportType === "hiking" || sportType === "trail_running"
+        ? { value: `${Math.round(item.totalAscent)} m`, unit: "總爬升" }
+        : { value: item.avgSpeed.toFixed(1), unit: "km/h 均速" };
 
     return (
       <Pressable
@@ -105,6 +116,9 @@ export default function HistoryScreen() {
         <Text style={[styles.routeName, { color: colors.foreground }]} numberOfLines={1}>
           {item.name || dateStr}
         </Text>
+        <View style={[styles.sportBadge, { backgroundColor: `${sportMeta.accent}22` }]}>
+          <Text style={[styles.sportBadgeText, { color: sportMeta.accent }]}>{sportMeta.icon} {sportMeta.label}</Text>
+        </View>
 
         {/* 日期時間 */}
         <View style={styles.dateRow}>
@@ -123,10 +137,10 @@ export default function HistoryScreen() {
         <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
           {/* 均速 */}
           <View style={styles.avgSpeedBox}>
-            <Text style={[styles.avgSpeed, { color: colors.foreground }]}>
-              {item.avgSpeed.toFixed(1)}
+            <Text style={[styles.avgSpeed, { color: colors.foreground }]}> 
+              {footerMetric.value}
             </Text>
-            <Text style={[styles.avgSpeedUnit, { color: colors.muted }]}>km/h 均速</Text>
+            <Text style={[styles.avgSpeedUnit, { color: colors.muted }]}>{footerMetric.unit}</Text>
           </View>
 
           <View style={styles.footerActions}>
@@ -267,7 +281,7 @@ export default function HistoryScreen() {
         )}
 
         {/* 搜索欄 */}
-        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
           <IconSymbol name="magnifyingglass" size={16} color={colors.muted} />
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
@@ -286,6 +300,24 @@ export default function HistoryScreen() {
               <IconSymbol name="xmark.circle.fill" size={16} color={colors.muted} />
             </Pressable>
           )}
+        </View>
+        <View style={styles.sportFilters}>
+          {SPORT_FILTERS.map((type) => {
+            const selected = sportFilter === type;
+            const meta = type === "all" ? null : SPORT_META[type];
+            const tint = meta?.accent ?? colors.primary;
+            return (
+              <Pressable
+                key={type}
+                style={[styles.sportFilter, { borderColor: selected ? tint : colors.border, backgroundColor: selected ? `${tint}22` : colors.surface }]}
+                onPress={() => setSportFilter(type)}
+              >
+                <Text style={[styles.sportFilterText, { color: selected ? tint : colors.muted }]}>
+                  {type === "all" ? "全部" : `${meta!.icon} ${meta!.label}`}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
@@ -349,6 +381,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingVertical: 0,
   },
+  sportFilters: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
+  sportFilter: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  sportFilterText: { fontSize: 11, fontWeight: "700" },
 
   listContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
 
@@ -367,6 +402,8 @@ const styles = StyleSheet.create({
   dateText: { fontSize: 12 },
   timeText: { fontSize: 12 },
   statsRow: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
+  sportBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  sportBadgeText: { fontSize: 11, fontWeight: "700" },
   statChip: { flexDirection: "row", alignItems: "center", gap: 4 },
   statChipText: { fontSize: 12, fontWeight: "500" },
 

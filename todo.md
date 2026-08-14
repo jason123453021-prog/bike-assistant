@@ -1596,6 +1596,14 @@
 - [x] 評估圖資、道路與自行車道維修資訊更新來源，於線上可用時顯示資料時效與重新規劃提示，離線時清楚提示無法取得即時道路變動
 - [x] 完成 TypeScript 0 errors、107 passed／1 skipped 與 Android Hermes bundle 5.61 MB 驗證
 
+## Local-First 多運動模式（2026-08-14）
+- [x] 建立 cycling、running、hiking、trail_running 四種運動類型及共用本機活動資料模型
+- [x] 實作跑步／越野跑配速平滑、GAP、登山／越野跑 VAM 與運動專屬 METs 卡路里估算
+- [x] 在地圖開始頁新增運動選擇器，依運動切換儀表板欄位、單位與自動暫停／GPS 防抖規則
+- [x] 將完成運動寫入對應 activity_type，並讓歷史清單、活動詳情、圖表與摘要依類型顯示
+- [x] 將運動類型寫入 GPX metadata 與 track type，支援外部平台識別
+- [x] 補強多運動單元、資料流與匯出回歸測試，完成 TypeScript 0 errors、111 passed／1 skipped 與 Android Hermes bundle 5.65 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑

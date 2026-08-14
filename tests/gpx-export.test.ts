@@ -26,4 +26,9 @@ describe("createGpxContent", () => {
     expect(createGpxContent({ ...record, route: [record.route[0]] })).toBeNull();
     expect(createGpxFilename(record)).toMatch(/^河濱-晨騎-\d{4}-\d{2}-\d{2}\.gpx$/);
   });
+
+  it("依多運動類型寫入 metadata 與 track type", () => {
+    const gpx = createGpxContent({ ...record, sportType: "trail_running" });
+    expect(gpx).toContain("<type>Trail Running</type>");
+  });
 });

@@ -1,9 +1,12 @@
-import React, { createContext, useCallback, useContext, useReducer } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { analyzeTraining, estimateFTP } from "./tss-calc";
 import { calculatePersonalBests, type PersonalBest } from "./personal-bests";
 import { normalizeRideRecord, normalizeRideRecords } from "./ride-record-normalizer";
 import { estimateAutomaticRpe } from "./automatic-rpe";
+import type { SportType } from "./sport-metrics";
+
+export type { SportType } from "./sport-metrics";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +23,7 @@ export interface RideActivityUpdate {
   equipment?: string;
   perceivedExertion?: number;
   perceivedExertionSource?: "app-estimate" | "manual";
+  sportType?: SportType;
 }
 
 export interface LocationPoint {
@@ -120,6 +124,8 @@ export interface RideRecord {
   description?: string;
   /** 完全本機保存的活動分類，不用於任何社群資料交換。 */
   activityType?: RideActivityType;
+  /** 多運動主類型；舊版單車紀錄安全回填為 cycling。 */
+  sportType?: SportType;
   /** 使用者自行輸入的車輛或裝備備註。 */
   equipment?: string;
   /** 主觀用力程度（RPE，1–10）。 */
@@ -149,6 +155,7 @@ export interface RideState {
   elapsed: number;          // seconds
   distance: number;         // meters
   currentSpeed: number;     // km/h
+  sportType: SportType;
   maxSpeed: number;
   avgSpeed: number;
   currentPower: number;     // watts
@@ -210,6 +217,7 @@ type RideAction =
   | { type: "SUPPLY_CONFIRMED"; confirmation: SupplyConfirmation }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
   | { type: "ADD_RECORD"; record: RideRecord }
+  | { type: "SET_SPORT_TYPE"; sportType: SportType }
   | { type: "UPDATE_RECORD_NAME"; id: string; name: string }
   | { type: "RESTORE"; snapshot: Partial<RideState> };
 
@@ -231,6 +239,7 @@ const initialState: RideState = {
   elapsed: 0,
   distance: 0,
   currentSpeed: 0,
+  sportType: "cycling",
   maxSpeed: 0,
   avgSpeed: 0,
   currentPower: 0,
@@ -402,6 +411,9 @@ function rideReducer(state: RideState, action: RideAction): RideState {
     case "ADD_RECORD":
       return { ...state, records: [action.record, ...state.records] };
 
+    case "SET_SPORT_TYPE":
+      return state.status === "idle" ? { ...state, sportType: action.sportType } : state;
+
     case "UPDATE_RECORD_NAME": {
       const updated = state.records.map((r) =>
         r.id === action.id ? { ...r, name: action.name } : r
@@ -435,6 +447,7 @@ interface RideContextValue {
   loadRecords: () => Promise<void>;
   updateRecordName: (id: string, name: string) => Promise<void>;
   updateRideActivity: (id: string, updates: RideActivityUpdate) => Promise<void>;
+  setSportType: (sportType: SportType) => void;
   /** 儲存騎乘進度快照（每 10 秒呼叫一次） */
   saveSnapshot: () => Promise<void>;
   /** 清除進度快照（騎乘結束後呼叫） */
@@ -448,6 +461,7 @@ interface RideContextValue {
 const RideContext = createContext<RideContextValue | null>(null);
 
 const STORAGE_KEY = "@bike_records";
+const SPORT_TYPE_STORAGE_KEY = "@bike_selected_sport";
 
 /** GPS 點抽樣：每隔 N 點保留一個，減少儲存大小 */
 function decimateRoute(route: LocationPoint[], maxPoints = 500): LocationPoint[] {
@@ -465,17 +479,31 @@ function decimateRoute(route: LocationPoint[], maxPoints = 500): LocationPoint[]
 }
 
 /** 生成預設路線名稱（依日期時間） */
-function generateDefaultName(date: number): string {
+function generateDefaultName(date: number, sportType: SportType = "cycling"): string {
   const d = new Date(date);
   const month = d.getMonth() + 1;
   const day = d.getDate();
   const hour = d.getHours();
   const period = hour < 6 ? "深夜" : hour < 12 ? "早晨" : hour < 18 ? "下午" : "夜間";
-  return `${month}月${day}日 ${period}騎乘`;
+  const sportLabel: Record<SportType, string> = {
+    cycling: "騎乘",
+    running: "跑步",
+    hiking: "登山",
+    trail_running: "越野跑",
+  };
+  return `${month}月${day}日 ${period}${sportLabel[sportType]}`;
 }
 
 export function RideProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(rideReducer, initialState);
+
+  useEffect(() => {
+    void AsyncStorage.getItem(SPORT_TYPE_STORAGE_KEY).then((stored) => {
+      if (stored === "cycling" || stored === "running" || stored === "hiking" || stored === "trail_running") {
+        dispatch({ type: "SET_SPORT_TYPE", sportType: stored });
+      }
+    }).catch(() => {});
+  }, []);
 
   const saveRecord = useCallback(async (
     name?: string,
@@ -515,7 +543,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     const recordBase: RideRecord = {
       id: now.toString(),
       date: now,
-      name: (name && name.trim()) ? name.trim() : generateDefaultName(now),
+      name: (name && name.trim()) ? name.trim() : generateDefaultName(now, state.sportType),
       duration: state.elapsed,
       distance: state.distance,
       avgSpeed: finalAvgSpeed,
@@ -536,6 +564,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       gradeAscentDistribution: state.gradeAscentDistribution,
       description: "",
       activityType: "road",
+      sportType: state.sportType,
       mediaItems: [],
       // 訓練效果分析
       tss: trainingAnalysis.tss,
@@ -567,7 +596,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       if (data) {
         const migrated = normalizeRideRecords(JSON.parse(data)).map((record) => ({
           ...record,
-          name: record.name || generateDefaultName(record.date),
+          name: record.name || generateDefaultName(record.date, record.sportType),
         }));
         if (JSON.stringify(migrated) !== data) {
           await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(migrated.slice(0, 100)));
@@ -606,6 +635,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
               ...(updates.mediaItems !== undefined ? { mediaItems: updates.mediaItems } : {}),
               ...(updates.coverPhotoUri !== undefined ? { coverPhotoUri: updates.coverPhotoUri ?? undefined } : {}),
               ...(updates.activityType !== undefined ? { activityType: updates.activityType } : {}),
+              ...(updates.sportType !== undefined ? { sportType: updates.sportType } : {}),
               ...(updates.equipment !== undefined ? { equipment: updates.equipment } : {}),
               ...(updates.perceivedExertion !== undefined ? { perceivedExertion: updates.perceivedExertion } : {}),
               ...(updates.perceivedExertionSource !== undefined ? { perceivedExertionSource: updates.perceivedExertionSource } : {}),
@@ -646,6 +676,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         route: state.route.slice(-100),
         powerHistory: state.powerHistory.slice(-50),
         powerZones: state.powerZones,
+        sportType: state.sportType,
         supplyConfirmations: state.supplyConfirmations,
         savedAt: Date.now(),
       };
@@ -698,8 +729,13 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     };
   }, [state.records]);
 
+  const setSportType = useCallback((sportType: SportType) => {
+    dispatch({ type: "SET_SPORT_TYPE", sportType });
+    void AsyncStorage.setItem(SPORT_TYPE_STORAGE_KEY, sportType).catch(() => {});
+  }, []);
+
   return (
-    <RideContext.Provider value={{ state, dispatch, saveRecord, loadRecords, updateRecordName, updateRideActivity, saveSnapshot, clearSnapshot, checkSnapshot, getRouteStats }}>
+    <RideContext.Provider value={{ state, dispatch, saveRecord, loadRecords, updateRecordName, updateRideActivity, setSportType, saveSnapshot, clearSnapshot, checkSnapshot, getRouteStats }}>
       {children}
     </RideContext.Provider>
   );

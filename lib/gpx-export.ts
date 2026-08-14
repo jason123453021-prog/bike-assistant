@@ -1,4 +1,5 @@
 import type { RideRecord } from "@/lib/ride-context";
+import { SPORT_META, type SportType } from "./sport-metrics";
 
 const GPX_EPOCH_THRESHOLD = 946_684_800_000;
 
@@ -36,7 +37,9 @@ export function createGpxContent(record: RideRecord): string | null {
   const latitudes = points.map((point) => point.latitude);
   const longitudes = points.map((point) => point.longitude);
   const routeName = escapeXml(record.name?.trim() || "騎乘紀錄");
-  const description = escapeXml(`騎乘記錄：${(record.distance / 1000).toFixed(2)} km，${Math.round(record.totalAscent)} m 爬升`);
+  const sportType: SportType = record.sportType ?? "cycling";
+  const sport = SPORT_META[sportType];
+  const description = escapeXml(`${sport.label}記錄：${(record.distance / 1000).toFixed(2)} km，${Math.round(record.totalAscent)} m 爬升`);
 
   const trackPoints = points.map((point, index) => {
     const extensions = [
@@ -60,11 +63,13 @@ export function createGpxContent(record: RideRecord): string | null {
   <metadata>
     <name>${routeName}</name>
     <desc>${description}</desc>
+    <type>${sport.gpxType}</type>
     <time>${new Date(record.date).toISOString()}</time>
     <bounds minlat="${Math.min(...latitudes).toFixed(7)}" minlon="${Math.min(...longitudes).toFixed(7)}" maxlat="${Math.max(...latitudes).toFixed(7)}" maxlon="${Math.max(...longitudes).toFixed(7)}"/>
   </metadata>
   <trk>
     <name>${routeName}</name>
+    <type>${sport.gpxType}</type>
     <trkseg>
 ${trackPoints}
     </trkseg>

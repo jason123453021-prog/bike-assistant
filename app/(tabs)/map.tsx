@@ -39,6 +39,7 @@ import {
 import LeafletMapView, { type LeafletMapHandle, type NavigationRouteOverlay } from "@/components/leaflet-map";
 import * as Location from "expo-location";
 import * as Battery from "expo-battery";
+import { Accelerometer } from "expo-sensors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
@@ -46,6 +47,16 @@ import Svg, { Circle } from "react-native-svg";
 
 import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
+import {
+  buildSportDashboardMetrics,
+  calculateGapPaceSecPerKm,
+  calculateVamMPerHour,
+  estimateSportCalories,
+  smoothSpeedKmh,
+  SPORT_META,
+  SPORT_TRACKING_POLICIES,
+  type SportType,
+} from "@/lib/sport-metrics";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday } from "@/lib/personal-profile";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
@@ -197,7 +208,7 @@ function findNearestPointIndex(lat: number, lon: number, points: GpxPoint[]): nu
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { state, dispatch, saveRecord, updateRideActivity, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
+  const { state, dispatch, saveRecord, updateRideActivity, setSportType, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
   const { settings } = useSettings();
   const { sharedRoute, clearSharedRoute } = useGpx();
   const autoPersonalMetrics = useMemo(() => deriveAutoPersonalMetrics(state.records, {
@@ -275,10 +286,13 @@ export default function MapScreen() {
   // 速度平滑窗口（用於過濾 GPS 速度抖動）
   const speedWindowRef = useRef<number[]>([]);
   const lastValidSpeedRef = useRef<number>(0);
+  const motionStillRef = useRef(true);
+  const hikingPauseSuggestedRef = useRef(false);
 
   // 崩潰恢復
   const [showRecoveryAlert, setShowRecoveryAlert] = useState(false);
   const [recoverySnapshot, setRecoverySnapshot] = useState<Partial<import("@/lib/ride-context").RideState> | null>(null);
+  const sportTrackingPolicy = SPORT_TRACKING_POLICIES[state.sportType];
 
   // 匯入 GPX 與釘選 OSRM 路徑分開保存，讓使用者可選擇清除或並存顯示。
   const [pinnedNavigationLayers, setPinnedNavigationLayers] = useState<PinnedNavigationLayer<GpxRoute>[]>([]);
@@ -362,6 +376,29 @@ export default function MapScreen() {
   // 騎乘狀態與背景監聽
   const [mapRideActive, setMapRideActive] = useState(false);
   const [isAppForeground, setIsAppForeground] = useState(true);
+
+  useEffect(() => {
+    if (!mapRideActive || !sportTrackingPolicy.autoPause.requiresStillness) {
+      motionStillRef.current = true;
+      return;
+    }
+    let subscription: { remove: () => void } | null = null;
+    let active = true;
+    void (async () => {
+      const available = await Accelerometer.isAvailableAsync();
+      if (!active || !available) return;
+      Accelerometer.setUpdateInterval(500);
+      subscription = Accelerometer.addListener(({ x, y, z }) => {
+        const magnitude = Math.sqrt(x * x + y * y + z * z);
+        // 重力約為 1 g；偏差小於 0.055 g 視為手機靜止。
+        motionStillRef.current = Math.abs(magnitude - 1) < 0.055;
+      });
+    })();
+    return () => {
+      active = false;
+      subscription?.remove();
+    };
+  }, [mapRideActive, sportTrackingPolicy.autoPause.requiresStillness]);
   const touchGuardHintOpacity = useRef(new Animated.Value(0)).current;
   const [touchGuardHoldProgress, setTouchGuardHoldProgress] = useState(0);
   const touchGuardHoldStartedAtRef = useRef<number | null>(null);
@@ -1285,7 +1322,7 @@ export default function MapScreen() {
         {
           accuracy: isIdleMonitor ? Location.Accuracy.Balanced : Location.Accuracy.BestForNavigation,
           timeInterval: isIdleMonitor ? 60_000 : LOCATION_INTERVAL_SEC * 1000,
-          distanceInterval: isIdleMonitor ? 18 : 3,
+          distanceInterval: isIdleMonitor ? 18 : sportTrackingPolicy.gpsDistanceIntervalM,
         },
         (loc) => {
           if (!active) return;
@@ -1417,7 +1454,8 @@ export default function MapScreen() {
           // GPS 漂移過濾
           if (prevPosRef.current) {
             const dist = haversine(prevPosRef.current.lat, prevPosRef.current.lon, latitude, longitude);
-            if (dist < GPS_DRIFT_FILTER_M) {
+            const driftFilterM = Math.min(GPS_DRIFT_FILTER_M, sportTrackingPolicy.gpsDistanceIntervalM);
+            if (dist < driftFilterM) {
               // GPS 漂移，保持上一個有效速度
               smoothedSpeed = lastValidSpeedRef.current;
             } else {
@@ -1428,12 +1466,15 @@ export default function MapScreen() {
           
           // 速度平滑（5 點滑動平均）
           speedWindowRef.current.push(smoothedSpeed);
-          if (speedWindowRef.current.length > 5) speedWindowRef.current.shift();
+          const sportSpeedWindowSize = stateRef.current.sportType === "running" || stateRef.current.sportType === "trail_running" ? 3 : 5;
+          if (speedWindowRef.current.length > sportSpeedWindowSize) speedWindowRef.current.shift();
           const avgSpeed = speedWindowRef.current.reduce((a, b) => a + b, 0) / speedWindowRef.current.length;
           
           // 自動暫停/恢復邏輯
+          const autoPausePolicy = SPORT_TRACKING_POLICIES[currentState.sportType].autoPause;
           if (currentState.status === "active") {
-            if (avgSpeed < AUTO_PAUSE_THRESHOLD) {
+            const satisfiesStillness = !autoPausePolicy.requiresStillness || motionStillRef.current;
+            if (autoPausePolicy.mode === "automatic" && avgSpeed < autoPausePolicy.speedBelowKmh && satisfiesStillness) {
               lowSpeedCountRef.current += 1;
               if (lowSpeedCountRef.current >= AUTO_PAUSE_CONSECUTIVE) {
                 lowSpeedCountRef.current = 0;
@@ -1447,10 +1488,18 @@ export default function MapScreen() {
                 EmotionalUXManager.onAutoPauseTriggered('speed').catch((error: any) => console.warn("Auto pause emotional UX failed:", error));
                 return;
               }
+            } else if (autoPausePolicy.mode === "suggest" && avgSpeed < autoPausePolicy.speedBelowKmh) {
+              lowSpeedCountRef.current += 1;
+              const hikingPromptCount = Math.ceil(autoPausePolicy.stillForSeconds / LOCATION_INTERVAL_SEC);
+              if (lowSpeedCountRef.current >= hikingPromptCount && !hikingPauseSuggestedRef.current) {
+                hikingPauseSuggestedRef.current = true;
+                Alert.alert("登山停留提示", "已偵測到長時間低速停留。登山模式不會自動暫停；若正在休息，可手動暫停以保持移動時間精確。");
+              }
             } else {
               lowSpeedCountRef.current = 0;
+              hikingPauseSuggestedRef.current = false;
             }
-          } else if (currentState.status === "paused" && avgSpeed >= AUTO_PAUSE_RESUME_THRESHOLD) {
+          } else if (currentState.status === "paused" && autoPausePolicy.mode === "automatic" && avgSpeed >= Math.max(AUTO_PAUSE_RESUME_THRESHOLD, autoPausePolicy.speedBelowKmh + 0.5)) {
             lowSpeedCountRef.current = 0;
             dispatch({ type: "RESUME" });
             // 集成情感化 UX - 自動恢復反饋
@@ -1531,7 +1580,8 @@ export default function MapScreen() {
             summary.hadLiveWeather = true;
           }
           const currentSpeedMs = speed ?? 0;
-          const rawPower = calculatePower({
+          const isCyclingSport = currentState.sportType === "cycling";
+          const rawPower = isCyclingSport ? calculatePower({
             speedMs: currentSpeedMs,
             prevSpeedMs: prevSpeedMsRef.current,
             intervalSec: LOCATION_INTERVAL_SEC,
@@ -1540,30 +1590,36 @@ export default function MapScreen() {
             riderMassKg: settings.weight,
             bikeMassKg: settings.bikeWeight ?? 10,
             airDensityKgM3: airDensityRef.current,
-          });
+          }) : 0;
           prevSpeedMsRef.current = currentSpeedMs;
-          // 純本機功率：以 GPS 速度、坡度、風況與重量進行五點平滑推算。
-          powerWindowRef.current.push(rawPower);
+          if (isCyclingSport) powerWindowRef.current.push(rawPower);
           if (powerWindowRef.current.length > 5) powerWindowRef.current.shift();
-          const power = Math.round(
-            powerWindowRef.current.reduce((a, b) => a + b, 0) / powerWindowRef.current.length
-          );
-          // 以物理推算功率；缺少功率時以體重、速度與坡度的 MET 模型回退。
-          const calorieResult = calculatePersonalizedCalories({
-            powerW: power,
-            hasMeasuredPower: power > 0,
-            speedKmh,
-            gradePct: grade,
-            riderWeightKg: settings.weight,
-            ftpW: estimateFtpW,
-            intervalSec: LOCATION_INTERVAL_SEC,
-            temperatureC: currentWeather?.temperature,
-            humidityPct: currentWeather?.humidity,
-            weatherCode: currentWeather?.weatherCode,
-            precipitationProb: currentWeather?.precipitationProb,
-            headwindMs,
-          });
-          const calIncrement = calorieResult.kcal;
+          const power = isCyclingSport
+            ? Math.round(powerWindowRef.current.reduce((a, b) => a + b, 0) / Math.max(1, powerWindowRef.current.length))
+            : 0;
+          const calIncrement = isCyclingSport
+            ? calculatePersonalizedCalories({
+              powerW: power,
+              hasMeasuredPower: power > 0,
+              speedKmh,
+              gradePct: grade,
+              riderWeightKg: settings.weight,
+              ftpW: estimateFtpW,
+              intervalSec: LOCATION_INTERVAL_SEC,
+              temperatureC: currentWeather?.temperature,
+              humidityPct: currentWeather?.humidity,
+              weatherCode: currentWeather?.weatherCode,
+              precipitationProb: currentWeather?.precipitationProb,
+              headwindMs,
+            }).kcal
+            : estimateSportCalories({
+              sportType: currentState.sportType,
+              weightKg: settings.weight,
+              durationSec: LOCATION_INTERVAL_SEC,
+              speedKmh,
+              gradePct: grade,
+              vamMPerHour: sportVam,
+            });
 
           dispatch({
             type: "LOCATION_UPDATE",
@@ -1618,7 +1674,7 @@ export default function MapScreen() {
             elapsedSec: currentState.elapsed,
             riderWeightKg: settings.weight,
             ftpW: estimateFtpW,
-            intensityFactor: calorieResult.intensityFactor,
+            intensityFactor: isCyclingSport ? Math.min(2, power / Math.max(1, estimateFtpW)) : 1,
             sweatRatePerHour: sweatResult.sweatRatePerHour,
             environmentLoad: sweatResult.environmentLoad,
             weatherAvailable: Boolean(currentWeather),
@@ -2214,6 +2270,34 @@ export default function MapScreen() {
     return (state.distance / 1000) / (state.elapsed / 3600);
   }, [state.elapsed, state.distance]);
 
+  const sportSpeedKmh = useMemo(() => {
+    if (state.sportType === "cycling" || state.route.length === 0) return state.currentSpeed;
+    return smoothSpeedKmh(state.route.slice(-12).map((point) => ({
+      speedKmh: Math.max(0, (point.speed ?? 0) * 3.6),
+      timestamp: point.timestamp,
+    })));
+  }, [state.currentSpeed, state.route, state.sportType]);
+  const sportVam = useMemo(() => calculateVamMPerHour(state.route.slice(-20).map((point) => ({
+    altitudeM: point.altitude,
+    timestamp: point.timestamp,
+  }))), [state.route]);
+  const sportGapPace = useMemo(() => {
+    const paceSeconds = sportSpeedKmh > 0 ? 3600 / sportSpeedKmh : 0;
+    return calculateGapPaceSecPerKm(paceSeconds, currentGrade);
+  }, [currentGrade, sportSpeedKmh]);
+  const sportDashboardMetrics = useMemo(() => buildSportDashboardMetrics({
+    sportType: state.sportType,
+    speedKmh: sportSpeedKmh,
+    averageSpeedKmh: avgSpeed,
+    distanceM: state.distance,
+    elapsedSec: state.elapsed,
+    altitudeM: state.currentAltitude,
+    totalAscentM: state.totalAscent,
+    gradePct: currentGrade,
+    gapPaceSecPerKm: sportGapPace,
+    vamMPerHour: sportVam,
+  }), [avgSpeed, currentGrade, sportGapPace, sportSpeedKmh, sportVam, state.currentAltitude, state.distance, state.elapsed, state.sportType, state.totalAscent]);
+
   const calorieWidth = calorieAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"], extrapolate: "clamp" });
   const waterWidth = waterAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"], extrapolate: "clamp" });
 
@@ -2542,11 +2626,41 @@ export default function MapScreen() {
           )}
         </View>
 
+        {!isActive && (
+          <View style={styles.sportSelector}>
+            {(Object.keys(SPORT_META) as SportType[]).map((sportType) => {
+              const meta = SPORT_META[sportType];
+              const selected = state.sportType === sportType;
+              return (
+                <Pressable
+                  key={sportType}
+                  accessibilityLabel={`選擇${meta.label}`}
+                  style={[styles.sportChoice, selected && { backgroundColor: meta.accent + "2E", borderColor: meta.accent }]}
+                  onPress={() => setSportType(sportType)}
+                >
+                  <Text style={styles.sportChoiceIcon}>{meta.icon}</Text>
+                  <Text style={[styles.sportChoiceLabel, selected && { color: "#fff" }]} numberOfLines={1}>{meta.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
         {/* ── 儀表板（依排序動態顯示，前6格在收縮面板） ── */}
         <View style={styles.sixGrid}>
-          {dashPanelFields.map((key) => (
-            <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} />
-          ))}
+          {state.sportType === "cycling"
+            ? dashPanelFields.map((key) => (
+              <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} />
+            ))
+            : sportDashboardMetrics.map((metric) => (
+              <View key={metric.label} style={styles.sportMetric}>
+                <Text style={styles.sportMetricLabel}>{metric.label}</Text>
+                <View style={styles.sportMetricValueRow}>
+                  <Text style={styles.sportMetricValue}>{metric.value}</Text>
+                  {metric.unit ? <Text style={styles.sportMetricUnit}>{metric.unit}</Text> : null}
+                </View>
+              </View>
+            ))}
         </View>
 
         {/* ── 展開後：總爬升 + 進度條 ── */}
@@ -3415,6 +3529,39 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(255,255,255,0.06)",
     marginTop: 2,
   },
+  sportSelector: {
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  sportChoice: {
+    flex: 1,
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+  sportChoiceIcon: { fontSize: 17 },
+  sportChoiceLabel: { color: "rgba(255,255,255,0.63)", fontSize: 10, fontWeight: "700", textAlign: "center" },
+  sportMetric: {
+    width: "33.333%",
+    minHeight: 76,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.07)",
+    paddingHorizontal: 4,
+  },
+  sportMetricLabel: { color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: "700", textAlign: "center" },
+  sportMetricValueRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "center", marginTop: 6 },
+  sportMetricValue: { color: "#fff", fontSize: 22, fontWeight: "800", letterSpacing: -0.7 },
+  sportMetricUnit: { color: "rgba(255,255,255,0.56)", fontSize: 10, marginLeft: 3 },
 
   // 展開區域
   expandedSection: {

@@ -1,5 +1,5 @@
 import { calculateNormalizedPowerFromHistory } from "./tss-calc";
-import type { LocationPoint, RideActivityType, RideCalculationProfile, RideRecord, SupplyConfirmation } from "./ride-context";
+import type { LocationPoint, RideActivityType, RideCalculationProfile, RideRecord, SportType, SupplyConfirmation } from "./ride-context";
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -161,6 +161,12 @@ function normalizeActivityType(value: unknown): RideActivityType {
     : "road";
 }
 
+function normalizeSportType(value: unknown): SportType {
+  return value === "running" || value === "hiking" || value === "trail_running" || value === "cycling"
+    ? value
+    : "cycling";
+}
+
 function normalizeRpe(value: unknown): number | undefined {
   const rpe = normalizedOptional(value);
   return rpe !== undefined && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : undefined;
@@ -241,6 +247,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     supplyConfirmations: normalizeSupplyConfirmations(source.supplyConfirmations),
     description: typeof source.description === "string" ? source.description : undefined,
     activityType: normalizeActivityType(source.activityType),
+    sportType: normalizeSportType(source.sportType),
     equipment: typeof source.equipment === "string" && source.equipment.trim() ? source.equipment.trim().slice(0, 80) : undefined,
     perceivedExertion: normalizeRpe(source.perceivedExertion),
     perceivedExertionSource: source.perceivedExertionSource === "manual" || source.perceivedExertionSource === "app-estimate" ? source.perceivedExertionSource : undefined,

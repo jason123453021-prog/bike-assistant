@@ -59,6 +59,7 @@ import { attachRidePhotos, loadRidePhotoTimeline, removeRidePhoto, type RidePhot
 import { persistRideMedia } from "@/lib/local-ride-media";
 import { ZoomableActivityPhoto } from "@/components/zoomable-activity-photo";
 import { resolveActivityCoverPhotoUri } from "@/lib/activity-media";
+import { calculateGapPaceSecPerKm, formatPaceFromKmh, formatPaceSeconds, SPORT_META, type SportType } from "@/lib/sport-metrics";
 import * as ImagePicker from "expo-image-picker";
 
 
@@ -958,7 +959,7 @@ export default function RideDetailScreen() {
         <View style={styles.activityInitialSummary}>
           <ActivitySummaryHeader
             title={record.name}
-            subtitle={`${dateStr} · ${activityTypeLabel(record.activityType)}`}
+            subtitle={`${dateStr} · ${SPORT_META[record.sportType ?? "cycling"].label}`}
           />
           <CoreActivitySummaryGrid
             distanceKm={record.distance / 1000}
@@ -967,6 +968,9 @@ export default function RideDetailScreen() {
             averagePowerW={record.avgPower}
             averageSpeedKmh={averageMovingSpeed}
             calories={record.calories}
+            sportType={record.sportType ?? "cycling"}
+            averageGrade={record.averageGrade ?? 0}
+            altitudeM={record.maxElevation ?? 0}
           />
         </View>
 
@@ -1529,7 +1533,7 @@ export default function RideDetailScreen() {
           <Animated.View style={[styles.activityViewerDrawer, { height: activityViewerDrawerHeight }]} {...activityViewerDrawerResponder.panHandlers}>
             <ActivitySummaryHeader
               title={record.name}
-              subtitle={`${dateStr} · ${activityTypeLabel(record.activityType)}`}
+              subtitle={`${dateStr} · ${SPORT_META[record.sportType ?? "cycling"].label}`}
             />
 
             <CoreActivitySummaryGrid
@@ -1539,6 +1543,9 @@ export default function RideDetailScreen() {
               averagePowerW={record.avgPower}
               averageSpeedKmh={averageMovingSpeed}
               calories={record.calories}
+              sportType={record.sportType ?? "cycling"}
+              averageGrade={record.averageGrade ?? 0}
+              altitudeM={record.maxElevation ?? 0}
             />
           </Animated.View>
         </View>
@@ -1731,6 +1738,9 @@ function CoreActivitySummaryGrid({
   averagePowerW,
   averageSpeedKmh,
   calories,
+  sportType,
+  averageGrade,
+  altitudeM,
 }: {
   distanceKm: number;
   ascentM: number;
@@ -1738,15 +1748,20 @@ function CoreActivitySummaryGrid({
   averagePowerW: number;
   averageSpeedKmh: number;
   calories: number;
+  sportType: SportType;
+  averageGrade: number;
+  altitudeM: number;
 }) {
-  const entries = [
-    ["距離", `${distanceKm.toFixed(2)} 公里`],
-    ["爬升海拔", `${Math.round(ascentM).toLocaleString()} 公尺`],
-    ["移動時間", formatDuration(movingDuration)],
-    ["平均功率", `${Math.round(averagePowerW)} 瓦`],
-    ["平均速度", `${averageSpeedKmh.toFixed(1)} 公里/小時`],
-    ["卡路里", `${Math.round(calories).toLocaleString()} 卡`],
-  ] as const;
+  const pace = formatPaceFromKmh(averageSpeedKmh);
+  const gap = formatPaceSeconds(calculateGapPaceSecPerKm(averageSpeedKmh > 0 ? 3600 / averageSpeedKmh : 0, averageGrade));
+  const vam = movingDuration > 0 ? (ascentM / movingDuration) * 3600 : 0;
+  const entries = sportType === "running"
+    ? [["距離", `${distanceKm.toFixed(2)} 公里`], ["總爬升", `${Math.round(ascentM)} 公尺`], ["移動時間", formatDuration(movingDuration)], ["平均配速", `${pace} /公里`], ["平均速度", `${averageSpeedKmh.toFixed(1)} 公里/小時`], ["卡路里", `${Math.round(calories)} 卡`]] as const
+    : sportType === "hiking"
+      ? [["距離", `${distanceKm.toFixed(2)} 公里`], ["總爬升", `${Math.round(ascentM)} 公尺`], ["移動時間", formatDuration(movingDuration)], ["爬升速度", `${Math.round(vam)} 公尺/小時`], ["最高海拔", `${Math.round(altitudeM)} 公尺`], ["卡路里", `${Math.round(calories)} 卡`]] as const
+      : sportType === "trail_running"
+        ? [["距離", `${distanceKm.toFixed(2)} 公里`], ["總爬升", `${Math.round(ascentM)} 公尺`], ["移動時間", formatDuration(movingDuration)], ["平均配速", `${pace} /公里`], ["GAP", `${gap} /公里`], ["卡路里", `${Math.round(calories)} 卡`]] as const
+        : [["距離", `${distanceKm.toFixed(2)} 公里`], ["爬升海拔", `${Math.round(ascentM).toLocaleString()} 公尺`], ["移動時間", formatDuration(movingDuration)], ["平均功率", `${Math.round(averagePowerW)} 瓦`], ["平均速度", `${averageSpeedKmh.toFixed(1)} 公里/小時`], ["卡路里", `${Math.round(calories).toLocaleString()} 卡`]] as const;
 
   return (
     <View style={styles.coreActivitySummaryGrid}>
