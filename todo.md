@@ -1533,3 +1533,8 @@
 - [x] 將活動詳情主頁摘要改為兩欄三列：距離／爬升海拔、移動時間／平均功率、平均速度／卡路里
 - [x] 移除主頁舊版三欄成就與次要數據列，讓主頁與全螢幕路線／照片使用同一套核心數據
 - [x] 補強主頁與媒體頁摘要一致性測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.59 MB；NitroModules／MapLibre 掃描 0）
+
+## 活動詳情起始摘要佈局（2026-08-14）
+- [x] 起始狀態只顯示兩欄三列核心數據，隱藏活動標題、日期、類型與其他延伸內容至上滑後
+- [x] 將核心數據向下配置並縮短起始黑色背景高度，擴大上方路線／照片可視空間
+- [x] 補強起始摘要與上滑後完整內容的版面邊界測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.59 MB；NitroModules／MapLibre 掃描 0）

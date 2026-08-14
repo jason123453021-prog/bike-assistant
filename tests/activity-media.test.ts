@@ -54,6 +54,7 @@ describe("activity media presentation", () => {
     expect(source).toContain("onPanResponderMove");
     expect(source).toContain("clampActivityViewerDrawerHeight");
     expect(source).toContain("CoreActivitySummaryGrid");
+    expect(source).toContain("mapHero: { height: 420");
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
   });
 

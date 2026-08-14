@@ -949,29 +949,33 @@ export default function RideDetailScreen() {
 
       {/* ── 本機活動摘要：向上滑動頁面可查看完整數據 ── */}
       <View style={styles.activityBody}>
-        <Text style={styles.activityEyebrow}>活動摘要</Text>
-        <Text style={styles.activityTitle}>{record.name}</Text>
-        <Text style={styles.activityDate}>{dateStr}</Text>
-        <View style={styles.activityMetaRow}>
-          <View style={styles.activityMetaChip}>
-            <Text style={styles.activityMetaChipText}>{activityTypeLabel(record.activityType)}</Text>
-          </View>
-          {record.perceivedExertion !== undefined && (
-            <View style={[styles.activityMetaChip, styles.activityMetaRpeChip]}>
-              <Text style={styles.activityMetaRpeText}>{record.perceivedExertionSource === "app-estimate" ? "App 推定 " : ""}RPE {record.perceivedExertion}/10</Text>
-            </View>
-          )}
-          {record.equipment ? <Text style={styles.activityEquipment}>{record.equipment}</Text> : null}
+        <View style={styles.activityInitialSummary}>
+          <CoreActivitySummaryGrid
+            distanceKm={record.distance / 1000}
+            ascentM={record.totalAscent}
+            movingDuration={movingDuration}
+            averagePowerW={record.avgPower}
+            averageSpeedKmh={averageMovingSpeed}
+            calories={record.calories}
+          />
         </View>
 
-        <CoreActivitySummaryGrid
-          distanceKm={record.distance / 1000}
-          ascentM={record.totalAscent}
-          movingDuration={movingDuration}
-          averagePowerW={record.avgPower}
-          averageSpeedKmh={averageMovingSpeed}
-          calories={record.calories}
-        />
+        <View style={styles.activityDetailsAfterInitial}>
+          <Text style={styles.activityEyebrow}>活動摘要</Text>
+          <Text style={styles.activityTitle}>{record.name}</Text>
+          <Text style={styles.activityDate}>{dateStr}</Text>
+          <View style={styles.activityMetaRow}>
+            <View style={styles.activityMetaChip}>
+              <Text style={styles.activityMetaChipText}>{activityTypeLabel(record.activityType)}</Text>
+            </View>
+            {record.perceivedExertion !== undefined && (
+              <View style={[styles.activityMetaChip, styles.activityMetaRpeChip]}>
+                <Text style={styles.activityMetaRpeText}>{record.perceivedExertionSource === "app-estimate" ? "App 推定 " : ""}RPE {record.perceivedExertion}/10</Text>
+              </View>
+            )}
+            {record.equipment ? <Text style={styles.activityEquipment}>{record.equipment}</Text> : null}
+          </View>
+        </View>
 
         {replayFrames.length > 1 && (
           <View style={styles.replayCard}>
@@ -1797,14 +1801,14 @@ const detailStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0d0d1a" },
   pageContent: { backgroundColor: "#0d0d1a" },
-  mapHero: { height: 360, width: SCREEN_W, position: "relative", overflow: "hidden" },
-  map: { width: SCREEN_W, height: 360 },
+  mapHero: { height: 420, width: SCREEN_W, position: "relative", overflow: "hidden" },
+  map: { width: SCREEN_W, height: 420 },
   activityBody: {
     backgroundColor: "#0d0d1a",
     marginTop: -20,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingTop: 22,
+    paddingTop: 0,
     paddingHorizontal: 20,
     minHeight: 520,
   },
@@ -1817,6 +1821,8 @@ const styles = StyleSheet.create({
   activityMetaRpeChip: { backgroundColor: "rgba(245,158,11,0.14)" },
   activityMetaRpeText: { color: "#FCD34D", fontSize: 11, fontWeight: "800" },
   activityEquipment: { color: "rgba(255,255,255,0.55)", fontSize: 11, flexShrink: 1 },
+  activityInitialSummary: { paddingTop: 34, paddingBottom: 20 },
+  activityDetailsAfterInitial: { paddingTop: 20 },
   summaryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",

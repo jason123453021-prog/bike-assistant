@@ -42,6 +42,9 @@ describe("ride detail JSX safety", () => {
     expect(source).toContain("ZoomableActivityPhoto");
     expect(source).toContain("CoreActivitySummaryGrid");
     expect((source.match(/<CoreActivitySummaryGrid/g) ?? []).length).toBe(2);
+    expect(source).toContain("activityInitialSummary");
+    expect(source).toContain("activityDetailsAfterInitial");
+    expect(source.indexOf("activityInitialSummary")).toBeLessThan(source.indexOf("activityDetailsAfterInitial"));
     expect(source).toContain("爬升海拔");
     expect(source).toContain("平均功率");
     expect(source).toContain("平均速度");
