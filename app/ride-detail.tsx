@@ -68,6 +68,7 @@ const ACTIVITY_SUMMARY_CONTENT_TOP = 22;
 const ACTIVITY_SUMMARY_CONTENT_BOTTOM = 20;
 const ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.46), 360);
 const ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.78), 620);
+const ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT = Math.max(0, SCREEN_H - 400);
 
 function clampActivityViewerDrawerHeight(value: number): number {
   return Math.min(ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT, Math.max(ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT, value));
@@ -953,10 +954,10 @@ export default function RideDetailScreen() {
       {/* ── 本機活動摘要：向上滑動頁面可查看完整數據 ── */}
       <View style={styles.activityBody}>
         <View style={styles.activityInitialSummary}>
-          <View style={styles.activityInitialHeading}>
-            <Text style={styles.activityTitle}>{record.name}</Text>
-            <Text style={styles.activityDate}>{dateStr}</Text>
-          </View>
+          <ActivitySummaryHeader
+            title={record.name}
+            subtitle={`${dateStr} · ${activityTypeLabel(record.activityType)}`}
+          />
           <CoreActivitySummaryGrid
             distanceKm={record.distance / 1000}
             ascentM={record.totalAscent}
@@ -1524,13 +1525,10 @@ export default function RideDetailScreen() {
           </Pressable>
 
           <Animated.View style={[styles.activityViewerDrawer, { height: activityViewerDrawerHeight }]} {...activityViewerDrawerResponder.panHandlers}>
-            <View style={styles.activityViewerDrawerHeader}>
-              <View style={styles.activityViewerDrawerTitleBlock}>
-                <Text style={styles.activityViewerDrawerEyebrow}>活動摘要</Text>
-                <Text style={styles.activityViewerDrawerTitle} numberOfLines={1}>{record.name}</Text>
-                <Text style={styles.activityViewerDrawerSubtitle} numberOfLines={2}>{dateStr} · {activityTypeLabel(record.activityType)}</Text>
-              </View>
-            </View>
+            <ActivitySummaryHeader
+              title={record.name}
+              subtitle={`${dateStr} · ${activityTypeLabel(record.activityType)}`}
+            />
 
             <CoreActivitySummaryGrid
               distanceKm={record.distance / 1000}
@@ -1760,6 +1758,16 @@ function CoreActivitySummaryGrid({
   );
 }
 
+function ActivitySummaryHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <View style={styles.activitySummaryHeader}>
+      <Text style={styles.activitySummaryEyebrow}>活動摘要</Text>
+      <Text style={styles.activitySummaryTitle} numberOfLines={1}>{title}</Text>
+      <Text style={styles.activitySummarySubtitle} numberOfLines={2}>{subtitle}</Text>
+    </View>
+  );
+}
+
 const summaryStyles = StyleSheet.create({
   cell: { flex: 1, alignItems: "center", gap: 2 },
   value: { fontSize: 20, fontWeight: "700", fontVariant: ["tabular-nums"] },
@@ -1803,16 +1811,17 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   activityEyebrow: { color: "#00E676", fontSize: 12, fontWeight: "700", letterSpacing: 0.6, marginBottom: 5 },
-  activityTitle: { color: "#fff", fontSize: 27, fontWeight: "800", lineHeight: 34 },
-  activityDate: { color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 5, marginBottom: 18 },
+  activitySummaryHeader: { width: "100%" },
+  activitySummaryEyebrow: { color: "#00E676", fontSize: 11, fontWeight: "800", letterSpacing: 0.7 },
+  activitySummaryTitle: { color: "#fff", fontSize: 21, fontWeight: "800", marginTop: 3 },
+  activitySummarySubtitle: { color: "rgba(255,255,255,0.62)", fontSize: 12, lineHeight: 17, marginTop: 5 },
   activityMetaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 7, marginTop: -10, marginBottom: 16 },
   activityMetaChip: { borderRadius: 99, backgroundColor: "rgba(96,165,250,0.14)", paddingHorizontal: 9, paddingVertical: 5 },
   activityMetaChipText: { color: "#93C5FD", fontSize: 11, fontWeight: "800" },
   activityMetaRpeChip: { backgroundColor: "rgba(245,158,11,0.14)" },
   activityMetaRpeText: { color: "#FCD34D", fontSize: 11, fontWeight: "800" },
   activityEquipment: { color: "rgba(255,255,255,0.55)", fontSize: 11, flexShrink: 1 },
-  activityInitialSummary: { paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM },
-  activityInitialHeading: { paddingBottom: 20 },
+  activityInitialSummary: { minHeight: ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT, paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM },
   activityDetailsAfterInitial: { paddingTop: 18 },
   summaryGrid: {
     flexDirection: "row",
@@ -2214,7 +2223,7 @@ const styles = StyleSheet.create({
   calibrationActions: { flexDirection: "row", gap: 10, marginTop: 16 },
   calibrationAction: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 11, alignItems: "center" },
   calibrationActionText: { fontSize: 14, fontWeight: "700" },
-  mediaViewer: { flex: 1, backgroundColor: "#050505", justifyContent: "center" },
+  mediaViewer: { flex: 1, backgroundColor: "#050505", justifyContent: "flex-start" },
   mediaViewerClose: { position: "absolute", top: 56, left: 18, zIndex: 2, width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.58)" },
   activityViewerStage: { width: "100%", overflow: "hidden", backgroundColor: "#050505" },
   mediaViewerPage: { width: SCREEN_W, height: SCREEN_H, justifyContent: "flex-start", alignItems: "center" },
@@ -2224,11 +2233,6 @@ const styles = StyleSheet.create({
   activityViewerRoutePage: { backgroundColor: "#08110D" },
   activityViewerRouteMap: { width: SCREEN_W, flex: 1 },
   activityViewerDrawer: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: ACTIVITY_SUMMARY_HORIZONTAL_PADDING, paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: "#101012", borderTopWidth: 1, borderColor: "rgba(255,255,255,0.13)", overflow: "hidden" },
-  activityViewerDrawerHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  activityViewerDrawerTitleBlock: { flex: 1 },
-  activityViewerDrawerEyebrow: { color: "#00E676", fontSize: 11, fontWeight: "800", letterSpacing: 0.7 },
-  activityViewerDrawerTitle: { color: "#fff", fontSize: 21, fontWeight: "800", marginTop: 3 },
-  activityViewerDrawerSubtitle: { color: "rgba(255,255,255,0.62)", fontSize: 12, lineHeight: 17, marginTop: 5 },
   coreActivitySummaryGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 22, rowGap: 24 },
   coreActivitySummaryMetric: { width: "50%", alignItems: "center", paddingHorizontal: 6 },
   coreActivitySummaryLabel: { color: "rgba(255,255,255,0.72)", fontSize: 13, fontWeight: "700", marginBottom: 5 },

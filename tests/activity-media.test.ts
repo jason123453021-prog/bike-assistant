@@ -60,19 +60,24 @@ describe("activity media presentation", () => {
     expect(source).toContain("fillContainer");
   });
 
-  it("keeps the activity title and date above the initial six-metric summary", () => {
+  it("uses one identical title, date, type, and six-metric summary for the initial main and media views", () => {
     const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
     const source = fs.readFileSync(filePath, "utf8");
     const initialSummaryIndex = source.indexOf('<View style={styles.activityInitialSummary}>');
-    const initialHeadingIndex = source.indexOf('<View style={styles.activityInitialHeading}>');
-    const summaryGridIndex = source.indexOf("<CoreActivitySummaryGrid", initialHeadingIndex);
+    const initialHeaderIndex = source.indexOf("<ActivitySummaryHeader", initialSummaryIndex);
+    const initialGridIndex = source.indexOf("<CoreActivitySummaryGrid", initialHeaderIndex);
+    const mediaDrawerIndex = source.indexOf('<Animated.View style={[styles.activityViewerDrawer');
+    const mediaHeaderIndex = source.indexOf("<ActivitySummaryHeader", mediaDrawerIndex);
+    const mediaGridIndex = source.indexOf("<CoreActivitySummaryGrid", mediaHeaderIndex);
 
     expect(initialSummaryIndex).toBeGreaterThanOrEqual(0);
-    expect(initialHeadingIndex).toBeGreaterThan(initialSummaryIndex);
-    expect(summaryGridIndex).toBeGreaterThan(initialHeadingIndex);
-    expect(source).toContain("<Text style={styles.activityTitle}>{record.name}</Text>");
-    expect(source).toContain("<Text style={styles.activityDate}>{dateStr}</Text>");
-    expect(source).toContain("activityInitialHeading: { paddingBottom: 20 }");
+    expect(initialHeaderIndex).toBeGreaterThan(initialSummaryIndex);
+    expect(initialGridIndex).toBeGreaterThan(initialHeaderIndex);
+    expect(mediaHeaderIndex).toBeGreaterThan(mediaDrawerIndex);
+    expect(mediaGridIndex).toBeGreaterThan(mediaHeaderIndex);
+    expect(source).toContain("function ActivitySummaryHeader");
+    expect(source).toContain("ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT");
+    expect(source).toContain("minHeight: ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT");
     expect(source).toContain("<Text style={styles.activityEyebrow}>活動詳情</Text>");
   });
 
@@ -85,6 +90,7 @@ describe("activity media presentation", () => {
     expect(source).toContain("CoreActivitySummaryGrid");
     expect(source).toContain("mapHero: { height: 420");
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
+    expect(source).toContain('mediaViewer: { flex: 1, backgroundColor: "#050505", justifyContent: "flex-start" }');
   });
 
   it("keeps the summary identical across route thumbnails and photos", () => {
