@@ -1493,3 +1493,8 @@
 - [x] 在全螢幕路線頁呈現每張照片的拍攝時間與對應軌跡海拔資訊
 - [x] 新增完全本機的活動封面照片選擇、儲存、替換與移除流程
 - [x] 補強媒體互動與封面選擇測試，完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；96 passed、1 skipped；Android Hermes bundle 5.58 MB；NitroModules／MapLibre 掃描 0）
+
+## 活動媒體平移與地圖手勢區隔（2026-08-14）
+- [x] 在放大後的全螢幕照片加入單指拖曳平移與超出範圍回彈限制
+- [x] 保持全螢幕路線地圖的平移、縮放與旋轉手勢，且不對照片開放旋轉
+- [x] 補強手勢邊界回歸測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；97 passed、1 skipped；Android Hermes bundle 5.59 MB；NitroModules／MapLibre 掃描 0）

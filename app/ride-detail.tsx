@@ -1496,7 +1496,7 @@ export default function RideDetailScreen() {
               <View key={photo.id} style={styles.mediaViewerPage}>
                 <ZoomableActivityPhoto uri={photo.uri} resetKey={photo.id} />
                 <View style={styles.activityViewerPhotoInfo}>
-                  <Text style={styles.activityViewerPhotoText}>照片 {index + 1} · 雙擊放大 · 雙指縮放</Text>
+                  <Text style={styles.activityViewerPhotoText}>照片 {index + 1} · 雙擊放大 · 雙指縮放 · 放大後單指拖曳</Text>
                   {photoCaptureDetails.get(photo.id) ? (
                     <Text style={styles.activityViewerPhotoMeta}>{formatActivityPhotoRouteMeta(photoCaptureDetails.get(photo.id)?.capturedAt, photoCaptureDetails.get(photo.id)?.altitude)}</Text>
                   ) : (

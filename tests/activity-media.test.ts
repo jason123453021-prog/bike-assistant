@@ -21,5 +21,19 @@ describe("activity media presentation", () => {
     expect(source).toContain("numberOfTaps(2)");
     expect(source).toContain("MAX_SCALE = 4");
     expect(source).toContain("GestureDetector");
+    expect(source).toContain("Gesture.Pan()");
+    expect(source).toContain("manualActivation(true)");
+    expect(source).toContain("maxHorizontalTranslation");
+    expect(source).toContain("放大後可單指拖曳平移");
+  });
+
+  it("keeps full-screen route map gestures separate from photo gestures", () => {
+    const filePath = path.join(process.cwd(), "components", "leaflet-map.tsx");
+    const source = fs.readFileSync(filePath, "utf8");
+
+    expect(source).toContain("dragging: true");
+    expect(source).toContain("touchZoom: true");
+    expect(source).toContain("rotate: true");
+    expect(source).toContain("touchRotate: true");
   });
 });
