@@ -1676,6 +1676,11 @@
 - [x] 檢視定位／權限／儲存失敗防呆、Safe Area 與按鈕操作可達性
 - [x] 新增必要回歸測試、完成完整測試與 Android bundle，並提供自我檢測摘要（TypeScript 0 errors、136 passed／1 skipped、Android Hermes bundle 5.66 MB）
 
+## React Native 已棄用樣式相容性（2026-08-14）
+- [x] 掃描全專案的 pointerEvents 屬性及 shadow* 舊式樣式
+- [x] 遷移至 style.pointerEvents 與 boxShadow 相容寫法，維持原本互動與視覺層級
+- [x] 新增棄用樣式回歸檢查，完成 TypeScript 0 errors、138 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑

@@ -3230,10 +3230,9 @@ export default function MapScreen() {
           delayLongPress={settings.touchGuardUnlockHoldMs}
         >
           <Animated.View
-            pointerEvents="none"
             style={[
               styles.touchGuardCornerHint,
-              { top: insets.top + 144, opacity: touchGuardHintOpacity },
+              { top: insets.top + 144, opacity: touchGuardHintOpacity, pointerEvents: "none" },
             ]}
           >
             <IconSymbol name="lock.fill" size={14} color="#9CFFB5" />
@@ -3242,7 +3241,7 @@ export default function MapScreen() {
             </Text>
           </Animated.View>
           {touchGuardHoldProgress > 0 && (
-            <View pointerEvents="none" style={[styles.touchGuardProgressRing, { top: insets.top + 56 }]}> 
+            <View style={[styles.touchGuardProgressRing, { top: insets.top + 56, pointerEvents: "none" }]}> 
               <Svg width={56} height={56} viewBox="0 0 56 56">
                 <Circle cx="28" cy="28" r="23" stroke="rgba(255,255,255,0.18)" strokeWidth="4" fill="rgba(5, 21, 14, 0.62)" />
                 <Circle
@@ -3267,12 +3266,12 @@ export default function MapScreen() {
 
       {showTouchGuardUnlockSuccess && (
         <Animated.View
-          pointerEvents="none"
           style={[
             styles.touchGuardUnlockSuccess,
             {
               top: insets.top + 56,
               opacity: touchGuardUnlockSuccessOpacity,
+              pointerEvents: "none",
               transform: [{ scale: touchGuardUnlockSuccessScale }],
             },
           ]}
@@ -3511,10 +3510,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(12, 91, 41, 0.96)",
     borderWidth: 2,
     borderColor: "#9CFFB5",
-    shadowColor: "#34C759",
-    shadowOpacity: 0.42,
-    shadowRadius: 10,
-    elevation: 8,
+    boxShadow: "0px 0px 10px rgba(52, 197, 89, 0.42)",
   },
   touchGuardUnlockSuccessCheck: { color: "#FFFFFF", fontSize: 31, fontWeight: "900", lineHeight: 36 },
   returnBtn: {
@@ -3569,11 +3565,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.30)",
   },
   turnBannerArrive: {
     backgroundColor: "rgba(52,199,89,0.92)",
@@ -3623,11 +3615,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.22)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.24,
-    shadowRadius: 8,
-    elevation: 8,
+    boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.24)",
   },
   rideTrackingStatusAutoPaused: {
     backgroundColor: "rgba(194, 87, 0, 0.96)",

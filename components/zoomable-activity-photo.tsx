@@ -235,7 +235,7 @@ export function ZoomableActivityPhoto({ uri, resetKey, fillContainer = false }: 
         </Animated.View>
       </GestureDetector>
       {fillContainer ? (
-        <View style={styles.photoControls} pointerEvents="box-none">
+        <View style={[styles.photoControls, { pointerEvents: "box-none" }]}>
           <Pressable
             style={({ pressed }) => [styles.photoModeButton, { opacity: pressed ? 0.72 : 1 }]}
             onPress={() => {

@@ -64,7 +64,7 @@ export function SupplyModal({
   const bothAlert = calorieAlert && waterAlert;
 
   return visible ? (
-    <View style={styles.overlay} pointerEvents="box-none">
+    <View style={[styles.overlay, { pointerEvents: "box-none" }]}>
         <Animated.View
           style={[
             styles.card,

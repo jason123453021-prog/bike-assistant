@@ -1949,7 +1949,7 @@ const styles = StyleSheet.create({
   mapPlaybackBadge: { position: "absolute", right: 14, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.62)", zIndex: 2 },
   mapPlaybackDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#FF8A4C" },
   mapPlaybackText: { color: "rgba(255,255,255,0.84)", fontSize: 10, fontWeight: "700" },
-  routeMapPhotoThumbButton: { position: "absolute", left: 14, bottom: 14, width: 76, height: 76, borderRadius: 12, overflow: "hidden", backgroundColor: "#101010", borderWidth: 2, borderColor: "rgba(255,255,255,0.86)", zIndex: 2, elevation: 3 },
+  routeMapPhotoThumbButton: { position: "absolute", left: 14, bottom: 14, width: 76, height: 76, borderRadius: 12, overflow: "hidden", backgroundColor: "#101010", borderWidth: 2, borderColor: "rgba(255,255,255,0.86)", zIndex: 2, boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.22)" },
   routeMapPhotoThumbImage: { width: "100%", height: "100%" },
   routeMapPhotoThumbBadge: { position: "absolute", left: 5, bottom: 5, minWidth: 28, height: 23, paddingHorizontal: 5, flexDirection: "row", gap: 3, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: "rgba(0,0,0,0.72)" },
   routeMapPhotoThumbCount: { color: "#fff", fontSize: 11, fontWeight: "800" },
