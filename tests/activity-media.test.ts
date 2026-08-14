@@ -53,7 +53,7 @@ describe("activity media presentation", () => {
 
     expect(source).toContain("onPanResponderMove");
     expect(source).toContain("clampActivityViewerDrawerHeight");
-    expect(source).toContain("activityViewerDrawerMetricsSecondary");
+    expect(source).toContain("activityViewerSummaryGrid");
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
   });
 
@@ -62,6 +62,10 @@ describe("activity media presentation", () => {
     const source = fs.readFileSync(filePath, "utf8");
 
     expect(source).toContain("活動摘要");
+    expect(source).toContain("爬升海拔");
+    expect(source).toContain("平均功率");
+    expect(source).toContain("平均速度");
+    expect(source).toContain("卡路里");
     expect(source).not.toContain("styles.activityViewerDrawerHandle");
     expect(source).not.toContain("styles.activityViewerDrawerHint");
   });

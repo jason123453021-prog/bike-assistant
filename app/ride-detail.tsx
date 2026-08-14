@@ -1568,33 +1568,30 @@ export default function RideDetailScreen() {
               </View>
             </View>
 
-            <View style={styles.activityViewerDrawerMetrics}>
-              <View style={styles.activityViewerDrawerMetric}>
-                <Text style={styles.activityViewerDrawerMetricValue}>{(record.distance / 1000).toFixed(2)}</Text>
-                <Text style={styles.activityViewerDrawerMetricLabel}>距離 km</Text>
+            <View style={styles.activityViewerSummaryGrid}>
+              <View style={styles.activityViewerSummaryMetric}>
+                <Text style={styles.activityViewerSummaryLabel}>距離</Text>
+                <Text style={styles.activityViewerSummaryValue}>{(record.distance / 1000).toFixed(2)} 公里</Text>
               </View>
-              <View style={styles.activityViewerDrawerMetric}>
-                <Text style={styles.activityViewerDrawerMetricValue}>{Math.round(record.totalAscent)}</Text>
-                <Text style={styles.activityViewerDrawerMetricLabel}>爬升 m</Text>
+              <View style={styles.activityViewerSummaryMetric}>
+                <Text style={styles.activityViewerSummaryLabel}>爬升海拔</Text>
+                <Text style={styles.activityViewerSummaryValue}>{Math.round(record.totalAscent).toLocaleString()} 公尺</Text>
               </View>
-              <View style={styles.activityViewerDrawerMetric}>
-                <Text style={styles.activityViewerDrawerMetricValue}>{Math.round(record.calories)}</Text>
-                <Text style={styles.activityViewerDrawerMetricLabel}>卡路里 kcal</Text>
+              <View style={styles.activityViewerSummaryMetric}>
+                <Text style={styles.activityViewerSummaryLabel}>移動時間</Text>
+                <Text style={styles.activityViewerSummaryValue}>{formatDuration(movingDuration)}</Text>
               </View>
-            </View>
-
-            <View style={[styles.activityViewerDrawerMetrics, styles.activityViewerDrawerMetricsSecondary]}>
-              <View style={styles.activityViewerDrawerMetric}>
-                <Text style={styles.activityViewerDrawerMetricValue}>{formatDuration(movingDuration)}</Text>
-                <Text style={styles.activityViewerDrawerMetricLabel}>移動時間</Text>
+              <View style={styles.activityViewerSummaryMetric}>
+                <Text style={styles.activityViewerSummaryLabel}>平均功率</Text>
+                <Text style={styles.activityViewerSummaryValue}>{record.avgPower} 瓦</Text>
               </View>
-              <View style={styles.activityViewerDrawerMetric}>
-                <Text style={styles.activityViewerDrawerMetricValue}>{averageMovingSpeed.toFixed(1)}</Text>
-                <Text style={styles.activityViewerDrawerMetricLabel}>平均速度 km/h</Text>
+              <View style={styles.activityViewerSummaryMetric}>
+                <Text style={styles.activityViewerSummaryLabel}>平均速度</Text>
+                <Text style={styles.activityViewerSummaryValue}>{averageMovingSpeed.toFixed(1)} 公里/小時</Text>
               </View>
-              <View style={styles.activityViewerDrawerMetric}>
-                <Text style={styles.activityViewerDrawerMetricValue}>{record.avgPower}</Text>
-                <Text style={styles.activityViewerDrawerMetricLabel}>平均功率 W</Text>
+              <View style={styles.activityViewerSummaryMetric}>
+                <Text style={styles.activityViewerSummaryLabel}>卡路里</Text>
+                <Text style={styles.activityViewerSummaryValue}>{Math.round(record.calories).toLocaleString()} 卡</Text>
               </View>
             </View>
           </Animated.View>
@@ -2246,6 +2243,10 @@ const styles = StyleSheet.create({
   activityViewerDrawerEyebrow: { color: "#00E676", fontSize: 11, fontWeight: "800", letterSpacing: 0.7 },
   activityViewerDrawerTitle: { color: "#fff", fontSize: 21, fontWeight: "800", marginTop: 3 },
   activityViewerDrawerSubtitle: { color: "rgba(255,255,255,0.62)", fontSize: 12, lineHeight: 17, marginTop: 5 },
+  activityViewerSummaryGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 22, rowGap: 24 },
+  activityViewerSummaryMetric: { width: "50%", alignItems: "center", paddingHorizontal: 6 },
+  activityViewerSummaryLabel: { color: "rgba(255,255,255,0.72)", fontSize: 13, fontWeight: "700", marginBottom: 5 },
+  activityViewerSummaryValue: { color: "#fff", fontSize: 23, fontWeight: "800", fontVariant: ["tabular-nums"], textAlign: "center" },
   activityViewerDrawerMetrics: { flexDirection: "row", marginTop: 15, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.06)", paddingVertical: 11 },
   activityViewerDrawerMetricsSecondary: { marginTop: 10 },
   activityViewerDrawerMetric: { flex: 1, alignItems: "center" },

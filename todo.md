@@ -1523,3 +1523,8 @@
 - [x] 將下方內容收斂為活動摘要，對齊參考畫面的名稱、日期、類型與核心騎乘數據
 - [x] 移除摘要中的額外手勢說明與媒體細節區塊，保留清楚且穩定的單一資訊版面
 - [x] 補強摘要結構測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）
+
+## 兩欄三列活動摘要數據（2026-08-14）
+- [x] 將全螢幕活動摘要改為兩欄三列：距離／爬升海拔、移動時間／平均功率、平均速度／卡路里
+- [x] 套用一致的中文單位與大字數據排版至路線與所有照片媒體頁
+- [x] 補強摘要數據順序與版面結構測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）

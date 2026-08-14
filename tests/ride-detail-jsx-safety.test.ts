@@ -40,7 +40,11 @@ describe("ride detail JSX safety", () => {
     expect(source).toContain("activityViewerPhotoMeta");
     expect(source).toContain("海拔 ${Math.round");
     expect(source).toContain("ZoomableActivityPhoto");
-    expect(source).toContain("activityViewerDrawerMetricsSecondary");
+    expect(source).toContain("activityViewerSummaryGrid");
+    expect(source).toContain("爬升海拔");
+    expect(source).toContain("平均功率");
+    expect(source).toContain("平均速度");
+    expect(source).toContain("卡路里");
     expect(source).not.toContain("styles.activityViewerDrawerHandle");
     expect(source).not.toContain("styles.activityViewerDrawerHint");
     expect(source).toContain("activityViewerRoutePhotoMeta");
