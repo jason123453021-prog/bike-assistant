@@ -1570,6 +1570,11 @@
 - [x] 讓摘要容器僅依活動摘要、標題、日期／類型與六項核心數據的實際內容高度自適應
 - [x] 補強摘要自然高度回歸測試，完成 TypeScript 0 errors、101 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
 
+## 全螢幕照片完整自適應顯示（2026-08-14）
+- [x] 預設以完整照片等比例縮小置入全螢幕可用舞台，不裁切、不只顯示局部
+- [x] 保留雙擊、雙指縮放與放大後平移，另保留使用者可選的裁切滿版模式
+- [x] 補強完整照片預設模式回歸測試，完成 TypeScript 0 errors、101 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑

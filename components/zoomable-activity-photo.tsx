@@ -67,7 +67,7 @@ export function ZoomableActivityPhoto({ uri, resetKey, fillContainer = false }: 
   });
   const [manualFocusY, setManualFocusY] = useState<number | null>(null);
   const [isFocusAdjusting, setIsFocusAdjusting] = useState(false);
-  const [isFullPhotoMode, setIsFullPhotoMode] = useState(false);
+  const [isFullPhotoMode, setIsFullPhotoMode] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -99,7 +99,7 @@ export function ZoomableActivityPhoto({ uri, resetKey, fillContainer = false }: 
     focusAdjusting.value = false;
     setManualFocusY(null);
     setIsFocusAdjusting(false);
-    setIsFullPhotoMode(false);
+    setIsFullPhotoMode(true);
   }, [focusAdjusting, resetKey, savedScale, savedTranslationX, savedTranslationY, scale, translationX, translationY]);
 
   const pinchGesture = Gesture.Pinch()
