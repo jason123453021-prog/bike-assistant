@@ -11,6 +11,7 @@ import * as Speech from "expo-speech";
 import { Platform } from "react-native";
 import { getLocalNotifications } from "@/lib/local-notifications";
 import { configureSupplyNotificationActions, SUPPLY_NOTIFICATION_CATEGORY, type SupplyNotificationKind } from "@/lib/supply-notification-actions";
+import type { SupplyPlan } from "@/lib/smart-supply-plan";
 
 // ─── 震動回饋 ─────────────────────────────────────────────────────────────────
 
@@ -89,6 +90,28 @@ export async function speakSupplyReminder(type: "calorie" | "water", enabled: bo
     ? "補給提醒，請補充能量棒或食物"
     : "補給提醒，請補充水分";
   await speak(msg, enabled);
+}
+
+/**
+ * 依目前智慧補給計畫組合可直接聽懂的提醒內容。這項計算完全在本機完成，
+ * 因此不依賴網路或雲端語音服務。
+ */
+export function formatSmartSupplyReminder(type: "calorie" | "water", plan: SupplyPlan): string {
+  const reason = plan.reason.trim() ? `。原因：${plan.reason}` : "";
+  if (type === "calorie") {
+    return `智慧補給提醒。建議補充 ${Math.round(plan.energyRecommendationKcal)} 大卡能量，約 ${Math.round(plan.carbohydrateRecommendationG)} 公克碳水${reason}`;
+  }
+  return `智慧補水提醒。建議補充 ${Math.round(plan.waterRecommendationMl)} 毫升水分${reason}`;
+}
+
+/** 在智慧補給模式下播報本輪的具體建議補給量與計算原因。 */
+export async function speakSmartSupplyReminder(
+  type: "calorie" | "water",
+  plan: SupplyPlan,
+  enabled: boolean,
+) {
+  if (!enabled) return;
+  await speak(formatSmartSupplyReminder(type, plan), enabled);
 }
 
 export async function speakAutoPause(enabled: boolean) {

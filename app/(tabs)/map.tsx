@@ -71,6 +71,7 @@ import {
   vibrateWarning,
   vibrateSuccess,
   speakSupplyReminder,
+  speakSmartSupplyReminder,
   speakAutoPause,
   speakAutoResume,
   showSupplyNotification,
@@ -431,6 +432,7 @@ export default function MapScreen() {
     // 追蹤尚未確認的補給類型（「稍後」只關閉 Modal，不清除此 ref）
   const pendingCalorieRef = useRef(false);
   const pendingWaterRef = useRef(false);
+  const pendingSupplyPlansRef = useRef<Partial<Record<"calorie" | "water", SupplyPlan>>>({});
   const supplySnoozedUntilRef = useRef<Record<"calorie" | "water", number>>({ calorie: 0, water: 0 });
   const lastAscentRef = useRef(0); // 用於判斷下坡狀態
   const rideStartLocationRef = useRef<{ lat: number; lon: number } | null>(null); // 記錄騎乘開始座標
@@ -599,6 +601,7 @@ export default function MapScreen() {
     }
     pendingCalorieRef.current = false;
     pendingWaterRef.current = false;
+    pendingSupplyPlansRef.current = {};
   }, []);
   const clearIntervalSupplyRepeatTimer = useCallback(() => {
     if (intervalSupplyRepeatTimerRef.current) {
@@ -664,6 +667,7 @@ export default function MapScreen() {
     calorieAnim.setValue(0);
     calorieReminderSentRef.current = false;
     pendingCalorieRef.current = false;
+    delete pendingSupplyPlansRef.current.calorie;
     if (!pendingWaterRef.current) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.calorie = 0;
     void acknowledgeBackgroundSupplyReminder("calorie");
@@ -689,6 +693,7 @@ export default function MapScreen() {
     waterAnim.setValue(0);
     waterReminderSentRef.current = false;
     pendingWaterRef.current = false;
+    delete pendingSupplyPlansRef.current.water;
     if (!pendingCalorieRef.current) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.water = 0;
     void acknowledgeBackgroundSupplyReminder("water");
@@ -947,6 +952,17 @@ export default function MapScreen() {
     }
   }, []);
 
+  const speakPlannedSupplyReminder = useCallback(
+    (type: "calorie" | "water", recommendation?: SupplyPlan) => {
+      if (settings.supplyCalculationMode === "smart" && recommendation) {
+        void speakSmartSupplyReminder(type, recommendation, settings.ttsEnabled);
+        return;
+      }
+      void speakSupplyReminder(type, settings.ttsEnabled);
+    },
+    [settings.supplyCalculationMode, settings.ttsEnabled],
+  );
+
   // ─── 補給提醒 ────────────────────────────────────────────────────────────────
   const triggerSupplyReminder = useCallback(
     async (type: "calorie" | "water", recommendation?: SupplyPlan) => {
@@ -960,8 +976,9 @@ export default function MapScreen() {
         if (recommendation?.waterRecommendationMl) setSupplyRecommendedMl(recommendation.waterRecommendationMl);
       }
       if (recommendation) setSupplyRecommendation(recommendation);
+      if (recommendation) pendingSupplyPlansRef.current[type] = recommendation;
       if (settings.vibrationEnabled) vibrateWarning();
-      if (settings.ttsEnabled) speakSupplyReminder(type, true);
+      speakPlannedSupplyReminder(type, recommendation);
       if (settings.soundEnabled) {
         try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
       }
@@ -985,9 +1002,11 @@ export default function MapScreen() {
           if (type === "calorie") {
             setCalorieAlert(false);
             pendingCalorieRef.current = false;
+            delete pendingSupplyPlansRef.current.calorie;
           } else {
             setWaterAlert(false);
             pendingWaterRef.current = false;
+            delete pendingSupplyPlansRef.current.water;
           }
         }, autoDismissSeconds * 1000);
       }
@@ -999,7 +1018,7 @@ export default function MapScreen() {
           const isPending = type === "calorie" ? pendingCalorieRef.current : pendingWaterRef.current;
           if (isPending && supplySnoozedUntilRef.current[type] <= Date.now()) {
             if (settings.vibrationEnabled) vibrateWarning();
-            if (settings.ttsEnabled) speakSupplyReminder(type, true);
+            speakPlannedSupplyReminder(type, recommendation);
             if (settings.soundEnabled) {
               try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
             }
@@ -1025,9 +1044,10 @@ export default function MapScreen() {
           if (caloriePending) setCalorieAlert(true);
           if (waterPending) setWaterAlert(true);
           // 重複音效與語音
-          if (settings.ttsEnabled) {
-            if (caloriePending) speakSupplyReminder("calorie", true);
-            else speakSupplyReminder("water", true);
+          if (caloriePending) {
+            speakPlannedSupplyReminder("calorie", pendingSupplyPlansRef.current.calorie);
+          } else if (waterPending) {
+            speakPlannedSupplyReminder("water", pendingSupplyPlansRef.current.water);
           }
           if (settings.vibrationEnabled) vibrateWarning();
           if (settings.soundEnabled) {
@@ -1036,7 +1056,7 @@ export default function MapScreen() {
         }, repeatSec * 1000);
       }
     },
-    [settings, alertPlayer, clearSupplyRepeatTimer]
+    [settings, alertPlayer, clearSupplyRepeatTimer, speakPlannedSupplyReminder]
   );
 
   // ─── 自訂補給品觸發邏輯 ────────────────────────────────────────────────────────

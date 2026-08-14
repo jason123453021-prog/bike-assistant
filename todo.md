@@ -1627,6 +1627,11 @@
 - [x] 確保動態閾值隨騎乘條件更新，確認補給提醒使用相同能量與水分目標
 - [x] 補強設定互斥與動態閾值回歸測試，完成 TypeScript 0 errors、118 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
 
+## 智慧補給語音播報（2026-08-14）
+- [x] 達到智慧能量或水分閾值時，以離線 TTS 播報具體建議補給量與計算原因
+- [x] 讓首次提醒、持續提醒與從背景恢復提醒皆沿用同一筆智慧補給計畫，並保留語音開關控制
+- [x] 新增語音提醒內容與導航觸發資料流回歸測試，完成 TypeScript 0 errors、120 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑
