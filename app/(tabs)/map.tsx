@@ -28,6 +28,7 @@ import {
   Animated,
   AppState,
   Dimensions,
+  Modal,
   PanResponder,
   Platform,
   Pressable,
@@ -843,6 +844,8 @@ export default function MapScreen() {
 
   // ─── 底部面板滑桿 ─────────────────────────────────────────────────────────────
   const [panelExpanded, setPanelExpanded] = useState(false);
+  const [sportPickerVisible, setSportPickerVisible] = useState(false);
+  const [sportPickerQuery, setSportPickerQuery] = useState("");
   // ── 儀表板欄位排序：依 normalModeFieldOrder 排序，只顯示已啟用的欄位 ──
   const orderedEnabledFields = useMemo(() => {
     const f = settings.normalModeFields;
@@ -863,9 +866,16 @@ export default function MapScreen() {
   const dashRows = Math.ceil(dashFieldCount / 3) || 1;
   const dashGridH = dashRows * CELL_H;
   const dynamicCollapsedH = Math.min(
-    HEADER_H + dashGridH + CTRL_H,
+    HEADER_H + dashGridH + CTRL_H + insets.bottom + 8,
     PANEL_COLLAPSED_H
   );
+  const sportPickerOptions = useMemo(() => {
+    const query = sportPickerQuery.trim().toLowerCase();
+    return (Object.keys(SPORT_META) as SportType[]).filter((type) => {
+      const meta = SPORT_META[type];
+      return !query || meta.label.toLowerCase().includes(query) || type.includes(query);
+    });
+  }, [sportPickerQuery]);
 
   const panelAnim = useRef(new Animated.Value(dynamicCollapsedH)).current;
   const prevCollapsedH = useRef(dynamicCollapsedH);
@@ -2626,26 +2636,6 @@ export default function MapScreen() {
           )}
         </View>
 
-        {!isActive && (
-          <View style={styles.sportSelector}>
-            {(Object.keys(SPORT_META) as SportType[]).map((sportType) => {
-              const meta = SPORT_META[sportType];
-              const selected = state.sportType === sportType;
-              return (
-                <Pressable
-                  key={sportType}
-                  accessibilityLabel={`選擇${meta.label}`}
-                  style={[styles.sportChoice, selected && { backgroundColor: meta.accent + "2E", borderColor: meta.accent }]}
-                  onPress={() => setSportType(sportType)}
-                >
-                  <Text style={styles.sportChoiceIcon}>{meta.icon}</Text>
-                  <Text style={[styles.sportChoiceLabel, selected && { color: "#fff" }]} numberOfLines={1}>{meta.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-
         {/* ── 儀表板（依排序動態顯示，前6格在收縮面板） ── */}
         <View style={styles.sixGrid}>
           {state.sportType === "cycling"
@@ -2845,6 +2835,71 @@ export default function MapScreen() {
           />
         </Pressable>
       </Animated.View>
+
+      {!isActive && (
+        <Pressable
+          accessibilityLabel="選擇運動類型"
+          style={[styles.sportTrigger, { bottom: dynamicCollapsedH + 16, borderColor: SPORT_META[state.sportType].accent }]}
+          onPress={() => setSportPickerVisible(true)}
+        >
+          <Text style={styles.sportTriggerIcon}>{SPORT_META[state.sportType].icon}</Text>
+          <Text style={styles.sportTriggerLabel}>{SPORT_META[state.sportType].label}</Text>
+        </Pressable>
+      )}
+
+      <Modal
+        visible={sportPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSportPickerVisible(false)}
+      >
+        <View style={styles.sportPickerBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSportPickerVisible(false)} />
+          <View style={[styles.sportPickerSheet, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.sportPickerHandle} />
+            <View style={styles.sportPickerHeader}>
+              <Text style={styles.sportPickerTitle}>選擇運動</Text>
+              <Pressable accessibilityLabel="關閉運動選擇" onPress={() => setSportPickerVisible(false)} style={styles.sportPickerClose}>
+                <IconSymbol name="xmark" size={24} color="#FFFFFF" />
+              </Pressable>
+            </View>
+            <View style={styles.sportPickerSearch}>
+              <IconSymbol name="magnifyingglass" size={20} color="rgba(255,255,255,0.55)" />
+              <TextInput
+                value={sportPickerQuery}
+                onChangeText={setSportPickerQuery}
+                placeholder="搜尋運動"
+                placeholderTextColor="rgba(255,255,255,0.42)"
+                style={styles.sportPickerSearchInput}
+                returnKeyType="done"
+              />
+            </View>
+            <Text style={styles.sportPickerSectionTitle}>你的運動</Text>
+            {sportPickerOptions.map((sportType) => {
+              const meta = SPORT_META[sportType];
+              const selected = state.sportType === sportType;
+              return (
+                <Pressable
+                  key={sportType}
+                  accessibilityLabel={`選擇${meta.label}`}
+                  style={styles.sportPickerRow}
+                  onPress={() => {
+                    setSportType(sportType);
+                    setSportPickerQuery("");
+                    setSportPickerVisible(false);
+                  }}
+                >
+                  <View style={[styles.sportPickerIcon, { backgroundColor: selected ? `${meta.accent}2A` : "rgba(255,255,255,0.09)" }]}>
+                    <Text style={styles.sportPickerIconText}>{meta.icon}</Text>
+                  </View>
+                  <Text style={[styles.sportPickerRowLabel, selected && { color: meta.accent }]}>{meta.label}</Text>
+                  {selected ? <Text style={[styles.sportPickerCheck, { color: meta.accent }]}>✓</Text> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
 
       {/* ── 補給 Modal ── */}
       <SupplyModal
@@ -3548,6 +3603,42 @@ const styles = StyleSheet.create({
   },
   sportChoiceIcon: { fontSize: 17 },
   sportChoiceLabel: { color: "rgba(255,255,255,0.63)", fontSize: 10, fontWeight: "700", textAlign: "center" },
+  sportTrigger: {
+    position: "absolute",
+    left: 16,
+    minWidth: 82,
+    minHeight: 68,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    backgroundColor: "rgba(15,15,23,0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+  },
+  sportTriggerIcon: { fontSize: 24 },
+  sportTriggerLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
+  sportPickerBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.56)" },
+  sportPickerSheet: {
+    backgroundColor: "#151515",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 10,
+    paddingHorizontal: 24,
+    minHeight: "62%",
+  },
+  sportPickerHandle: { alignSelf: "center", width: 42, height: 5, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.38)", marginBottom: 22 },
+  sportPickerHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 22 },
+  sportPickerTitle: { color: "#FFFFFF", fontSize: 25, fontWeight: "800" },
+  sportPickerClose: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.07)" },
+  sportPickerSearch: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#3B3B3D", borderRadius: 18, paddingHorizontal: 16, height: 54 },
+  sportPickerSearchInput: { flex: 1, color: "#FFFFFF", fontSize: 17, paddingVertical: 0 },
+  sportPickerSectionTitle: { color: "#FFFFFF", fontSize: 19, fontWeight: "800", marginTop: 28, marginBottom: 10 },
+  sportPickerRow: { flexDirection: "row", alignItems: "center", minHeight: 68, gap: 14 },
+  sportPickerIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  sportPickerIconText: { fontSize: 24 },
+  sportPickerRowLabel: { flex: 1, color: "#F5F5F5", fontSize: 18, fontWeight: "700" },
+  sportPickerCheck: { fontSize: 28, fontWeight: "900" },
   sportMetric: {
     width: "33.333%",
     minHeight: 76,
@@ -3581,15 +3672,15 @@ const styles = StyleSheet.create({
   rateText: { fontSize: 10, fontWeight: "600" },
 
   // 控制按鈕
-  btnRow: { alignItems: "center", marginTop: 10, marginBottom: 2 /* internal spacing */ },
+  btnRow: { alignItems: "center", marginTop: 12, marginBottom: 8 /* internal spacing */ },
   activeButtons: { flexDirection: "row", alignItems: "center", gap: 12 },
   startBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 32,
-    height: 48,
-    borderRadius: 24,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: "#00C853",
     justifyContent: "center",
   },

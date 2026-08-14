@@ -1610,6 +1610,12 @@
 - [x] 新增登山／越野跑的本機海拔區間、停留與爬升分布分析
 - [x] 補強統計與活動分析測試，完成 TypeScript 0 errors、114 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
 
+## 運動選擇器與開始按鈕版面（2026-08-14）
+- [x] 修正地圖底部面板安全區與高度，讓開始按鈕在各螢幕尺寸完整可見
+- [x] 移除上方橫向運動選擇器，改為地圖左下角單一目前運動按鈕
+- [x] 實作 Strava 風格底部運動選擇頁，提供搜尋與四種本機運動選項
+- [x] 補強版面與模式選擇回歸測試，完成 TypeScript 0 errors、116 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑
