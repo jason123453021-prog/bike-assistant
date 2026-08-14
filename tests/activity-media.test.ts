@@ -57,4 +57,15 @@ describe("activity media presentation", () => {
     expect(source).toContain("activityViewerDrawerDetailGrid");
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
   });
+
+  it("keeps the drawer content scrollable and identical across route thumbnails and photos", () => {
+    const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
+    const source = fs.readFileSync(filePath, "utf8");
+
+    expect(source).toContain("activityViewerDrawerScrollHint");
+    expect(source).toContain("activityViewerDrawerSectionTitle");
+    expect(source).toContain("在此區上滑即可展開並捲動完整騎乘資訊");
+    expect(source).toContain("活動摘要");
+    expect(source).toContain("!activityViewerDrawerExpandedRef.current");
+  });
 });

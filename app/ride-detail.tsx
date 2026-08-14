@@ -63,8 +63,8 @@ import * as ImagePicker from "expo-image-picker";
 
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-const ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT = 176;
-const ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.62), 520);
+const ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.46), 360);
+const ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.78), 620);
 
 function clampActivityViewerDrawerHeight(value: number): number {
   return Math.min(ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT, Math.max(ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT, value));
@@ -399,7 +399,7 @@ export default function RideDetailScreen() {
   const activityViewerDrawerResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_event, gestureState) => Math.abs(gestureState.dy) > 5,
+      onMoveShouldSetPanResponder: (_event, gestureState) => !activityViewerDrawerExpandedRef.current && Math.abs(gestureState.dy) > 5,
       onPanResponderGrant: () => {
         activityViewerDrawerHeight.stopAnimation((value) => {
           activityViewerDrawerDragStartHeight.current = value;
@@ -1559,22 +1559,16 @@ export default function RideDetailScreen() {
             <IconSymbol name="xmark" size={20} color="#fff" />
           </Pressable>
 
-          <Animated.View style={[styles.activityViewerDrawer, { height: activityViewerDrawerHeight }]}> 
-            <View style={styles.activityViewerDrawerGrabArea} {...activityViewerDrawerResponder.panHandlers}>
+          <Animated.View style={[styles.activityViewerDrawer, { height: activityViewerDrawerHeight }]} {...activityViewerDrawerResponder.panHandlers}>
+            <View style={styles.activityViewerDrawerGrabArea}>
               <View style={styles.activityViewerDrawerHandle} />
               <View style={styles.activityViewerDrawerHeader}>
                 <View style={styles.activityViewerDrawerTitleBlock}>
-                  <Text style={styles.activityViewerDrawerEyebrow}>{activityViewerMode === "route" ? "活動摘要 · 完整騎乘路線" : `活動摘要 · 照片 ${activityViewerIndex} / ${activityPhotos.length}`}</Text>
+                  <Text style={styles.activityViewerDrawerEyebrow}>活動摘要</Text>
                   <Text style={styles.activityViewerDrawerTitle} numberOfLines={1}>{record.name}</Text>
-                  <Text style={styles.activityViewerDrawerSubtitle} numberOfLines={2}>
-                    {activityViewerMode === "route"
-                      ? `地圖可平移、縮放與旋轉 · ${activityPhotos.length} 張本機照片`
-                      : activeViewerPhotoDetails
-                        ? formatActivityPhotoRouteMeta(activeViewerPhotoDetails.capturedAt, activeViewerPhotoDetails.altitude)
-                        : "雙擊放大、雙指縮放；放大後可單指拖曳"}
-                  </Text>
+                  <Text style={styles.activityViewerDrawerSubtitle} numberOfLines={2}>{dateStr} · {activityTypeLabel(record.activityType)} · {activityPhotos.length} 張本機照片</Text>
                 </View>
-                <Text style={styles.activityViewerDrawerHint}>{activityViewerDrawerExpanded ? "下拉收合" : "上拉展開"}</Text>
+                <Text style={styles.activityViewerDrawerHint}>{activityViewerDrawerExpanded ? "捲動資訊" : "上滑查看"}</Text>
               </View>
             </View>
 
@@ -1613,25 +1607,27 @@ export default function RideDetailScreen() {
                     <Text style={styles.activityViewerDrawerDetailLabel}>活動類型</Text>
                   </View>
                 </View>
-                {activityViewerMode === "route" ? (
-                  activityPhotos.length > 0 ? (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.activityViewerRoutePhotoRail}>
-                      {activityPhotos.map((photo, index) => {
-                        const details = photoCaptureDetails.get(photo.id);
-                        return (
-                          <Pressable key={photo.id} style={({ pressed }) => [styles.activityViewerRoutePhotoCard, { opacity: pressed ? 0.72 : 1 }]} onPress={() => openActivityViewer(index + 1)}>
-                            <Image source={{ uri: photo.uri }} style={styles.activityViewerRoutePhotoThumb} />
-                            <Text style={styles.activityViewerRoutePhotoMeta} numberOfLines={2}>{formatActivityPhotoRouteMeta(details?.capturedAt, details?.altitude)}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </ScrollView>
-                  ) : <Text style={styles.activityViewerRouteEmpty}>此活動尚未附加本機照片。</Text>
-                ) : (
-                  <Text style={styles.activityViewerDrawerGestureCopy}>左右滑動切換照片。相片不支援旋轉，避免與路線地圖操作混淆。</Text>
-                )}
+                <Text style={styles.activityViewerDrawerSectionTitle}>騎乘瞬間</Text>
+                {activityPhotos.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.activityViewerRoutePhotoRail}>
+                    {activityPhotos.map((photo, index) => {
+                      const details = photoCaptureDetails.get(photo.id);
+                      return (
+                        <Pressable key={photo.id} style={({ pressed }) => [styles.activityViewerRoutePhotoCard, { opacity: pressed ? 0.72 : 1 }]} onPress={() => openActivityViewer(index + 1)}>
+                          <Image source={{ uri: photo.uri }} style={styles.activityViewerRoutePhotoThumb} />
+                          <Text style={styles.activityViewerRoutePhotoMeta} numberOfLines={2}>{formatActivityPhotoRouteMeta(details?.capturedAt, details?.altitude)}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                ) : <Text style={styles.activityViewerRouteEmpty}>此活動尚未附加本機照片。</Text>}
+                <View style={styles.activityViewerDrawerLongMetrics}>
+                  <Text style={styles.activityViewerDrawerLongMetric}>最高速度 {record.maxSpeed.toFixed(1)} km/h</Text>
+                  <Text style={styles.activityViewerDrawerLongMetric}>總下降 {Math.round(record.totalDescent ?? 0)} m</Text>
+                  <Text style={styles.activityViewerDrawerLongMetric}>水分流失 {Math.round(record.totalSweatMl)} ml</Text>
+                </View>
               </ScrollView>
-            ) : null}
+            ) : <Text style={styles.activityViewerDrawerScrollHint}>在此區上滑即可展開並捲動完整騎乘資訊；切換照片不會重設此活動頁面。</Text>}
           </Animated.View>
         </View>
       </Modal>
@@ -2294,6 +2290,10 @@ const styles = StyleSheet.create({
   activityViewerDrawerDetailCell: { width: "50%", alignItems: "center", paddingVertical: 10 },
   activityViewerDrawerDetailValue: { color: "#fff", fontSize: 15, fontWeight: "800", fontVariant: ["tabular-nums"] },
   activityViewerDrawerDetailLabel: { color: "rgba(255,255,255,0.55)", fontSize: 10, marginTop: 3 },
+  activityViewerDrawerSectionTitle: { color: "#fff", fontSize: 15, fontWeight: "800", marginTop: 16 },
+  activityViewerDrawerLongMetrics: { marginTop: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(255,255,255,0.12)", paddingTop: 10, gap: 7 },
+  activityViewerDrawerLongMetric: { color: "rgba(255,255,255,0.72)", fontSize: 13, fontVariant: ["tabular-nums"] },
+  activityViewerDrawerScrollHint: { color: "rgba(255,255,255,0.58)", fontSize: 12, lineHeight: 18, marginTop: 10 },
   activityViewerDrawerGestureCopy: { color: "rgba(255,255,255,0.72)", fontSize: 12, lineHeight: 18, marginTop: 10 },
   activityViewerRouteInfo: { position: "absolute", left: 18, right: 18, bottom: 82, padding: 14, borderRadius: 16, backgroundColor: "rgba(7,18,14,0.9)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.16)" },
   activityViewerRouteTitle: { color: "#fff", fontSize: 17, fontWeight: "800" },

@@ -1511,3 +1511,9 @@
 - [x] 建立收合摘要與上拉後完整騎乘資訊，並依參考影片維持一致的上拉／下拉手勢邏輯
 - [x] 抽屜高度變化時同步調整上方路線或照片的可視高度，且不打斷照片切換與縮放手勢
 - [x] 補強固定抽屜互動回歸測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；99 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）
+
+## Strava 式媒體頁面與抽屜捲動（2026-08-14）
+- [x] 將白色滑桿固定為抽屜頂端的視覺把手，不要求使用者只能由滑桿拖曳
+- [x] 讓滑桿以下的抽屜內容區可直接上滑／下滑捲動完整活動資訊，且不干擾上方媒體手勢
+- [x] 讓路線、縮圖入口與任一照片都使用同一個全螢幕媒體頁面及相同活動資訊抽屜
+- [x] 補強 Strava 式手勢與媒體一致性測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）
