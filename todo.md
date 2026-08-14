@@ -1469,3 +1469,9 @@
 - [x] 對照目前活動詳情頁並完成資訊層級與互動流程重構
 - [x] 保留本機 GPX、媒體、分享、曲線分析與活動編輯，不加入帳號或社群功能
 - [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；89 passed、1 skipped；Android Hermes bundle 5.57 MB；NitroModules／MapLibre 掃描 0）
+
+## 離線回放、照片軌跡標記與歷史分段比較（2026-08-14）
+- [x] 以抽樣與節流策略優化長距離軌跡回放流暢度
+- [x] 將本機照片依拍攝時間對應至騎乘軌跡並顯示位置標記
+- [x] 以本機歷史騎乘資料建立真實的個人最佳分段比較
+- [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；92 passed、1 skipped；Android Hermes bundle 5.58 MB；NitroModules／MapLibre 掃描 0）

@@ -47,6 +47,15 @@ export interface KilometerMarker {
   elevation: number;
 }
 
+/** 由本機 EXIF 或拍攝時間與 GPS 軌跡對應後顯示的照片標記。 */
+export interface PhotoMapMarker {
+  id: string;
+  lat: number;
+  lon: number;
+  label: string;
+  source: "exif" | "route-time";
+}
+
 export interface LeafletMapProps {
   style?: object;
   initialRegion?: {
@@ -70,6 +79,8 @@ export interface LeafletMapProps {
   onMapCenterChanged?: (lat: number, lon: number) => void;
   onMapMoveEnd?: (bounds: { northEast: { lat: number; lon: number }; southWest: { lat: number; lon: number } }) => void;
   kilometersMarkers?: KilometerMarker[];
+  photoMarkers?: PhotoMapMarker[];
+  onPhotoMarkerPress?: (id: string) => void;
 }
 
 export interface LeafletMapHandle {
@@ -551,19 +562,27 @@ function handleMessage(data) {
         break;
       case 'setPlaybackMarker':
         var lat = msg.lat, lon = msg.lon, color = msg.color || '#007AFF';
-        if (posMarker) { map.removeLayer(posMarker); posMarker = null; }
-        posMarker = L.marker([lat, lon], {
-          icon: makeCircleIcon(color, 16, '#fff'),
-          zIndexOffset: 1000,
-        }).addTo(map);
+        if (posMarker) {
+          posMarker.setLatLng([lat, lon]);
+          posMarker.setIcon(makeCircleIcon(color, 16, '#fff'));
+        } else {
+          posMarker = L.marker([lat, lon], {
+            icon: makeCircleIcon(color, 16, '#fff'),
+            zIndexOffset: 1000,
+          }).addTo(map);
+        }
         break;
       case 'animatePlaybackMarker':
         var lat = msg.lat, lon = msg.lon, color = msg.color || '#007AFF', duration = msg.duration || 100;
-        if (posMarker) { map.removeLayer(posMarker); posMarker = null; }
-        posMarker = L.marker([lat, lon], {
-          icon: makeCircleIcon(color, 16, '#fff'),
-          zIndexOffset: 1000,
-        }).addTo(map);
+        if (posMarker) {
+          posMarker.setLatLng([lat, lon]);
+          posMarker.setIcon(makeCircleIcon(color, 16, '#fff'));
+        } else {
+          posMarker = L.marker([lat, lon], {
+            icon: makeCircleIcon(color, 16, '#fff'),
+            zIndexOffset: 1000,
+          }).addTo(map);
+        }
         break;
       case 'highlightPlayedTrail':
         var coords = msg.coords || [];
@@ -625,6 +644,22 @@ function handleMessage(data) {
           kilometerMarkersLayer.push(marker);
         });
         break;
+      case 'setPhotoMarkers':
+        photoMarkersLayer.forEach(function(marker) { map.removeLayer(marker); });
+        photoMarkersLayer = [];
+        (msg.markers || []).forEach(function(photo) {
+          if (!Number.isFinite(photo.lat) || !Number.isFinite(photo.lon)) return;
+          var photoIcon = L.divIcon({
+            html: '<div style="width:30px;height:30px;border-radius:15px;background:#FF8A4C;border:2px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-size:15px;">&#128247;</div>',
+            iconSize: [30, 30], iconAnchor: [15, 15], className: 'photo-route-marker'
+          });
+          var photoMarker = L.marker([photo.lat, photo.lon], { icon: photoIcon, zIndexOffset: 650 }).addTo(map);
+          photoMarker.on('click', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'photoMarkerPress', id: photo.id }));
+          });
+          photoMarkersLayer.push(photoMarker);
+        });
+        break;
       case 'setHeadingUpMode':
         headingUpMode = msg.enabled || false;
         break;
@@ -665,6 +700,8 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       onMapCenterChanged,
       kilometersMarkers,
       onMapMoveEnd,
+      photoMarkers,
+      onPhotoMarkerPress,
     },
     ref
   ) => {
@@ -825,6 +862,13 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       );
     }, [kilometersMarkers, isReady]);
 
+    useEffect(() => {
+      if (!isReady || !webViewRef.current) return;
+      webViewRef.current.postMessage(
+        JSON.stringify({ type: "setPhotoMarkers", markers: photoMarkers || [] })
+      );
+    }, [photoMarkers, isReady]);
+
     // Send center pin location
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
@@ -871,6 +915,8 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             northEast: { lat: msg.northEast.lat, lon: msg.northEast.lon },
             southWest: { lat: msg.southWest.lat, lon: msg.southWest.lon },
           });
+        } else if (msg.type === "photoMarkerPress" && typeof msg.id === "string") {
+          onPhotoMarkerPress?.(msg.id);
         }
       } catch {}
     };

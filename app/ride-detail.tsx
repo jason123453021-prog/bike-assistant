@@ -28,7 +28,7 @@ import {
 } from "react-native";
 
 import * as Sharing from "expo-sharing";
-import LeafletMapView, { type LeafletMapHandle } from "@/components/leaflet-map";
+import LeafletMapView, { type LeafletMapHandle, type PhotoMapMarker } from "@/components/leaflet-map";
 import Svg, { Circle, Defs, G, LinearGradient, Path, Polyline, Rect, Stop, Text as SvgText } from "react-native-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
@@ -46,6 +46,9 @@ import { deriveLocalEstimationCalibration } from "@/lib/activity-estimation-cali
 import { createGpxContent } from "@/lib/gpx-export";
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
 import { buildRideSplits } from "@/lib/ride-splits";
+import { buildReplayFrames, replayFrameDelayMs } from "@/lib/activity-replay";
+import { buildPhotoRouteMarkers } from "@/lib/photo-route-markers";
+import { compareLocalSplitPersonalBests } from "@/lib/local-split-personal-bests";
 import { buildLocalActivityHighlights, calculateBestPowerEfforts } from "@/lib/local-activity-insights";
 import { useSettings } from "@/lib/settings-context";
 import { calibrateSweatRate } from "@/lib/supply-calibration";
@@ -306,20 +309,36 @@ export default function RideDetailScreen() {
     if (!record?.route || record.route.length === 0) return [];
     return record.route.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
   }, [record]);
+  const replayFrames = useMemo(() => buildReplayFrames(record?.route ?? []), [record?.route]);
+  const photoRouteMarkers = useMemo<PhotoMapMarker[]>(() => buildPhotoRouteMarkers(photoTimeline, record?.route ?? []).map((marker) => ({
+    id: marker.id,
+    lat: marker.latitude,
+    lon: marker.longitude,
+    label: marker.label,
+    source: marker.source,
+  })), [photoTimeline, record?.route]);
+  const localSplitPersonalBests = useMemo(
+    () => record ? compareLocalSplitPersonalBests(record, state.records) : [],
+    [record, state.records],
+  );
+  const openPhotoFromMarker = useCallback((photoId: string) => {
+    const index = photoTimeline.findIndex((photo) => photo.id === photoId);
+    if (index >= 0) setSelectedMediaIndex(index);
+  }, [photoTimeline]);
 
   const [mapReady, setMapReady] = useState(false);
 
   const setReplayPosition = useCallback((index: number, animate = true) => {
-    if (polylineCoords.length === 0) return;
-    const safeIndex = Math.min(Math.max(0, index), polylineCoords.length - 1);
-    const point = polylineCoords[safeIndex];
+    if (replayFrames.length === 0) return;
+    const safeIndex = Math.min(Math.max(0, index), replayFrames.length - 1);
+    const point = replayFrames[safeIndex];
     setReplayIndex(safeIndex);
     if (animate) {
-      mapRef.current?.animatePlaybackMarker(point.latitude, point.longitude, "#FF6A22", Math.round(650 / replaySpeed));
+      mapRef.current?.animatePlaybackMarker(point.latitude, point.longitude, "#FF6A22", replayFrameDelayMs(replaySpeed));
     } else {
       mapRef.current?.setPlaybackMarker(point.latitude, point.longitude, "#FF6A22");
     }
-  }, [polylineCoords, replaySpeed]);
+  }, [replayFrames, replaySpeed]);
 
   useEffect(() => {
     if (mapReady && polylineCoords.length > 1) {
@@ -338,23 +357,26 @@ export default function RideDetailScreen() {
   }, [mapReady, polylineCoords]);
 
   useEffect(() => {
-    if (!mapReady || polylineCoords.length === 0) return;
+    if (!mapReady || replayFrames.length === 0) return;
     setReplayPosition(replayIndex, false);
-  }, [mapReady, polylineCoords.length, replayIndex, setReplayPosition]);
+  }, [mapReady, replayFrames.length, replayIndex, setReplayPosition]);
 
   useEffect(() => {
-    if (!isReplayPlaying || polylineCoords.length < 2) return;
-    const delay = Math.round(850 / replaySpeed);
+    if (!isReplayPlaying || replayFrames.length < 2) return;
+    const delay = replayFrameDelayMs(replaySpeed);
     const timer = setInterval(() => {
       setReplayIndex((current) => {
-        const next = current >= polylineCoords.length - 1 ? 0 : current + 1;
-        const point = polylineCoords[next];
+        const next = current >= replayFrames.length - 1 ? 0 : current + 1;
+        const point = replayFrames[next];
         mapRef.current?.animatePlaybackMarker(point.latitude, point.longitude, "#FF6A22", delay);
+        if (next % 4 === 0 || next === replayFrames.length - 1) {
+          mapRef.current?.highlightPlayedTrail(replayFrames.slice(0, next + 1), "#FF8A4C");
+        }
         return next;
       });
     }, delay);
     return () => clearInterval(timer);
-  }, [isReplayPlaying, polylineCoords, replaySpeed]);
+  }, [isReplayPlaying, replayFrames, replaySpeed]);
   
 
   
@@ -701,6 +723,8 @@ export default function RideDetailScreen() {
         }}
         onMapReady={() => setMapReady(true)}
         gpxPolyline={polylineCoords}
+        photoMarkers={photoRouteMarkers}
+        onPhotoMarkerPress={openPhotoFromMarker}
       />
 
       {/* ── 頂部導覽列 ── */}
@@ -766,10 +790,10 @@ export default function RideDetailScreen() {
         </View>
       )}
 
-      {polylineCoords.length > 1 && (
+      {replayFrames.length > 1 && (
         <View style={styles.mapPlaybackBadge}>
           <View style={styles.mapPlaybackDot} />
-          <Text style={styles.mapPlaybackText}>{isReplayPlaying ? "正在回放本機軌跡" : "可回放本機軌跡"}</Text>
+          <Text style={styles.mapPlaybackText}>{isReplayPlaying ? "正在回放本機軌跡" : `長路線最佳化回放 · ${replayFrames.length} 影格`}</Text>
         </View>
       )}
 
@@ -869,14 +893,14 @@ export default function RideDetailScreen() {
           </View>
         </View>
 
-        {polylineCoords.length > 1 && (
+        {replayFrames.length > 1 && (
           <View style={styles.replayCard}>
             <View style={styles.replayHeader}>
               <View>
                 <Text style={styles.replayTitle}>軌跡回放</Text>
                 <Text style={styles.replaySubtitle}>依本機 GPS 記錄重播，不需要網路或帳號</Text>
               </View>
-              <Text style={styles.replayProgress}>{replayIndex + 1} / {polylineCoords.length}</Text>
+              <Text style={styles.replayProgress}>{replayIndex + 1} / {replayFrames.length}</Text>
             </View>
             <View style={styles.replayControls}>
               <Pressable
@@ -892,11 +916,11 @@ export default function RideDetailScreen() {
                 style={styles.replayTrack}
                 onPress={(event) => {
                   const ratio = Math.max(0, Math.min(1, event.nativeEvent.locationX / 172));
-                  setReplayPosition(Math.round(ratio * (polylineCoords.length - 1)));
+                  setReplayPosition(Math.round(ratio * (replayFrames.length - 1)));
                 }}
               >
-                <View style={[styles.replayTrackFill, { width: `${((replayIndex + 1) / polylineCoords.length) * 100}%` }]} />
-                <View style={[styles.replayThumb, { left: `${((replayIndex + 1) / polylineCoords.length) * 100}%` }]} />
+                <View style={[styles.replayTrackFill, { width: `${((replayIndex + 1) / replayFrames.length) * 100}%` }]} />
+                <View style={[styles.replayThumb, { left: `${((replayIndex + 1) / replayFrames.length) * 100}%` }]} />
               </Pressable>
             </View>
             <View style={styles.replaySpeedRow}>
@@ -918,13 +942,13 @@ export default function RideDetailScreen() {
           <View style={styles.topMediaSection}>
             <View style={styles.topMediaHeading}>
               <Text style={styles.topMediaTitle}>騎乘瞬間</Text>
-              <Text style={styles.topMediaCount}>{photoTimeline.length} 張</Text>
+              <Text style={styles.topMediaCount}>{photoTimeline.length} 張 · {photoRouteMarkers.length} 處路線標記</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topMediaRail}>
               {photoTimeline.map((photo, index) => (
                 <Pressable key={photo.id} style={({ pressed }) => [styles.topMediaThumbWrap, { opacity: pressed ? 0.76 : 1 }]} onPress={() => setSelectedMediaIndex(index)}>
                   <Image source={{ uri: photo.uri }} style={styles.topMediaThumb} />
-                  {index === 0 ? <View style={styles.topMediaPrimaryBadge}><Text style={styles.topMediaPrimaryText}>精選</Text></View> : null}
+                  {photoRouteMarkers.some((marker) => marker.id === photo.id) ? <View style={styles.topMediaPrimaryBadge}><Text style={styles.topMediaPrimaryText}>已定位</Text></View> : null}
                 </Pressable>
               ))}
             </ScrollView>
@@ -1229,6 +1253,25 @@ export default function RideDetailScreen() {
               </View>
             )}
 
+            {localSplitPersonalBests.length > 0 && (
+              <View style={[styles.statsPanel, { borderColor: "#F59E0B66", marginTop: 12 }]}> 
+                <Text style={[styles.panelTitle, { color: "#FCD34D" }]}>本機 1 km 個人最佳比較</Text>
+                <Text style={[styles.personalBestHint, { color: colors.muted }]}>僅比較此裝置較早活動的完整 1 km GPS 努力，不會將不同道路誤稱為同一雲端路段。</Text>
+                {localSplitPersonalBests.slice(0, 4).map(({ split, priorBestSeconds, isPersonalBest, comparedEffortCount }) => (
+                  <View key={`local-best-${split.index}`} style={[styles.segmentCard, { backgroundColor: colors.surface, borderColor: isPersonalBest ? "#F59E0B88" : colors.border }]}> 
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={[styles.segmentTitle, { color: colors.foreground }]}>第 {split.index} 個 1 km</Text>
+                      <Text style={{ color: isPersonalBest ? "#FCD34D" : colors.muted, fontSize: 11, fontWeight: "800" }}>{isPersonalBest ? "本機最佳" : `${comparedEffortCount} 次可比努力`}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                      <Text style={{ color: colors.foreground, fontSize: 17, fontWeight: "800" }}>{formatDuration(split.movingTimeSeconds)}</Text>
+                      <Text style={{ color: colors.muted, fontSize: 12 }}>{priorBestSeconds === undefined ? "尚無較早可比資料" : `歷史最佳 ${formatDuration(priorBestSeconds)}`}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
             {/* 僅比較此裝置歷史資料的個人最佳紀錄 */}
             {(record.personalBests?.length ?? 0) > 0 && (
               <View style={[styles.statsPanel, { borderColor: "#F59E0B66", marginTop: 12 }]}> 
@@ -1369,6 +1412,11 @@ export default function RideDetailScreen() {
               longitudeDelta: 0.01,
             }}
             gpxPolyline={polylineCoords}
+            photoMarkers={photoRouteMarkers}
+            onPhotoMarkerPress={(photoId) => {
+              setIsMapDetailVisible(false);
+              openPhotoFromMarker(photoId);
+            }}
           />
           <Pressable style={styles.mapDetailClose} onPress={() => setIsMapDetailVisible(false)}>
             <IconSymbol name="xmark" size={20} color="#fff" />
