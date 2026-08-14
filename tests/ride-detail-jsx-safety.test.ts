@@ -38,7 +38,8 @@ describe("ride detail JSX safety", () => {
     expect(source).toContain("pagingEnabled");
     expect(source).toContain("openActivityViewer(0)");
     expect(source).toContain("activityViewerPhotoMeta");
-    expect(source).toContain("海拔 ${Math.round");
+    expect(source).toContain("photoRouteMarkers");
+    expect(source).toContain("photoMarkers={photoRouteMarkers}");
     expect(source).toContain("ZoomableActivityPhoto");
     expect(source).toContain("CoreActivitySummaryGrid");
     expect((source.match(/<CoreActivitySummaryGrid/g) ?? []).length).toBe(2);

@@ -10,7 +10,7 @@
  *
  * 3. 強度以 MET（代謝當量）或功率估算
  *
- * 補水建議：每流失 250ml 提醒一次（可設定）
+ * 補水建議：以約 10–15 分鐘的汗液流失量拆分為小量補充，避免單次大量飲水。
  */
 
 export interface HydrationInput {
@@ -55,7 +55,7 @@ export interface HydrationResult {
   sweatRatePerHour: number;
   /** 當前強度等級描述 */
   intensityLabel: string;
-  /** 建議補水量 ml（每次提醒） */
+  /** 建議補水量 ml（每次提醒；採 10–15 分鐘小量分次） */
   recommendedRefillMl: number;
   /** 0–1 的環境熱負荷，供補給提醒調整間隔 */
   environmentLoad: number;
@@ -232,8 +232,10 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   // 本次間隔流失量 ml
   const sweatLossMl = (sweatRatePerHour / 3600) * intervalSec;
 
-  // 建議補水量：最少 150ml，最多 500ml
-  const recommendedRefillMl = Math.min(500, Math.max(150, Math.round(sweatRatePerHour * 0.25)));
+  // 建議補水量：以 12.5 分鐘為中點估算單次汗液流失量，再限制為可耐受的小量。
+  // 例如：600 ml/h 約為 125 ml，會以保守的 150 ml 小口補充提示；
+  // 1,200 ml/h 約為 250 ml。避免舊模型一次建議 400–500 ml 而造成腸胃不適。
+  const recommendedRefillMl = Math.min(250, Math.max(150, Math.round(sweatRatePerHour * (12.5 / 60))));
   const environmentLoad = Math.max(
     0,
     Math.min(1, ((Math.max(0, temperatureC - 20) / 18) * 0.55) + ((Math.max(0, humidityPct - 60) / 40) * 0.3) + (weatherCode <= 2 ? 0.15 : 0)),
@@ -248,7 +250,7 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   };
 }
 
-// ─── 補水閾值（預設：每流失 250ml 提醒一次）──────────────────────────────────
+// ─── 補水閾值（智慧模式會依 10–15 分鐘的小量流失動態計算）────────────────────
 export const DEFAULT_HYDRATION_THRESHOLD_ML = 250;
 
 // ─── 格式化顯示 ────────────────────────────────────────────────────────────────

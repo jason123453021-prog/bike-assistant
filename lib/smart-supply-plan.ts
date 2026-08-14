@@ -2,8 +2,10 @@ export type SupplyCalculationMode = "smart" | "custom";
 
 export interface SupplyPlanInput {
   mode: SupplyCalculationMode;
-  calorieThresholdKcal: number;
-  waterThresholdMl: number;
+  /** 僅供舊版固定模式相容；智慧模式不讀取此值。 */
+  calorieThresholdKcal?: number;
+  /** 僅供舊版固定模式相容；智慧模式不讀取此值。 */
+  waterThresholdMl?: number;
   elapsedSec: number;
   riderWeightKg: number;
   ftpW: number;
@@ -24,7 +26,10 @@ export interface SupplyPlan {
 }
 
 const SMART_ENERGY_TRIGGER_RANGE = { min: 160, max: 280 } as const;
-const SMART_WATER_TRIGGER_RANGE = { min: 180, max: 420 } as const;
+// 觸發量依 10–15 分鐘的估計汗液流失拆分；它是提醒節奏，不是一次飲水量。
+const SMART_WATER_TRIGGER_RANGE = { min: 100, max: 250 } as const;
+const SMART_WATER_RECOMMENDATION_RANGE = { min: 150, max: 250 } as const;
+const MICRO_SIP_INTERVAL_MINUTES = 12.5;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -44,12 +49,11 @@ function carbohydrateTargetGPerHour(elapsedSec: number, intensityFactor: number,
 }
 
 /**
- * 產生單次補給提醒的門檻與建議量。智慧模式只在既有個人與環境資料上做保守修正；
- * 固定模式完整尊重使用者自訂門檻，僅提供不超出安全範圍的顯示建議。
+ * 產生單次補給提醒的門檻與建議量。智慧模式僅以個人、騎乘及環境資料動態推導，
+ * 補水會拆分為約每 10–15 分鐘一次、每次 150–250 mL 的可耐受小量建議；
+ * 固定模式僅保留舊版資料相容。
  */
 export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
-  const calorieBase = clamp(Math.round(input.calorieThresholdKcal || 300), 100, 2_000);
-  const waterBase = clamp(Math.round(input.waterThresholdMl || 500), 150, 3_000);
   const intensity = clamp(input.intensityFactor, 0, 1.25);
   const environmentLoad = clamp(input.environmentLoad, 0, 1);
   const sweatRate = clamp(input.sweatRatePerHour, 350, 1_800);
@@ -57,12 +61,14 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
   const energyRecommendationKcal = Math.round(carbohydrateG * 4);
   const durationHydrationLoad = input.elapsedSec >= 3 * 60 * 60 ? 0.08 : input.elapsedSec >= 2 * 60 * 60 ? 0.05 : input.elapsedSec >= 60 * 60 ? 0.02 : 0;
   const waterRecommendationMl = Math.round(clamp(
-    sweatRate * (0.18 + environmentLoad * 0.08 + Math.max(0, intensity - 0.65) * 0.05 + durationHydrationLoad),
-    150,
-    500,
+    sweatRate * (MICRO_SIP_INTERVAL_MINUTES / 60),
+    SMART_WATER_RECOMMENDATION_RANGE.min,
+    SMART_WATER_RECOMMENDATION_RANGE.max,
   ));
 
   if (input.mode === "custom") {
+    const calorieBase = clamp(Math.round(input.calorieThresholdKcal || 300), 100, 2_000);
+    const waterBase = clamp(Math.round(input.waterThresholdMl || 500), 150, 3_000);
     return {
       calorieTriggerKcal: calorieBase,
       waterTriggerMl: waterBase,
@@ -75,7 +81,6 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
   }
 
   const intensityLoad = clamp((intensity - 0.6) / 0.55, 0, 1);
-  const sweatLoad = clamp((sweatRate - 550) / 1_000, 0, 1);
   const durationEnergyLoad = input.elapsedSec >= 3 * 60 * 60 ? 0.08 : input.elapsedSec >= 2 * 60 * 60 ? 0.05 : 0;
   const smartEnergyTriggerKcal = Math.round(clamp(
     260 - intensityLoad * 48 - environmentLoad * 28 - durationEnergyLoad * 180,
@@ -83,13 +88,14 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
     SMART_ENERGY_TRIGGER_RANGE.max,
   ));
   const smartWaterTriggerMl = Math.round(clamp(
-    400 - sweatLoad * 120 - environmentLoad * 85 - durationHydrationLoad * 600,
+    // 汗率 × 約 12.5 分鐘，再依熱負荷／長時段稍微提前提醒。
+    sweatRate * (MICRO_SIP_INTERVAL_MINUTES / 60) * (1 - environmentLoad * 0.12 - durationHydrationLoad),
     SMART_WATER_TRIGGER_RANGE.min,
     SMART_WATER_TRIGGER_RANGE.max,
   ));
   const source = input.weatherAvailable ? "smart" : "smart-offline-fallback";
   const reasonParts = [
-    "全自動智慧計畫",
+    "全自動智慧計畫（約每 10–15 分鐘小量補水）",
     intensityLoad >= 0.3 ? "騎乘強度較高" : "騎乘強度一般",
     environmentLoad >= 0.4 ? "環境熱負荷提高" : input.weatherAvailable ? "環境負荷穩定" : "離線環境回退",
     input.elapsedSec >= 2 * 60 * 60 ? "長時間騎乘" : "騎乘時間尚短",

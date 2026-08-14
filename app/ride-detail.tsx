@@ -31,7 +31,6 @@ import {
 import * as Sharing from "expo-sharing";
 import LeafletMapView, { type LeafletMapHandle, type PhotoMapMarker } from "@/components/leaflet-map";
 import Svg, { G, Path } from "react-native-svg";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -75,7 +74,6 @@ const ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT 
 function clampActivityViewerDrawerHeight(value: number): number {
   return Math.min(ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT, Math.max(ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT, value));
 }
-const STORAGE_KEY = "@bike_records";
 const ACTIVITY_TYPES = [
   { value: "road", label: "公路" },
   { value: "gravel", label: "礫石" },
@@ -92,16 +90,6 @@ function isVideoMedia(uri: string): boolean {
   return /\.(mp4|mov|m4v|webm)(\?|$)/i.test(uri);
 }
 
-function formatActivityPhotoRouteMeta(capturedAt?: number, altitude?: number): string {
-  const capturedAtText = capturedAt && Number.isFinite(capturedAt)
-    ? new Date(capturedAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
-    : "拍攝時間未提供";
-  const altitudeText = altitude === undefined || !Number.isFinite(altitude)
-    ? "尚未對應海拔"
-    : `海拔 ${Math.round(altitude)} m`;
-  return `${capturedAtText} · ${altitudeText}`;
-}
-
 function formatPowerInterval(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
@@ -113,7 +101,7 @@ export default function RideDetailScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, dispatch, updateRecordName, updateRideActivity, getRouteStats } = useRide();
+  const { state, updateRecordName, updateRideActivity, getRouteStats } = useRide();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editDescInput, setEditDescInput] = useState("");
   const [editNameInput, setEditNameInput] = useState("");
@@ -135,7 +123,7 @@ export default function RideDetailScreen() {
         const newUris = await persistRideMedia(record.id, result.assets);
         setLocalMedia((prev) => [...prev, ...newUris]);
       }
-    } catch (e) {
+    } catch {
       Alert.alert("提示", "無法存取媒體庫");
     }
   };
@@ -203,6 +191,7 @@ export default function RideDetailScreen() {
 
   // 地圖 ref
   const mapRef = useRef<LeafletMapHandle>(null);
+  const [isEmbeddedMapInteracting, setIsEmbeddedMapInteracting] = useState(false);
 
   // 分享卡片
   const [shareCardVisible, setShareCardVisible] = useState(false);
@@ -210,9 +199,8 @@ export default function RideDetailScreen() {
   const [confirmedFluidInput, setConfirmedFluidInput] = useState("");
   const [photoTimeline, setPhotoTimeline] = useState<RidePhotoTimelineEntry[]>([]);
   const [isActivityViewerVisible, setIsActivityViewerVisible] = useState(false);
-  const [activityViewerIndex, setActivityViewerIndex] = useState(0);
+  const [, setActivityViewerIndex] = useState(0);
   const [activityViewerMode, setActivityViewerMode] = useState<"route" | "photos">("route");
-  const [activityViewerDrawerExpanded, setActivityViewerDrawerExpanded] = useState(false);
   const activityViewerRef = useRef<ScrollView>(null);
   const activityViewerDrawerHeight = useRef(new Animated.Value(ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT)).current;
   const activityViewerDrawerExpandedRef = useRef(false);
@@ -296,6 +284,12 @@ export default function RideDetailScreen() {
     if (!record?.route || record.route.length === 0) return [];
     return record.route.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
   }, [record]);
+  const activityMapInitialRegion = useMemo(() => ({
+    latitude: polylineCoords[0]?.latitude ?? 25.0478,
+    longitude: polylineCoords[0]?.longitude ?? 121.5319,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  }), [polylineCoords]);
   const replayFrames = useMemo(() => buildReplayFrames(record?.route ?? []), [record?.route]);
   const photoRouteMarkers = useMemo<PhotoMapMarker[]>(() => buildPhotoRouteMarkers(photoTimeline, record?.route ?? []).map((marker) => ({
     id: marker.id,
@@ -329,16 +323,8 @@ export default function RideDetailScreen() {
     () => record ? compareLocalSplitPersonalBests(record, state.records) : [],
     [record, state.records],
   );
-  const photoCaptureDetails = useMemo(() => new Map(photoTimeline.map((photo) => {
-    const marker = photoRouteMarkers.find((candidate) => candidate.id === photo.id);
-    return [photo.id, {
-      capturedAt: photo.capturedAt ?? photo.selectedAt,
-      altitude: marker?.altitude,
-    }];
-  })), [photoRouteMarkers, photoTimeline]);
   const setActivityViewerDrawer = useCallback((expanded: boolean) => {
     activityViewerDrawerExpandedRef.current = expanded;
-    setActivityViewerDrawerExpanded(expanded);
     Animated.timing(activityViewerDrawerHeight, {
       toValue: expanded ? ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT : ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT,
       duration: 240,
@@ -384,11 +370,9 @@ export default function RideDetailScreen() {
     const index = activityPhotos.findIndex((photo) => photo.id === photoId);
     if (index >= 0) openActivityViewer(index + 1);
   }, [activityPhotos, openActivityViewer]);
-  const activeViewerPhoto = activityViewerMode === "photos"
-    ? activityPhotos[Math.max(0, activityViewerIndex - 1)]
-    : undefined;
-  const activeViewerPhotoDetails = activeViewerPhoto ? photoCaptureDetails.get(activeViewerPhoto.id) : undefined;
-
+  const handleActivityMapReady = useCallback(() => setMapReady(true), []);
+  const beginEmbeddedMapInteraction = useCallback(() => setIsEmbeddedMapInteracting(true), []);
+  const endEmbeddedMapInteraction = useCallback(() => setIsEmbeddedMapInteracting(false), []);
   const [mapReady, setMapReady] = useState(false);
 
   const setReplayPosition = useCallback((index: number, animate = true) => {
@@ -417,7 +401,7 @@ export default function RideDetailScreen() {
         });
       }, 600);
     }
-  }, [mapReady, polylineCoords]);
+  }, [insets.top, mapReady, polylineCoords]);
 
   useEffect(() => {
     if (!mapReady || replayFrames.length === 0) return;
@@ -444,13 +428,13 @@ export default function RideDetailScreen() {
 
   
   // 心率區間定義（5 個區間，包含 BPM 範圍）
-  const HR_ZONES = [
+  const HR_ZONES = useMemo(() => [
     { name: "恢復", min: 0, max: 0.6, color: "#4FC3F7", minBpm: 60, maxBpm: 120 },
     { name: "有氧基礎", min: 0.6, max: 0.7, color: "#66BB6A", minBpm: 120, maxBpm: 140 },
     { name: "有氧耐力", min: 0.7, max: 0.8, color: "#FDD835", minBpm: 140, maxBpm: 160 },
     { name: "乳酸閾值", min: 0.8, max: 0.9, color: "#FB8C00", minBpm: 160, maxBpm: 180 },
     { name: "最大強度", min: 0.9, max: 1.0, color: "#E53935", minBpm: 180, maxBpm: 200 }
-  ];
+  ], []);
 
   // 計算心率區間分布（簡化版：基於平均心率估算）
   const calculateHeartRateZones = useCallback(() => {
@@ -468,11 +452,6 @@ export default function RideDetailScreen() {
   }, [record]);
 
   const heartRateZones = calculateHeartRateZones();
-  
-  // 心率區間顯示（包含 BPM 範圍）
-  const getHeartRateZoneDisplay = (zone: any) => {
-    return `${zone.name} (${zone.minBpm}-${zone.maxBpm} bpm)`;
-  };
   
   const estimationCalibration = useMemo(
     () => deriveLocalEstimationCalibration(state.records, settings.ftp),
@@ -722,24 +701,6 @@ export default function RideDetailScreen() {
     await Share.share({ message: msg });
   }, [record]);
 
-  // 刪除
-  const handleDelete = useCallback(() => {
-    Alert.alert("刪除記錄", "確定要刪除這筆騎乘記錄嗎？", [
-      { text: "取消", style: "cancel" },
-      {
-        text: "刪除",
-        style: "destructive",
-        onPress: async () => {
-          if (!record) return;
-          const updated = state.records.filter((r) => r.id !== record.id);
-          dispatch({ type: "LOAD_RECORDS", records: updated });
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-          router.back();
-        },
-      },
-    ]);
-  }, [record, state.records, dispatch]);
-
   if (!record) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -772,19 +733,20 @@ export default function RideDetailScreen() {
       style={styles.container}
       contentContainerStyle={[styles.pageContent, { paddingBottom: insets.bottom + 28 }]}
       showsVerticalScrollIndicator={false}
+      scrollEnabled={!isEmbeddedMapInteracting}
     >
-      <View style={styles.mapHero}>
+      <View
+        style={styles.mapHero}
+        onTouchStart={beginEmbeddedMapInteraction}
+        onTouchEnd={endEmbeddedMapInteraction}
+        onTouchCancel={endEmbeddedMapInteraction}
+      >
       {/* ── 全螢幕地圖（Leaflet WebView） ── */}
       <LeafletMapView
         ref={mapRef}
         style={styles.map}
-        initialRegion={{
-          latitude: polylineCoords[0]?.latitude ?? 25.0478,
-          longitude: polylineCoords[0]?.longitude ?? 121.5319,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        }}
-        onMapReady={() => setMapReady(true)}
+        initialRegion={activityMapInitialRegion}
+        onMapReady={handleActivityMapReady}
         gpxPolyline={polylineCoords}
         photoMarkers={photoRouteMarkers}
         onPhotoMarkerPress={openPhotoFromMarker}
@@ -1460,12 +1422,7 @@ export default function RideDetailScreen() {
             {activityViewerMode === "route" ? (
               <LeafletMapView
                 style={styles.activityViewerRouteMap}
-                initialRegion={{
-                  latitude: polylineCoords[0]?.latitude ?? 25.0478,
-                  longitude: polylineCoords[0]?.longitude ?? 121.5319,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                }}
+                initialRegion={activityMapInitialRegion}
                 gpxPolyline={polylineCoords}
                 photoMarkers={photoRouteMarkers}
                 onPhotoMarkerPress={openPhotoFromMarker}
@@ -1681,19 +1638,6 @@ export default function RideDetailScreen() {
 
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
-function SummaryCell({ icon, value, unit, label, color }: {
-  icon: string; value: string; unit: string; label: string; color: string;
-}) {
-  return (
-    <View style={summaryStyles.cell}>
-      <IconSymbol name={icon as any} size={14} color={color} />
-      <Text style={[summaryStyles.value, { color }]}>{value}</Text>
-      {unit ? <Text style={summaryStyles.unit}>{unit}</Text> : null}
-      <Text style={summaryStyles.label}>{label}</Text>
-    </View>
-  );
-}
-
 function CoreActivitySummaryGrid({
   distanceKm,
   ascentM,
@@ -1747,13 +1691,6 @@ function ActivitySummaryHeader({ title, subtitle }: { title: string; subtitle: s
     </View>
   );
 }
-
-const summaryStyles = StyleSheet.create({
-  cell: { flex: 1, alignItems: "center", gap: 2 },
-  value: { fontSize: 20, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  unit: { fontSize: 10, color: "rgba(255,255,255,0.4)" },
-  label: { fontSize: 10, color: "rgba(255,255,255,0.4)" },
-});
 
 function DetailCell({ label, value, unit, accent, color }: {
   label: string; value: string; unit: string; accent?: boolean; color?: string;

@@ -967,7 +967,12 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
 
 LeafletMapView.displayName = "LeafletMapView";
 
-export default LeafletMapView;
+// 地圖包含 WebView 與較大的軌跡資料；父頁面更新摘要、計時或抽屜時，僅在地圖 props
+// 實際變更時才重新協調子樹，避免影響拖曳與縮放的畫面流暢度。
+const MemoizedLeafletMapView = React.memo(LeafletMapView);
+MemoizedLeafletMapView.displayName = "MemoizedLeafletMapView";
+
+export default MemoizedLeafletMapView;
 
 const styles = StyleSheet.create({
   container: {

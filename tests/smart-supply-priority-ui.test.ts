@@ -22,9 +22,9 @@ describe("smart supply priority", () => {
     expect(mapSource).toContain('settings.supplyCalculationMode === "smart" ? false : settings.supplyDistanceIntervalEnabled');
   });
 
-  it("explains that smart mode ignores manual thresholds and hides manual threshold editors", () => {
-    expect(settingsSource).toContain("不會使用下方自訂值");
-    expect(settingsSource).toContain("不需要設定能量或補水門檻");
+  it("explains that smart mode does not read manual thresholds and removes threshold editors", () => {
+    expect(settingsSource).toContain("智慧計畫完全由 FTP");
+    expect(settingsSource).toContain("每次 150–250 mL");
     expect(settingsSource).not.toContain("能量門檻基準");
     expect(settingsSource).not.toContain("汗液流失提醒閾值");
   });

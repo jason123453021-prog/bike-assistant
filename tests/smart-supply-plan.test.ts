@@ -25,7 +25,7 @@ describe("smart supply plan", () => {
     expect(plan.waterRecommendationMl).toBeGreaterThanOrEqual(150);
   });
 
-  it("brings reminders forward and raises suggestion amounts under high intensity and heat stress", () => {
+  it("raises each micro-sip amount under high intensity and heat stress without exceeding tolerance", () => {
     const mild = createSupplyPlan({ ...baseInput, mode: "smart" });
     const heatStress = createSupplyPlan({
       ...baseInput,
@@ -36,11 +36,14 @@ describe("smart supply plan", () => {
     });
 
     expect(heatStress.calorieTriggerKcal).toBeLessThan(mild.calorieTriggerKcal);
-    expect(heatStress.waterTriggerMl).toBeLessThan(mild.waterTriggerMl);
+    expect(heatStress.waterTriggerMl).toBeGreaterThan(mild.waterTriggerMl);
     expect(heatStress.energyRecommendationKcal).toBeGreaterThan(mild.energyRecommendationKcal);
     expect(heatStress.waterRecommendationMl).toBeGreaterThan(mild.waterRecommendationMl);
     expect(heatStress.carbohydrateRecommendationG).toBeLessThanOrEqual(90);
-    expect(heatStress.waterRecommendationMl).toBeLessThanOrEqual(500);
+    expect(heatStress.waterRecommendationMl).toBeLessThanOrEqual(250);
+    expect(heatStress.waterRecommendationMl).toBeGreaterThanOrEqual(150);
+    expect(heatStress.waterTriggerMl).toBeLessThanOrEqual(250);
+    expect(heatStress.waterTriggerMl).toBeGreaterThanOrEqual(100);
   });
 
   it("keeps smart triggers independent from any manual custom thresholds", () => {

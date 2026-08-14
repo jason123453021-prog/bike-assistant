@@ -388,8 +388,8 @@ export default function SettingsScreen() {
           </View>
         </View>}
 
-        {/* ── 補給閾值 ── */}
-        <SectionHeader title="補給閾值" colors={colors} onToggle={() => toggleSection("supply")} collapsed={collapsedSections["supply"]} />
+        {/* ── 補給提醒 ── */}
+        <SectionHeader title="補給提醒" colors={colors} onToggle={() => toggleSection("supply")} collapsed={collapsedSections["supply"]} />
         {!collapsedSections["supply"] && <View style={[styles.section, { borderColor: colors.border }]}> 
           <ToggleRow
             icon="bolt.fill"
@@ -408,15 +408,8 @@ export default function SettingsScreen() {
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
             <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
               {settings.supplyCalculationMode === "smart"
-                ? "智慧門檻完全由 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨決定；不會使用下方自訂值。離線時仍以本機個人與騎乘資料安全計算。"
-                : "使用下方自訂固定門檻；這些數值只會在手動模式生效。"}
-            </Text>
-          </View>
-          <Divider colors={colors} />
-          <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-            <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "700" }}>不需要設定能量或補水門檻</Text>
-            <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 4 }}>
-              系統會依 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨，自動在導航儀表板更新能量與水分計畫。
+                ? "智慧計畫完全由 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨決定；補水會採約每 10–15 分鐘、每次 150–250 mL 的小量分次建議。離線時仍以本機個人與騎乘資料安全計算。"
+                : "使用既有固定提醒規則；這些數值只會在手動模式生效。"}
             </Text>
           </View>
           <Divider colors={colors} />

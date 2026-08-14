@@ -1681,6 +1681,14 @@
 - [x] 遷移至 style.pointerEvents 與 boxShadow 相容寫法，維持原本互動與視覺層級
 - [x] 新增棄用樣式回歸檢查，完成 TypeScript 0 errors、138 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
 
+## 補水耐受度與活動地圖互動優化（2026-08-14）
+- [x] 檢查第三方套件更新狀態與剩餘 Hook lint advisory，清理安全可修正項目
+- [x] 移除智慧補給模式下所有能量與補水手動門檻設定殘留
+- [x] 依科學化耐受度將智慧補水改為 10–15 分鐘的小量分次建議，避免一次補充過多造成腸胃不適
+- [x] 隔離活動詳情地圖手勢與外層捲動，並降低地圖傳遞與重繪負載
+- [x] 新增小量補水回歸測試，完成 TypeScript、零 lint advisory、140 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
+- [ ] 新增回歸測試、完成 TypeScript、完整測試與 Android bundle 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑

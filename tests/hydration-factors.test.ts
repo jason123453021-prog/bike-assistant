@@ -38,7 +38,7 @@ describe("smart hydration factors", () => {
     expect(coolWetNight.sweatRatePerHour).toBeLessThan(baseline.sweatRatePerHour);
   });
 
-  it("shortens smart hydration intervals and raises refill guidance as a session becomes prolonged", () => {
+  it("shortens smart hydration intervals as a session becomes prolonged while retaining micro-sip tolerance", () => {
     const basePlan = createSupplyPlan({
       mode: "smart", calorieThresholdKcal: 300, waterThresholdMl: 500, elapsedSec: 30 * 60,
       riderWeightKg: 70, ftpW: 240, intensityFactor: 0.8, sweatRatePerHour: 900, environmentLoad: 0.55, weatherAvailable: true,
@@ -49,7 +49,9 @@ describe("smart hydration factors", () => {
     });
 
     expect(longPlan.waterTriggerMl).toBeLessThanOrEqual(basePlan.waterTriggerMl);
-    expect(longPlan.waterRecommendationMl).toBeGreaterThan(basePlan.waterRecommendationMl);
+    expect(longPlan.waterRecommendationMl).toBe(basePlan.waterRecommendationMl);
+    expect(longPlan.waterRecommendationMl).toBeGreaterThanOrEqual(150);
+    expect(longPlan.waterRecommendationMl).toBeLessThanOrEqual(250);
     expect(longPlan.reason).toContain("長時間騎乘");
   });
 });
