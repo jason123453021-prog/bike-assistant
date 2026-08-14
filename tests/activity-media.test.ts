@@ -23,8 +23,9 @@ describe("activity media presentation", () => {
     expect(source).toContain("GestureDetector");
     expect(source).toContain("Gesture.Pan()");
     expect(source).toContain("manualActivation(true)");
-    expect(source).toContain("maxHorizontalTranslation");
+    expect(source).toContain("maxVerticalTranslation");
     expect(source).toContain("放大後可單指拖曳平移");
+    expect(source).toContain('resizeMode={fillContainer ? "cover" : "contain"}');
   });
 
   it("keeps full-screen route map gestures separate from photo gestures", () => {
@@ -44,6 +45,7 @@ describe("activity media presentation", () => {
     expect(source).toContain("routeMapPhotoThumbButton");
     expect(source).toContain("activityViewerMode === \"route\"");
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
+    expect(source).toContain("activityInitialSummary");
     expect(source).toContain("fillContainer");
   });
 

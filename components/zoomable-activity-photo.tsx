@@ -120,7 +120,7 @@ export function ZoomableActivityPhoto({ uri, resetKey, fillContainer = false }: 
     <View style={[styles.container, fillContainer && styles.containerFill]} accessible accessibilityLabel="活動照片；雙擊可放大或還原，雙指可縮放，放大後可單指拖曳平移">
       <GestureDetector gesture={Gesture.Simultaneous(pinchGesture, doubleTapGesture, panGesture)}>
         <Animated.View style={[styles.imageContainer, imageAnimationStyle]}>
-          <Image source={{ uri }} style={styles.image} resizeMode="contain" />
+          <Image source={{ uri }} style={styles.image} resizeMode={fillContainer ? "cover" : "contain"} />
         </Animated.View>
       </GestureDetector>
     </View>

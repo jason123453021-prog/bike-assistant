@@ -63,6 +63,9 @@ import * as ImagePicker from "expo-image-picker";
 
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+const ACTIVITY_SUMMARY_HORIZONTAL_PADDING = 20;
+const ACTIVITY_SUMMARY_CONTENT_TOP = 22;
+const ACTIVITY_SUMMARY_CONTENT_BOTTOM = 20;
 const ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.46), 360);
 const ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.78), 620);
 
@@ -950,6 +953,22 @@ export default function RideDetailScreen() {
       {/* ── 本機活動摘要：向上滑動頁面可查看完整數據 ── */}
       <View style={styles.activityBody}>
         <View style={styles.activityInitialSummary}>
+          <View style={styles.activityDetailsAfterInitial}>
+            <Text style={styles.activityEyebrow}>活動摘要</Text>
+            <Text style={styles.activityTitle}>{record.name}</Text>
+            <Text style={styles.activityDate}>{dateStr}</Text>
+            <View style={styles.activityMetaRow}>
+              <View style={styles.activityMetaChip}>
+                <Text style={styles.activityMetaChipText}>{activityTypeLabel(record.activityType)}</Text>
+              </View>
+              {record.perceivedExertion !== undefined && (
+                <View style={[styles.activityMetaChip, styles.activityMetaRpeChip]}>
+                  <Text style={styles.activityMetaRpeText}>{record.perceivedExertionSource === "app-estimate" ? "App 推定 " : ""}RPE {record.perceivedExertion}/10</Text>
+                </View>
+              )}
+              {record.equipment ? <Text style={styles.activityEquipment}>{record.equipment}</Text> : null}
+            </View>
+          </View>
           <CoreActivitySummaryGrid
             distanceKm={record.distance / 1000}
             ascentM={record.totalAscent}
@@ -958,23 +977,6 @@ export default function RideDetailScreen() {
             averageSpeedKmh={averageMovingSpeed}
             calories={record.calories}
           />
-        </View>
-
-        <View style={styles.activityDetailsAfterInitial}>
-          <Text style={styles.activityEyebrow}>活動摘要</Text>
-          <Text style={styles.activityTitle}>{record.name}</Text>
-          <Text style={styles.activityDate}>{dateStr}</Text>
-          <View style={styles.activityMetaRow}>
-            <View style={styles.activityMetaChip}>
-              <Text style={styles.activityMetaChipText}>{activityTypeLabel(record.activityType)}</Text>
-            </View>
-            {record.perceivedExertion !== undefined && (
-              <View style={[styles.activityMetaChip, styles.activityMetaRpeChip]}>
-                <Text style={styles.activityMetaRpeText}>{record.perceivedExertionSource === "app-estimate" ? "App 推定 " : ""}RPE {record.perceivedExertion}/10</Text>
-              </View>
-            )}
-            {record.equipment ? <Text style={styles.activityEquipment}>{record.equipment}</Text> : null}
-          </View>
         </View>
 
         {replayFrames.length > 1 && (
@@ -1809,7 +1811,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: ACTIVITY_SUMMARY_HORIZONTAL_PADDING,
     minHeight: 520,
   },
   activityEyebrow: { color: "#00E676", fontSize: 12, fontWeight: "700", letterSpacing: 0.6, marginBottom: 5 },
@@ -1821,8 +1823,8 @@ const styles = StyleSheet.create({
   activityMetaRpeChip: { backgroundColor: "rgba(245,158,11,0.14)" },
   activityMetaRpeText: { color: "#FCD34D", fontSize: 11, fontWeight: "800" },
   activityEquipment: { color: "rgba(255,255,255,0.55)", fontSize: 11, flexShrink: 1 },
-  activityInitialSummary: { paddingTop: 34, paddingBottom: 20 },
-  activityDetailsAfterInitial: { paddingTop: 20 },
+  activityInitialSummary: { paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM },
+  activityDetailsAfterInitial: { paddingTop: 0 },
   summaryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2226,11 +2228,11 @@ const styles = StyleSheet.create({
   mediaViewer: { flex: 1, backgroundColor: "#050505", justifyContent: "center" },
   mediaViewerClose: { position: "absolute", top: 56, left: 18, zIndex: 2, width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.58)" },
   activityViewerStage: { width: "100%", overflow: "hidden", backgroundColor: "#050505" },
-  mediaViewerPage: { width: SCREEN_W, flex: 1, justifyContent: "center", alignItems: "center" },
+  mediaViewerPage: { width: SCREEN_W, height: "100%", justifyContent: "center", alignItems: "center" },
   mediaViewerImage: { width: SCREEN_W, height: "82%" },
   activityViewerRoutePage: { backgroundColor: "#08110D" },
   activityViewerRouteMap: { width: SCREEN_W, flex: 1 },
-  activityViewerDrawer: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingBottom: 24, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: "#101012", borderTopWidth: 1, borderColor: "rgba(255,255,255,0.13)", overflow: "hidden" },
+  activityViewerDrawer: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: ACTIVITY_SUMMARY_HORIZONTAL_PADDING, paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: "#101012", borderTopWidth: 1, borderColor: "rgba(255,255,255,0.13)", overflow: "hidden" },
   activityViewerDrawerHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   activityViewerDrawerTitleBlock: { flex: 1 },
   activityViewerDrawerEyebrow: { color: "#00E676", fontSize: 11, fontWeight: "800", letterSpacing: 0.7 },
