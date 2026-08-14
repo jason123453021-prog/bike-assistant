@@ -17,10 +17,20 @@ describe("smart supply speech reminders", () => {
 
   it("uses smart speech for initial, repeated, and recovered pending reminders while respecting ttsEnabled", () => {
     expect(mapSource).toContain('settings.supplyCalculationMode === "smart" && recommendation');
-    expect(mapSource).toContain("speakSmartSupplyReminder(type, recommendation, settings.ttsEnabled)");
+    expect(mapSource).toContain("if (!settings.ttsEnabled) return");
+    expect(mapSource).toContain("speakSmartSupplyReminder(type, recommendation, true)");
     expect(mapSource).toContain("speakPlannedSupplyReminder(type, recommendation)");
     expect(mapSource).toContain("pendingSupplyPlansRef.current[type] = recommendation");
     expect(mapSource).toContain('speakPlannedSupplyReminder("calorie", pendingSupplyPlansRef.current.calorie)');
     expect(mapSource).toContain('speakPlannedSupplyReminder("water", pendingSupplyPlansRef.current.water)');
+  });
+
+  it("defers only supply speech while downhill and resumes one still-pending reminder after the descent", () => {
+    expect(mapSource).toContain("const isDownhillRef = useRef(false)");
+    expect(mapSource).toContain("const deferredSupplySpeechPlansRef");
+    expect(mapSource).toContain("if (isDownhillRef.current)");
+    expect(mapSource).toContain("deferredSupplySpeechPlansRef.current[type] = recommendation");
+    expect(mapSource).toContain("const resumeDeferredSupplySpeech = useCallback");
+    expect(mapSource).toContain("if (!isDownhill) resumeDeferredSupplySpeech()");
   });
 });
