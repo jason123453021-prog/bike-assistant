@@ -1505,3 +1505,9 @@
 - [x] 點擊上方路線主視覺可直接進入全螢幕；全螢幕路線地圖不參與左右滑動換頁，保留地圖手勢
 - [x] 將全螢幕底部資訊改為可上拉／下拉的活動摘要抽屜，拖曳時同步調整媒體可視高度
 - [x] 完成互動結構回歸測試、TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；98 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）
+
+## 固定活動資訊抽屜（2026-08-14）
+- [x] 將全螢幕檢視器底部改為固定白色把手的活動資訊抽屜，路線與所有照片皆可使用
+- [x] 建立收合摘要與上拉後完整騎乘資訊，並依參考影片維持一致的上拉／下拉手勢邏輯
+- [x] 抽屜高度變化時同步調整上方路線或照片的可視高度，且不打斷照片切換與縮放手勢
+- [x] 補強固定抽屜互動回歸測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；99 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）

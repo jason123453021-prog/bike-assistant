@@ -46,4 +46,15 @@ describe("activity media presentation", () => {
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
     expect(source).toContain("fillContainer");
   });
+
+  it("keeps a fixed activity drawer available for routes and every photo", () => {
+    const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
+    const source = fs.readFileSync(filePath, "utf8");
+
+    expect(source).toContain("activityViewerDrawerGrabArea");
+    expect(source).toContain("onPanResponderMove");
+    expect(source).toContain("clampActivityViewerDrawerHeight");
+    expect(source).toContain("activityViewerDrawerDetailGrid");
+    expect(source).toContain("activityViewerDrawerHeight.interpolate");
+  });
 });
