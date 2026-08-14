@@ -1585,6 +1585,11 @@
 - [x] 以中央焦點處理必要的溢出裁切，避免畫面變形與大面積黑色空白
 - [x] 補強自動填滿留白回歸測試，完成 TypeScript 0 errors、101 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
 
+## 釘選模式地址導航（2026-08-14）
+- [x] 按下地圖「釘選」時於地圖上方開啟地址輸入欄，保留既有地圖長按釘選
+- [x] 將輸入地址解析為目的地座標、在地圖標記目的地並串接既有導航路線
+- [x] 提供搜尋中、找不到地址及離線時的清楚回饋，完成 TypeScript 0 errors、103 passed／1 skipped 與 Android Hermes bundle 5.60 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑

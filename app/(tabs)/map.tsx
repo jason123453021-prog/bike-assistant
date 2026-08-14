@@ -33,6 +33,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import LeafletMapView, { type LeafletMapHandle, type NavigationRouteOverlay } from "@/components/leaflet-map";
@@ -399,9 +400,12 @@ export default function MapScreen() {
   const [pinSelectMode, setPinSelectMode] = useState(false); // 釘選模式是否啟動
   const [centerPinLocation, setCenterPinLocation] = useState<{ lat: number; lon: number } | null>(null); // 中心圖釘的位置
   const [pinnedLocation, setPinnedLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [pinnedLocationLabel, setPinnedLocationLabel] = useState<string | null>(null);
   const [showPinCard, setShowPinCard] = useState(false);
   const [isFetchingPinRoute, setIsFetchingPinRoute] = useState(false);
   const [pinRouteInfo, setPinRouteInfo] = useState<{ distM: number; durSec: number; polyline: { latitude: number; longitude: number }[] } | null>(null);
+  const [pinAddress, setPinAddress] = useState("");
+  const [isResolvingPinAddress, setIsResolvingPinAddress] = useState(false);
 
   const clearAllNavigationLayers = useCallback(() => {
     // 立即通知 Leaflet 清空已繪製圖層與數字標記，避免等待 React state 更新而短暫殘留。
@@ -415,6 +419,7 @@ export default function MapScreen() {
     setDistToEnd(null);
     setNavInstruction("");
     setPinnedLocation(null);
+    setPinnedLocationLabel(null);
     setCenterPinLocation(null);
     setShowPinCard(false);
     setPinRouteInfo(null);
@@ -453,6 +458,43 @@ export default function MapScreen() {
       ],
     );
   }, [clearSharedRoute, pinnedNavigationLayers.length, settings.ttsEnabled, sharedRoute]);
+
+  const handleResolvePinAddress = useCallback(async () => {
+    const address = pinAddress.trim();
+    if (!address) {
+      Alert.alert("輸入地址", "請輸入目的地地址、地標或店家名稱。");
+      return;
+    }
+    setIsResolvingPinAddress(true);
+    try {
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        const requested = await Location.requestForegroundPermissionsAsync();
+        if (requested.status !== "granted") {
+          Alert.alert("需要定位權限", "地址導航需要前景定位權限，才能將目的地接入現有導航流程。");
+          return;
+        }
+      }
+      const results = await Location.geocodeAsync(address);
+      const destination = results[0];
+      if (!destination) {
+        Alert.alert("找不到地址", "請補上城市、區域或門牌後再搜尋，也可直接移動地圖中心圖釘選點。");
+        return;
+      }
+      const nextLocation = { lat: destination.latitude, lon: destination.longitude };
+      setPinnedLocation(nextLocation);
+      setPinnedLocationLabel(address);
+      setPinRouteInfo(null);
+      setShowPinCard(true);
+      setPinSelectMode(false);
+      setCenterPinLocation(null);
+      mapRef.current?.animateCamera({ center: { latitude: nextLocation.lat, longitude: nextLocation.lon }, zoom: 16 }, { duration: 360 });
+    } catch {
+      Alert.alert("地址搜尋暫時不可用", "請確認網路與定位服務後再試；離線時仍可直接移動地圖，以中心圖釘選擇目的地。");
+    } finally {
+      setIsResolvingPinAddress(false);
+    }
+  }, [pinAddress]);
 
   // ── 自訂補給品追蹤 ──
   // 記錄每個補給品上次觸發的時間（秒）或距離（公里）
@@ -2200,6 +2242,8 @@ export default function MapScreen() {
         onPanDrag={scheduleAutoRecenter}
         onMapLongPress={(lat, lon) => {
           setPinnedLocation({ lat, lon });
+          setPinnedLocationLabel(null);
+          setPinRouteInfo(null);
           setShowPinCard(true);
           scheduleAutoRecenter();
           // 視覺回饋：縮放到釘選位置
@@ -2224,6 +2268,28 @@ export default function MapScreen() {
         kilometersMarkers={kilometersMarkers}
         onMapMoveEnd={scheduleAutoRecenter}
       />
+
+      {pinSelectMode && (
+        <View style={[styles.pinAddressBar, { top: insets.top + 10 }]}>
+          <TextInput
+            value={pinAddress}
+            onChangeText={setPinAddress}
+            placeholder="輸入地址、地標或店家名稱"
+            placeholderTextColor="rgba(255,255,255,0.52)"
+            style={styles.pinAddressInput}
+            returnKeyType="search"
+            autoCorrect={false}
+            onSubmitEditing={() => { void handleResolvePinAddress(); }}
+          />
+          <Pressable
+            style={[styles.pinAddressSearchButton, isResolvingPinAddress && styles.pinAddressSearchButtonDisabled]}
+            disabled={isResolvingPinAddress}
+            onPress={() => { void handleResolvePinAddress(); }}
+          >
+            <Text style={styles.pinAddressSearchText}>{isResolvingPinAddress ? "搜尋中" : "搜尋"}</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* ── 右側工具列 ── */}
       <View style={[styles.toolBar, { top: insets.top + 8, right: 16 }]}>
@@ -2293,6 +2359,8 @@ export default function MapScreen() {
             if (pinSelectMode) {
               if (centerPinLocation) {
                 setPinnedLocation(centerPinLocation);
+                setPinnedLocationLabel(null);
+                setPinRouteInfo(null);
                 setShowPinCard(true);
                 setPinSelectMode(false);
                 setCenterPinLocation(null);
@@ -2300,6 +2368,8 @@ export default function MapScreen() {
             } else {
               if (currentPos) {
                 setCenterPinLocation({ lat: currentPos.lat, lon: currentPos.lon });
+                setPinAddress("");
+                setPinnedLocationLabel(null);
                 setPinSelectMode(true);
               }
             }
@@ -2663,14 +2733,15 @@ export default function MapScreen() {
 
       {/* ── 釘選地點卡片 ── */}
       {showPinCard && pinnedLocation && (
-        <View style={[styles.pinCard, { bottom: dynamicCollapsedH + 16 }]}>
+        <View style={[styles.pinCard, { bottom: dynamicCollapsedH + 16 }]}> 
           <View style={styles.pinCardHeader}>
-            <Text style={styles.pinCardTitle}>釘選位置</Text>
+            <Text style={styles.pinCardTitle} numberOfLines={1}>{pinnedLocationLabel ?? "釘選位置"}</Text>
             <Pressable
               style={styles.pinCardClose}
               onPress={() => {
                 setShowPinCard(false);
                 setPinnedLocation(null);
+                setPinnedLocationLabel(null);
                 setPinRouteInfo(null);
               }}
             >
@@ -2737,7 +2808,7 @@ export default function MapScreen() {
                   return;
                 }
                 const osmrRoute = {
-                  name: "釘選位置導航",
+                  name: pinnedLocationLabel ? `${pinnedLocationLabel} 導航` : "釘選位置導航",
                   points: pinRouteInfo.polyline.map(p => ({ lat: p.latitude, lon: p.longitude, ele: 0 })),
                   totalDistance: pinRouteInfo.distM,
                   totalAscent: 0,
@@ -2749,7 +2820,7 @@ export default function MapScreen() {
                   avgGradient: 0,
                   maxGradient: 0,
                 };
-                startPinnedNavigationRoute(osmrRoute, "開始導航到釘選位置");
+                startPinnedNavigationRoute(osmrRoute, `開始導航到${pinnedLocationLabel ?? "釘選位置"}`);
                 setShowPinCard(false);
               }}
             >
@@ -2761,6 +2832,7 @@ export default function MapScreen() {
               onPress={() => {
                 setShowPinCard(false);
                 setPinnedLocation(null);
+                setPinnedLocationLabel(null);
                 setPinRouteInfo(null);
               }}
             >
@@ -2961,6 +3033,34 @@ const styles = StyleSheet.create({
   navDist: { color: "#00E676", fontSize: 12, fontWeight: "700" },
 
   toolBar: { position: "absolute", gap: 10, zIndex: 30 },
+  pinAddressBar: {
+    position: "absolute",
+    left: 16,
+    right: 76,
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingLeft: 14,
+    paddingRight: 6,
+    borderRadius: 14,
+    backgroundColor: "rgba(20,20,24,0.96)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    zIndex: 40,
+  },
+  pinAddressInput: { flex: 1, color: "#fff", fontSize: 14, minHeight: 44 },
+  pinAddressSearchButton: {
+    minWidth: 58,
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    marginVertical: 4,
+    backgroundColor: "#007AFF",
+  },
+  pinAddressSearchButtonDisabled: { opacity: 0.58 },
+  pinAddressSearchText: { color: "#fff", fontSize: 13, fontWeight: "800" },
   toolBtn: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: "rgba(0,0,0,0.7)",
@@ -3378,9 +3478,11 @@ const styles = StyleSheet.create({
     marginBottom: 8 /* internal spacing */,
   },
   pinCardTitle: {
+    flex: 1,
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
+    marginRight: 10,
   },
   pinCardClose: {
     width: 28,
