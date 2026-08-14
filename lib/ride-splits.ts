@@ -7,6 +7,7 @@ export interface RideSplit {
   distanceM: number;
   movingTimeSeconds: number;
   averageSpeedKmh?: number;
+  paceSecondsPerKm?: number;
   ascentM: number;
   descentM: number;
   averagePowerW?: number;
@@ -76,6 +77,7 @@ export function buildRideSplits(record: RideRecord, splitDistanceM = 1_000): Rid
       distanceM: current.distanceM,
       movingTimeSeconds: current.movingTimeSeconds,
       averageSpeedKmh,
+      paceSecondsPerKm: current.distanceM > 0 ? (current.movingTimeSeconds / current.distanceM) * 1_000 : undefined,
       ascentM: current.ascentM,
       descentM: current.descentM,
       averagePowerW: current.powerDistance > 0 ? current.powerSum / current.powerDistance : undefined,
@@ -134,6 +136,7 @@ export function buildRideSplits(record: RideRecord, splitDistanceM = 1_000): Rid
     ascentM: Math.round(split.ascentM * 10) / 10,
     descentM: Math.round(split.descentM * 10) / 10,
     averageSpeedKmh: split.averageSpeedKmh === undefined ? undefined : Math.round(split.averageSpeedKmh * 10) / 10,
+    paceSecondsPerKm: split.paceSecondsPerKm === undefined ? undefined : Math.round(split.paceSecondsPerKm),
     averagePowerW: split.averagePowerW === undefined ? undefined : Math.round(split.averagePowerW),
   }));
 }

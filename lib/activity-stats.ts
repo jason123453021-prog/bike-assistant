@@ -3,7 +3,7 @@
  * 月度統計、年度統計、路線排行、成績排行
  */
 
-import { RideRecord } from "./ride-context";
+import { RideRecord, SportType } from "./ride-context";
 
 export interface ActivityStats {
   totalDistance: number;      // 總距離 (km)
@@ -15,6 +15,27 @@ export interface ActivityStats {
   maxSpeed: number;           // 最高速度 (km/h)
   maxElevation: number;       // 最高海拔 (m)
   rideCount: number;          // 騎乘次數
+}
+
+export function filterRecordsBySport(rides: RideRecord[], sportType?: SportType): RideRecord[] {
+  return sportType ? rides.filter((ride) => (ride.sportType ?? "cycling") === sportType) : rides;
+}
+
+/** 依運動類型計算最近七日的純本機總覽；省略類型時保留全部運動合併視角。 */
+export function calculateWeeklySportStats(rides: RideRecord[], sportType?: SportType, now = new Date()): ActivityStats {
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  return calculateStats(filterRecordsBySport(rides, sportType).filter((ride) => {
+    const date = new Date(ride.date);
+    return date >= weekAgo && date <= now;
+  }));
+}
+
+/** 依運動類型計算指定月份的純本機總覽。 */
+export function calculateMonthlySportStats(rides: RideRecord[], sportType?: SportType, month = new Date().getMonth(), year = new Date().getFullYear()): ActivityStats {
+  return calculateStats(filterRecordsBySport(rides, sportType).filter((ride) => {
+    const date = new Date(ride.date);
+    return date.getMonth() === month && date.getFullYear() === year;
+  }));
 }
 
 export interface RouteRanking {

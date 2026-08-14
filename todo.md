@@ -1604,6 +1604,12 @@
 - [x] 將運動類型寫入 GPX metadata 與 track type，支援外部平台識別
 - [x] 補強多運動單元、資料流與匯出回歸測試，完成 TypeScript 0 errors、111 passed／1 skipped 與 Android Hermes bundle 5.65 MB 驗證
 
+## 多運動訓練統計與地形分析（2026-08-14）
+- [x] 讓週／月訓練統計依單車、跑步、登山與越野跑獨立計算並可切換
+- [x] 新增跑步／越野跑的本機每公里分段配速分析
+- [x] 新增登山／越野跑的本機海拔區間、停留與爬升分布分析
+- [x] 補強統計與活動分析測試，完成 TypeScript 0 errors、114 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
+
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
 - [ ] 修正造成 Expo Go 無法開啟的相容性或執行期崩潰程式路徑

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RideRecord } from "../lib/ride-context";
 import { buildRideSplits } from "../lib/ride-splits";
+import { buildElevationBands } from "../lib/elevation-bands";
 
 const route = [
   { latitude: 25, longitude: 121, altitude: 10, speed: 5, timestamp: 0, power: 150 },
@@ -39,9 +40,16 @@ describe("buildRideSplits", () => {
     expect(splits[0].ascentM).toBeGreaterThan(0);
     expect(splits[1].descentM).toBeGreaterThan(0);
     expect(splits[0].averagePowerW).toBeGreaterThan(0);
+    expect(splits[0].paceSecondsPerKm).toBeGreaterThan(0);
   });
 
   it("在沒有足夠 GPS 軌跡時安全回傳空分段", () => {
     expect(buildRideSplits({ ...record, route: [route[0]] })).toEqual([]);
+  });
+
+  it("以本機軌跡建立海拔區間分布", () => {
+    const bands = buildElevationBands({ ...record, route: route.map((point, index) => ({ ...point, altitude: 20 + index * 110 })) }, 100);
+    expect(bands.length).toBeGreaterThan(1);
+    expect(bands.reduce((sum, band) => sum + band.distanceM, 0)).toBeGreaterThan(0);
   });
 });

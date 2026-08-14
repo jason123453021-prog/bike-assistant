@@ -16,7 +16,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useRide, type RideRecord } from "@/lib/ride-context";
 import { formatDuration } from "@/lib/power-calc";
-import { calculateWeeklyTrainingStats, calculateMonthlyTrainingStats } from "@/lib/activity-stats";
+import { calculateMonthlySportStats, calculateWeeklySportStats, filterRecordsBySport } from "@/lib/activity-stats";
 import { buildLocalTrainingLog, shiftTrainingLogMonth } from "@/lib/local-training-log";
 import { formatPaceFromKmh, SPORT_META, type SportType } from "@/lib/sport-metrics";
 
@@ -32,17 +32,23 @@ export default function HistoryScreen() {
   const [showStats, setShowStats] = useState(false);
   const [trainingLogMonth, setTrainingLogMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
-  // 計算周期訓練統計
-  const weeklyStats = useMemo(() => calculateWeeklyTrainingStats(state.records), [state.records]);
-  const monthlyStats = useMemo(() => calculateMonthlyTrainingStats(state.records), [state.records]);
+  const selectedSportType = sportFilter === "all" ? undefined : sportFilter;
+  const selectedSportLabel = selectedSportType ? SPORT_META[selectedSportType].label : "全部運動";
+  const selectedSportRecords = useMemo(() => filterRecordsBySport(state.records, selectedSportType), [state.records, selectedSportType]);
+  const weeklyStats = useMemo(() => calculateWeeklySportStats(state.records, selectedSportType), [state.records, selectedSportType]);
+  const monthlyStats = useMemo(() => calculateMonthlySportStats(state.records, selectedSportType), [state.records, selectedSportType]);
   const selectedMonthStats = useMemo(
-    () => calculateMonthlyTrainingStats(state.records, trainingLogMonth.getMonth(), trainingLogMonth.getFullYear()),
-    [state.records, trainingLogMonth],
+    () => calculateMonthlySportStats(state.records, selectedSportType, trainingLogMonth.getMonth(), trainingLogMonth.getFullYear()),
+    [state.records, selectedSportType, trainingLogMonth],
   );
   const trainingLog = useMemo(
-    () => buildLocalTrainingLog(state.records, trainingLogMonth.getFullYear(), trainingLogMonth.getMonth()),
-    [state.records, trainingLogMonth],
+    () => buildLocalTrainingLog(selectedSportRecords, trainingLogMonth.getFullYear(), trainingLogMonth.getMonth()),
+    [selectedSportRecords, trainingLogMonth],
   );
+  const usePace = selectedSportType === "running" || selectedSportType === "trail_running";
+  const formatPeriodMetric = (stats: typeof weeklyStats) => usePace
+    ? `${formatPaceFromKmh(stats.averageSpeed)} /km`
+    : `${stats.averageSpeed.toFixed(1)} km/h`;
 
   useEffect(() => {
     loadRecords();
@@ -178,8 +184,8 @@ export default function HistoryScreen() {
             style={[styles.statsToggle, { backgroundColor: colors.surface, borderColor: colors.border }]}
           >
             <View style={styles.statsToggleContent}>
-              <Text style={[styles.statsToggleLabel, { color: colors.foreground }]}>📊 本周訓練負荷</Text>
-              <Text style={[styles.statsToggleValue, { color: colors.primary }]}>{weeklyStats.totalTSS.toFixed(0)} TSS</Text>
+              <Text style={[styles.statsToggleLabel, { color: colors.foreground }]}>📊 本週{selectedSportLabel}統計</Text>
+              <Text style={[styles.statsToggleValue, { color: colors.primary }]}>{weeklyStats.totalDistance.toFixed(1)} km</Text>
             </View>
             <IconSymbol name={showStats ? "chevron.up" : "chevron.down"} size={16} color={colors.muted} />
           </Pressable>
@@ -189,37 +195,45 @@ export default function HistoryScreen() {
         {showStats && state.records.length > 0 && (
           <View style={[styles.statsDetail, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.statsPeriod}>
-              <Text style={[styles.statsPeriodTitle, { color: colors.foreground }]}>本周訓練</Text>
+              <Text style={[styles.statsPeriodTitle, { color: colors.foreground }]}>本週{selectedSportLabel}</Text>
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Text style={[styles.statLabel, { color: colors.muted }]}>總 TSS</Text>
-                  <Text style={[styles.statValue, { color: colors.primary }]}>{weeklyStats.totalTSS.toFixed(0)}</Text>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>總距離</Text>
+                  <Text style={[styles.statValue, { color: colors.primary }]}>{weeklyStats.totalDistance.toFixed(1)} km</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Text style={[styles.statLabel, { color: colors.muted }]}>騎乘次數</Text>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>活動次數</Text>
                   <Text style={[styles.statValue, { color: colors.foreground }]}>{weeklyStats.rideCount}</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Text style={[styles.statLabel, { color: colors.muted }]}>負荷等級</Text>
-                  <Text style={[styles.statValue, { color: colors.foreground }]}>{weeklyStats.trainingLoadLabel}</Text>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>{usePace ? "平均配速" : "平均速度"}</Text>
+                  <Text style={[styles.statValue, { color: colors.foreground }]}>{formatPeriodMetric(weeklyStats)}</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>總爬升</Text>
+                  <Text style={[styles.statValue, { color: colors.foreground }]}>{weeklyStats.totalElevation} m</Text>
                 </View>
               </View>
             </View>
             <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statsPeriod}>
-              <Text style={[styles.statsPeriodTitle, { color: colors.foreground }]}>本月訓練</Text>
+              <Text style={[styles.statsPeriodTitle, { color: colors.foreground }]}>本月{selectedSportLabel}</Text>
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Text style={[styles.statLabel, { color: colors.muted }]}>總 TSS</Text>
-                  <Text style={[styles.statValue, { color: colors.primary }]}>{monthlyStats.totalTSS.toFixed(0)}</Text>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>總距離</Text>
+                  <Text style={[styles.statValue, { color: colors.primary }]}>{monthlyStats.totalDistance.toFixed(1)} km</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Text style={[styles.statLabel, { color: colors.muted }]}>騎乘次數</Text>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>活動次數</Text>
                   <Text style={[styles.statValue, { color: colors.foreground }]}>{monthlyStats.rideCount}</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Text style={[styles.statLabel, { color: colors.muted }]}>負荷等級</Text>
-                  <Text style={[styles.statValue, { color: colors.foreground }]}>{monthlyStats.trainingLoadLabel}</Text>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>{usePace ? "平均配速" : "平均速度"}</Text>
+                  <Text style={[styles.statValue, { color: colors.foreground }]}>{formatPeriodMetric(monthlyStats)}</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statLabel, { color: colors.muted }]}>總爬升</Text>
+                  <Text style={[styles.statValue, { color: colors.foreground }]}>{monthlyStats.totalElevation} m</Text>
                 </View>
               </View>
             </View>
@@ -248,7 +262,7 @@ export default function HistoryScreen() {
                 </View>
               </View>
               <Text style={[styles.trainingLogSummaryText, { color: colors.muted }]}>
-                {selectedMonthStats.rideCount} 次騎乘 · {(selectedMonthStats.totalDuration / 3600).toFixed(1)} 小時 · {selectedMonthStats.totalTSS.toFixed(0)} TSS
+                {selectedMonthStats.rideCount} 次{selectedSportLabel} · {(selectedMonthStats.totalTime / 3600).toFixed(1)} 小時 · {selectedMonthStats.totalElevation} m 爬升
               </Text>
               <View style={styles.weekdayRow}>
                 {["一", "二", "三", "四", "五", "六", "日"].map((day) => (

@@ -48,6 +48,7 @@ import { deriveLocalEstimationCalibration } from "@/lib/activity-estimation-cali
 import { createGpxContent } from "@/lib/gpx-export";
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
 import { buildRideSplits } from "@/lib/ride-splits";
+import { buildElevationBands } from "@/lib/elevation-bands";
 import { buildReplayFrames, replayFrameDelayMs } from "@/lib/activity-replay";
 import { buildPhotoRouteMarkers } from "@/lib/photo-route-markers";
 import { compareLocalSplitPersonalBests } from "@/lib/local-split-personal-bests";
@@ -282,6 +283,8 @@ export default function RideDetailScreen() {
   const [replaySpeed, setReplaySpeed] = useState<1 | 2 | 4>(1);
 
   const rideSplits = useMemo(() => record ? buildRideSplits(record) : [], [record]);
+  const sportType = record?.sportType ?? "cycling";
+  const elevationBands = useMemo(() => record && (sportType === "hiking" || sportType === "trail_running") ? buildElevationBands(record) : [], [record, sportType]);
 
   const handleApplySweatCalibration = useCallback(async () => {
     if (!record) return;
@@ -1180,17 +1183,38 @@ export default function RideDetailScreen() {
                 <View style={styles.splitHeader}>
                   <Text style={styles.splitHeaderText}>段</Text>
                   <Text style={styles.splitHeaderText}>時間</Text>
-                  <Text style={styles.splitHeaderText}>均速</Text>
+                  <Text style={styles.splitHeaderText}>{sportType === "running" || sportType === "trail_running" ? "配速" : "均速"}</Text>
                   <Text style={styles.splitHeaderText}>爬／降</Text>
-                  <Text style={styles.splitHeaderText}>功率</Text>
+                  <Text style={styles.splitHeaderText}>{sportType === "trail_running" ? "GAP" : sportType === "hiking" ? "VAM" : "功率"}</Text>
                 </View>
                 {rideSplits.map((split) => (
                   <View key={split.index} style={styles.splitRow}>
                     <Text style={styles.splitCell}>{split.distanceM >= 950 ? `${split.index} km` : `${split.index} · ${(split.distanceM / 1000).toFixed(2)} km`}</Text>
                     <Text style={styles.splitCell}>{formatDuration(split.movingTimeSeconds)}</Text>
-                    <Text style={styles.splitCell}>{split.averageSpeedKmh?.toFixed(1) ?? "--"}</Text>
+                    <Text style={styles.splitCell}>{sportType === "running" || sportType === "trail_running" ? formatPaceSeconds(split.paceSecondsPerKm ?? 0) : split.averageSpeedKmh?.toFixed(1) ?? "--"}</Text>
                     <Text style={styles.splitCell}>{`${Math.round(split.ascentM)} / ${Math.round(split.descentM)}`}</Text>
-                    <Text style={styles.splitCell}>{split.averagePowerW === undefined ? "--" : `${split.averagePowerW} W`}</Text>
+                    <Text style={styles.splitCell}>{sportType === "trail_running" ? formatPaceSeconds(calculateGapPaceSecPerKm(split.paceSecondsPerKm ?? 0, record.averageGrade ?? 0)) : sportType === "hiking" ? `${split.movingTimeSeconds > 0 ? Math.round((split.ascentM / split.movingTimeSeconds) * 3600) : 0}` : split.averagePowerW === undefined ? "--" : `${split.averagePowerW} W`}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {elevationBands.length > 0 && (
+              <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}> 
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>海拔區間分布</Text>
+                <Text style={[styles.panelHint, { color: colors.muted }]}>依本次儲存的 GPS 海拔與軌跡距離建立，不使用外部地形資料。</Text>
+                <View style={styles.splitHeader}>
+                  <Text style={styles.splitHeaderText}>海拔</Text>
+                  <Text style={styles.splitHeaderText}>距離</Text>
+                  <Text style={styles.splitHeaderText}>停留</Text>
+                  <Text style={styles.splitHeaderText}>爬升</Text>
+                </View>
+                {elevationBands.map((band) => (
+                  <View key={band.label} style={styles.splitRow}>
+                    <Text style={styles.splitCell}>{band.label}</Text>
+                    <Text style={styles.splitCell}>{(band.distanceM / 1000).toFixed(2)} km</Text>
+                    <Text style={styles.splitCell}>{formatDuration(band.movingTimeSeconds)}</Text>
+                    <Text style={styles.splitCell}>{Math.round(band.ascentM)} m</Text>
                   </View>
                 ))}
               </View>
