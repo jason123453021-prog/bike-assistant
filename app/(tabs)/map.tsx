@@ -421,6 +421,7 @@ export default function MapScreen() {
   const [waterAlert, setWaterAlert] = useState(false);
   const [supplyRecommendedMl, setSupplyRecommendedMl] = useState<number | undefined>(undefined);
   const [supplyRecommendation, setSupplyRecommendation] = useState<SupplyPlan | undefined>(undefined);
+  const [activeSupplyPlan, setActiveSupplyPlan] = useState<SupplyPlan | undefined>(undefined);
 
   const calorieReminderSentRef = useRef(false);
   const waterReminderSentRef = useRef(false);
@@ -841,6 +842,19 @@ export default function MapScreen() {
   const hydrationThresholdMl = settings.waterThreshold > 0
     ? settings.waterThreshold
     : DEFAULT_HYDRATION_THRESHOLD_ML;
+  const fallbackSupplyPlan = useMemo(() => createSupplyPlan({
+    mode: settings.supplyCalculationMode,
+    calorieThresholdKcal: settings.calorieThreshold,
+    waterThresholdMl: hydrationThresholdMl,
+    elapsedSec: state.elapsed,
+    riderWeightKg: settings.weight,
+    ftpW: estimateFtpW,
+    intensityFactor: state.currentPower > 0 ? Math.min(2, state.currentPower / Math.max(1, estimateFtpW)) : 0.65,
+    sweatRatePerHour: state.currentSweatRatePerHour || 550,
+    environmentLoad: Math.min(1, Math.max(0, ((state.currentSweatRatePerHour || 550) - 550) / 1_000)),
+    weatherAvailable: false,
+  }), [estimateFtpW, hydrationThresholdMl, settings.calorieThreshold, settings.supplyCalculationMode, settings.weight, state.currentPower, state.currentSweatRatePerHour, state.elapsed]);
+  const dashboardSupplyPlan = activeSupplyPlan ?? fallbackSupplyPlan;
 
   // ─── 底部面板滑桿 ─────────────────────────────────────────────────────────────
   const [panelExpanded, setPanelExpanded] = useState(false);
@@ -1689,6 +1703,7 @@ export default function MapScreen() {
             environmentLoad: sweatResult.environmentLoad,
             weatherAvailable: Boolean(currentWeather),
           });
+          setActiveSupplyPlan(supplyPlan);
           const newCalories = currentState.calories + calIncrement;
           const calPct = Math.min(1, newCalories / supplyPlan.calorieTriggerKcal);
           const newSweatSince = currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
@@ -1930,9 +1945,9 @@ export default function MapScreen() {
       currentLat: lastPos?.coords.latitude ?? 0,
       currentLon: lastPos?.coords.longitude ?? 0,
       supplyIntervalReminderEnabled: settings.supplyIntervalReminderEnabled,
-      supplyTimeIntervalEnabled: settings.supplyTimeIntervalEnabled,
+      supplyTimeIntervalEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyTimeIntervalEnabled,
       supplyTimeIntervalMinutes: settings.supplyTimeIntervalMinutes,
-      supplyDistanceIntervalEnabled: settings.supplyDistanceIntervalEnabled,
+      supplyDistanceIntervalEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyDistanceIntervalEnabled,
       supplyDistanceIntervalKm: settings.supplyDistanceIntervalKm,
       riderProfile: {
         weightKg: settings.weight,
@@ -2312,7 +2327,8 @@ export default function MapScreen() {
   const waterWidth = waterAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"], extrapolate: "clamp" });
 
   const sweatCurrent = Math.round(state.sweatSinceLastRefill);
-  const sweatTarget = Math.round(hydrationThresholdMl);
+  const calorieTarget = Math.round(dashboardSupplyPlan.calorieTriggerKcal);
+  const sweatTarget = Math.round(dashboardSupplyPlan.waterTriggerMl);
   const waterProgress = sweatCurrent / sweatTarget;
   const waterBarColor = waterProgress < 0.5 ? "#4FC3F7" : waterProgress < 0.8 ? "#F59E0B" : "#EF4444";
 
@@ -2697,7 +2713,7 @@ export default function MapScreen() {
                   <Text style={styles.progressLabel}>卡路里</Text>
                 </View>
                 <Text style={styles.progressValue}>
-                  {Math.round(state.calories)} / {settings.calorieThreshold} kcal
+                  {Math.round(state.calories)} / {calorieTarget} kcal{settings.supplyCalculationMode === "smart" ? " · 智慧" : ""}
                 </Text>
               </View>
               <View style={styles.progressTrack}>
@@ -2772,7 +2788,7 @@ export default function MapScreen() {
                     </View>
                   )}
                 </View>
-                <Text style={styles.progressValue}>{sweatCurrent} / {sweatTarget} ml</Text>
+                <Text style={styles.progressValue}>{sweatCurrent} / {sweatTarget} ml{settings.supplyCalculationMode === "smart" ? " · 智慧" : ""}</Text>
               </View>
               <View style={styles.progressTrack}>
                 <Animated.View style={[styles.progressFill, { width: waterWidth, backgroundColor: waterBarColor }]} />

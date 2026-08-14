@@ -399,7 +399,14 @@ export default function SettingsScreen() {
             label="智慧補給計算"
             value={settings.supplyCalculationMode === "smart"}
             colors={colors}
-            onToggle={(enabled) => updateSettings({ supplyCalculationMode: enabled ? "smart" : "custom" })}
+            onToggle={(enabled) => updateSettings(enabled
+              ? {
+                  supplyCalculationMode: "smart",
+                  supplyIntervalReminderEnabled: false,
+                  supplyTimeIntervalEnabled: false,
+                  supplyDistanceIntervalEnabled: false,
+                }
+              : { supplyCalculationMode: "custom" })}
           />
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
             <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
@@ -433,12 +440,17 @@ export default function SettingsScreen() {
           <Divider colors={colors} />
           <ToggleRow
             icon="bell.badge.fill"
-            label="依時間／距離提醒補給"
-            value={settings.supplyIntervalReminderEnabled}
+            label={settings.supplyCalculationMode === "smart" ? "依時間／距離提醒補給（智慧模式已接管）" : "依時間／距離提醒補給"}
+            value={settings.supplyCalculationMode === "smart" ? false : settings.supplyIntervalReminderEnabled}
             colors={colors}
+            disabled={settings.supplyCalculationMode === "smart"}
             onToggle={(enabled) => updateSettings({ supplyIntervalReminderEnabled: enabled })}
           />
-          {settings.supplyIntervalReminderEnabled && <>
+          {settings.supplyCalculationMode === "smart" ? (
+            <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
+              <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>智慧補給會依即時能量與水分閾值提醒，已停用固定時間／距離間隔，避免重複或衝突通知。</Text>
+            </View>
+          ) : settings.supplyIntervalReminderEnabled && <>
             <Divider colors={colors} />
             <ToggleRow
               icon="clock.fill"
@@ -1328,17 +1340,18 @@ function TextRow({
 }
 
 function ToggleRow({
-  icon, label, value, colors, onToggle,
+  icon, label, value, colors, onToggle, disabled = false,
 }: {
-  icon: string; label: string; value: boolean; colors: any; onToggle: (v: boolean) => void;
+  icon: string; label: string; value: boolean; colors: any; onToggle: (v: boolean) => void; disabled?: boolean;
 }) {
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, disabled && { opacity: 0.45 }]}>
       <IconSymbol name={icon as any} size={18} color={colors.muted} />
       <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onToggle}
+        disabled={disabled}
         trackColor={{ false: "#767577", true: "#34C759" }}
         thumbColor="#fff"
         ios_backgroundColor="#767577"
