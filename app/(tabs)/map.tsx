@@ -1706,10 +1706,12 @@ export default function MapScreen() {
             powerW: power,
             speedKmh,
             ascentPerInterval: ascent,
+            gradePct: grade,
             intervalSec: LOCATION_INTERVAL_SEC,
             temperatureC: weatherRef.current?.temperature ?? 25,
             humidityPct: weatherRef.current?.humidity ?? 60,
             weatherCode: weatherRef.current?.weatherCode ?? 1,
+            isDaylight: new Date().getHours() >= 6 && new Date().getHours() < 18,
             ftpW: estimateFtpW,
             headwindMs,
             precipitationProb: currentWeather?.precipitationProb ?? 0,
@@ -2851,13 +2853,26 @@ export default function MapScreen() {
         {/* ── 控制按鈕 ── */}
         <View style={styles.btnRow}>
           {!isActive ? (
-            <Pressable
-              style={({ pressed }) => [styles.startBtn, { opacity: pressed ? 0.85 : 1 }]}
-              onPress={handleStart}
-            >
-              <IconSymbol name="play.fill" size={20} color="#fff" />
-              <Text style={styles.startBtnText}>開始</Text>
-            </Pressable>
+            <View style={styles.preRideControls}>
+              <Pressable
+                accessibilityLabel="選擇運動類型"
+                style={({ pressed }) => [
+                  styles.sportInlineTrigger,
+                  { borderColor: SPORT_META[state.sportType].accent, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => setSportPickerVisible(true)}
+              >
+                <Text style={styles.sportInlineIcon}>{SPORT_META[state.sportType].icon}</Text>
+                <Text style={styles.sportInlineLabel}>{SPORT_META[state.sportType].label}</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.startBtn, { opacity: pressed ? 0.85 : 1 }]}
+                onPress={handleStart}
+              >
+                <IconSymbol name="play.fill" size={20} color="#fff" />
+                <Text style={styles.startBtnText}>開始</Text>
+              </Pressable>
+            </View>
           ) : (
             <View style={styles.activeButtons}>
               {isRiding ? (
@@ -2902,17 +2917,6 @@ export default function MapScreen() {
           />
         </Pressable>
       </Animated.View>
-
-      {!isActive && (
-        <Pressable
-          accessibilityLabel="選擇運動類型"
-          style={[styles.sportTrigger, { bottom: dynamicCollapsedH + 16, borderColor: SPORT_META[state.sportType].accent }]}
-          onPress={() => setSportPickerVisible(true)}
-        >
-          <Text style={styles.sportTriggerIcon}>{SPORT_META[state.sportType].icon}</Text>
-          <Text style={styles.sportTriggerLabel}>{SPORT_META[state.sportType].label}</Text>
-        </Pressable>
-      )}
 
       <Modal
         visible={sportPickerVisible}
@@ -3670,21 +3674,20 @@ const styles = StyleSheet.create({
   },
   sportChoiceIcon: { fontSize: 17 },
   sportChoiceLabel: { color: "rgba(255,255,255,0.63)", fontSize: 10, fontWeight: "700", textAlign: "center" },
-  sportTrigger: {
-    position: "absolute",
-    left: 16,
-    minWidth: 82,
-    minHeight: 68,
-    paddingHorizontal: 12,
-    borderRadius: 18,
+  preRideControls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
+  sportInlineTrigger: {
+    minWidth: 88,
+    height: 52,
+    paddingHorizontal: 10,
+    borderRadius: 16,
     borderWidth: 1.5,
     backgroundColor: "rgba(15,15,23,0.9)",
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
+    gap: 1,
   },
-  sportTriggerIcon: { fontSize: 24 },
-  sportTriggerLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
+  sportInlineIcon: { fontSize: 18 },
+  sportInlineLabel: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   sportPickerBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.56)" },
   sportPickerSheet: {
     backgroundColor: "#151515",

@@ -47,8 +47,9 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
   const sweatRate = clamp(input.sweatRatePerHour, 350, 1_800);
   const carbohydrateG = carbohydrateTargetGPerHour(input.elapsedSec, intensity, environmentLoad);
   const energyRecommendationKcal = Math.round(carbohydrateG * 4);
+  const durationHydrationLoad = input.elapsedSec >= 3 * 60 * 60 ? 0.08 : input.elapsedSec >= 2 * 60 * 60 ? 0.05 : input.elapsedSec >= 60 * 60 ? 0.02 : 0;
   const waterRecommendationMl = Math.round(clamp(
-    sweatRate * (0.18 + environmentLoad * 0.08 + Math.max(0, intensity - 0.65) * 0.05),
+    sweatRate * (0.18 + environmentLoad * 0.08 + Math.max(0, intensity - 0.65) * 0.05 + durationHydrationLoad),
     150,
     500,
   ));
@@ -68,11 +69,12 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
   const intensityLoad = clamp((intensity - 0.6) / 0.55, 0, 1);
   const sweatLoad = clamp((sweatRate - 550) / 1_000, 0, 1);
   const energyReduction = clamp(Math.max(intensityLoad * 0.16, environmentLoad * 0.12), 0, 0.25);
-  const waterReduction = clamp(Math.max(sweatLoad * 0.2, environmentLoad * 0.25), 0, 0.3);
+  const waterReduction = clamp(Math.max(sweatLoad * 0.2, environmentLoad * 0.25, durationHydrationLoad), 0, 0.3);
   const source = input.weatherAvailable ? "smart" : "smart-offline-fallback";
   const reasonParts = [
     intensityLoad >= 0.3 ? "騎乘強度較高" : "騎乘強度一般",
     environmentLoad >= 0.4 ? "環境熱負荷提高" : input.weatherAvailable ? "環境負荷穩定" : "離線環境回退",
+    input.elapsedSec >= 2 * 60 * 60 ? "長時間騎乘" : "騎乘時間尚短",
   ];
 
   return {

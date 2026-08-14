@@ -26,6 +26,8 @@ export interface HydrationInput {
   speedKmh: number;
   /** 最近 N 秒的爬升 m（用於計算額外強度） */
   ascentPerInterval: number;
+  /** 即時平滑坡度 %；與爬升量互補，反映短坡的工作負荷。 */
+  gradePct?: number;
   /** 間隔秒數 */
   intervalSec: number;
   /** 環境溫度 °C */
@@ -34,6 +36,8 @@ export interface HydrationInput {
   humidityPct?: number;
   /** 天氣代碼（WMO），用於判斷日照強度 */
   weatherCode?: number;
+  /** 當地日照時段；夜間不套用晴空輻射熱加成。 */
+  isDaylight?: boolean;
   /** 逆風分量 m/s；較強逆風會提高工作量，同時帶來部分蒸發冷卻 */
   headwindMs?: number;
   /** 降雨機率 %；雨天通常降低日照與皮膚表面熱負荷 */
@@ -82,7 +86,8 @@ function humidityFactor(humidityPct: number): number {
 }
 
 // ─── 日照強度修正（晴天輻射熱增加汗液）──────────────────────────────────────
-function solarFactor(weatherCode: number): number {
+function solarFactor(weatherCode: number, isDaylight: boolean): number {
+  if (!isDaylight) return 0.92;
   if (weatherCode === 0) return 1.15;   // 晴天
   if (weatherCode <= 2) return 1.08;    // 大致晴/部分多雲
   if (weatherCode <= 3) return 1.0;     // 陰天
@@ -157,6 +162,13 @@ function ascentBonus(ascentPerInterval: number, intervalSec: number): number {
   return 0.20;
 }
 
+// ─── 即時坡度修正（爬坡提高代謝熱負荷，下坡略減）──────────────────────────────
+function gradeFactor(gradePct: number): number {
+  const uphill = Math.min(20, Math.max(0, gradePct));
+  const downhill = Math.min(15, Math.max(0, -gradePct));
+  return 1 + uphill * 0.012 - downhill * 0.003;
+}
+
 // ─── 主計算函數 ────────────────────────────────────────────────────────────────
 export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   const {
@@ -165,15 +177,17 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
     powerW,
     speedKmh,
     ascentPerInterval,
+    gradePct = 0,
     intervalSec,
-  temperatureC,
-  humidityPct = 60,
-  weatherCode = 1,
-  ftpW,
-  headwindMs = 0,
-  precipitationProb = 0,
-  ageYears = 32,
-  calibrationMultiplier = 1,
+    temperatureC,
+    humidityPct = 60,
+    weatherCode = 1,
+    isDaylight = true,
+    ftpW,
+    headwindMs = 0,
+    precipitationProb = 0,
+    ageYears = 32,
+    calibrationMultiplier = 1,
   } = input;
 
   // 體表面積（標準人 BSA ≈ 1.7 m²）
@@ -190,8 +204,9 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   // 各環境修正係數
   const tFactor = tempFactor(temperatureC);
   const hFactor = humidityFactor(humidityPct);
-  const sFactor = solarFactor(weatherCode);
+  const sFactor = solarFactor(weatherCode, isDaylight);
   const aBonusFactor = 1 + ascentBonus(ascentPerInterval, intervalSec);
+  const gFactor = gradeFactor(gradePct);
   // 逆風增加工作量，但也提高蒸發冷卻；雨勢／降雨機率則降低日照熱負荷。
   const headwindWorkFactor = 1 + Math.min(0.12, Math.max(0, headwindMs) * 0.025);
   const windCoolingFactor = 1 - Math.min(0.1, Math.abs(headwindMs) * 0.012);
@@ -205,7 +220,7 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
 
   // 最終汗液流失率 ml/h（移除 intFactor，使用 hrFactor 作為強度代理）
   let sweatRatePerHour = Math.round(
-    BASE_RATE_LPH * 1000 * bsaFactor * hrFactor * tFactor * hFactor * sFactor * aBonusFactor * headwindWorkFactor * windCoolingFactor * rainCoolingFactor
+    BASE_RATE_LPH * 1000 * bsaFactor * hrFactor * tFactor * hFactor * sFactor * aBonusFactor * gFactor * headwindWorkFactor * windCoolingFactor * rainCoolingFactor
   );
   sweatRatePerHour = Math.round(sweatRatePerHour * Math.max(0.75, Math.min(1.25, calibrationMultiplier)));
   

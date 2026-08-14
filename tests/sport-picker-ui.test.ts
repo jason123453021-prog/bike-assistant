@@ -5,8 +5,9 @@ import { resolve } from "node:path";
 const mapSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"), "utf8");
 
 describe("sport picker presentation", () => {
-  it("uses a left map trigger and a searchable bottom picker instead of the dashboard row", () => {
-    expect(mapSource).toContain("styles.sportTrigger");
+  it("uses the start control's left-side trigger and a searchable bottom picker instead of the dashboard row", () => {
+    expect(mapSource).toContain("styles.preRideControls");
+    expect(mapSource).toContain("styles.sportInlineTrigger");
     expect(mapSource).toContain("sportPickerVisible");
     expect(mapSource).toContain("選擇運動");
     expect(mapSource).toContain("搜尋運動");
