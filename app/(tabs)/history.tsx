@@ -17,8 +17,6 @@ import { useColors } from "@/hooks/use-colors";
 import { useRide, type RideRecord } from "@/lib/ride-context";
 import { formatDuration } from "@/lib/power-calc";
 import { calculateWeeklyTrainingStats, calculateMonthlyTrainingStats } from "@/lib/activity-stats";
-import { createRouteFromRideRecord } from "@/lib/history-route";
-import { useGpx } from "@/lib/gpx-context";
 import { buildLocalTrainingLog, shiftTrainingLogMonth } from "@/lib/local-training-log";
 
 const STORAGE_KEY = "@bike_records";
@@ -27,7 +25,6 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { state, dispatch, loadRecords } = useRide();
-  const { setSharedRoute } = useGpx();
   const [searchQuery, setSearchQuery] = useState("");
   const [showStats, setShowStats] = useState(false);
   const [trainingLogMonth, setTrainingLogMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -90,22 +87,11 @@ export default function HistoryScreen() {
     router.push({ pathname: "/ride-detail", params: { id } });
   };
 
-  const handleReuseRoute = (record: RideRecord) => {
-    const route = createRouteFromRideRecord(record);
-    if (!route) {
-      Alert.alert("無法再次導航", "這筆記錄沒有足夠的 GPS 軌跡資料可建立本機路線。");
-      return;
-    }
-    setSharedRoute(route);
-    router.push("/map");
-  };
-
   const renderItem = ({ item }: { item: RideRecord }) => {
     const date = new Date(item.date);
     const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
     const timeStr = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
     const distKm = (item.distance / 1000).toFixed(2);
-    const hasRoute = item.route && item.route.length > 1;
 
     return (
       <Pressable
@@ -144,43 +130,6 @@ export default function HistoryScreen() {
           </View>
 
           <View style={styles.footerActions}>
-            {/* 查看軌跡按鈕 */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.trailBtn,
-                { backgroundColor: hasRoute ? colors.accent + "18" : colors.border + "40",
-                  borderColor: hasRoute ? colors.accent + "50" : colors.border,
-                  opacity: pressed ? 0.7 : 1 },
-              ]}
-              onPress={() => handleViewDetail(item.id)}
-            >
-              <IconSymbol
-                name="map.fill"
-                size={13}
-                color={hasRoute ? colors.accent : colors.muted}
-              />
-              <Text style={[styles.trailBtnText, { color: hasRoute ? colors.accent : colors.muted }]}> 
-                查看軌跡
-              </Text>
-            </Pressable>
-
-            <Pressable
-              disabled={!hasRoute}
-              style={({ pressed }) => [
-                styles.reuseBtn,
-                {
-                  backgroundColor: hasRoute ? colors.primary + "18" : colors.border + "40",
-                  borderColor: hasRoute ? colors.primary + "50" : colors.border,
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
-              onPress={() => handleReuseRoute(item)}
-            >
-              <IconSymbol name="location.fill" size={13} color={hasRoute ? colors.primary : colors.muted} />
-              <Text style={[styles.trailBtnText, { color: hasRoute ? colors.primary : colors.muted }]}>再次導航</Text>
-            </Pressable>
-
-            {/* 刪除按鈕 */}
             <Pressable
               style={({ pressed }) => [styles.deleteBtn, { opacity: pressed ? 0.6 : 1 }]}
               onPress={() => handleDelete(item.id)}
@@ -434,16 +383,6 @@ const styles = StyleSheet.create({
   avgSpeedUnit: { fontSize: 11 },
 
   footerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
-  trailBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  trailBtnText: { fontSize: 12, fontWeight: "600" },
   deleteBtn: { padding: 4 },
 
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
@@ -471,15 +410,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  reuseBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-    borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
   },
   statsPeriod: { gap: 8 },

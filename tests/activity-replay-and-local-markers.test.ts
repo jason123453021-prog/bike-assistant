@@ -42,8 +42,8 @@ describe("離線活動回放與標記", () => {
     }, 1, 0);
     const timedPhoto = { id: "time", rideId: "ride", uri: "file:///time.jpg", selectedAt: 1, capturedAt: 129_000 };
     const markers = buildPhotoRouteMarkers([exifPhoto, timedPhoto], route);
-    expect(markers[0]).toMatchObject({ source: "exif", latitude: 24.5, longitude: 121.5 });
-    expect(markers[1]).toMatchObject({ source: "route-time", latitude: route[2].latitude });
+    expect(markers[0]).toMatchObject({ source: "exif", latitude: 24.5, longitude: 121.5, altitude: 20 });
+    expect(markers[1]).toMatchObject({ source: "route-time", latitude: route[2].latitude, altitude: 20 });
   });
 
   it("僅與較早的本機完整 1 km 努力比較，並辨識較快的新紀錄", () => {

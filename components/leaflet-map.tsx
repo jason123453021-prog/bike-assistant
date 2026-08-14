@@ -52,6 +52,7 @@ export interface PhotoMapMarker {
   id: string;
   lat: number;
   lon: number;
+  altitude?: number;
   label: string;
   source: "exif" | "route-time";
 }

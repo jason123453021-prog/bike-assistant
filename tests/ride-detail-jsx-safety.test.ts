@@ -37,6 +37,8 @@ describe("ride detail JSX safety", () => {
     expect(source).toContain("activityViewerRoutePage");
     expect(source).toContain("pagingEnabled");
     expect(source).toContain("openActivityViewer(0)");
+    expect(source).toContain("activityViewerPhotoMeta");
+    expect(source).toContain("海拔 ${Math.round");
     expect(source).not.toContain("activityMediaHero");
     expect(source).not.toContain("isMapDetailVisible");
   });

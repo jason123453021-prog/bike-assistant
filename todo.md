@@ -1481,3 +1481,9 @@
 - [x] 建立明確的照片入口並在全螢幕中呈現路線與照片項目
 - [x] 支援左右滑動切換路線與照片，照片可連續左右輪換
 - [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；93 passed、1 skipped；Android Hermes bundle 5.57 MB；NitroModules／MapLibre 掃描 0）
+
+## 照片騎乘資訊與歷史入口精簡（2026-08-14）
+- [x] 在全螢幕照片中顯示拍攝時間與對應軌跡海拔
+- [x] 修正活動詳情的「Text strings must be rendered within a Text component」錯誤
+- [x] 移除歷史列表重複的查看軌跡與再次導航按鈕及遺留邏輯
+- [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；94 passed、1 skipped；Android Hermes bundle 5.57 MB；NitroModules／MapLibre 掃描 0）

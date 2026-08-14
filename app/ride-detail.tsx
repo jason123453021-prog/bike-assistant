@@ -315,6 +315,7 @@ export default function RideDetailScreen() {
     id: marker.id,
     lat: marker.latitude,
     lon: marker.longitude,
+    altitude: marker.altitude,
     label: marker.label,
     source: marker.source,
   })), [photoTimeline, record?.route]);
@@ -330,6 +331,13 @@ export default function RideDetailScreen() {
     () => record ? compareLocalSplitPersonalBests(record, state.records) : [],
     [record, state.records],
   );
+  const photoCaptureDetails = useMemo(() => new Map(photoTimeline.map((photo) => {
+    const marker = photoRouteMarkers.find((candidate) => candidate.id === photo.id);
+    return [photo.id, {
+      capturedAt: photo.capturedAt ?? photo.selectedAt,
+      altitude: marker?.altitude,
+    }];
+  })), [photoRouteMarkers, photoTimeline]);
   const openActivityViewer = useCallback((index: number) => {
     const safeIndex = Math.max(0, Math.min(index, activityPhotos.length));
     setActivityViewerIndex(safeIndex);
@@ -1424,6 +1432,14 @@ export default function RideDetailScreen() {
                 <Image source={{ uri: photo.uri }} style={styles.mediaViewerImage} resizeMode="contain" />
                 <View style={styles.activityViewerPhotoInfo}>
                   <Text style={styles.activityViewerPhotoText}>照片 {index + 1} · 向左或向右滑動切換</Text>
+                  {photoCaptureDetails.get(photo.id) ? (
+                    <Text style={styles.activityViewerPhotoMeta}>
+                      {new Date(photoCaptureDetails.get(photo.id)?.capturedAt ?? 0).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {photoCaptureDetails.get(photo.id)?.altitude === undefined ? " · 尚未對應海拔" : ` · 海拔 ${Math.round(photoCaptureDetails.get(photo.id)?.altitude ?? 0)} m`}
+                    </Text>
+                  ) : (
+                    <Text style={styles.activityViewerPhotoMeta}>此舊版活動媒體沒有可用的拍攝時間或軌跡海拔。</Text>
+                  )}
                 </View>
               </View>
             ))}
@@ -2037,8 +2053,9 @@ const styles = StyleSheet.create({
   activityViewerRouteInfo: { position: "absolute", left: 18, right: 18, bottom: 82, padding: 14, borderRadius: 16, backgroundColor: "rgba(7,18,14,0.9)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.16)" },
   activityViewerRouteTitle: { color: "#fff", fontSize: 17, fontWeight: "800" },
   activityViewerRouteCopy: { color: "rgba(255,255,255,0.68)", fontSize: 12, marginTop: 4 },
-  activityViewerPhotoInfo: { position: "absolute", left: 18, right: 18, bottom: 84, alignItems: "center" },
+  activityViewerPhotoInfo: { position: "absolute", left: 18, right: 18, bottom: 84, alignItems: "center", gap: 7 },
   activityViewerPhotoText: { color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: "700", backgroundColor: "rgba(0,0,0,0.58)", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, overflow: "hidden" },
+  activityViewerPhotoMeta: { color: "rgba(255,255,255,0.94)", fontSize: 12, fontWeight: "700", backgroundColor: "rgba(0,0,0,0.72)", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, overflow: "hidden" },
   activityViewerCounterPill: { position: "absolute", bottom: 34, alignSelf: "center", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 15, backgroundColor: "rgba(0,0,0,0.62)" },
   mediaViewerCounter: { color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: "800" },
   splitHeader: {
