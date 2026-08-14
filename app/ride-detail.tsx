@@ -964,44 +964,14 @@ export default function RideDetailScreen() {
           {record.equipment ? <Text style={styles.activityEquipment}>{record.equipment}</Text> : null}
         </View>
 
-        <View style={styles.summaryGrid}>
-          <SummaryCell
-            icon="location.fill"
-            value={(record.distance / 1000).toFixed(2)}
-            unit="km"
-            label="距離"
-            color="#00E676"
-          />
-          <SummaryCell
-            icon="flame.fill"
-            value={`${Math.round(record.totalAscent)}`}
-            unit="m"
-            label="爬升海拔"
-            color="#F59E0B"
-          />
-          <SummaryCell
-            icon="flame.fill"
-            value={`${activityHighlights.length + (record.personalBests?.length ?? 0)}`}
-            unit="項"
-            label="本機成就"
-            color="#F6C445"
-          />
-        </View>
-
-        <View style={styles.performanceRow}>
-          <View style={styles.performanceMetric}>
-            <Text style={styles.performanceMetricValue}>{formatDuration(movingDuration)}</Text>
-            <Text style={styles.performanceMetricLabel}>移動時間</Text>
-          </View>
-          <View style={styles.performanceMetric}>
-            <Text style={styles.performanceMetricValue}>{averageMovingSpeed.toFixed(1)} km/h</Text>
-            <Text style={styles.performanceMetricLabel}>平均速度</Text>
-          </View>
-          <View style={styles.performanceMetric}>
-            <Text style={styles.performanceMetricValue}>{Math.round(record.avgPower)} W</Text>
-            <Text style={styles.performanceMetricLabel}>平均功率</Text>
-          </View>
-        </View>
+        <CoreActivitySummaryGrid
+          distanceKm={record.distance / 1000}
+          ascentM={record.totalAscent}
+          movingDuration={movingDuration}
+          averagePowerW={record.avgPower}
+          averageSpeedKmh={averageMovingSpeed}
+          calories={record.calories}
+        />
 
         {replayFrames.length > 1 && (
           <View style={styles.replayCard}>
@@ -1568,32 +1538,14 @@ export default function RideDetailScreen() {
               </View>
             </View>
 
-            <View style={styles.activityViewerSummaryGrid}>
-              <View style={styles.activityViewerSummaryMetric}>
-                <Text style={styles.activityViewerSummaryLabel}>距離</Text>
-                <Text style={styles.activityViewerSummaryValue}>{(record.distance / 1000).toFixed(2)} 公里</Text>
-              </View>
-              <View style={styles.activityViewerSummaryMetric}>
-                <Text style={styles.activityViewerSummaryLabel}>爬升海拔</Text>
-                <Text style={styles.activityViewerSummaryValue}>{Math.round(record.totalAscent).toLocaleString()} 公尺</Text>
-              </View>
-              <View style={styles.activityViewerSummaryMetric}>
-                <Text style={styles.activityViewerSummaryLabel}>移動時間</Text>
-                <Text style={styles.activityViewerSummaryValue}>{formatDuration(movingDuration)}</Text>
-              </View>
-              <View style={styles.activityViewerSummaryMetric}>
-                <Text style={styles.activityViewerSummaryLabel}>平均功率</Text>
-                <Text style={styles.activityViewerSummaryValue}>{record.avgPower} 瓦</Text>
-              </View>
-              <View style={styles.activityViewerSummaryMetric}>
-                <Text style={styles.activityViewerSummaryLabel}>平均速度</Text>
-                <Text style={styles.activityViewerSummaryValue}>{averageMovingSpeed.toFixed(1)} 公里/小時</Text>
-              </View>
-              <View style={styles.activityViewerSummaryMetric}>
-                <Text style={styles.activityViewerSummaryLabel}>卡路里</Text>
-                <Text style={styles.activityViewerSummaryValue}>{Math.round(record.calories).toLocaleString()} 卡</Text>
-              </View>
-            </View>
+            <CoreActivitySummaryGrid
+              distanceKm={record.distance / 1000}
+              ascentM={record.totalAscent}
+              movingDuration={movingDuration}
+              averagePowerW={record.avgPower}
+              averageSpeedKmh={averageMovingSpeed}
+              calories={record.calories}
+            />
           </Animated.View>
         </View>
       </Modal>
@@ -1778,6 +1730,41 @@ function SummaryCell({ icon, value, unit, label, color }: {
   );
 }
 
+function CoreActivitySummaryGrid({
+  distanceKm,
+  ascentM,
+  movingDuration,
+  averagePowerW,
+  averageSpeedKmh,
+  calories,
+}: {
+  distanceKm: number;
+  ascentM: number;
+  movingDuration: number;
+  averagePowerW: number;
+  averageSpeedKmh: number;
+  calories: number;
+}) {
+  const entries = [
+    ["距離", `${distanceKm.toFixed(2)} 公里`],
+    ["爬升海拔", `${Math.round(ascentM).toLocaleString()} 公尺`],
+    ["移動時間", formatDuration(movingDuration)],
+    ["平均功率", `${Math.round(averagePowerW)} 瓦`],
+    ["平均速度", `${averageSpeedKmh.toFixed(1)} 公里/小時`],
+    ["卡路里", `${Math.round(calories).toLocaleString()} 卡`],
+  ] as const;
+
+  return (
+    <View style={styles.coreActivitySummaryGrid}>
+      {entries.map(([label, value]) => (
+        <View key={label} style={styles.coreActivitySummaryMetric}>
+          <Text style={styles.coreActivitySummaryLabel}>{label}</Text>
+          <Text style={styles.coreActivitySummaryValue}>{value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 const summaryStyles = StyleSheet.create({
   cell: { flex: 1, alignItems: "center", gap: 2 },
@@ -2243,10 +2230,10 @@ const styles = StyleSheet.create({
   activityViewerDrawerEyebrow: { color: "#00E676", fontSize: 11, fontWeight: "800", letterSpacing: 0.7 },
   activityViewerDrawerTitle: { color: "#fff", fontSize: 21, fontWeight: "800", marginTop: 3 },
   activityViewerDrawerSubtitle: { color: "rgba(255,255,255,0.62)", fontSize: 12, lineHeight: 17, marginTop: 5 },
-  activityViewerSummaryGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 22, rowGap: 24 },
-  activityViewerSummaryMetric: { width: "50%", alignItems: "center", paddingHorizontal: 6 },
-  activityViewerSummaryLabel: { color: "rgba(255,255,255,0.72)", fontSize: 13, fontWeight: "700", marginBottom: 5 },
-  activityViewerSummaryValue: { color: "#fff", fontSize: 23, fontWeight: "800", fontVariant: ["tabular-nums"], textAlign: "center" },
+  coreActivitySummaryGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 22, rowGap: 24 },
+  coreActivitySummaryMetric: { width: "50%", alignItems: "center", paddingHorizontal: 6 },
+  coreActivitySummaryLabel: { color: "rgba(255,255,255,0.72)", fontSize: 13, fontWeight: "700", marginBottom: 5 },
+  coreActivitySummaryValue: { color: "#fff", fontSize: 23, fontWeight: "800", fontVariant: ["tabular-nums"], textAlign: "center" },
   activityViewerDrawerMetrics: { flexDirection: "row", marginTop: 15, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.06)", paddingVertical: 11 },
   activityViewerDrawerMetricsSecondary: { marginTop: 10 },
   activityViewerDrawerMetric: { flex: 1, alignItems: "center" },

@@ -53,7 +53,7 @@ describe("activity media presentation", () => {
 
     expect(source).toContain("onPanResponderMove");
     expect(source).toContain("clampActivityViewerDrawerHeight");
-    expect(source).toContain("activityViewerSummaryGrid");
+    expect(source).toContain("CoreActivitySummaryGrid");
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
   });
 

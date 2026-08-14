@@ -1528,3 +1528,8 @@
 - [x] 將全螢幕活動摘要改為兩欄三列：距離／爬升海拔、移動時間／平均功率、平均速度／卡路里
 - [x] 套用一致的中文單位與大字數據排版至路線與所有照片媒體頁
 - [x] 補強摘要數據順序與版面結構測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）
+
+## 活動詳情主頁摘要一致化（2026-08-14）
+- [x] 將活動詳情主頁摘要改為兩欄三列：距離／爬升海拔、移動時間／平均功率、平均速度／卡路里
+- [x] 移除主頁舊版三欄成就與次要數據列，讓主頁與全螢幕路線／照片使用同一套核心數據
+- [x] 補強主頁與媒體頁摘要一致性測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.59 MB；NitroModules／MapLibre 掃描 0）
