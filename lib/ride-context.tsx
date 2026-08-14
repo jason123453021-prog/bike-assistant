@@ -14,6 +14,8 @@ export interface RideActivityUpdate {
   name?: string;
   description?: string;
   mediaItems?: string[];
+  /** null 代表清除使用者選擇的本機活動封面。 */
+  coverPhotoUri?: string | null;
   activityType?: RideActivityType;
   equipment?: string;
   perceivedExertion?: number;
@@ -126,6 +128,8 @@ export interface RideRecord {
   perceivedExertionSource?: "app-estimate" | "manual";
   /** 用戶自行新增的本機相片／影片 URI 清單 */
   mediaItems?: string[];
+  /** 使用者從本機活動相片選出的主視覺，來源移除時畫面會安全回退為路線。 */
+  coverPhotoUri?: string;
   /** 路段成就與瓦數統計列表 */
   segmentAchievements?: {
     id: string;
@@ -600,6 +604,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
               ...(updates.name !== undefined ? { name: updates.name } : {}),
               ...(updates.description !== undefined ? { description: updates.description } : {}),
               ...(updates.mediaItems !== undefined ? { mediaItems: updates.mediaItems } : {}),
+              ...(updates.coverPhotoUri !== undefined ? { coverPhotoUri: updates.coverPhotoUri ?? undefined } : {}),
               ...(updates.activityType !== undefined ? { activityType: updates.activityType } : {}),
               ...(updates.equipment !== undefined ? { equipment: updates.equipment } : {}),
               ...(updates.perceivedExertion !== undefined ? { perceivedExertion: updates.perceivedExertion } : {}),

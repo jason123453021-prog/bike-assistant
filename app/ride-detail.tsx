@@ -55,6 +55,8 @@ import { calibrateSweatRate } from "@/lib/supply-calibration";
 import { writeLocalFitBackup } from "@/lib/local-fit-backup";
 import { attachRidePhotos, loadRidePhotoTimeline, removeRidePhoto, type RidePhotoTimelineEntry } from "@/lib/local-ride-photos";
 import { persistRideMedia } from "@/lib/local-ride-media";
+import { ZoomableActivityPhoto } from "@/components/zoomable-activity-photo";
+import { resolveActivityCoverPhotoUri } from "@/lib/activity-media";
 import * as ImagePicker from "expo-image-picker";
 
 
@@ -88,6 +90,16 @@ const DARK_MAP_STYLE = [
 
 function isVideoMedia(uri: string): boolean {
   return /\.(mp4|mov|m4v|webm)(\?|$)/i.test(uri);
+}
+
+function formatActivityPhotoRouteMeta(capturedAt?: number, altitude?: number): string {
+  const capturedAtText = capturedAt && Number.isFinite(capturedAt)
+    ? new Date(capturedAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "拍攝時間未提供";
+  const altitudeText = altitude === undefined || !Number.isFinite(altitude)
+    ? "尚未對應海拔"
+    : `海拔 ${Math.round(altitude)} m`;
+  return `${capturedAtText} · ${altitudeText}`;
 }
 
 function formatPowerInterval(seconds: number): string {
@@ -151,6 +163,7 @@ export default function RideDetailScreen() {
   const [editDescInput, setEditDescInput] = useState("");
   const [editNameInput, setEditNameInput] = useState("");
   const [localMedia, setLocalMedia] = useState<string[]>([]);
+  const [editCoverPhotoUri, setEditCoverPhotoUri] = useState<string | undefined>(undefined);
   const [editActivityType, setEditActivityType] = useState<RideRecord["activityType"]>("road");
   const [editEquipmentInput, setEditEquipmentInput] = useState("");
   const [editRpe, setEditRpe] = useState<number | undefined>(undefined);
@@ -174,10 +187,15 @@ export default function RideDetailScreen() {
 
   const handleSaveActivityEdit = async () => {
     if (!record) return;
+    const persistedCoverPhotoUri = resolveActivityCoverPhotoUri(
+      editCoverPhotoUri,
+      coverPhotoChoices.map((photo) => photo.uri),
+    );
     await updateRideActivity(record.id, {
       name: editNameInput.trim() || record.name,
       description: editDescInput.trim(),
       mediaItems: localMedia,
+      coverPhotoUri: persistedCoverPhotoUri ?? null,
       activityType: editActivityType ?? "road",
       equipment: editEquipmentInput.trim(),
       perceivedExertion: editRpe,
@@ -214,6 +232,7 @@ export default function RideDetailScreen() {
       setEditNameInput(record.name);
       setEditDescInput(record.description ?? "");
       setLocalMedia(record.mediaItems ?? []);
+      setEditCoverPhotoUri(record.coverPhotoUri);
       setEditActivityType(record.activityType ?? "road");
       setEditEquipmentInput(record.equipment ?? "");
       setEditRpe(record.perceivedExertion);
@@ -301,9 +320,14 @@ export default function RideDetailScreen() {
 
   const handleRemoveRidePhoto = useCallback(async (photoId: string) => {
     if (!record) return;
+    const removedPhoto = photoTimeline.find((photo) => photo.id === photoId);
     const timeline = await removeRidePhoto(record.id, photoId);
     setPhotoTimeline(timeline);
-  }, [record]);
+    if (removedPhoto?.uri === record.coverPhotoUri) {
+      setEditCoverPhotoUri(undefined);
+      await updateRideActivity(record.id, { coverPhotoUri: null });
+    }
+  }, [photoTimeline, record, updateRideActivity]);
 
   // 地圖適配軌跡
   const polylineCoords = useMemo(() => {
@@ -327,6 +351,18 @@ export default function RideDetailScreen() {
       .map((uri, index) => ({ id: `stored-media-${index}-${uri}`, uri }));
     return [...timelinePhotos, ...storedPhotos];
   }, [photoTimeline, record?.mediaItems]);
+  const coverPhotoChoices = useMemo(() => {
+    const timelineChoices = photoTimeline.map((photo) => ({ id: photo.id, uri: photo.uri }));
+    const knownUris = new Set(timelineChoices.map((photo) => photo.uri));
+    const mediaChoices = localMedia
+      .filter((uri) => !isVideoMedia(uri) && !knownUris.has(uri))
+      .map((uri, index) => ({ id: `edit-media-${index}-${uri}`, uri }));
+    return [...timelineChoices, ...mediaChoices];
+  }, [localMedia, photoTimeline]);
+  const coverPhotoUri = useMemo(
+    () => resolveActivityCoverPhotoUri(record?.coverPhotoUri, activityPhotos.map((photo) => photo.uri)),
+    [activityPhotos, record?.coverPhotoUri],
+  );
   const localSplitPersonalBests = useMemo(
     () => record ? compareLocalSplitPersonalBests(record, state.records) : [],
     [record, state.records],
@@ -749,6 +785,21 @@ export default function RideDetailScreen() {
         photoMarkers={photoRouteMarkers}
         onPhotoMarkerPress={openPhotoFromMarker}
       />
+      {coverPhotoUri ? (
+        <Pressable
+          style={({ pressed }) => [styles.activityCoverPhoto, { opacity: pressed ? 0.86 : 1 }]}
+          onPress={() => {
+            const index = activityPhotos.findIndex((photo) => photo.uri === coverPhotoUri);
+            if (index >= 0) openActivityViewer(index + 1);
+          }}
+        >
+          <Image source={{ uri: coverPhotoUri }} style={styles.activityCoverImage} />
+          <View style={styles.activityCoverShade}>
+            <Text style={styles.activityCoverEyebrow}>活動封面</Text>
+            <Text style={styles.activityCoverCopy}>點擊全螢幕查看與縮放</Text>
+          </View>
+        </Pressable>
+      ) : null}
 
       {/* ── 頂部導覽列 ── */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
@@ -799,6 +850,7 @@ export default function RideDetailScreen() {
             setEditNameInput(record.name);
             setEditDescInput(record.description ?? "");
             setLocalMedia(record.mediaItems ?? []);
+            setEditCoverPhotoUri(record.coverPhotoUri);
             setIsEditModalVisible(true);
           }}
         >
@@ -1425,18 +1477,28 @@ export default function RideDetailScreen() {
               <View style={styles.activityViewerRouteInfo}>
                 <Text style={styles.activityViewerRouteTitle}>{record.name}</Text>
                 <Text style={styles.activityViewerRouteCopy}>完整騎乘路線 · 向左滑動查看 {activityPhotos.length} 張照片</Text>
+                {activityPhotos.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.activityViewerRoutePhotoRail}>
+                    {activityPhotos.map((photo, index) => {
+                      const details = photoCaptureDetails.get(photo.id);
+                      return (
+                        <Pressable key={photo.id} style={({ pressed }) => [styles.activityViewerRoutePhotoCard, { opacity: pressed ? 0.72 : 1 }]} onPress={() => openActivityViewer(index + 1)}>
+                          <Image source={{ uri: photo.uri }} style={styles.activityViewerRoutePhotoThumb} />
+                          <Text style={styles.activityViewerRoutePhotoMeta} numberOfLines={2}>{formatActivityPhotoRouteMeta(details?.capturedAt, details?.altitude)}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                ) : <Text style={styles.activityViewerRouteEmpty}>此活動沒有可顯示拍攝時間與海拔的本機照片。</Text>}
               </View>
             </View>
             {activityPhotos.map((photo, index) => (
               <View key={photo.id} style={styles.mediaViewerPage}>
-                <Image source={{ uri: photo.uri }} style={styles.mediaViewerImage} resizeMode="contain" />
+                <ZoomableActivityPhoto uri={photo.uri} resetKey={photo.id} />
                 <View style={styles.activityViewerPhotoInfo}>
-                  <Text style={styles.activityViewerPhotoText}>照片 {index + 1} · 向左或向右滑動切換</Text>
+                  <Text style={styles.activityViewerPhotoText}>照片 {index + 1} · 雙擊放大 · 雙指縮放</Text>
                   {photoCaptureDetails.get(photo.id) ? (
-                    <Text style={styles.activityViewerPhotoMeta}>
-                      {new Date(photoCaptureDetails.get(photo.id)?.capturedAt ?? 0).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      {photoCaptureDetails.get(photo.id)?.altitude === undefined ? " · 尚未對應海拔" : ` · 海拔 ${Math.round(photoCaptureDetails.get(photo.id)?.altitude ?? 0)} m`}
-                    </Text>
+                    <Text style={styles.activityViewerPhotoMeta}>{formatActivityPhotoRouteMeta(photoCaptureDetails.get(photo.id)?.capturedAt, photoCaptureDetails.get(photo.id)?.altitude)}</Text>
                   ) : (
                     <Text style={styles.activityViewerPhotoMeta}>此舊版活動媒體沒有可用的拍攝時間或軌跡海拔。</Text>
                   )}
@@ -1519,6 +1581,28 @@ export default function RideDetailScreen() {
                   numberOfLines={3}
                   style={[styles.input, { height: 80, textAlignVertical: "top", color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
                 />
+              </View>
+              <View>
+                <Text style={[styles.label, { color: colors.muted }]}>活動封面照片</Text>
+                <Text style={[styles.coverPickerHint, { color: colors.muted }]}>選擇本機照片作為活動主視覺；未設定時會顯示完整路線。</Text>
+                {coverPhotoChoices.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.coverPickerRail}>
+                    {coverPhotoChoices.map((photo) => {
+                      const selected = editCoverPhotoUri === photo.uri;
+                      return (
+                        <Pressable key={photo.id} style={[styles.coverPickerOption, { borderColor: selected ? colors.primary : colors.border }]} onPress={() => setEditCoverPhotoUri(photo.uri)}>
+                          <Image source={{ uri: photo.uri }} style={styles.coverPickerImage} />
+                          {selected ? <View style={[styles.coverPickerSelected, { backgroundColor: colors.primary }]}><Text style={styles.coverPickerSelectedText}>封面</Text></View> : null}
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                ) : <Text style={[styles.coverPickerEmpty, { color: colors.muted }]}>請先於下方加入本機相片，再選擇活動封面。</Text>}
+                {editCoverPhotoUri ? (
+                  <Pressable style={styles.clearCoverButton} onPress={() => setEditCoverPhotoUri(undefined)}>
+                    <Text style={styles.clearCoverButtonText}>清除活動封面，改回路線視覺</Text>
+                  </Pressable>
+                ) : null}
               </View>
               <View>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -1754,6 +1838,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 10,
     backgroundColor: "rgba(0,0,0,0.55)",
+    zIndex: 3,
   },
   topBarBtn: {
     width: 40, height: 40,
@@ -1787,6 +1872,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
 
+  activityCoverPhoto: { position: "absolute", inset: 0, zIndex: 1, backgroundColor: "#08110D" },
+  activityCoverImage: { width: "100%", height: "100%" },
+  activityCoverShade: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 32, paddingBottom: 18, backgroundColor: "rgba(0,0,0,0.42)" },
+  activityCoverEyebrow: { color: "#00E676", fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
+  activityCoverCopy: { color: "rgba(255,255,255,0.88)", fontSize: 12, marginTop: 4, fontWeight: "700" },
+
   noTrailBadge: {
     position: "absolute",
     top: "40%",
@@ -1795,13 +1886,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 10,
+    zIndex: 2,
   },
   noTrailText: { color: "rgba(255,255,255,0.6)", fontSize: 13 },
-  mapPlaybackBadge: { position: "absolute", right: 14, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.62)" },
+  mapPlaybackBadge: { position: "absolute", right: 14, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.62)", zIndex: 2 },
   mapPlaybackDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#FF8A4C" },
   mapPlaybackText: { color: "rgba(255,255,255,0.84)", fontSize: 10, fontWeight: "700" },
-  routeMapFocusButton: { position: "absolute", left: 14, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.68)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.2)" },
-  routeMapPhotoButton: { position: "absolute", left: 126, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.68)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.2)" },
+  routeMapFocusButton: { position: "absolute", left: 14, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.68)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.2)", zIndex: 2 },
+  routeMapPhotoButton: { position: "absolute", left: 126, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.68)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.2)", zIndex: 2 },
   routeMapFocusText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
   // 底部面板
@@ -1923,6 +2015,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  coverPickerHint: { fontSize: 11, lineHeight: 16, marginTop: -2 },
+  coverPickerRail: { gap: 9, paddingTop: 9, paddingRight: 4 },
+  coverPickerOption: { width: 92, height: 74, borderRadius: 9, borderWidth: 2, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.06)" },
+  coverPickerImage: { width: "100%", height: "100%" },
+  coverPickerSelected: { position: "absolute", left: 5, bottom: 5, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
+  coverPickerSelectedText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  coverPickerEmpty: { fontSize: 12, lineHeight: 18, marginTop: 8 },
+  clearCoverButton: { alignSelf: "flex-start", marginTop: 8, paddingVertical: 4 },
+  clearCoverButtonText: { color: "#FF6B6B", fontSize: 12, fontWeight: "700" },
   modalBtn: {
     flex: 1,
     paddingVertical: 12,
@@ -2053,6 +2154,11 @@ const styles = StyleSheet.create({
   activityViewerRouteInfo: { position: "absolute", left: 18, right: 18, bottom: 82, padding: 14, borderRadius: 16, backgroundColor: "rgba(7,18,14,0.9)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.16)" },
   activityViewerRouteTitle: { color: "#fff", fontSize: 17, fontWeight: "800" },
   activityViewerRouteCopy: { color: "rgba(255,255,255,0.68)", fontSize: 12, marginTop: 4 },
+  activityViewerRoutePhotoRail: { gap: 9, paddingTop: 12, paddingRight: 4 },
+  activityViewerRoutePhotoCard: { width: 130, padding: 5, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.09)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.17)" },
+  activityViewerRoutePhotoThumb: { width: "100%", height: 70, borderRadius: 7, backgroundColor: "rgba(255,255,255,0.08)" },
+  activityViewerRoutePhotoMeta: { color: "rgba(255,255,255,0.82)", fontSize: 9, lineHeight: 13, marginTop: 5, fontVariant: ["tabular-nums"] },
+  activityViewerRouteEmpty: { color: "rgba(255,255,255,0.58)", fontSize: 11, lineHeight: 16, marginTop: 10 },
   activityViewerPhotoInfo: { position: "absolute", left: 18, right: 18, bottom: 84, alignItems: "center", gap: 7 },
   activityViewerPhotoText: { color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: "700", backgroundColor: "rgba(0,0,0,0.58)", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, overflow: "hidden" },
   activityViewerPhotoMeta: { color: "rgba(255,255,255,0.94)", fontSize: 12, fontWeight: "700", backgroundColor: "rgba(0,0,0,0.72)", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, overflow: "hidden" },

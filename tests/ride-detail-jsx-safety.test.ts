@@ -39,6 +39,11 @@ describe("ride detail JSX safety", () => {
     expect(source).toContain("openActivityViewer(0)");
     expect(source).toContain("activityViewerPhotoMeta");
     expect(source).toContain("海拔 ${Math.round");
+    expect(source).toContain("ZoomableActivityPhoto");
+    expect(source).toContain("雙擊放大");
+    expect(source).toContain("activityViewerRoutePhotoMeta");
+    expect(source).toContain("活動封面照片");
+    expect(source).toContain("coverPhotoUri");
     expect(source).not.toContain("activityMediaHero");
     expect(source).not.toContain("isMapDetailVisible");
   });

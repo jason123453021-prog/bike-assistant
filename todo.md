@@ -1487,3 +1487,9 @@
 - [x] 修正活動詳情的「Text strings must be rendered within a Text component」錯誤
 - [x] 移除歷史列表重複的查看軌跡與再次導航按鈕及遺留邏輯
 - [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；94 passed、1 skipped；Android Hermes bundle 5.57 MB；NitroModules／MapLibre 掃描 0）
+
+## 活動媒體互動與封面照片（2026-08-14）
+- [x] 在全螢幕照片加入雙擊放大、雙指縮放與安全的縮放重設手勢
+- [x] 在全螢幕路線頁呈現每張照片的拍攝時間與對應軌跡海拔資訊
+- [x] 新增完全本機的活動封面照片選擇、儲存、替換與移除流程
+- [x] 補強媒體互動與封面選擇測試，完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；96 passed、1 skipped；Android Hermes bundle 5.58 MB；NitroModules／MapLibre 掃描 0）

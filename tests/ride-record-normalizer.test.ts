@@ -113,6 +113,7 @@ describe("ride record normalizer", () => {
       activityType: "gravel",
       equipment: "  鋁合金礫石車  ",
       perceivedExertion: 7.4,
+      coverPhotoUri: "  file:///ride/cover.jpg  ",
     });
     const invalid = normalizeRideRecord({
       id: "metadata-invalid",
@@ -122,13 +123,16 @@ describe("ride record normalizer", () => {
       activityType: "unsupported",
       equipment: 123,
       perceivedExertion: 12,
+      coverPhotoUri: 123,
     });
 
     expect(valid?.activityType).toBe("gravel");
     expect(valid?.equipment).toBe("鋁合金礫石車");
     expect(valid?.perceivedExertion).toBe(7);
+    expect(valid?.coverPhotoUri).toBe("file:///ride/cover.jpg");
     expect(invalid?.activityType).toBe("road");
     expect(invalid?.equipment).toBeUndefined();
     expect(invalid?.perceivedExertion).toBeUndefined();
+    expect(invalid?.coverPhotoUri).toBeUndefined();
   });
 });

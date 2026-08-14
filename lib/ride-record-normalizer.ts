@@ -245,6 +245,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     perceivedExertion: normalizeRpe(source.perceivedExertion),
     perceivedExertionSource: source.perceivedExertionSource === "manual" || source.perceivedExertionSource === "app-estimate" ? source.perceivedExertionSource : undefined,
     mediaItems: Array.isArray(source.mediaItems) ? source.mediaItems.filter((uri): uri is string => typeof uri === "string") : undefined,
+    coverPhotoUri: typeof source.coverPhotoUri === "string" && source.coverPhotoUri.trim() ? source.coverPhotoUri.trim() : undefined,
     segmentAchievements: Array.isArray(source.segmentAchievements) ? source.segmentAchievements : undefined,
   };
 }
