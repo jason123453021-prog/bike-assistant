@@ -25,11 +25,15 @@ describe("activity media presentation", () => {
     expect(source).toContain("manualActivation(true)");
     expect(source).toContain("maxVerticalTranslation");
     expect(source).toContain("放大後可單指拖曳平移");
-    expect(source).toContain('resizeMode={fillContainer ? "cover" : "contain"}');
+    expect(source).toContain('resizeMode={usingCoverCrop ? "cover" : "contain"}');
     expect(source).toContain("Image.getSize(");
     expect(source).toContain("resolvePhotoOrientation");
     expect(source).toContain('orientation === "portrait" ? 0.28');
     expect(source).toContain('orientation === "square" ? 0.42 : 0.5');
+    expect(source).toContain("Gesture.LongPress()");
+    expect(source).toContain("commitManualFocus");
+    expect(source).toContain("完整照片");
+    expect(source).toContain("裁切滿版");
   });
 
   it("keeps full-screen route map gestures separate from photo gestures", () => {
@@ -50,6 +54,9 @@ describe("activity media presentation", () => {
     expect(source).toContain("activityViewerMode === \"route\"");
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
     expect(source).toContain("activityInitialSummary");
+    expect(source).not.toContain("騎乘瞬間");
+    expect(source).toContain("activityViewerPhotoPagerContent");
+    expect(source).toContain('activityViewerPhotoPagerContent: { height: "100%" }');
     expect(source).toContain("fillContainer");
   });
 

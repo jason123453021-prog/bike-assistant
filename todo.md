@@ -1548,3 +1548,9 @@
 - [x] 讀取本機照片原始長寬比，區分直式、橫式與近方形照片
 - [x] 對直式照片採中央偏上裁切焦點，對橫式照片採中央主體裁切焦點，保留滿版縮放與平移手勢
 - [x] 補強方向裁切策略測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）
+
+## 精簡起始頁與照片焦點調整（2026-08-14）
+- [x] 移除主頁「騎乘瞬間」區塊，起始頁只保留六項核心數據，其他資訊需上滑後查看
+- [x] 重新配置全螢幕上方媒體舞台，減少無內容黑色區域並優先顯示照片主體
+- [x] 支援長按照片手動調整裁切焦點，並提供可切換的無裁切完整照片檢視模式
+- [x] 補強起始頁精簡、焦點調整與完整照片模式測試，完成 TypeScript、完整測試與 Android bundle 驗證（TypeScript 0 errors；100 passed、1 skipped；Android Hermes bundle 5.60 MB；NitroModules／MapLibre 掃描 0）

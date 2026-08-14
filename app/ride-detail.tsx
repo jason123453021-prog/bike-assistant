@@ -953,22 +953,6 @@ export default function RideDetailScreen() {
       {/* ── 本機活動摘要：向上滑動頁面可查看完整數據 ── */}
       <View style={styles.activityBody}>
         <View style={styles.activityInitialSummary}>
-          <View style={styles.activityDetailsAfterInitial}>
-            <Text style={styles.activityEyebrow}>活動摘要</Text>
-            <Text style={styles.activityTitle}>{record.name}</Text>
-            <Text style={styles.activityDate}>{dateStr}</Text>
-            <View style={styles.activityMetaRow}>
-              <View style={styles.activityMetaChip}>
-                <Text style={styles.activityMetaChipText}>{activityTypeLabel(record.activityType)}</Text>
-              </View>
-              {record.perceivedExertion !== undefined && (
-                <View style={[styles.activityMetaChip, styles.activityMetaRpeChip]}>
-                  <Text style={styles.activityMetaRpeText}>{record.perceivedExertionSource === "app-estimate" ? "App 推定 " : ""}RPE {record.perceivedExertion}/10</Text>
-                </View>
-              )}
-              {record.equipment ? <Text style={styles.activityEquipment}>{record.equipment}</Text> : null}
-            </View>
-          </View>
           <CoreActivitySummaryGrid
             distanceKm={record.distance / 1000}
             ascentM={record.totalAscent}
@@ -977,6 +961,23 @@ export default function RideDetailScreen() {
             averageSpeedKmh={averageMovingSpeed}
             calories={record.calories}
           />
+        </View>
+
+        <View style={styles.activityDetailsAfterInitial}>
+          <Text style={styles.activityEyebrow}>活動摘要</Text>
+          <Text style={styles.activityTitle}>{record.name}</Text>
+          <Text style={styles.activityDate}>{dateStr}</Text>
+          <View style={styles.activityMetaRow}>
+            <View style={styles.activityMetaChip}>
+              <Text style={styles.activityMetaChipText}>{activityTypeLabel(record.activityType)}</Text>
+            </View>
+            {record.perceivedExertion !== undefined && (
+              <View style={[styles.activityMetaChip, styles.activityMetaRpeChip]}>
+                <Text style={styles.activityMetaRpeText}>{record.perceivedExertionSource === "app-estimate" ? "App 推定 " : ""}RPE {record.perceivedExertion}/10</Text>
+              </View>
+            )}
+            {record.equipment ? <Text style={styles.activityEquipment}>{record.equipment}</Text> : null}
+          </View>
         </View>
 
         {replayFrames.length > 1 && (
@@ -1021,23 +1022,6 @@ export default function RideDetailScreen() {
                 </Pressable>
               ))}
             </View>
-          </View>
-        )}
-
-        {photoTimeline.length > 0 && (
-          <View style={styles.topMediaSection}>
-            <View style={styles.topMediaHeading}>
-              <Text style={styles.topMediaTitle}>騎乘瞬間</Text>
-              <Text style={styles.topMediaCount}>{photoTimeline.length} 張 · {photoRouteMarkers.length} 處路線標記</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topMediaRail}>
-              {photoTimeline.map((photo, index) => (
-                <Pressable key={photo.id} style={({ pressed }) => [styles.topMediaThumbWrap, { opacity: pressed ? 0.76 : 1 }]} onPress={() => openActivityViewer(index + 1)}>
-                  <Image source={{ uri: photo.uri }} style={styles.topMediaThumb} />
-                  {photoRouteMarkers.some((marker) => marker.id === photo.id) ? <View style={styles.topMediaPrimaryBadge}><Text style={styles.topMediaPrimaryText}>已定位</Text></View> : null}
-                </Pressable>
-              ))}
-            </ScrollView>
           </View>
         )}
 
@@ -1517,9 +1501,11 @@ export default function RideDetailScreen() {
             ) : (
               <ScrollView
                 ref={activityViewerRef}
+                style={styles.activityViewerPhotoPager}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.activityViewerPhotoPagerContent}
                 onMomentumScrollEnd={(event) => setActivityViewerIndex(Math.round(event.nativeEvent.contentOffset.x / SCREEN_W) + 1)}
               >
                 {activityPhotos.map((photo) => (
@@ -1812,7 +1798,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingTop: 0,
     paddingHorizontal: ACTIVITY_SUMMARY_HORIZONTAL_PADDING,
-    minHeight: 520,
+    minHeight: 0,
   },
   activityEyebrow: { color: "#00E676", fontSize: 12, fontWeight: "700", letterSpacing: 0.6, marginBottom: 5 },
   activityTitle: { color: "#fff", fontSize: 27, fontWeight: "800", lineHeight: 34 },
@@ -1824,7 +1810,7 @@ const styles = StyleSheet.create({
   activityMetaRpeText: { color: "#FCD34D", fontSize: 11, fontWeight: "800" },
   activityEquipment: { color: "rgba(255,255,255,0.55)", fontSize: 11, flexShrink: 1 },
   activityInitialSummary: { paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM },
-  activityDetailsAfterInitial: { paddingTop: 0 },
+  activityDetailsAfterInitial: { paddingTop: 18 },
   summaryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2229,6 +2215,8 @@ const styles = StyleSheet.create({
   mediaViewerClose: { position: "absolute", top: 56, left: 18, zIndex: 2, width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.58)" },
   activityViewerStage: { width: "100%", overflow: "hidden", backgroundColor: "#050505" },
   mediaViewerPage: { width: SCREEN_W, height: "100%", justifyContent: "center", alignItems: "center" },
+  activityViewerPhotoPager: { width: SCREEN_W, height: "100%" },
+  activityViewerPhotoPagerContent: { height: "100%" },
   mediaViewerImage: { width: SCREEN_W, height: "82%" },
   activityViewerRoutePage: { backgroundColor: "#08110D" },
   activityViewerRouteMap: { width: SCREEN_W, flex: 1 },
