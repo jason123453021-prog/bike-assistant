@@ -1463,3 +1463,9 @@
 - [x] 復核本週訓練負荷 TSS 說明入口不使用問號圖示
 - [x] 復核路線頁的建議補給／休息規劃點與最愛路線欄位均已移除
 - [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；89 passed、1 skipped；Android Hermes bundle 5.56 MB）
+
+## Strava 風格活動詳情重構（2026-08-14）
+- [x] 分析使用者提供的活動紀錄操作影片並定義離線可實作互動規格
+- [x] 對照目前活動詳情頁並完成資訊層級與互動流程重構
+- [x] 保留本機 GPX、媒體、分享、曲線分析與活動編輯，不加入帳號或社群功能
+- [x] 完成 TypeScript、完整測試與 Android bundle 回歸驗證（TypeScript 0 errors；89 passed、1 skipped；Android Hermes bundle 5.57 MB；NitroModules／MapLibre 掃描 0）

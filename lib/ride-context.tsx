@@ -533,28 +533,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       description: "",
       activityType: "road",
       mediaItems: [],
-      segmentAchievements: [
-        {
-          id: "seg-1",
-          segmentName: "主要爬坡路段 (PR)",
-          distance: Math.min(2.5, Math.round((state.distance / 1000) * 0.4 * 10) / 10),
-          time: `${Math.floor(movingTime / 60)}分${movingTime % 60}秒`,
-          avgSpeed: Math.round(state.avgSpeed * 1.1 * 10) / 10,
-          avgPower: Math.round(state.avgPower * 1.08),
-          isPR: true,
-          date: new Date(now).toLocaleDateString(),
-        },
-        {
-          id: "seg-2",
-          segmentName: "平路巡航衝刺段",
-          distance: Math.min(4.1, Math.round((state.distance / 1000) * 0.6 * 10) / 10),
-          time: `${Math.floor((movingTime * 0.6) / 60)}分`,
-          avgSpeed: Math.round(state.avgSpeed * 1.2 * 10) / 10,
-          avgPower: Math.round(state.avgPower * 1.15),
-          isPR: false,
-          date: new Date(now).toLocaleDateString(),
-        },
-      ],
       // 訓練效果分析
       tss: trainingAnalysis.tss,
       intensityFactor: trainingAnalysis.intensityFactor,

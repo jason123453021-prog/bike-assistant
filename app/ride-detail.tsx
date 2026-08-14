@@ -232,6 +232,11 @@ export default function RideDetailScreen() {
   const [calibrationVisible, setCalibrationVisible] = useState(false);
   const [confirmedFluidInput, setConfirmedFluidInput] = useState("");
   const [photoTimeline, setPhotoTimeline] = useState<RidePhotoTimelineEntry[]>([]);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState<number | null>(null);
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [isReplayPlaying, setIsReplayPlaying] = useState(false);
+  const [replaySpeed, setReplaySpeed] = useState<1 | 2 | 4>(1);
+  const [isMapDetailVisible, setIsMapDetailVisible] = useState(false);
 
   const rideSplits = useMemo(() => record ? buildRideSplits(record) : [], [record]);
 
@@ -304,6 +309,18 @@ export default function RideDetailScreen() {
 
   const [mapReady, setMapReady] = useState(false);
 
+  const setReplayPosition = useCallback((index: number, animate = true) => {
+    if (polylineCoords.length === 0) return;
+    const safeIndex = Math.min(Math.max(0, index), polylineCoords.length - 1);
+    const point = polylineCoords[safeIndex];
+    setReplayIndex(safeIndex);
+    if (animate) {
+      mapRef.current?.animatePlaybackMarker(point.latitude, point.longitude, "#FF6A22", Math.round(650 / replaySpeed));
+    } else {
+      mapRef.current?.setPlaybackMarker(point.latitude, point.longitude, "#FF6A22");
+    }
+  }, [polylineCoords, replaySpeed]);
+
   useEffect(() => {
     if (mapReady && polylineCoords.length > 1) {
       setTimeout(() => {
@@ -319,6 +336,25 @@ export default function RideDetailScreen() {
       }, 600);
     }
   }, [mapReady, polylineCoords]);
+
+  useEffect(() => {
+    if (!mapReady || polylineCoords.length === 0) return;
+    setReplayPosition(replayIndex, false);
+  }, [mapReady, polylineCoords.length, replayIndex, setReplayPosition]);
+
+  useEffect(() => {
+    if (!isReplayPlaying || polylineCoords.length < 2) return;
+    const delay = Math.round(850 / replaySpeed);
+    const timer = setInterval(() => {
+      setReplayIndex((current) => {
+        const next = current >= polylineCoords.length - 1 ? 0 : current + 1;
+        const point = polylineCoords[next];
+        mapRef.current?.animatePlaybackMarker(point.latitude, point.longitude, "#FF6A22", delay);
+        return next;
+      });
+    }, delay);
+    return () => clearInterval(timer);
+  }, [isReplayPlaying, polylineCoords, replaySpeed]);
   
 
   
@@ -730,6 +766,20 @@ export default function RideDetailScreen() {
         </View>
       )}
 
+      {polylineCoords.length > 1 && (
+        <View style={styles.mapPlaybackBadge}>
+          <View style={styles.mapPlaybackDot} />
+          <Text style={styles.mapPlaybackText}>{isReplayPlaying ? "正在回放本機軌跡" : "可回放本機軌跡"}</Text>
+        </View>
+      )}
+
+      {polylineCoords.length > 1 && (
+        <Pressable style={({ pressed }) => [styles.routeMapFocusButton, { opacity: pressed ? 0.74 : 1 }]} onPress={() => setIsMapDetailVisible(true)}>
+          <IconSymbol name="arrow.up.left.and.arrow.down.right" size={14} color="#fff" />
+          <Text style={styles.routeMapFocusText}>檢視路線</Text>
+        </Pressable>
+      )}
+
       </View>
 
       {/* ── 活動主視覺媒體：由使用者選取的首張相片／影片 ── */}
@@ -789,13 +839,6 @@ export default function RideDetailScreen() {
             color="#00E676"
           />
           <SummaryCell
-            icon="clock.fill"
-            value={formatDuration(movingDuration)}
-            unit=""
-            label="移動時間"
-            color="#fff"
-          />
-          <SummaryCell
             icon="flame.fill"
             value={`${Math.round(record.totalAscent)}`}
             unit="m"
@@ -803,27 +846,90 @@ export default function RideDetailScreen() {
             color="#F59E0B"
           />
           <SummaryCell
-            icon="location.fill"
-            value={averageMovingSpeed.toFixed(1)}
-            unit="km/h"
-            label="平均速度"
-            color="#60A5FA"
-          />
-          <SummaryCell
             icon="flame.fill"
-            value={`${Math.round(record.calories)}`}
-            unit="kcal"
-            label="卡路里"
-            color="#F97316"
-          />
-          <SummaryCell
-            icon="clock.fill"
-            value={`${Math.round(record.avgPower)}`}
-            unit="W"
-            label="平均功率"
-            color="#A78BFA"
+            value={`${activityHighlights.length + (record.personalBests?.length ?? 0)}`}
+            unit="項"
+            label="本機成就"
+            color="#F6C445"
           />
         </View>
+
+        <View style={styles.performanceRow}>
+          <View style={styles.performanceMetric}>
+            <Text style={styles.performanceMetricValue}>{formatDuration(movingDuration)}</Text>
+            <Text style={styles.performanceMetricLabel}>移動時間</Text>
+          </View>
+          <View style={styles.performanceMetric}>
+            <Text style={styles.performanceMetricValue}>{averageMovingSpeed.toFixed(1)} km/h</Text>
+            <Text style={styles.performanceMetricLabel}>平均速度</Text>
+          </View>
+          <View style={styles.performanceMetric}>
+            <Text style={styles.performanceMetricValue}>{Math.round(record.avgPower)} W</Text>
+            <Text style={styles.performanceMetricLabel}>平均功率</Text>
+          </View>
+        </View>
+
+        {polylineCoords.length > 1 && (
+          <View style={styles.replayCard}>
+            <View style={styles.replayHeader}>
+              <View>
+                <Text style={styles.replayTitle}>軌跡回放</Text>
+                <Text style={styles.replaySubtitle}>依本機 GPS 記錄重播，不需要網路或帳號</Text>
+              </View>
+              <Text style={styles.replayProgress}>{replayIndex + 1} / {polylineCoords.length}</Text>
+            </View>
+            <View style={styles.replayControls}>
+              <Pressable
+                style={({ pressed }) => [styles.replayPlayButton, { opacity: pressed ? 0.75 : 1 }]}
+                onPress={() => setIsReplayPlaying((current) => !current)}
+              >
+                <IconSymbol name={isReplayPlaying ? "pause.fill" : "play.fill"} size={18} color="#07120E" />
+                <Text style={styles.replayPlayText}>{isReplayPlaying ? "暫停" : "播放"}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="adjustable"
+                accessibilityLabel="軌跡回放進度"
+                style={styles.replayTrack}
+                onPress={(event) => {
+                  const ratio = Math.max(0, Math.min(1, event.nativeEvent.locationX / 172));
+                  setReplayPosition(Math.round(ratio * (polylineCoords.length - 1)));
+                }}
+              >
+                <View style={[styles.replayTrackFill, { width: `${((replayIndex + 1) / polylineCoords.length) * 100}%` }]} />
+                <View style={[styles.replayThumb, { left: `${((replayIndex + 1) / polylineCoords.length) * 100}%` }]} />
+              </Pressable>
+            </View>
+            <View style={styles.replaySpeedRow}>
+              <Text style={styles.replaySpeedLabel}>回放速度</Text>
+              {([1, 2, 4] as const).map((speed) => (
+                <Pressable
+                  key={speed}
+                  style={({ pressed }) => [styles.replaySpeedOption, replaySpeed === speed && styles.replaySpeedOptionActive, { opacity: pressed ? 0.7 : 1 }]}
+                  onPress={() => setReplaySpeed(speed)}
+                >
+                  <Text style={[styles.replaySpeedText, replaySpeed === speed && styles.replaySpeedTextActive]}>{speed}×</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {photoTimeline.length > 0 && (
+          <View style={styles.topMediaSection}>
+            <View style={styles.topMediaHeading}>
+              <Text style={styles.topMediaTitle}>騎乘瞬間</Text>
+              <Text style={styles.topMediaCount}>{photoTimeline.length} 張</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topMediaRail}>
+              {photoTimeline.map((photo, index) => (
+                <Pressable key={photo.id} style={({ pressed }) => [styles.topMediaThumbWrap, { opacity: pressed ? 0.76 : 1 }]} onPress={() => setSelectedMediaIndex(index)}>
+                  <Image source={{ uri: photo.uri }} style={styles.topMediaThumb} />
+                  {index === 0 ? <View style={styles.topMediaPrimaryBadge}><Text style={styles.topMediaPrimaryText}>精選</Text></View> : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {activityHighlights.length > 0 && (
           <View style={styles.activityHighlightsCard}>
@@ -1099,56 +1205,29 @@ export default function RideDetailScreen() {
               </View>
             </View>
 
-            {/* Strava 風格：個人路段成就與瓦數列表 */}
-            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <Text style={[styles.panelTitle, { color: colors.foreground }]}>路段成就與功率表現 (PR)</Text>
-                <Text style={{ fontSize: 12, color: colors.muted }}>{record.segmentAchievements?.length ?? 2} 處路段</Text>
-              </View>
-              {(record.segmentAchievements ?? [
-                {
-                  id: "seg-1",
-                  segmentName: "主要爬坡路段 (PR)",
-                  distance: 2.34,
-                  time: "10:33",
-                  avgSpeed: 13.4,
-                  avgPower: 191,
-                  isPR: true,
-                  date: new Date(record.date).toLocaleDateString(),
-                },
-                {
-                  id: "seg-2",
-                  segmentName: "平路巡航衝刺段",
-                  distance: 4.18,
-                  time: "5:42",
-                  avgSpeed: 44.0,
-                  avgPower: Math.round(record.avgPower * 1.15),
-                  isPR: false,
-                  date: new Date(record.date).toLocaleDateString(),
-                }
-              ]).map((seg) => (
-                <View key={seg.id} style={[styles.segmentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-                      {seg.isPR && (
-                        <View style={styles.prBadge}>
-                          <Text style={styles.prBadgeText}>PR</Text>
-                        </View>
-                      )}
-                      <Text style={[styles.segmentTitle, { color: colors.foreground }]} numberOfLines={1}>{seg.segmentName}</Text>
-                    </View>
-                    <Text style={{ fontSize: 12, color: colors.muted }}>{seg.distance} 公里</Text>
-                  </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                    <Text style={{ fontSize: 18, fontWeight: "bold", color: seg.isPR ? "#F59E0B" : colors.foreground }}>{seg.time}</Text>
-                    <View style={{ flexDirection: "row", gap: 12 }}>
-                      <Text style={{ fontSize: 13, color: colors.muted }}>{seg.avgSpeed} 公里/小時</Text>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: "#FF9500" }}>{seg.avgPower} 瓦</Text>
-                    </View>
-                  </View>
+            {rideSplits.length > 0 && (
+              <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}> 
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <Text style={[styles.panelTitle, { color: colors.foreground }]}>本機分段功率表現</Text>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>由 GPS 軌跡重建</Text>
                 </View>
-              ))}
-            </View>
+                {rideSplits.slice(0, 4).map((split) => (
+                  <View key={`power-${split.index}`} style={[styles.segmentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <Text style={[styles.segmentTitle, { color: colors.foreground }]}>{split.distanceM >= 950 ? `${split.index} km 分段` : `第 ${split.index} 段`}</Text>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>{(split.distanceM / 1000).toFixed(2)} 公里</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                      <Text style={{ fontSize: 18, fontWeight: "bold", color: colors.foreground }}>{formatDuration(split.movingTimeSeconds)}</Text>
+                      <View style={{ flexDirection: "row", gap: 12 }}>
+                        <Text style={{ fontSize: 13, color: colors.muted }}>{split.averageSpeedKmh?.toFixed(1) ?? "--"} 公里/小時</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: "#FF9500" }}>{split.averagePowerW === undefined ? "--" : `${split.averagePowerW} 瓦`}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* 僅比較此裝置歷史資料的個人最佳紀錄 */}
             {(record.personalBests?.length ?? 0) > 0 && (
@@ -1278,6 +1357,59 @@ export default function RideDetailScreen() {
         ride={record}
         onClose={() => setShareCardVisible(false)}
       />
+
+      <Modal visible={isMapDetailVisible} animationType="slide" onRequestClose={() => setIsMapDetailVisible(false)}>
+        <View style={styles.mapDetailScreen}>
+          <LeafletMapView
+            style={styles.mapDetailMap}
+            initialRegion={{
+              latitude: polylineCoords[0]?.latitude ?? 25.0478,
+              longitude: polylineCoords[0]?.longitude ?? 121.5319,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+            gpxPolyline={polylineCoords}
+          />
+          <Pressable style={styles.mapDetailClose} onPress={() => setIsMapDetailVisible(false)}>
+            <IconSymbol name="xmark" size={20} color="#fff" />
+          </Pressable>
+          <View style={styles.mapDetailStatsCard}>
+            <Text style={styles.mapDetailTitle}>{record.name}</Text>
+            <View style={styles.mapDetailMetrics}>
+              <View><Text style={styles.mapDetailValue}>{(record.distance / 1000).toFixed(2)} km</Text><Text style={styles.mapDetailLabel}>距離</Text></View>
+              <View><Text style={styles.mapDetailValue}>{Math.round(record.totalAscent)} m</Text><Text style={styles.mapDetailLabel}>總爬升</Text></View>
+              <View><Text style={styles.mapDetailValue}>{formatDuration(movingDuration)}</Text><Text style={styles.mapDetailLabel}>移動時間</Text></View>
+              <View><Text style={styles.mapDetailValue}>{averageMovingSpeed.toFixed(1)} km/h</Text><Text style={styles.mapDetailLabel}>平均速度</Text></View>
+            </View>
+            <Pressable style={styles.mapDetailReplayButton} onPress={() => { setIsMapDetailVisible(false); setIsReplayPlaying(true); }}>
+              <IconSymbol name="play.fill" size={14} color="#07120E" />
+              <Text style={styles.mapDetailReplayText}>開始軌跡回放</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={selectedMediaIndex !== null} animationType="fade" onRequestClose={() => setSelectedMediaIndex(null)}>
+        <View style={styles.mediaViewer}>
+          <Pressable style={styles.mediaViewerClose} onPress={() => setSelectedMediaIndex(null)}>
+            <IconSymbol name="xmark" size={20} color="#fff" />
+          </Pressable>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: Math.max(0, selectedMediaIndex ?? 0) * SCREEN_W, y: 0 }}
+            onMomentumScrollEnd={(event) => setSelectedMediaIndex(Math.round(event.nativeEvent.contentOffset.x / SCREEN_W))}
+          >
+            {photoTimeline.map((photo) => (
+              <View key={photo.id} style={styles.mediaViewerPage}>
+                <Image source={{ uri: photo.uri }} style={styles.mediaViewerImage} resizeMode="contain" />
+              </View>
+            ))}
+          </ScrollView>
+          <Text style={styles.mediaViewerCounter}>{(selectedMediaIndex ?? 0) + 1} / {photoTimeline.length}</Text>
+        </View>
+      </Modal>
 
       {/* 編輯活動 Modal (名稱、心得描述、相片與影片新增) */}
       <Modal visible={isEditModalVisible} animationType="slide" transparent>
@@ -1498,6 +1630,36 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.1)",
     paddingVertical: 14,
   },
+  performanceRow: { flexDirection: "row", marginTop: 10, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.035)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.08)" },
+  performanceMetric: { flex: 1, alignItems: "center", paddingVertical: 11 },
+  performanceMetricValue: { color: "rgba(255,255,255,0.93)", fontSize: 12, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  performanceMetricLabel: { color: "rgba(255,255,255,0.46)", fontSize: 10, marginTop: 3 },
+  replayCard: { marginTop: 16, padding: 14, borderRadius: 16, backgroundColor: "rgba(255,106,34,0.09)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,106,34,0.26)" },
+  replayHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
+  replayTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  replaySubtitle: { color: "rgba(255,255,255,0.52)", fontSize: 11, lineHeight: 16, marginTop: 3, maxWidth: SCREEN_W - 148 },
+  replayProgress: { color: "#FFB28C", fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  replayControls: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 14 },
+  replayPlayButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minWidth: 78, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 11, backgroundColor: "#FF8A4C" },
+  replayPlayText: { color: "#07120E", fontSize: 12, fontWeight: "900" },
+  replayTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.16)", overflow: "visible" },
+  replayTrackFill: { height: 6, borderRadius: 3, backgroundColor: "#FF8A4C" },
+  replayThumb: { position: "absolute", top: -4, width: 14, height: 14, marginLeft: -7, borderRadius: 7, backgroundColor: "#fff", borderWidth: 3, borderColor: "#FF8A4C" },
+  replaySpeedRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 14 },
+  replaySpeedLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, marginRight: "auto" },
+  replaySpeedOption: { minWidth: 34, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.14)" },
+  replaySpeedOptionActive: { borderColor: "#FF8A4C", backgroundColor: "rgba(255,138,76,0.18)" },
+  replaySpeedText: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: "800" },
+  replaySpeedTextActive: { color: "#FFB28C" },
+  topMediaSection: { marginTop: 18 },
+  topMediaHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 9 },
+  topMediaTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  topMediaCount: { color: "rgba(255,255,255,0.48)", fontSize: 11, fontWeight: "700" },
+  topMediaRail: { gap: 10, paddingRight: 4 },
+  topMediaThumbWrap: { width: 132, height: 94, borderRadius: 12, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.08)" },
+  topMediaThumb: { width: "100%", height: "100%" },
+  topMediaPrimaryBadge: { position: "absolute", left: 7, bottom: 7, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, backgroundColor: "rgba(0,0,0,0.62)" },
+  topMediaPrimaryText: { color: "#fff", fontSize: 9, fontWeight: "800" },
   localInsightCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -1593,6 +1755,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   noTrailText: { color: "rgba(255,255,255,0.6)", fontSize: 13 },
+  mapPlaybackBadge: { position: "absolute", right: 14, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.62)" },
+  mapPlaybackDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#FF8A4C" },
+  mapPlaybackText: { color: "rgba(255,255,255,0.84)", fontSize: 10, fontWeight: "700" },
+  routeMapFocusButton: { position: "absolute", left: 14, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.68)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.2)" },
+  routeMapFocusText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  mapDetailScreen: { flex: 1, backgroundColor: "#08110D" },
+  mapDetailMap: { flex: 1 },
+  mapDetailClose: { position: "absolute", top: 58, left: 18, width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.64)" },
+  mapDetailStatsCard: { position: "absolute", left: 14, right: 14, bottom: 20, borderRadius: 18, padding: 16, backgroundColor: "rgba(8,17,13,0.96)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.14)" },
+  mapDetailTitle: { color: "#fff", fontSize: 17, fontWeight: "800" },
+  mapDetailMetrics: { flexDirection: "row", flexWrap: "wrap", rowGap: 12, marginTop: 14 },
+  mapDetailValue: { color: "#fff", fontSize: 13, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  mapDetailLabel: { color: "rgba(255,255,255,0.46)", fontSize: 10, marginTop: 2 },
+  mapDetailReplayButton: { marginTop: 16, backgroundColor: "#FF8A4C", borderRadius: 11, paddingVertical: 11, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 7 },
+  mapDetailReplayText: { color: "#07120E", fontSize: 13, fontWeight: "900" },
 
   // 底部面板
   panel: {
@@ -1855,6 +2032,11 @@ const styles = StyleSheet.create({
   calibrationActions: { flexDirection: "row", gap: 10, marginTop: 16 },
   calibrationAction: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 11, alignItems: "center" },
   calibrationActionText: { fontSize: 14, fontWeight: "700" },
+  mediaViewer: { flex: 1, backgroundColor: "#050505", justifyContent: "center" },
+  mediaViewerClose: { position: "absolute", top: 56, left: 18, zIndex: 2, width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.58)" },
+  mediaViewerPage: { width: SCREEN_W, flex: 1, justifyContent: "center", alignItems: "center" },
+  mediaViewerImage: { width: SCREEN_W, height: "82%" },
+  mediaViewerCounter: { position: "absolute", bottom: 42, alignSelf: "center", color: "rgba(255,255,255,0.78)", fontSize: 12, fontWeight: "800" },
   splitHeader: {
     flexDirection: "row",
     borderBottomWidth: 1,
