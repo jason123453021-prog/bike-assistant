@@ -9,8 +9,8 @@ describe("energy and hydration persistent reminders", () => {
   it("renders one focused modal that supports independent energy, water, and simultaneous alerts", () => {
     expect(modalSource).toContain("const visible = calorieAlert || waterAlert");
     expect(modalSource).toContain("const bothAlert = calorieAlert && waterAlert");
-    expect(modalSource).toContain("已補充能量");
-    expect(modalSource).toContain("已補充水分");
+    expect(modalSource).toContain("已補給能量");
+    expect(modalSource).toContain("已補給水分");
   });
 
   it("re-displays pending energy or water alerts and resets only after the matching confirmation", () => {

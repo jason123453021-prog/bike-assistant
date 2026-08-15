@@ -45,6 +45,19 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).toContain('restartSmartSupplyCountdown(\n          smartSupplyCountdownRef.current,\n          "water"');
   });
 
+  it("keeps dual-supply controls readable, scrollable, and independently accessible on smaller screens", () => {
+    expect(modalSource).toContain("<ScrollView");
+    expect(modalSource).toContain('contentContainerStyle={styles.cardContent}');
+    expect(modalSource).toContain('maxHeight: "86%"');
+    expect(modalSource).toContain("supplyStack");
+    expect(modalSource).toContain("gap: 14");
+    expect(modalSource).toContain('accessibilityLabel="確認已補給能量並重新開始能量倒數"');
+    expect(modalSource).toContain('accessibilityLabel="確認已補給水分並重新開始補水倒數"');
+    expect(modalSource).toContain("hitSlop={6}");
+    expect(modalSource).toContain("energyButton");
+    expect(modalSource).toContain("waterButton");
+  });
+
   it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {
     expect(mapSource).toContain("const smartCalorieDue = bgState.supplyCalculationMode === \"smart\"");
     expect(mapSource).toContain("const smartWaterDue = bgState.supplyCalculationMode === \"smart\"");

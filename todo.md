@@ -1722,6 +1722,9 @@
 - [x] 修正能量與水分倒數同時到期時兩種補給彈窗皆顯示的行為
 - [x] 確保能量與水分可依序分別確認，且每項只重啟自身倒數、不隱藏另一項
 - [x] 新增雙補給同時到期與依序確認回歸測試，完成 TypeScript、零 lint advisory、164 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
+- [x] 優化雙補給彈窗的資訊層級、文字可讀性、間距與按鈕觸控範圍
+- [x] 確保能量與水分的確認操作在雙區塊模式下明確隔離且不互相干擾
+- [x] 新增雙補給彈窗版面回歸測試，完成 TypeScript、零 lint advisory、165 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
