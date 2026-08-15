@@ -10,6 +10,11 @@ const themeSource = readFileSync(resolve(process.cwd(), "theme.config.js"), "utf
 const themeProviderSource = readFileSync(resolve(process.cwd(), "lib/theme-provider.tsx"), "utf8");
 const elevationChartSource = readFileSync(resolve(process.cwd(), "components/activity-elevation-chart.tsx"), "utf8");
 const permissionReadinessSource = readFileSync(resolve(process.cwd(), "components/ride-permission-readiness.tsx"), "utf8");
+const supplyItemModalSource = readFileSync(resolve(process.cwd(), "components/custom-supply-item-modal.tsx"), "utf8");
+const rideSummarySource = readFileSync(resolve(process.cwd(), "components/ride-summary-modal.tsx"), "utf8");
+const rideDetailSource = readFileSync(resolve(process.cwd(), "app/ride-detail.tsx"), "utf8");
+const speedCurveSource = readFileSync(resolve(process.cwd(), "components/speed-curve-chart.tsx"), "utf8");
+const shareCardSource = readFileSync(resolve(process.cwd(), "components/share-card-modal.tsx"), "utf8");
 
 describe("small-screen readability guardrails", () => {
   it("keeps the screen background synchronized with the active runtime color palette", () => {
@@ -52,5 +57,18 @@ describe("small-screen readability guardrails", () => {
     expect(elevationChartSource).toContain('stroke={colors.accent}');
     expect(permissionReadinessSource).toContain("action: { minHeight: 44");
     expect(permissionReadinessSource).toContain("subtitle: { fontSize: 13, lineHeight: 19");
+  });
+
+  it("uses onAccent foregrounds for dynamic primary and accent action surfaces", () => {
+    expect(supplyItemModalSource).toContain("triggerType === 'time' ? colors.onAccent : colors.foreground");
+    expect(supplyItemModalSource).toContain("triggerType === 'distance' ? colors.onAccent : colors.foreground");
+    expect(supplyItemModalSource).toContain("color: colors.onAccent");
+    expect(rideSummarySource).toContain("color={colors.onAccent}");
+    expect(rideSummarySource).toContain("style={[styles.saveBtnText, { color: colors.onAccent }]}");
+    expect(rideSummarySource).toContain('name="plus" size={17} color={colors.onAccent}');
+    expect(rideDetailSource).toContain("style={[styles.photoAddButtonText, { color: colors.onAccent }]}");
+    expect(rideDetailSource).toContain("color: colors.onAccent, fontWeight: \"600\"");
+    expect(speedCurveSource).toContain("selectedBasis ? colors.onAccent : colors.muted");
+    expect(shareCardSource).toContain("color: colors.onAccent, fontSize: 14, fontWeight: \"600\"");
   });
 });

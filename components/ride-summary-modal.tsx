@@ -197,7 +197,7 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
                   onPress={handlePickMedia}
                   disabled={isPickingMedia}
                 >
-                  <IconSymbol name="plus" size={17} color="#fff" />
+                  <IconSymbol name="plus" size={17} color={colors.onAccent} />
                   <Text style={styles.addMediaButtonText}>{isPickingMedia ? "處理中" : "加入"}</Text>
                 </Pressable>
               </View>
@@ -300,8 +300,8 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
               ]}
               onPress={handleSave}
             >
-              <IconSymbol name="checkmark.circle.fill" size={20} color="#fff" />
-              <Text style={styles.saveBtnText}>儲存並完成</Text>
+              <IconSymbol name="checkmark.circle.fill" size={20} color={colors.onAccent} />
+              <Text style={[styles.saveBtnText, { color: colors.onAccent }]}>儲存並完成</Text>
             </Pressable>
           </ScrollView>
         </View>

@@ -1236,7 +1236,7 @@ export default function RideDetailScreen() {
                   <Text style={[styles.photoTimelineHint, { color: colors.muted }]}>只會加入您現在明確選取的相片，不讀取整個相簿，也不會上傳。</Text>
                 </View>
                 <Pressable style={({ pressed }) => [styles.photoAddButton, { backgroundColor: colors.primary, opacity: pressed ? 0.7 : 1 }]} onPress={() => void handlePickRidePhotos()}>
-                  <Text style={styles.photoAddButtonText}>加入相片</Text>
+                  <Text style={[styles.photoAddButtonText, { color: colors.onAccent }]}>加入相片</Text>
                 </Pressable>
               </View>
               {photoTimeline.length === 0 ? (
@@ -1424,7 +1424,7 @@ export default function RideDetailScreen() {
                       return (
                         <Pressable key={photo.id} style={[styles.coverPickerOption, { borderColor: selected ? colors.primary : colors.border }]} onPress={() => setEditCoverPhotoUri(photo.uri)}>
                           <Image source={{ uri: photo.uri }} style={styles.coverPickerImage} />
-                          {selected ? <View style={[styles.coverPickerSelected, { backgroundColor: colors.primary }]}><Text style={styles.coverPickerSelectedText}>封面</Text></View> : null}
+                          {selected ? <View style={[styles.coverPickerSelected, { backgroundColor: colors.primary }]}><Text style={[styles.coverPickerSelectedText, { color: colors.onAccent }]}>封面</Text></View> : null}
                         </Pressable>
                       );
                     })}
@@ -1440,7 +1440,7 @@ export default function RideDetailScreen() {
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <Text style={[styles.label, { color: colors.muted }]}>本機媒體（相片或影片）</Text>
                   <Pressable onPress={handlePickMedia} style={[styles.mediaAddBtn, { backgroundColor: colors.primary }]}>
-                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>+ 新增媒體</Text>
+                    <Text style={{ color: colors.onAccent, fontSize: 12, fontWeight: "bold" }}>+ 新增媒體</Text>
                   </Pressable>
                 </View>
                 {localMedia.length > 0 ? (
@@ -1473,7 +1473,7 @@ export default function RideDetailScreen() {
                 onPress={handleSaveActivityEdit}
                 style={[styles.modalBtn, { backgroundColor: colors.primary }]}
               >
-                <Text style={{ color: "#fff", fontWeight: "600" }}>儲存活動</Text>
+                <Text style={{ color: colors.onAccent, fontWeight: "600" }}>儲存活動</Text>
               </Pressable>
             </View>
           </View>

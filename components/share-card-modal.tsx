@@ -392,7 +392,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
               ]}
               onPress={onClose}
             >
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" }}>
+              <Text style={{ color: colors.onAccent, fontSize: 14, fontWeight: "600", textAlign: "center" }}>
                 關閉
               </Text>
             </Pressable>

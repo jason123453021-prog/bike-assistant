@@ -143,7 +143,7 @@ export function SpeedCurveChart({
         {(["time", "distance"] as ActivityChartAxisBasis[]).map((basis) => {
           const selectedBasis = axisBasis === basis;
           return <Pressable key={basis} onPress={() => setAxisBasis(basis)} style={[styles.axisTab, selectedBasis && { backgroundColor: colors.primary }]}>
-            <Text style={[styles.axisText, { color: selectedBasis ? "#fff" : colors.muted }]}>{basis === "time" ? "時間" : "距離"}</Text>
+            <Text style={[styles.axisText, { color: selectedBasis ? colors.onAccent : colors.muted }]}>{basis === "time" ? "時間" : "距離"}</Text>
           </Pressable>;
         })}
       </View>

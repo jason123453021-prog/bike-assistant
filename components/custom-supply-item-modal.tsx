@@ -216,7 +216,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
                   style={[
                     styles.segmentText,
                     {
-                      color: triggerType === 'time' ? '#fff' : colors.foreground,
+                      color: triggerType === 'time' ? colors.onAccent : colors.foreground,
                     },
                   ]}
                 >
@@ -239,7 +239,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
                   style={[
                     styles.segmentText,
                     {
-                      color: triggerType === 'distance' ? '#fff' : colors.foreground,
+                      color: triggerType === 'distance' ? colors.onAccent : colors.foreground,
                     },
                   ]}
                 >
@@ -362,7 +362,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
               { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 },
             ]}
           >
-            <Text style={[styles.buttonText, { color: '#fff' }]}>
+            <Text style={[styles.buttonText, { color: colors.onAccent }]}>
               {item ? '更新' : '新增'}
             </Text>
           </Pressable>
