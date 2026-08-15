@@ -12,6 +12,9 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).toContain("restartSmartSupplyCountdown");
     expect(mapSource).toContain('settings.supplyCalculationMode === "smart"');
     expect(mapSource).toContain('settings.supplyCalculationMode !== "smart" && autoDismissSeconds');
+    expect(mapSource).toContain('settings.supplyCalculationMode === "smart" && (kind === "calorie" || kind === "water")');
+    expect(mapSource).toContain("pendingCalorieRef.current ? {");
+    expect(mapSource).toContain("pendingWaterRef.current ? {");
   });
 
   it("uses a native modal over the map and omits amount guidance", () => {
@@ -22,5 +25,17 @@ describe("smart supply countdown UI", () => {
     expect(modalSource).not.toContain("recommendedMl");
     expect(modalSource).not.toContain("recommendedEnergyKcal");
     expect(modalSource).not.toContain("recommendedCarbohydrateG");
+    expect(modalSource).toContain("allowSnooze = true");
+    expect(modalSource).toContain("{allowSnooze && (");
+    expect(mapSource).toContain('allowSnooze={settings.supplyCalculationMode !== "smart" || (!calorieAlert && !waterAlert)}');
+  });
+
+  it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {
+    expect(mapSource).toContain("const smartCalorieDue = bgState.supplyCalculationMode === \"smart\"");
+    expect(mapSource).toContain("const smartWaterDue = bgState.supplyCalculationMode === \"smart\"");
+    expect(mapSource).toContain("bgState.calorieReminderSent || smartCalorieDue || pendingCalorieRef.current");
+    expect(mapSource).toContain("bgState.waterReminderSent || smartWaterDue || pendingWaterRef.current");
+    expect(mapSource).toContain("updateBackgroundSmartSupplyCountdown");
+    expect(mapSource).toContain("setBackgroundSupplyReminderPending");
   });
 });

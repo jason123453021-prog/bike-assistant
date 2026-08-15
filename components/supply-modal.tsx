@@ -21,6 +21,8 @@ export interface SupplyModalProps {
   onConfirmWater: () => void;
   /** 按下「稍後」（關閉但不重置） */
   onDismiss: () => void;
+  /** 智慧倒數到期後必須明確確認，不能暫時關閉。 */
+  allowSnooze?: boolean;
   /** 自訂補給品提醒清單（優先級排序） */
   customSupplyAlerts?: { id: string; name: string; onConfirm: () => void }[];
 }
@@ -31,6 +33,7 @@ export function SupplyModal({
   onConfirmCalorie,
   onConfirmWater,
   onDismiss,
+  allowSnooze = true,
   customSupplyAlerts = [],
 }: SupplyModalProps) {
   const colors = useColors();
@@ -59,7 +62,7 @@ export function SupplyModal({
       animationType="fade"
       statusBarTranslucent
       hardwareAccelerated
-      onRequestClose={onDismiss}
+      onRequestClose={() => { if (allowSnooze) onDismiss(); }}
     >
       <View style={styles.overlay}>
         <Animated.View
@@ -152,16 +155,17 @@ export function SupplyModal({
             為避免改變系統音量行為，實體音量鍵維持調整音量；請直接點選上方放大的「已補給」按鈕快速確認。
           </Text>
 
-          {/* 稍後按鈕 */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.dismissBtn,
-              { borderColor: colors.border, opacity: pressed ? 0.6 : 1 },
-            ]}
-            onPress={onDismiss}
-          >
-            <Text style={[styles.dismissText, { color: colors.muted }]}>稍後提醒</Text>
-          </Pressable>
+          {allowSnooze && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.dismissBtn,
+                { borderColor: colors.border, opacity: pressed ? 0.6 : 1 },
+              ]}
+              onPress={onDismiss}
+            >
+              <Text style={[styles.dismissText, { color: colors.muted }]}>稍後提醒</Text>
+            </Pressable>
+          )}
         </Animated.View>
       </View>
     </Modal>

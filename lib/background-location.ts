@@ -481,6 +481,34 @@ export async function updateBackgroundEnvironment(environment: NonNullable<Backg
   } catch {}
 }
 
+/** 前景倒數變動時同步到背景任務，讓鎖定期間到期可持久化為待確認提醒。 */
+export async function updateBackgroundSmartSupplyCountdown(countdown: Pick<
+  BackgroundState,
+  "smartCalorieCountdownStartedElapsedSec" | "smartWaterCountdownStartedElapsedSec" | "smartCalorieCountdownDurationSec" | "smartWaterCountdownDurationSec"
+>) {
+  try {
+    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+    if (!stateStr) return;
+    const state: BackgroundState = JSON.parse(stateStr);
+    if (!state.isRiding || state.supplyCalculationMode !== "smart") return;
+    Object.assign(state, countdown);
+    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+/** 前景到期或背景任務到期時，持久化待確認狀態供回到前景立即恢復彈窗。 */
+export async function setBackgroundSupplyReminderPending(kind: "calorie" | "water", pending: boolean) {
+  try {
+    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+    if (!stateStr) return;
+    const state: BackgroundState = JSON.parse(stateStr);
+    if (!state.isRiding) return;
+    if (kind === "calorie") state.calorieReminderSent = pending;
+    else state.waterReminderSent = pending;
+    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
 /**
  * 停止背景追蹤時，標記狀態為非騎乘
  */

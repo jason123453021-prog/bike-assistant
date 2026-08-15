@@ -25,6 +25,10 @@ describe("smart supply countdown", () => {
     expect(smartSupplyCountdownRemainingSec(countdown, "calorie", 120)).toBe(plan.energyCountdownSec);
     expect(smartSupplyCountdownRemainingSec(countdown, "water", 120)).toBe(plan.waterCountdownSec);
     expect(isSmartSupplyCountdownDue(countdown, "water", countdown.waterDueElapsedSec)).toBe(true);
+    expect(plan.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
+    expect(plan.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
+    expect(plan.energyCountdownSec).toBeGreaterThanOrEqual(30 * 60);
+    expect(plan.energyCountdownSec).toBeLessThanOrEqual(60 * 60);
   });
 
   it("未確認前只更新到期時間，確認後才重設對應類別的倒數起點", () => {

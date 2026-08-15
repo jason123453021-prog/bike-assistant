@@ -35,7 +35,8 @@ const SMART_WATER_TRIGGER_RANGE = { min: 100, max: 250 } as const;
 const SMART_WATER_RECOMMENDATION_RANGE = { min: 150, max: 250 } as const;
 const MICRO_SIP_INTERVAL_MINUTES = 12.5;
 const SMART_WATER_COUNTDOWN_RANGE_SEC = { min: 10 * 60, max: 15 * 60 } as const;
-const SMART_ENERGY_COUNTDOWN_RANGE_SEC = { min: 20 * 60, max: 90 * 60 } as const;
+// 耐力活動超過一小時開始主動補碳水；以 30–60 g/h 的分次策略轉成不帶量化處方的提醒節奏。
+const SMART_ENERGY_COUNTDOWN_RANGE_SEC = { min: 30 * 60, max: 60 * 60 } as const;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -57,7 +58,7 @@ function carbohydrateTargetGPerHour(elapsedSec: number, intensityFactor: number,
 /**
  * 將既有的科學化補給模型轉為下一次提醒的時間。
  * 補水固定維持 10–15 分鐘的可耐受小量節奏；高汗率、強度、熱負荷與長時段會提前。
- * 能量則依每小時碳水目標推導，較短且低強度的活動不會過早強制補給。
+ * 能量則依每小時碳水目標推導，保守維持 30–60 分鐘提醒，避免以單次大量補給取代規律分次。
  */
 function deriveCountdowns(
   elapsedSec: number,
@@ -76,7 +77,7 @@ function deriveCountdowns(
     SMART_WATER_COUNTDOWN_RANGE_SEC.max,
   ));
   const energyCountdownSec = carbohydrateGPerHour <= 0
-    ? (intensity >= 0.9 ? 40 : 45) * 60
+    ? SMART_ENERGY_COUNTDOWN_RANGE_SEC.max
     : Math.round(clamp(
         (energyTriggerKcal / Math.max(1, carbohydrateGPerHour * 4)) * 3600,
         SMART_ENERGY_COUNTDOWN_RANGE_SEC.min,
