@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const mapSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"), "utf8");
 const modalSource = readFileSync(resolve(process.cwd(), "components/supply-modal.tsx"), "utf8");
+const feedbackSource = readFileSync(resolve(process.cwd(), "lib/feedback-service.ts"), "utf8");
 
 describe("smart supply countdown UI", () => {
   it("shows countdown status and restarts only after explicit confirmation", () => {
@@ -37,5 +38,16 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).toContain("bgState.waterReminderSent || smartWaterDue || pendingWaterRef.current");
     expect(mapSource).toContain("updateBackgroundSmartSupplyCountdown");
     expect(mapSource).toContain("setBackgroundSupplyReminderPending");
+  });
+
+  it("schedules a local Android reminder for countdown expiry and clears it only after confirmation", () => {
+    expect(feedbackSource).toContain("scheduleSmartSupplyDueNotification");
+    expect(feedbackSource).toContain("clearSmartSupplyDueNotification");
+    expect(feedbackSource).toContain("SchedulableTriggerInputTypes.DATE");
+    expect(feedbackSource).toContain('channelId: "supply"');
+    expect(mapSource).toContain('scheduleSmartSupplyDueNotification(\n        "calorie"');
+    expect(mapSource).toContain('scheduleSmartSupplyDueNotification(\n        "water"');
+    expect(mapSource).toContain('clearSmartSupplyDueNotification("calorie")');
+    expect(mapSource).toContain('clearSmartSupplyDueNotification("water")');
   });
 });

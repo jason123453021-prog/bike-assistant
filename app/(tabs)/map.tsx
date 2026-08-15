@@ -72,6 +72,8 @@ import {
   speakSupplyReminder,
   speakAutoPause,
   speakAutoResume,
+  scheduleSmartSupplyDueNotification,
+  clearSmartSupplyDueNotification,
   showSupplyNotification,
   showRidingNotification,
   cancelRidingNotification,
@@ -489,6 +491,15 @@ export default function MapScreen() {
         smartCalorieCountdownDurationSec: nextCountdown.calorieDurationSec,
         smartWaterCountdownDurationSec: nextCountdown.waterDurationSec,
       });
+      const currentElapsedSec = stateRef.current.elapsed;
+      void scheduleSmartSupplyDueNotification(
+        "calorie",
+        Date.now() + Math.max(1, nextCountdown.calorieDueElapsedSec - currentElapsedSec) * 1000,
+      );
+      void scheduleSmartSupplyDueNotification(
+        "water",
+        Date.now() + Math.max(1, nextCountdown.waterDueElapsedSec - currentElapsedSec) * 1000,
+      );
     }
   }, []);
 
@@ -767,6 +778,7 @@ export default function MapScreen() {
     if (!pendingWaterRef.current) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.calorie = 0;
     void acknowledgeBackgroundSupplyReminder("calorie");
+    void clearSmartSupplyDueNotification("calorie");
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!pendingWaterRef.current) clearSupplyRepeatTimer();
   }, [calorieAnim, clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, syncSmartSupplyCountdown]);
@@ -806,6 +818,7 @@ export default function MapScreen() {
     if (!pendingCalorieRef.current) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.water = 0;
     void acknowledgeBackgroundSupplyReminder("water");
+    void clearSmartSupplyDueNotification("water");
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!pendingCalorieRef.current) clearSupplyRepeatTimer();
   }, [clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);

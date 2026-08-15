@@ -182,6 +182,51 @@ export interface SupplyNotificationRecommendation {
   reason?: string;
 }
 
+const SMART_SUPPLY_NOTIFICATION_IDS = {
+  calorie: "bike-assistant-smart-calorie-due",
+  water: "bike-assistant-smart-water-due",
+} as const;
+
+/**
+ * 將已計算的智慧倒數交給 Android 本機排程；鎖定／背景時系統通知是唯一可立即呈現的介面。
+ * App 回到前景後，導航頁會依同一待確認狀態補顯示原生 Modal。
+ */
+export async function scheduleSmartSupplyDueNotification(type: "calorie" | "water", dueAtMs: number) {
+  const Notifications = await getLocalNotifications();
+  if (!Notifications || dueAtMs <= Date.now()) return;
+  try {
+    await configureSupplyNotificationActions();
+    await Notifications.cancelScheduledNotificationAsync(SMART_SUPPLY_NOTIFICATION_IDS[type]).catch(() => {});
+    await Notifications.scheduleNotificationAsync({
+      identifier: SMART_SUPPLY_NOTIFICATION_IDS[type],
+      content: {
+        title: type === "calorie" ? "補給提醒" : "補水提醒",
+        body: type === "calorie" ? "請補給能量，完成後在 App 內確認。" : "請補給水分，完成後在 App 內確認。",
+        sound: true,
+        badge: 1,
+        categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
+        data: { type: "supply_reminder", supplyKind: type, smartCountdown: true },
+        ...(Platform.OS === "android" ? { channelId: "supply" } : {}),
+      } as any,
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: new Date(dueAtMs),
+      } as any,
+    });
+  } catch {}
+}
+
+/** 使用者確認補給或結束騎乘後，清除對應的未到期／已呈現系統提醒。 */
+export async function clearSmartSupplyDueNotification(type: "calorie" | "water") {
+  const Notifications = await getLocalNotifications();
+  if (!Notifications) return;
+  const identifier = SMART_SUPPLY_NOTIFICATION_IDS[type];
+  try {
+    await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => {});
+    await Notifications.dismissNotificationAsync(identifier).catch(() => {});
+  } catch {}
+}
+
 export async function showSupplyNotification(
   type: SupplyNotificationKind,
   recommendation?: SupplyNotificationRecommendation,

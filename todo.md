@@ -1701,6 +1701,7 @@
 - [x] 將智慧補水倒數維持在動態 10–15 分鐘範圍，智慧補能量倒數維持在動態 30–60 分鐘範圍
 - [x] 新增待確認恢復與倒數時間範圍回歸測試，完成 TypeScript、零 lint advisory、147 passed／1 skipped 與 Android Hermes bundle 5.67 MB 驗證
 - [x] 以現代運動營養科學指引校準智慧補水與補能量倒數範圍，依模型動態調整而非固定採用使用者指定分鐘數
+- [x] 端到端核對背景／鎖定螢幕補給到期通知、待確認狀態保存與回到前景即時補顯示 Modal 的行為（148 passed／1 skipped、Android Hermes bundle 5.67 MB）
 - [ ] 新增回歸測試、完成 TypeScript、完整測試與 Android bundle 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）
