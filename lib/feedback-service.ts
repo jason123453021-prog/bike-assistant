@@ -98,8 +98,8 @@ export async function speakRideUpdate(
 export async function speakSupplyReminder(type: "calorie" | "water", enabled: boolean) {
   if (!enabled) return;
   const msg = type === "calorie"
-    ? "補給提醒，請補充能量棒或食物"
-    : "補給提醒，請補充水分";
+    ? "請補給能量"
+    : "請補給水分";
   await speak(msg, enabled);
 }
 
@@ -108,11 +108,8 @@ export async function speakSupplyReminder(type: "calorie" | "water", enabled: bo
  * 因此不依賴網路或雲端語音服務。
  */
 export function formatSmartSupplyReminder(type: "calorie" | "water", plan: SupplyPlan): string {
-  const reason = plan.reason.trim() ? `。原因：${plan.reason}` : "";
-  if (type === "calorie") {
-    return `智慧補給提醒。建議補充 ${Math.round(plan.energyRecommendationKcal)} 大卡能量，約 ${Math.round(plan.carbohydrateRecommendationG)} 公克碳水${reason}`;
-  }
-  return `智慧補水提醒。建議補充 ${Math.round(plan.waterRecommendationMl)} 毫升水分${reason}`;
+  void plan;
+  return type === "calorie" ? "請補給能量" : "請補給水分";
 }
 
 /** 在智慧補給模式下播報本輪的具體建議補給量與計算原因。 */
@@ -121,8 +118,8 @@ export async function speakSmartSupplyReminder(
   plan: SupplyPlan,
   enabled: boolean,
 ) {
-  if (!enabled) return;
-  await speak(formatSmartSupplyReminder(type, plan), enabled);
+  void plan;
+  await speakSupplyReminder(type, enabled);
 }
 
 export async function speakAutoPause(enabled: boolean) {

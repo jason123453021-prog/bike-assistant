@@ -744,7 +744,6 @@ export default function MapScreen() {
       dismissTimeoutId: null,
       repeatIntervalId: null,
     };
-    speak(`已確認補給${settings.supplyItems.find(s => s.id === id)?.name}`, settings.ttsEnabled);
     vibrateLight();
   }, [state.elapsed, state.distance, settings.supplyItems, settings.ttsEnabled]);
 
@@ -758,7 +757,6 @@ export default function MapScreen() {
     intervalSupplyAlertsRef.current = nextAlerts;
     setIntervalSupplyAlerts(nextAlerts);
     if (!nextAlerts.time && !nextAlerts.distance) clearIntervalSupplyRepeatTimer();
-    if (settings.ttsEnabled) speak("已確認補給");
     if (settings.vibrationEnabled) vibrateSuccess();
   }, [clearIntervalSupplyRepeatTimer, settings.ttsEnabled, settings.vibrationEnabled]);
 
@@ -1295,7 +1293,7 @@ export default function MapScreen() {
 
       // 播放回饋
       if (settings.vibrationEnabled) vibrateWarning();
-      if (settings.ttsEnabled) speak(`請補給 ${supplyItem.name}`);
+      if (settings.ttsEnabled) void speakSupplyReminder("calorie", true);
       if (settings.soundEnabled) {
         try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
       }
@@ -1318,7 +1316,7 @@ export default function MapScreen() {
         tracker.repeatIntervalId = setInterval(() => {
           if (customSupplyAlertsRef.current[supplyItem.id]) {
             if (settings.vibrationEnabled) vibrateWarning();
-            if (settings.ttsEnabled) speak(`請補給 ${supplyItem.name}`);
+            if (settings.ttsEnabled) void speakSupplyReminder("calorie", true);
             if (settings.soundEnabled) {
               try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
             }
@@ -1364,7 +1362,7 @@ export default function MapScreen() {
     powerSavingManagerRef.current.onSupplyReminder();
     setTouchGuardEnabled(false);
     if (settings.vibrationEnabled) vibrateWarning();
-    if (settings.ttsEnabled) speak("請補給");
+    if (settings.ttsEnabled) void speakSupplyReminder("calorie", true);
     if (settings.soundEnabled) {
       try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
     }
@@ -1382,7 +1380,7 @@ export default function MapScreen() {
           return;
         }
         if (settings.vibrationEnabled) vibrateWarning();
-        if (settings.ttsEnabled) speak("請補給");
+        if (settings.ttsEnabled) void speakSupplyReminder("calorie", true);
         if (settings.soundEnabled) {
           try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
         }

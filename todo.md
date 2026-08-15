@@ -1716,6 +1716,9 @@
 - [x] 騎乘中偵測系統音訊中斷時停止導航、補給與提示語音，讓出電話通話
 - [x] 確保通話結束後不自動補播語音，持續保留 GPS 記錄、待確認補給畫面與本機通知
 - [x] 新增通話優先音訊回歸測試，完成 TypeScript、零 lint advisory、162 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
+- [x] 盤點補水、能量與自訂補給提醒的所有語音入口與文案
+- [x] 將補給語音統一為「請補給水分」或「請補給能量」，移除數量、原因與其他延伸播報
+- [x] 新增精簡補給語音回歸測試，完成 TypeScript、零 lint advisory、163 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
