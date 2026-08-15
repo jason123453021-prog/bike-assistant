@@ -31,6 +31,20 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).toContain('allowSnooze={settings.supplyCalculationMode !== "smart" || (!calorieAlert && !waterAlert)}');
   });
 
+  it("renders energy and water together when both countdowns expire, then allows either confirmation to keep the other pending", () => {
+    expect(mapSource).toContain('if (calorieDue && !calorieReminderSentRef.current && !pendingCalorieRef.current)');
+    expect(mapSource).toContain('if (waterDue && !waterReminderSentRef.current && !pendingWaterRef.current)');
+    expect(mapSource).toContain('pendingCalorieRef.current = true;\n        setCalorieAlert(true);');
+    expect(mapSource).toContain('pendingWaterRef.current = true;\n        setWaterAlert(true);');
+    expect(modalSource).toContain('const bothAlert = calorieAlert && waterAlert');
+    expect(modalSource).toContain('{calorieAlert && (');
+    expect(modalSource).toContain('{waterAlert && (');
+    expect(mapSource).toContain('const waterStillPending = pendingWaterRef.current || waterAlert;');
+    expect(mapSource).toContain('const calorieStillPending = pendingCalorieRef.current || calorieAlert;');
+    expect(mapSource).toContain('restartSmartSupplyCountdown(\n          smartSupplyCountdownRef.current,\n          "calorie"');
+    expect(mapSource).toContain('restartSmartSupplyCountdown(\n          smartSupplyCountdownRef.current,\n          "water"');
+  });
+
   it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {
     expect(mapSource).toContain("const smartCalorieDue = bgState.supplyCalculationMode === \"smart\"");
     expect(mapSource).toContain("const smartWaterDue = bgState.supplyCalculationMode === \"smart\"");

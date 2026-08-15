@@ -792,13 +792,14 @@ export default function MapScreen() {
     pendingCalorieRef.current = false;
     delete pendingSupplyPlansRef.current.calorie;
     delete deferredSupplySpeechPlansRef.current.calorie;
-    if (!pendingWaterRef.current) setSupplyRecommendation(undefined);
+    const waterStillPending = pendingWaterRef.current || waterAlert;
+    if (!waterStillPending) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.calorie = 0;
     void acknowledgeBackgroundSupplyReminder("calorie");
     void clearSmartSupplyDueNotification("calorie");
     if (settings.vibrationEnabled) vibrateSuccess();
-    if (!pendingWaterRef.current) clearSupplyRepeatTimer();
-  }, [calorieAnim, clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, syncSmartSupplyCountdown]);
+    if (!waterStillPending) clearSupplyRepeatTimer();
+  }, [calorieAnim, clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, syncSmartSupplyCountdown, waterAlert]);
 
   const handleConfirmWaterSupply = useCallback(() => {
     setWaterAlert(false);
@@ -832,13 +833,14 @@ export default function MapScreen() {
     pendingWaterRef.current = false;
     delete pendingSupplyPlansRef.current.water;
     delete deferredSupplySpeechPlansRef.current.water;
-    if (!pendingCalorieRef.current) setSupplyRecommendation(undefined);
+    const calorieStillPending = pendingCalorieRef.current || calorieAlert;
+    if (!calorieStillPending) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.water = 0;
     void acknowledgeBackgroundSupplyReminder("water");
     void clearSmartSupplyDueNotification("water");
     if (settings.vibrationEnabled) vibrateSuccess();
-    if (!pendingCalorieRef.current) clearSupplyRepeatTimer();
-  }, [clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
+    if (!calorieStillPending) clearSupplyRepeatTimer();
+  }, [calorieAlert, clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
 
   const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind) => {
     if (settings.supplyCalculationMode === "smart" && (kind === "calorie" || kind === "water")) return;
@@ -1127,8 +1129,10 @@ export default function MapScreen() {
       powerSavingManagerRef.current.onSupplyReminder();
       setTouchGuardEnabled(false);
       if (type === "calorie") {
+        pendingCalorieRef.current = true;
         setCalorieAlert(true);
       } else {
+        pendingWaterRef.current = true;
         setWaterAlert(true);
         if (recommendation?.waterRecommendationMl) setSupplyRecommendedMl(recommendation.waterRecommendationMl);
       }
@@ -1148,10 +1152,6 @@ export default function MapScreen() {
           reason: recommendation.reason,
         } : undefined);
       }
-
-      // 記錄尚未確認的補給類型
-      if (type === "calorie") pendingCalorieRef.current = true;
-      else pendingWaterRef.current = true;
 
       // 單次提醒自動關閉功能
       const autoDismissSeconds = type === "calorie" ? settings.calorieAutoDismissSeconds : settings.waterAutoDismissSeconds;

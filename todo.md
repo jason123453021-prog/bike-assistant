@@ -1719,6 +1719,9 @@
 - [x] 盤點補水、能量與自訂補給提醒的所有語音入口與文案
 - [x] 將補給語音統一為「請補給水分」或「請補給能量」，移除數量、原因與其他延伸播報
 - [x] 新增精簡補給語音回歸測試，完成 TypeScript、零 lint advisory、163 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
+- [x] 修正能量與水分倒數同時到期時兩種補給彈窗皆顯示的行為
+- [x] 確保能量與水分可依序分別確認，且每項只重啟自身倒數、不隱藏另一項
+- [x] 新增雙補給同時到期與依序確認回歸測試，完成 TypeScript、零 lint advisory、164 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
