@@ -63,4 +63,18 @@ describe("ride detail JSX safety", () => {
     expect(source).not.toContain("activityMediaHero");
     expect(source).not.toContain("isMapDetailVisible");
   });
+
+  it("keeps map gestures outside the black detail scroll region", () => {
+    const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
+    const source = fs.readFileSync(filePath, "utf8");
+    const mapHeroIndex = source.indexOf('<View style={styles.mapHero}>');
+    const detailScrollIndex = source.indexOf('style={styles.activityDetailScroll}');
+
+    expect(mapHeroIndex).toBeGreaterThan(-1);
+    expect(detailScrollIndex).toBeGreaterThan(mapHeroIndex);
+    expect(source).not.toContain("isEmbeddedMapInteracting");
+    expect(source).not.toContain("activityRouteTapTarget");
+    expect(source).toContain("activityRouteExpandButton");
+    expect(source).toContain("activityMapPolyline");
+  });
 });

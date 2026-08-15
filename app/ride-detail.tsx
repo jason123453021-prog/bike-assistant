@@ -57,6 +57,7 @@ import { persistRideMedia } from "@/lib/local-ride-media";
 import { ZoomableActivityPhoto } from "@/components/zoomable-activity-photo";
 import { resolveActivityCoverPhotoUri } from "@/lib/activity-media";
 import { calculateGapPaceSecPerKm, formatPaceFromKmh, formatPaceSeconds, SPORT_META, type SportType } from "@/lib/sport-metrics";
+import { sampleActivityMapPolyline } from "@/lib/activity-map-presentation";
 import * as ImagePicker from "expo-image-picker";
 
 
@@ -190,7 +191,6 @@ export default function RideDetailScreen() {
 
   // 地圖 ref
   const mapRef = useRef<LeafletMapHandle>(null);
-  const [isEmbeddedMapInteracting, setIsEmbeddedMapInteracting] = useState(false);
 
   // 分享卡片
   const [shareCardVisible, setShareCardVisible] = useState(false);
@@ -260,6 +260,10 @@ export default function RideDetailScreen() {
     if (!record?.route || record.route.length === 0) return [];
     return record.route.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
   }, [record]);
+  const activityMapPolyline = useMemo(
+    () => sampleActivityMapPolyline(polylineCoords),
+    [polylineCoords],
+  );
   const activityMapInitialRegion = useMemo(() => ({
     latitude: polylineCoords[0]?.latitude ?? 25.0478,
     longitude: polylineCoords[0]?.longitude ?? 121.5319,
@@ -347,8 +351,6 @@ export default function RideDetailScreen() {
     if (index >= 0) openActivityViewer(index + 1);
   }, [activityPhotos, openActivityViewer]);
   const handleActivityMapReady = useCallback(() => setMapReady(true), []);
-  const beginEmbeddedMapInteraction = useCallback(() => setIsEmbeddedMapInteracting(true), []);
-  const endEmbeddedMapInteraction = useCallback(() => setIsEmbeddedMapInteracting(false), []);
   const [mapReady, setMapReady] = useState(false);
 
   const setReplayPosition = useCallback((index: number, animate = true) => {
@@ -705,25 +707,15 @@ export default function RideDetailScreen() {
   const bestPowerEfforts = calculateBestPowerEfforts(record);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.pageContent, { paddingBottom: insets.bottom + 28 }]}
-      showsVerticalScrollIndicator={false}
-      scrollEnabled={!isEmbeddedMapInteracting}
-    >
-      <View
-        style={styles.mapHero}
-        onTouchStart={beginEmbeddedMapInteraction}
-        onTouchEnd={endEmbeddedMapInteraction}
-        onTouchCancel={endEmbeddedMapInteraction}
-      >
+    <View style={styles.container}>
+      <View style={styles.mapHero}>
       {/* ── 全螢幕地圖（Leaflet WebView） ── */}
       <LeafletMapView
         ref={mapRef}
         style={styles.map}
         initialRegion={activityMapInitialRegion}
         onMapReady={handleActivityMapReady}
-        gpxPolyline={polylineCoords}
+        gpxPolyline={activityMapPolyline}
         photoMarkers={photoRouteMarkers}
         onPhotoMarkerPress={openPhotoFromMarker}
       />
@@ -744,11 +736,13 @@ export default function RideDetailScreen() {
       ) : null}
       {!coverPhotoUri && polylineCoords.length > 1 ? (
         <Pressable
-          style={styles.activityRouteTapTarget}
+          style={({ pressed }) => [styles.activityRouteExpandButton, { opacity: pressed ? 0.72 : 1 }]}
           accessibilityRole="button"
           accessibilityLabel="全螢幕檢視路線軌跡"
           onPress={() => openActivityViewer(0)}
-        />
+        >
+          <Text style={styles.activityRouteExpandButtonText}>全螢幕路線</Text>
+        </Pressable>
       ) : null}
 
       {/* ── 頂部導覽列 ── */}
@@ -835,7 +829,12 @@ export default function RideDetailScreen() {
       </View>
 
       {/* ── 本機活動摘要：向上滑動頁面可查看完整數據 ── */}
-      <View style={styles.activityBody}>
+      <ScrollView
+        style={styles.activityDetailScroll}
+        contentContainerStyle={[styles.pageContent, { paddingBottom: insets.bottom + 28 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.activityBody}>
         <View style={styles.activityInitialSummary}>
           <ActivitySummaryHeader
             title={record.name}
@@ -1361,7 +1360,8 @@ export default function RideDetailScreen() {
               </View>
             )}
         </View>
-      </View>
+        </View>
+      </ScrollView>
 
       {/* 分享卡片 Modal */}
       <ShareCardModal
@@ -1388,7 +1388,7 @@ export default function RideDetailScreen() {
               <LeafletMapView
                 style={styles.activityViewerRouteMap}
                 initialRegion={activityMapInitialRegion}
-                gpxPolyline={polylineCoords}
+                gpxPolyline={activityMapPolyline}
                 photoMarkers={photoRouteMarkers}
                 onPhotoMarkerPress={openPhotoFromMarker}
               />
@@ -1568,7 +1568,7 @@ export default function RideDetailScreen() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -1652,6 +1652,7 @@ const detailStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0d0d1a" },
   pageContent: { backgroundColor: "#0d0d1a" },
+  activityDetailScroll: { flex: 1, backgroundColor: "#0d0d1a" },
   mapHero: { height: ACTIVITY_DETAIL_MAIN_HERO_HEIGHT, width: SCREEN_W, position: "relative", overflow: "hidden" },
   map: { width: SCREEN_W, height: ACTIVITY_DETAIL_MAIN_HERO_HEIGHT },
   activityBody: {
@@ -1806,7 +1807,8 @@ const styles = StyleSheet.create({
   activityCoverShade: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 32, paddingBottom: 18, backgroundColor: "rgba(0,0,0,0.42)" },
   activityCoverEyebrow: { color: "#00E676", fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
   activityCoverCopy: { color: "rgba(255,255,255,0.88)", fontSize: 12, marginTop: 4, fontWeight: "700" },
-  activityRouteTapTarget: { position: "absolute", inset: 0, zIndex: 1 },
+  activityRouteExpandButton: { position: "absolute", right: 14, bottom: 14, zIndex: 3, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: "rgba(7,18,14,0.78)", borderWidth: 1, borderColor: "rgba(255,255,255,0.22)" },
+  activityRouteExpandButtonText: { color: "#fff", fontSize: 11, fontWeight: "800" },
 
   noTrailBadge: {
     position: "absolute",

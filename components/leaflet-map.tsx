@@ -946,9 +946,11 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
           javaScriptEnabled
           domStorageEnabled
           originWhitelist={["*"]}
+          cacheEnabled
           scrollEnabled={false}
           bounces={false}
           overScrollMode="never"
+          androidLayerType="hardware"
           // Allow loading external resources (Leaflet CDN)
           mixedContentMode="always"
           allowsInlineMediaPlayback

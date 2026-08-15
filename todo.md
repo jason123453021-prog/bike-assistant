@@ -1689,6 +1689,8 @@
 - [x] 新增小量補水回歸測試，完成 TypeScript、零 lint advisory、140 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
 - [x] 將多次騎乘的汗率校正改為完全自動化本機學習，移除人工補水量輸入
 - [x] 新增自動汗率校正回歸測試，完成 TypeScript、零 lint advisory、139 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
+- [x] 嚴格隔離活動詳情地圖手勢與外層頁面捲動，僅允許活動摘要以下的黑色內容區觸發頁面捲動
+- [x] 降低活動詳情 Leaflet 地圖資料同步與重繪負載，完成手勢與效能回歸驗證（142 passed／1 skipped、Android Hermes bundle 5.66 MB）
 - [ ] 新增回歸測試、完成 TypeScript、完整測試與 Android bundle 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）
