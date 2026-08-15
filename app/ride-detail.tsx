@@ -46,7 +46,6 @@ import { deriveLocalEstimationCalibration } from "@/lib/activity-estimation-cali
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
 import { buildRideSplits } from "@/lib/ride-splits";
 import { buildElevationBands } from "@/lib/elevation-bands";
-import { buildReplayFrames, replayFrameDelayMs } from "@/lib/activity-replay";
 import { buildPhotoRouteMarkers } from "@/lib/photo-route-markers";
 import { compareLocalSplitPersonalBests } from "@/lib/local-split-personal-bests";
 import { buildLocalActivityHighlights, calculateBestPowerEfforts } from "@/lib/local-activity-insights";
@@ -202,9 +201,6 @@ export default function RideDetailScreen() {
   const activityViewerDrawerHeight = useRef(new Animated.Value(ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT)).current;
   const activityViewerDrawerExpandedRef = useRef(false);
   const activityViewerDrawerDragStartHeight = useRef(ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT);
-  const [replayIndex, setReplayIndex] = useState(0);
-  const [isReplayPlaying, setIsReplayPlaying] = useState(false);
-  const [replaySpeed, setReplaySpeed] = useState<1 | 2 | 4>(1);
 
   const rideSplits = useMemo(() => record ? buildRideSplits(record) : [], [record]);
   const sportType = record?.sportType ?? "cycling";
@@ -270,7 +266,6 @@ export default function RideDetailScreen() {
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   }), [polylineCoords]);
-  const replayFrames = useMemo(() => buildReplayFrames(record?.route ?? []), [record?.route]);
   const photoRouteMarkers = useMemo<PhotoMapMarker[]>(() => buildPhotoRouteMarkers(photoTimeline, record?.route ?? []).map((marker) => ({
     id: marker.id,
     lat: marker.latitude,
@@ -353,18 +348,6 @@ export default function RideDetailScreen() {
   const handleActivityMapReady = useCallback(() => setMapReady(true), []);
   const [mapReady, setMapReady] = useState(false);
 
-  const setReplayPosition = useCallback((index: number, animate = true) => {
-    if (replayFrames.length === 0) return;
-    const safeIndex = Math.min(Math.max(0, index), replayFrames.length - 1);
-    const point = replayFrames[safeIndex];
-    setReplayIndex(safeIndex);
-    if (animate) {
-      mapRef.current?.animatePlaybackMarker(point.latitude, point.longitude, "#FF6A22", replayFrameDelayMs(replaySpeed));
-    } else {
-      mapRef.current?.setPlaybackMarker(point.latitude, point.longitude, "#FF6A22");
-    }
-  }, [replayFrames, replaySpeed]);
-
   useEffect(() => {
     if (mapReady && polylineCoords.length > 1) {
       setTimeout(() => {
@@ -381,30 +364,6 @@ export default function RideDetailScreen() {
     }
   }, [insets.top, mapReady, polylineCoords]);
 
-  useEffect(() => {
-    if (!mapReady || replayFrames.length === 0) return;
-    setReplayPosition(replayIndex, false);
-  }, [mapReady, replayFrames.length, replayIndex, setReplayPosition]);
-
-  useEffect(() => {
-    if (!isReplayPlaying || replayFrames.length < 2) return;
-    const delay = replayFrameDelayMs(replaySpeed);
-    const timer = setInterval(() => {
-      setReplayIndex((current) => {
-        const next = current >= replayFrames.length - 1 ? 0 : current + 1;
-        const point = replayFrames[next];
-        mapRef.current?.animatePlaybackMarker(point.latitude, point.longitude, "#FF6A22", delay);
-        if (next % 4 === 0 || next === replayFrames.length - 1) {
-          mapRef.current?.highlightPlayedTrail(replayFrames.slice(0, next + 1), "#FF8A4C");
-        }
-        return next;
-      });
-    }, delay);
-    return () => clearInterval(timer);
-  }, [isReplayPlaying, replayFrames, replaySpeed]);
-  
-
-  
   // 心率區間定義（5 個區間，包含 BPM 範圍）
   const HR_ZONES = useMemo(() => [
     { name: "恢復", min: 0, max: 0.6, color: "#4FC3F7", minBpm: 60, maxBpm: 120 },
@@ -809,13 +768,6 @@ export default function RideDetailScreen() {
         </View>
       )}
 
-      {replayFrames.length > 1 && (
-        <View style={styles.mapPlaybackBadge}>
-          <View style={styles.mapPlaybackDot} />
-          <Text style={styles.mapPlaybackText}>{isReplayPlaying ? "正在回放本機軌跡" : `長路線最佳化回放 · ${replayFrames.length} 影格`}</Text>
-        </View>
-      )}
-
       {activityPhotos.length > 0 && (
         <Pressable style={({ pressed }) => [styles.routeMapPhotoThumbButton, { opacity: pressed ? 0.78 : 1 }]} onPress={() => openActivityViewer(1)}>
           <Image source={{ uri: activityPhotos[0].uri }} style={styles.routeMapPhotoThumbImage} />
@@ -867,51 +819,6 @@ export default function RideDetailScreen() {
             {record.equipment ? <Text style={styles.activityEquipment}>{record.equipment}</Text> : null}
           </View>
         </View>
-
-        {replayFrames.length > 1 && (
-          <View style={styles.replayCard}>
-            <View style={styles.replayHeader}>
-              <View>
-                <Text style={styles.replayTitle}>軌跡回放</Text>
-                <Text style={styles.replaySubtitle}>依本機 GPS 記錄重播，不需要網路或帳號</Text>
-              </View>
-              <Text style={styles.replayProgress}>{replayIndex + 1} / {replayFrames.length}</Text>
-            </View>
-            <View style={styles.replayControls}>
-              <Pressable
-                style={({ pressed }) => [styles.replayPlayButton, { opacity: pressed ? 0.75 : 1 }]}
-                onPress={() => setIsReplayPlaying((current) => !current)}
-              >
-                <IconSymbol name={isReplayPlaying ? "pause.fill" : "play.fill"} size={18} color="#07120E" />
-                <Text style={styles.replayPlayText}>{isReplayPlaying ? "暫停" : "播放"}</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="adjustable"
-                accessibilityLabel="軌跡回放進度"
-                style={styles.replayTrack}
-                onPress={(event) => {
-                  const ratio = Math.max(0, Math.min(1, event.nativeEvent.locationX / 172));
-                  setReplayPosition(Math.round(ratio * (replayFrames.length - 1)));
-                }}
-              >
-                <View style={[styles.replayTrackFill, { width: `${((replayIndex + 1) / replayFrames.length) * 100}%` }]} />
-                <View style={[styles.replayThumb, { left: `${((replayIndex + 1) / replayFrames.length) * 100}%` }]} />
-              </Pressable>
-            </View>
-            <View style={styles.replaySpeedRow}>
-              <Text style={styles.replaySpeedLabel}>回放速度</Text>
-              {([1, 2, 4] as const).map((speed) => (
-                <Pressable
-                  key={speed}
-                  style={({ pressed }) => [styles.replaySpeedOption, replaySpeed === speed && styles.replaySpeedOptionActive, { opacity: pressed ? 0.7 : 1 }]}
-                  onPress={() => setReplaySpeed(speed)}
-                >
-                  <Text style={[styles.replaySpeedText, replaySpeed === speed && styles.replaySpeedTextActive]}>{speed}×</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
 
         {activityHighlights.length > 0 && (
           <View style={styles.activityHighlightsCard}>
@@ -1690,23 +1597,6 @@ const styles = StyleSheet.create({
   performanceMetric: { flex: 1, alignItems: "center", paddingVertical: 11 },
   performanceMetricValue: { color: "rgba(255,255,255,0.93)", fontSize: 12, fontWeight: "800", fontVariant: ["tabular-nums"] },
   performanceMetricLabel: { color: "rgba(255,255,255,0.46)", fontSize: 10, marginTop: 3 },
-  replayCard: { marginTop: 16, padding: 14, borderRadius: 16, backgroundColor: "rgba(255,106,34,0.09)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,106,34,0.26)" },
-  replayHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
-  replayTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
-  replaySubtitle: { color: "rgba(255,255,255,0.52)", fontSize: 11, lineHeight: 16, marginTop: 3, maxWidth: SCREEN_W - 148 },
-  replayProgress: { color: "#FFB28C", fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  replayControls: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 14 },
-  replayPlayButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minWidth: 78, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 11, backgroundColor: "#FF8A4C" },
-  replayPlayText: { color: "#07120E", fontSize: 12, fontWeight: "900" },
-  replayTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.16)", overflow: "visible" },
-  replayTrackFill: { height: 6, borderRadius: 3, backgroundColor: "#FF8A4C" },
-  replayThumb: { position: "absolute", top: -4, width: 14, height: 14, marginLeft: -7, borderRadius: 7, backgroundColor: "#fff", borderWidth: 3, borderColor: "#FF8A4C" },
-  replaySpeedRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 14 },
-  replaySpeedLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, marginRight: "auto" },
-  replaySpeedOption: { minWidth: 34, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.14)" },
-  replaySpeedOptionActive: { borderColor: "#FF8A4C", backgroundColor: "rgba(255,138,76,0.18)" },
-  replaySpeedText: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: "800" },
-  replaySpeedTextActive: { color: "#FFB28C" },
   topMediaSection: { marginTop: 18 },
   topMediaHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 9 },
   topMediaTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
@@ -1821,9 +1711,6 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   noTrailText: { color: "rgba(255,255,255,0.6)", fontSize: 13 },
-  mapPlaybackBadge: { position: "absolute", right: 14, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.62)", zIndex: 2 },
-  mapPlaybackDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#FF8A4C" },
-  mapPlaybackText: { color: "rgba(255,255,255,0.84)", fontSize: 10, fontWeight: "700" },
   routeMapPhotoThumbButton: { position: "absolute", left: 14, bottom: 14, width: 76, height: 76, borderRadius: 12, overflow: "hidden", backgroundColor: "#101010", borderWidth: 2, borderColor: "rgba(255,255,255,0.86)", zIndex: 2, boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.22)" },
   routeMapPhotoThumbImage: { width: "100%", height: "100%" },
   routeMapPhotoThumbBadge: { position: "absolute", left: 5, bottom: 5, minWidth: 28, height: 23, paddingHorizontal: 5, flexDirection: "row", gap: 3, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: "rgba(0,0,0,0.72)" },

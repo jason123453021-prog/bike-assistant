@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { buildReplayFrames, replayFrameDelayMs } from "../lib/activity-replay";
 import { compareLocalSplitPersonalBests } from "../lib/local-split-personal-bests";
 import { buildPhotoRouteMarkers } from "../lib/photo-route-markers";
 import { createTimelineEntry } from "../lib/ride-photo-timeline";
@@ -24,16 +23,7 @@ function makeRide(id: string, date: number, route = makeRoute(12)): RideRecord {
   };
 }
 
-describe("離線活動回放與標記", () => {
-  it("將長路線均勻收斂為有限回放影格並保留起訖點", () => {
-    const route = makeRoute(1_000);
-    const frames = buildReplayFrames(route, 100);
-    expect(frames).toHaveLength(100);
-    expect(frames[0]).toEqual(route[0]);
-    expect(frames.at(-1)).toEqual(route.at(-1));
-    expect(replayFrameDelayMs(4)).toBeLessThan(replayFrameDelayMs(2));
-  });
-
+describe("離線活動標記與本機成果", () => {
   it("優先採用 EXIF 座標，否則以拍攝時間對應最近的本機 GPS 點", () => {
     const route = makeRoute(4, 10_000);
     const exifPhoto = createTimelineEntry("ride", {
