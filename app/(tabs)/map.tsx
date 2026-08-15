@@ -79,6 +79,8 @@ import {
   showRidingNotification,
   cancelRidingNotification,
   requestNotificationPermission,
+  setRideSpeechSuppressed,
+  stopSpeech,
 } from "@/lib/feedback-service";
 import {
   calculatePower,
@@ -169,6 +171,7 @@ import {
 } from "@/lib/pinned-navigation-layers";
 import { shouldTrackRideHeading, shouldTrackRideLocation } from "@/lib/ride-tracking-lifecycle";
 import { shouldEnterIdleMonitor, shouldResumeFromIdleMonitor, type RideLocationTrackingMode } from "@/lib/idle-auto-pause";
+import { shouldSuppressRideAudioForSystemInterruption } from "@/lib/ride-audio-interruption";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -240,13 +243,13 @@ export default function MapScreen() {
 
   useKeepAwake();
 
-  // Audio — 使用混音模式，不中斷背景音樂（iOS: mixWithOthers；Android: duckOthers 僅短暫降低背景音量）
+  // Audio — 騎乘提示不與電話或其他系統通話混音，讓系統優先處理通話音訊焦點。
   const alertPlayer = useAudioPlayer(require("../../assets/sounds/alert.mp3"));
   useEffect(() => {
     setAudioModeAsync({
       playsInSilentMode: true,
-      interruptionMode: "mixWithOthers",   // iOS: 與背景音樂混音，不中斷
-      interruptionModeAndroid: "duckOthers", // Android: 短暫降低背景音量後恢復
+      interruptionMode: "doNotMix",
+      interruptionModeAndroid: "doNotMix",
       shouldPlayInBackground: false,
     }).catch(() => {});
     return () => { alertPlayer.release(); };
@@ -464,9 +467,18 @@ export default function MapScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
       setIsAppForeground(nextState === "active");
+      const shouldSuppressAudio = shouldSuppressRideAudioForSystemInterruption(nextState);
+      setRideSpeechSuppressed(shouldSuppressAudio);
+      if (shouldSuppressAudio) {
+        void stopSpeech();
+        try { alertPlayer.pause(); } catch {}
+      }
     });
-    return () => subscription.remove();
-  }, []);
+    return () => {
+      subscription.remove();
+      setRideSpeechSuppressed(false);
+    };
+  }, [alertPlayer]);
   const [showSummary, setShowSummary] = useState(false);
   const [summaryRecordId, setSummaryRecordId] = useState<string | null>(null);
   // 補給提醒分別管理（支援兩種同時顯示）

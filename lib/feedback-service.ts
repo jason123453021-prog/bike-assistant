@@ -13,6 +13,17 @@ import { getLocalNotifications } from "@/lib/local-notifications";
 import { configureSupplyNotificationActions, SUPPLY_NOTIFICATION_CATEGORY, type SupplyNotificationKind } from "@/lib/supply-notification-actions";
 import type { SupplyPlan } from "@/lib/smart-supply-plan";
 
+let rideSpeechSuppressed = false;
+
+/** 系統通話或其他音訊中斷期間，暫停騎乘語音且不佇列或補播。 */
+export function setRideSpeechSuppressed(suppressed: boolean) {
+  rideSpeechSuppressed = suppressed;
+}
+
+export function isRideSpeechSuppressed(): boolean {
+  return rideSpeechSuppressed;
+}
+
 // ─── 震動回饋 ─────────────────────────────────────────────────────────────────
 
 export async function vibrateLight() {
@@ -53,7 +64,7 @@ export async function vibrateWarning() {
 // ─── TTS 語音播報 ─────────────────────────────────────────────────────────────
 
 export async function speak(text: string, enabled: boolean = true) {
-  if (!enabled || Platform.OS === "web") return;
+  if (!enabled || rideSpeechSuppressed || Platform.OS === "web") return;
   try {
     const isSpeaking = await Speech.isSpeakingAsync();
     if (isSpeaking) await Speech.stop();

@@ -1713,6 +1713,9 @@
 - [x] 修正背景或鎖定螢幕恢復定位後的跳點、跨區直線與重疊軌跡
 - [x] 為背景定位恢復、異常點拒絕與軌跡銜接新增回歸測試
 - [x] 完成背景軌跡修正的 TypeScript、零 lint advisory、158 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
+- [x] 騎乘中偵測系統音訊中斷時停止導航、補給與提示語音，讓出電話通話
+- [x] 確保通話結束後不自動補播語音，持續保留 GPS 記錄、待確認補給畫面與本機通知
+- [x] 新增通話優先音訊回歸測試，完成 TypeScript、零 lint advisory、162 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌

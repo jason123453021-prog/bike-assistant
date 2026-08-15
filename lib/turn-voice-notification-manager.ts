@@ -1,5 +1,6 @@
 import * as Speech from 'expo-speech';
 import { Platform } from 'react-native';
+import { isRideSpeechSuppressed } from './feedback-service';
 
 export type Language = 'zh-TW' | 'en-US';
 
@@ -103,7 +104,7 @@ export class TurnVoiceNotificationManager {
   ): Promise<void> {
     try {
       // 如果禁用或靜音模式，跳過播放
-      if (!this.config.enabled || this.config.silenceMode) {
+      if (!this.config.enabled || this.config.silenceMode || isRideSpeechSuppressed()) {
         return;
       }
 
@@ -154,6 +155,10 @@ export class TurnVoiceNotificationManager {
    */
   private async playVoice(text: string): Promise<void> {
     try {
+      if (isRideSpeechSuppressed()) {
+        this.notificationQueue = [];
+        return;
+      }
       // 檢查是否已在播放
       if (this.isSpeaking) {
         console.log('[TurnVoiceNotificationManager] Already speaking, queuing...');

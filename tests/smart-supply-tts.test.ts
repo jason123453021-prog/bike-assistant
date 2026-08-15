@@ -28,4 +28,9 @@ describe("smart supply speech reminders", () => {
     expect(mapSource).toContain("const resumeDeferredSupplySpeech = useCallback");
     expect(mapSource).toContain("if (!isDownhill) resumeDeferredSupplySpeech()");
   });
+
+  it("passes through the centralized speech guard so a system call interruption suppresses supply speech", () => {
+    expect(mapSource).toContain("setRideSpeechSuppressed(shouldSuppressAudio)");
+    expect(feedbackSource).toContain("rideSpeechSuppressed");
+  });
 });
