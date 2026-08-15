@@ -148,6 +148,11 @@ import {
   saveRideSessionSnapshot,
   type RideSession,
 } from "@/lib/ride-recovery/ride-session-recovery";
+import {
+  evaluateTrackPoint,
+  filterTrackPointBatch,
+  type TrackQualityPoint,
+} from "@/lib/track-point-quality";
 import { SmartPowerSavingManager } from "@/lib/power-saving/smart-power-saving-system";
 import { getDueSupplyIntervals, type SupplyIntervalKind } from "@/lib/supply-interval";
 import {
@@ -385,7 +390,7 @@ export default function MapScreen() {
   }, [gpxRoute]);
 
   // 即時軌跡
-  const [liveTrail, setLiveTrail] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [liveTrail, setLiveTrail] = useState<Array<{ latitude: number; longitude: number; segmentStart?: boolean }>>([]);
 
   // 坡度
   const [currentGrade, setCurrentGrade] = useState(0);
@@ -704,6 +709,7 @@ export default function MapScreen() {
   }, [clearIntervalSupplyRepeatTimer, clearSupplyRepeatTimer]);
 
   const lastLocationRef = useRef<Location.LocationObject | null>(null);
+  const lastAcceptedTrackPointRef = useRef<TrackQualityPoint | null>(null);
   const lastBgSyncTsRef = useRef<number>(0); // 背景軌跡去重：記錄上次同步的最大時間戳
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1418,8 +1424,18 @@ export default function MapScreen() {
           altitude: point.altitude ?? 0,
           speed: point.speed ?? 0,
           timestamp: point.timestamp,
+          segmentStart: point.segmentStart,
         }));
         const lastPoint = persistentSession.trackPoints.at(-1);
+        lastAcceptedTrackPointRef.current = lastPoint
+          ? {
+            latitude: lastPoint.latitude,
+            longitude: lastPoint.longitude,
+            timestamp: lastPoint.timestamp,
+            accuracy: lastPoint.accuracy,
+            speed: lastPoint.speed,
+          }
+          : null;
         dispatch({
           type: "RESTORE",
           snapshot: {
@@ -1435,7 +1451,11 @@ export default function MapScreen() {
             sweatSinceLastRefill: persistentSession.stats.waterLoss,
           },
         });
-        setLiveTrail(recoveredRoute.map((point) => ({ latitude: point.latitude, longitude: point.longitude })));
+        setLiveTrail(recoveredRoute.map((point) => ({
+          latitude: point.latitude,
+          longitude: point.longitude,
+          segmentStart: point.segmentStart,
+        })));
         setMapRideActive(true);
         return;
       }
@@ -1516,6 +1536,26 @@ export default function MapScreen() {
           if (!active) return;
           const { latitude, longitude, altitude, heading, speed } = loc.coords;
           const speedKmhRaw = (speed ?? 0) * 3.6;
+
+          const trackPointDecision = mapRideActive
+            ? evaluateTrackPoint(lastAcceptedTrackPointRef.current, {
+              latitude,
+              longitude,
+              timestamp: loc.timestamp,
+              accuracy: loc.coords.accuracy,
+              speed,
+            })
+            : { accepted: true, segmentStart: false };
+          if (mapRideActive && !trackPointDecision.accepted) return;
+          if (mapRideActive) {
+            lastAcceptedTrackPointRef.current = {
+              latitude,
+              longitude,
+              timestamp: loc.timestamp,
+              accuracy: loc.coords.accuracy,
+              speed,
+            };
+          }
 
           if (isIdleMonitor) {
             const previous = idleMonitorLastPositionRef.current;
@@ -1698,7 +1738,16 @@ export default function MapScreen() {
 
           // 即時軌跡
           if (mapRideActive) {
-            setLiveTrail((prev) => [...prev, { latitude, longitude }]);
+            setLiveTrail((prev) => [...prev, {
+              latitude,
+              longitude,
+              segmentStart: trackPointDecision.segmentStart || undefined,
+            }]);
+            if (trackPointDecision.segmentStart) {
+              prevPosRef.current = { lat: latitude, lon: longitude };
+              prevAltRef.current = altitude ?? null;
+              gradeWindowRef.current = [];
+            }
           }
 
           // 即時坡度：最小距離 10m、異常値過濾、7 點滑動平均
@@ -1742,7 +1791,7 @@ export default function MapScreen() {
           let grade = 0;
           let ascent = 0;
           let distanceM = 0;
-          if (lastLocationRef.current) {
+          if (!trackPointDecision.segmentStart && lastLocationRef.current) {
             distanceM = haversineDistance(
               lastLocationRef.current.coords.latitude,
               lastLocationRef.current.coords.longitude,
@@ -1811,7 +1860,14 @@ export default function MapScreen() {
 
           dispatch({
             type: "LOCATION_UPDATE",
-            point: { latitude, longitude, altitude: altitude ?? 0, speed: speed ?? 0, timestamp: Date.now() },
+            point: {
+              latitude,
+              longitude,
+              altitude: altitude ?? 0,
+              speed: speed ?? 0,
+              timestamp: loc.timestamp,
+              segmentStart: trackPointDecision.segmentStart || undefined,
+            },
             power, calories: calIncrement, ascent, distanceM,
           });
 
@@ -1850,6 +1906,7 @@ export default function MapScreen() {
               speed: speed ?? undefined,
               accuracy: loc.coords.accuracy ?? undefined,
               heading: hdg,
+              segmentStart: trackPointDecision.segmentStart || undefined,
             };
             addTrackPoint(recoverySession, trackPoint, recoverySession.trackPoints.at(-1));
             recoverySession.stats.caloriesBurned += calIncrement;
@@ -2091,6 +2148,8 @@ export default function MapScreen() {
     calorieAnim.setValue(0);
     waterAnim.setValue(0);
     lastLocationRef.current = null;
+    lastAcceptedTrackPointRef.current = null;
+    lastBgSyncTsRef.current = 0;
     setLiveTrail([]);
     setCurrentGrade(0);
     prevAltRef.current = null;
@@ -2150,6 +2209,8 @@ export default function MapScreen() {
       supplyCalculationMode: settings.supplyCalculationMode,
       currentLat: lastPos?.coords.latitude ?? 0,
       currentLon: lastPos?.coords.longitude ?? 0,
+      currentTimestamp: lastPos?.timestamp,
+      currentAccuracy: lastPos?.coords.accuracy,
       supplyIntervalReminderEnabled: settings.supplyIntervalReminderEnabled,
       supplyTimeIntervalEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyTimeIntervalEnabled,
       supplyTimeIntervalMinutes: settings.supplyTimeIntervalMinutes,
@@ -2381,20 +2442,49 @@ export default function MapScreen() {
             }
           }
           if (bgState && bgTrack.length > 0) {
-            // 去重：只合併時間戳大於上次同步的軌跡點
-            const newPoints = bgTrack.filter(pt => pt.ts > lastBgSyncTsRef.current);
+            // 只合併尚未同步的背景點，並再次套用品質檢核，防止鎖定期間的延遲批次產生跨區直線。
+            const newPoints = filterTrackPointBatch(
+              bgTrack
+                .filter((point) => point.ts > lastBgSyncTsRef.current)
+                .map((point) => ({
+                  latitude: point.lat,
+                  longitude: point.lon,
+                  timestamp: point.ts,
+                  accuracy: point.accuracy,
+                  segmentStart: point.segmentStart,
+                  distanceM: point.distanceM,
+                })),
+              lastAcceptedTrackPointRef.current,
+            );
             if (newPoints.length > 0) {
-              for (const pt of newPoints) {
+              setLiveTrail((previous) => [
+                ...previous,
+                ...newPoints.map((point) => ({
+                  latitude: point.latitude,
+                  longitude: point.longitude,
+                  segmentStart: point.segmentStart,
+                })),
+              ]);
+              for (const point of newPoints) {
                 dispatch({
                   type: "LOCATION_UPDATE",
-                  point: { latitude: pt.lat, longitude: pt.lon, altitude: 0, speed: 0, timestamp: pt.ts },
+                  point: {
+                    latitude: point.latitude,
+                    longitude: point.longitude,
+                    altitude: 0,
+                    speed: 0,
+                    timestamp: point.timestamp,
+                    segmentStart: point.segmentStart,
+                  },
                   power: 0,
                   calories: 0,
                   ascent: 0,
+                  distanceM: point.segmentStart ? 0 : point.distanceM ?? 0,
                 });
               }
+              lastAcceptedTrackPointRef.current = newPoints.at(-1) ?? lastAcceptedTrackPointRef.current;
               // 更新最大同步時間戳
-              lastBgSyncTsRef.current = Math.max(...newPoints.map(p => p.ts));
+              lastBgSyncTsRef.current = Math.max(...newPoints.map((point) => point.timestamp));
             }
             console.log(`[AppState] 已合併 ${newPoints.length}/${bgTrack.length} 個背景軌跡點（去重後）`);
             const restoredIntervalAlerts: Partial<Record<SupplyIntervalKind, boolean>> = {

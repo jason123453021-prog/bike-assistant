@@ -1710,6 +1710,9 @@
 - [x] 完整移除活動詳情的軌跡回放控制、播放狀態與相關 UI，保留路線地圖與活動摘要
 - [x] 清理軌跡回放廢碼與測試，完成 TypeScript、零 lint advisory、153 passed／1 skipped 與 Android Hermes bundle 5.69 MB 驗證
 - [ ] 新增回歸測試、完成 TypeScript、完整測試與 Android bundle 驗證
+- [x] 修正背景或鎖定螢幕恢復定位後的跳點、跨區直線與重疊軌跡
+- [x] 為背景定位恢復、異常點拒絕與軌跡銜接新增回歸測試
+- [x] 完成背景軌跡修正的 TypeScript、零 lint advisory、158 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌

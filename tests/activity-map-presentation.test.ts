@@ -18,4 +18,15 @@ describe("sampleActivityMapPolyline", () => {
     expect(sampled[0]).toEqual(coordinates[0]);
     expect(sampled.at(-1)).toEqual(coordinates.at(-1));
   });
+
+  it("在長軌跡抽樣後保留背景恢復的安全斷點", () => {
+    const coordinates = Array.from({ length: 500 }, (_, index) => ({
+      latitude: 25 + index / 10_000,
+      longitude: 121 + index / 10_000,
+      segmentStart: index === 333 || undefined,
+    }));
+    const sampled = sampleActivityMapPolyline(coordinates, 220);
+
+    expect(sampled).toContain(coordinates[333]);
+  });
 });

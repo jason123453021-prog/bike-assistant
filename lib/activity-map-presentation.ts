@@ -1,6 +1,7 @@
 export interface ActivityMapCoordinate {
   latitude: number;
   longitude: number;
+  segmentStart?: boolean;
 }
 
 /**
@@ -16,10 +17,19 @@ export function sampleActivityMapPolyline<T extends ActivityMapCoordinate>(
   const interiorPointCount = coordinates.length - 2;
   const interiorCapacity = maximumPoints - 2;
   const step = Math.ceil(interiorPointCount / interiorCapacity);
+  const protectedIndices = new Set<number>([0, coordinates.length - 1]);
+  coordinates.forEach((coordinate, index) => {
+    if (coordinate.segmentStart) protectedIndices.add(index);
+  });
   const sampled = [coordinates[0]];
   for (let index = step; index < coordinates.length - 1; index += step) {
     sampled.push(coordinates[index]);
   }
+  protectedIndices.forEach((index) => {
+    const coordinate = coordinates[index];
+    if (!sampled.includes(coordinate)) sampled.push(coordinate);
+  });
+  sampled.sort((left, right) => coordinates.indexOf(left) - coordinates.indexOf(right));
   const lastPoint = coordinates[coordinates.length - 1];
   if (sampled[sampled.length - 1] !== lastPoint) sampled.push(lastPoint);
   return sampled;

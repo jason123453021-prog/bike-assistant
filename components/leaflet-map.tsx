@@ -30,6 +30,22 @@ import { WebView } from "react-native-webview";
 export interface LatLng {
   latitude: number;
   longitude: number;
+  /** 安全軌跡斷點；此點開始新的折線，不與前一點相連。 */
+  segmentStart?: boolean;
+}
+
+function toLeafletSegments(points?: LatLng[]): number[][][] {
+  const segments: number[][][] = [];
+  let current: number[][] = [];
+  for (const point of points ?? []) {
+    if (point.segmentStart && current.length > 0) {
+      segments.push(current);
+      current = [];
+    }
+    current.push([point.latitude, point.longitude]);
+  }
+  if (current.length > 0) segments.push(current);
+  return segments;
 }
 
 /** 顯示於地圖的導航路徑圖層；每個圖層各自管理折線、起訖點與方向箭頭。 */
@@ -191,7 +207,7 @@ function refreshBaseTiles() {
 // Layers
 var gpxLayer = L.polyline([], { color: '#FF3B30', weight: 4, opacity: 0.9 }).addTo(map);
 var passedLayer = L.polyline([], { color: '#8B0000', weight: 4, opacity: 0.9 }).addTo(map);
-var trailLayer = L.polyline([], { color: '#00E676', weight: 3, opacity: 0.9 }).addTo(map);
+var trailLayers = [];
 var returnLayer = L.polyline([], { color: '#FF9500', weight: 4, opacity: 0.9 }).addTo(map);
 var routeOverlayPolylines = [];
 var routeOverlayArrowMarkers = [];
@@ -220,6 +236,15 @@ function clearRouteOverlays() {
     if (className === 'gpx-arrow' || className === 'route-direction-arrow') legacyArrows.push(layer);
   });
   legacyArrows.forEach(function(marker) { map.removeLayer(marker); });
+}
+
+function renderLiveTrailSegments(segments) {
+  trailLayers.forEach(function(layer) { map.removeLayer(layer); });
+  trailLayers = [];
+  (segments || []).forEach(function(coords) {
+    if (!coords || !coords.length) return;
+    trailLayers.push(L.polyline(coords, { color: '#00E676', weight: 3, opacity: 0.9 }).addTo(map));
+  });
 }
 
 // 由 React Native 的「清除所有導航圖層」動作直接呼叫；避免等待 state 渲染期間殘留數字或折線。
@@ -493,7 +518,9 @@ function handleMessage(data) {
         }
         break;
       case 'setGpxPolyline':
-        renderRouteOverlays([{ id: 'legacy', coords: msg.coords || [], color: '#FF3B30', showDirectionArrows: true }]);
+        renderRouteOverlays((msg.segments || []).map(function(coords, index) {
+          return { id: 'legacy-' + index, coords: coords, color: '#FF3B30', showDirectionArrows: true };
+        }));
         break;
       case 'setRouteOverlays':
         renderRouteOverlays(msg.layers || []);
@@ -505,7 +532,7 @@ function handleMessage(data) {
         passedLayer.setLatLngs(msg.coords);
         break;
       case 'setLiveTrail':
-        trailLayer.setLatLngs(msg.coords);
+        renderLiveTrailSegments(msg.segments || []);
         break;
       case 'setReturnPolyline':
         returnLayer.setLatLngs(msg.coords);
@@ -830,9 +857,9 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         );
         return;
       }
-      const coords = (gpxPolyline ?? []).map((c) => [c.latitude, c.longitude]);
+      const segments = toLeafletSegments(gpxPolyline);
       webViewRef.current.postMessage(
-        JSON.stringify({ type: "setGpxPolyline", coords })
+        JSON.stringify({ type: "setGpxPolyline", segments })
       );
     }, [gpxPolyline, isReady, routeOverlays]);
 
@@ -848,9 +875,9 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
     // Send live trail
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
-      const coords = (liveTrail ?? []).map((c) => [c.latitude, c.longitude]);
+      const segments = toLeafletSegments(liveTrail);
       webViewRef.current.postMessage(
-        JSON.stringify({ type: "setLiveTrail", coords })
+        JSON.stringify({ type: "setLiveTrail", segments })
       );
     }, [liveTrail, isReady]);
 

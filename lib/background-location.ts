@@ -26,6 +26,7 @@ import {
 import { calculateSweatLoss } from "@/lib/hydration-calc";
 import { getHeadwindMs } from "@/lib/weather-service";
 import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
+import { evaluateTrackPoint, type TrackQualityPoint } from "@/lib/track-point-quality";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
@@ -33,7 +34,7 @@ const BG_STATE_KEY = "@bike_bg_state";
 const BG_TRACK_FLUSH_INTERVAL_MS = 5_000;
 const BG_TRACK_MAX_POINTS = 10_000;
 
-type BackgroundTrackPoint = { lat: number; lon: number; ts: number };
+type BackgroundTrackPoint = { lat: number; lon: number; ts: number; accuracy?: number; segmentStart?: boolean; distanceM?: number };
 
 let backgroundTrackCache: BackgroundTrackPoint[] | null = null;
 let lastBackgroundTrackFlushAt = 0;
@@ -70,6 +71,7 @@ export interface BackgroundState {
   lastLat: number;
   lastLon: number;
   lastTimestamp: number;
+  lastAccuracy?: number;
   isRiding: boolean;
   calorieThreshold: number;
   waterThreshold: number;
@@ -157,8 +159,39 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         weatherAvailable: Boolean(state.environment),
       });
 
-      // 處理每個位置更新
-      for (const loc of locations) {
+      const acceptedLocations: Array<{ loc: Location.LocationObject; segmentStart: boolean; distanceM: number }> = [];
+      let qualityAnchor: TrackQualityPoint | null = state.lastLat !== 0 && state.lastLon !== 0
+        ? {
+          latitude: state.lastLat,
+          longitude: state.lastLon,
+          timestamp: state.lastTimestamp,
+          accuracy: state.lastAccuracy,
+        }
+        : null;
+
+      // 背景／鎖定螢幕會批次交付位置，必須先依時間排序並拒絕不準、倒退或不合理高速跳點。
+      for (const loc of [...locations].sort((left, right) => left.timestamp - right.timestamp)) {
+        const decision = evaluateTrackPoint(qualityAnchor, {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          timestamp: loc.timestamp,
+          accuracy: loc.coords.accuracy,
+          speed: loc.coords.speed,
+        });
+        if (!decision.accepted) continue;
+        acceptedLocations.push({ loc, segmentStart: decision.segmentStart, distanceM: 0 });
+        qualityAnchor = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          timestamp: loc.timestamp,
+          accuracy: loc.coords.accuracy,
+          speed: loc.coords.speed,
+        };
+      }
+
+      // 處理已驗證的位置更新。
+      for (const acceptedLocation of acceptedLocations) {
+        const { loc, segmentStart } = acceptedLocation;
         const { latitude, longitude, speed } = loc.coords;
         const timestamp = loc.timestamp;
         const speedMs = speed ?? 0;
@@ -186,16 +219,17 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         }
 
         // 計算距離增量
-        if (state.lastLat !== 0 && state.lastLon !== 0) {
+        if (!segmentStart && state.lastLat !== 0 && state.lastLon !== 0) {
           const dist = bgHaversine(state.lastLat, state.lastLon, latitude, longitude);
           // 過濾 GPS 跳動（單次距離超過 200m 視為異常）
           if (dist < 200 && dist > 1) {
             state.totalDistanceM += dist;
+            acceptedLocation.distanceM = dist;
           }
         }
 
         // 鎖屏期間沿用前景的個人 FTP、體重與最近環境摘要；沒有天氣資料時安全回退為預設環境。
-        if (speedKmh > 3) {
+        if (!segmentStart && speedKmh > 3) {
           const dt = state.lastTimestamp > 0 ? (timestamp - state.lastTimestamp) / 1000 : 0;
           if (dt > 0 && dt < 30) {
             const profile = state.riderProfile ?? { weightKg: 70, heightCm: 175, ageYears: 32, ftpW: 245, bikeWeightKg: 10 };
@@ -275,6 +309,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         state.lastLat = latitude;
         state.lastLon = longitude;
         state.lastTimestamp = timestamp;
+        state.lastAccuracy = loc.coords.accuracy ?? undefined;
         state.lastSpeedMs = speedMs;
         state.lastAltitude = loc.coords.altitude;
 
@@ -288,6 +323,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
             speed: speed ?? undefined,
             accuracy: loc.coords.accuracy ?? undefined,
             heading: loc.coords.heading ?? undefined,
+            segmentStart,
           },
           recoverySession.trackPoints.at(-1),
         );
@@ -403,11 +439,14 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
 
       // 以記憶體快取合併軌跡批次，避免每次背景回呼讀取和重寫全部歷史軌跡。
-      await appendBackgroundTrackBatch(locations.map((loc) => (
+      await appendBackgroundTrackBatch(acceptedLocations.map(({ loc, segmentStart, distanceM }) => (
         {
           lat: loc.coords.latitude,
           lon: loc.coords.longitude,
           ts: loc.timestamp,
+          accuracy: loc.coords.accuracy ?? undefined,
+          segmentStart: segmentStart || undefined,
+          distanceM: distanceM || undefined,
         }
       )));
     } catch (e) {
@@ -425,6 +464,8 @@ export async function initBackgroundState(params: {
   supplyCalculationMode?: "smart" | "custom";
   currentLat: number;
   currentLon: number;
+  currentTimestamp?: number;
+  currentAccuracy?: number | null;
   supplyIntervalReminderEnabled: boolean;
   supplyTimeIntervalEnabled: boolean;
   supplyTimeIntervalMinutes: number;
@@ -440,7 +481,8 @@ export async function initBackgroundState(params: {
     sweatLossMl: 0,
     lastLat: params.currentLat,
     lastLon: params.currentLon,
-    lastTimestamp: startedAt,
+    lastTimestamp: params.currentTimestamp ?? startedAt,
+    lastAccuracy: params.currentAccuracy ?? undefined,
     isRiding: true,
     calorieThreshold: params.calorieThreshold,
     waterThreshold: params.waterThreshold,
@@ -568,7 +610,7 @@ export async function acknowledgeBackgroundSupplyReminder(kind: "calorie" | "wat
 /**
  * 獲取背景追蹤的軌跡點（前台恢復時使用）
  */
-export async function getBackgroundTrackPoints(): Promise<Array<{ lat: number; lon: number; ts: number }>> {
+export async function getBackgroundTrackPoints(): Promise<BackgroundTrackPoint[]> {
   try {
     const str = await AsyncStorage.getItem(BG_TRACK_KEY);
     return str ? JSON.parse(str) : [];

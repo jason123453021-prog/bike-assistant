@@ -13,6 +13,8 @@ export interface RideTrackPoint {
   speed?: number;
   accuracy?: number;
   heading?: number;
+  /** 背景定位長時間中斷後的下一段安全軌跡起點。 */
+  segmentStart?: boolean;
 }
 
 export interface RideStats {
@@ -127,7 +129,7 @@ export function addTrackPoint(
   session.lastUpdateTime = point.timestamp;
 
   // 計算距離增量
-  if (previousPoint) {
+  if (previousPoint && !point.segmentStart) {
     const distance = calculateDistance(
       previousPoint.latitude,
       previousPoint.longitude,
@@ -143,7 +145,7 @@ export function addTrackPoint(
     session.stats.minAltitude = Math.min(session.stats.minAltitude, point.altitude);
 
     // 計算爬升/下降
-    if (previousPoint && previousPoint.altitude !== undefined) {
+    if (previousPoint && previousPoint.altitude !== undefined && !point.segmentStart) {
       const elevationDiff = point.altitude - previousPoint.altitude;
       if (elevationDiff > 0) {
         session.stats.totalElevationGain += elevationDiff;

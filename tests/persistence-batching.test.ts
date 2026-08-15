@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 const mapSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"), "utf8");
 const backgroundSource = readFileSync(resolve(process.cwd(), "lib/background-location.ts"), "utf8");
+const leafletSource = readFileSync(resolve(process.cwd(), "components/leaflet-map.tsx"), "utf8");
 
 describe("ride persistence batching", () => {
   it("batches foreground recovery snapshots and flushes the newest state before ride cleanup", () => {
@@ -18,7 +19,18 @@ describe("ride persistence batching", () => {
     expect(backgroundSource).toContain("BG_TRACK_FLUSH_INTERVAL_MS = 5_000");
     expect(backgroundSource).toContain("backgroundTrackCache");
     expect(backgroundSource).toContain("appendBackgroundTrackBatch");
-    expect(backgroundSource).toContain("await appendBackgroundTrackBatch(locations.map");
+    expect(backgroundSource).toContain("const acceptedLocations");
+    expect(backgroundSource).toContain("evaluateTrackPoint(qualityAnchor");
+    expect(backgroundSource).toContain("await appendBackgroundTrackBatch(acceptedLocations.map");
     expect(backgroundSource).not.toContain("const trackStr = await AsyncStorage.getItem(BG_TRACK_KEY)");
+  });
+
+  it("rechecks background points when returning to foreground and preserves visual safety breaks", () => {
+    expect(mapSource).toContain("filterTrackPointBatch(");
+    expect(mapSource).toContain("lastAcceptedTrackPointRef");
+    expect(mapSource).toContain("segmentStart: point.segmentStart");
+    expect(leafletSource).toContain("function toLeafletSegments");
+    expect(leafletSource).toContain("renderLiveTrailSegments(msg.segments || [])");
+    expect(leafletSource).toContain('JSON.stringify({ type: "setLiveTrail", segments })');
   });
 });

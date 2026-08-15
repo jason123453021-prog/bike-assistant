@@ -254,7 +254,11 @@ export default function RideDetailScreen() {
   // 地圖適配軌跡
   const polylineCoords = useMemo(() => {
     if (!record?.route || record.route.length === 0) return [];
-    return record.route.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
+    return record.route.map((p) => ({
+      latitude: p.latitude,
+      longitude: p.longitude,
+      segmentStart: p.segmentStart,
+    }));
   }, [record]);
   const activityMapPolyline = useMemo(
     () => sampleActivityMapPolyline(polylineCoords),

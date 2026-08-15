@@ -37,6 +37,8 @@ export interface LocationPoint {
   heartRate?: number;    // 心率 (bpm)
   cadence?: number;      // 踏頻 (rpm)
   slope?: number;        // 坡度 (%)
+  /** 背景定位長時間中斷後的下一個可靠點，不與前一段以直線相連。 */
+  segmentStart?: boolean;
 }
 
 // 路線統計資料
