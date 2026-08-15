@@ -27,8 +27,6 @@ import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-profile";
 import { RidePermissionReadiness } from "@/components/ride-permission-readiness";
 import { SupplyModal } from "@/components/supply-modal";
-import { speakSupplyReminder, vibrateWarning } from "@/lib/feedback-service";
-import { useAudioPlayer } from "expo-audio";
 
 
 import Constants from "expo-constants";
@@ -86,7 +84,6 @@ export default function SettingsScreen() {
     item: SupplyItem | null;
   }>({ visible: false, mode: "add", item: null });
   const [supplyPreview, setSupplyPreview] = useState({ energy: false, water: false });
-  const previewAlertPlayer = useAudioPlayer(require("../../assets/sounds/alert.mp3"));
 
   const getUnifiedSupplySettingLabel = (energyEnabled: boolean, waterEnabled: boolean) => {
     if (energyEnabled && waterEnabled) return "能量與補水皆開啟";
@@ -106,54 +103,6 @@ export default function SettingsScreen() {
       settings.waterPauseOnDownhill ?? false,
     ),
   };
-
-  const testPreviewVibration = () => {
-    if (!settings.vibrationEnabled) {
-      Alert.alert("震動回饋已關閉", "請先在「回饋設定」開啟震動回饋，再測試實際的補給提醒震動。");
-      return;
-    }
-    void vibrateWarning();
-  };
-
-  /**
-   * 僅用於設定頁的回饋試聽；不建立本機通知、不改變倒數，也不寫入補給或騎乘資料。
-   * 正式騎乘同樣使用 speakSupplyReminder，因此兩處固定播報相同的短句。
-   */
-  const testSupplySoundAndSpeech = (type: "calorie" | "water"): boolean => {
-    let played = false;
-    if (settings.soundEnabled) {
-      try {
-        previewAlertPlayer.seekTo(0);
-        previewAlertPlayer.play();
-        played = true;
-      } catch {}
-    }
-    if (settings.ttsEnabled) {
-      void speakSupplyReminder(type, true);
-      played = true;
-    }
-    return played;
-  };
-
-  const testPreviewAlertSound = () => {
-    const type = supplyPreview.energy ? "calorie" : "water";
-    if (!testSupplySoundAndSpeech(type)) {
-      Alert.alert("提示音與文字語音皆已關閉", "請先在「回饋設定」開啟音效提醒或 TTS 語音播報，再測試補給提醒。");
-    }
-  };
-
-  const testCustomSupplyFeedback = () => {
-    let played = testSupplySoundAndSpeech(supplyForm.target === "water" ? "water" : "calorie");
-    if (settings.vibrationEnabled) {
-      void vibrateWarning();
-      played = true;
-    }
-    if (!played) {
-      Alert.alert("回饋皆已關閉", "請先在「回饋設定」開啟震動、音效提醒或 TTS 語音播報，再測試自訂補給品提醒。");
-    }
-  };
-
-  useEffect(() => () => { previewAlertPlayer.release(); }, [previewAlertPlayer]);
 
   const [supplyForm, setSupplyForm] = useState<SupplyItem>({
     id: "",
@@ -1182,34 +1131,19 @@ export default function SettingsScreen() {
                       style={({ pressed }) => ([
                         styles.chipButton,
                         {
-                          backgroundColor: supplyForm.target === target ? (target === "energy" ? "#D97706" : "#0284C7") : colors.background,
-                          borderColor: supplyForm.target === target ? (target === "energy" ? "#D97706" : "#0284C7") : colors.border,
+                          backgroundColor: supplyForm.target === target ? (target === "energy" ? colors.warning : colors.accent) : colors.background,
+                          borderColor: supplyForm.target === target ? (target === "energy" ? colors.warning : colors.accent) : colors.border,
                           opacity: pressed ? 0.7 : 1,
                         },
                       ])}
                       onPress={() => setSupplyForm({ ...supplyForm, target })}
                     >
-                      <Text style={{ color: supplyForm.target === target ? "#fff" : colors.foreground, fontWeight: "600", fontSize: 14 }}>
+                      <Text style={{ color: supplyForm.target === target ? (target === "energy" ? colors.onWarning : colors.onAccent) : colors.foreground, fontWeight: "600", fontSize: 14 }}>
                         {target === "energy" ? "能量補給" : "補水"}
                       </Text>
                     </Pressable>
                   ))}
                 </View>
-              </View>
-
-              <View style={{ marginBottom: 24, padding: 14, borderWidth: 1, borderRadius: 14, borderColor: colors.border, backgroundColor: colors.background }}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>測試此補給品提醒</Text>
-                <Text style={{ fontSize: 12, lineHeight: 18, color: colors.muted, marginTop: 4, marginBottom: 12 }}>
-                  依目前的震動、音效與 TTS 開關測試{ supplyForm.target === "energy" ? "「請補給能量」" : "「請補給水分」" }；不會建立通知、倒數或儲存此品項。
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`測試自訂${supplyForm.target === "energy" ? "能量" : "補水"}補給提醒`}
-                  onPress={testCustomSupplyFeedback}
-                  style={({ pressed }) => [{ minHeight: 48, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary, opacity: pressed ? 0.82 : 1 }]}
-                >
-                  <Text style={{ color: colors.onAccent, fontSize: 15, fontWeight: "700" }}>測試提醒</Text>
-                </Pressable>
               </View>
 
               {/* 觸發方式 */}
@@ -1233,7 +1167,7 @@ export default function SettingsScreen() {
                     >
                       <Text
                         style={{
-                          color: supplyForm.triggerType === type ? "#fff" : colors.foreground,
+                          color: supplyForm.triggerType === type ? colors.onAccent : colors.foreground,
                           fontWeight: "600",
                           fontSize: 14,
                         }}
@@ -1354,13 +1288,6 @@ export default function SettingsScreen() {
         onConfirmCalorie={() => setSupplyPreview((current) => ({ ...current, energy: false }))}
         onConfirmWater={() => setSupplyPreview((current) => ({ ...current, water: false }))}
         onDismiss={() => setSupplyPreview({ energy: false, water: false })}
-        previewControls={{
-          vibrationEnabled: settings.vibrationEnabled,
-          soundEnabled: settings.soundEnabled,
-          ttsEnabled: settings.ttsEnabled,
-          onTestVibration: testPreviewVibration,
-          onTestSound: testPreviewAlertSound,
-        }}
         previewSummary={supplyPreviewSummary}
       />
     </ScreenContainer>

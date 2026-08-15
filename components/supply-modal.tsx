@@ -26,15 +26,7 @@ export interface SupplyModalProps {
   allowSnooze?: boolean;
   /** 自訂補給品提醒清單，依附於能量或補水的共用提醒流程。 */
   customSupplyAlerts?: { id: string; name: string; target: "energy" | "water"; onConfirm: () => void }[];
-  /** 設定頁預覽才會傳入；測試仍遵循目前的震動與音效開關。 */
-  previewControls?: {
-    vibrationEnabled: boolean;
-    soundEnabled: boolean;
-    ttsEnabled: boolean;
-    onTestVibration: () => void;
-    onTestSound: () => void;
-  };
-  /** 設定頁預覽才會傳入，讓使用者在測試時辨識正在採用的提醒規則。 */
+  /** 設定頁預覽才會傳入，讓使用者辨識目前正在採用的提醒規則。 */
   previewSummary?: {
     repeatInterval: string;
     repeatUntilDismissed: string;
@@ -50,7 +42,6 @@ export function SupplyModal({
   onDismiss,
   allowSnooze = true,
   customSupplyAlerts = [],
-  previewControls,
   previewSummary,
 }: SupplyModalProps) {
   const colors = useColors();
@@ -185,7 +176,7 @@ export function SupplyModal({
               ))}
             </View>
 
-            {(previewControls || previewSummary) && (
+            {previewSummary && (
               <View style={[styles.previewPanel, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={[styles.previewPanelTitle, { color: colors.foreground }]}>預覽提醒設定</Text>
                 {previewSummary && (
@@ -193,30 +184,6 @@ export function SupplyModal({
                     <PreviewSummaryRow label="重複提醒間隔" value={previewSummary.repeatInterval} colors={colors} />
                     <PreviewSummaryRow label="未關閉時重複提醒" value={previewSummary.repeatUntilDismissed} colors={colors} />
                     <PreviewSummaryRow label="長下坡暫停提醒" value={previewSummary.pauseOnDownhill} colors={colors} />
-                  </View>
-                )}
-                {previewControls && (
-                  <View style={styles.previewControlList}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="測試補給提醒震動"
-                      style={({ pressed }) => [styles.previewTestButton, { borderColor: colors.border, opacity: pressed ? 0.65 : 1 }]}
-                      onPress={previewControls.onTestVibration}
-                    >
-                      <IconSymbol name="iphone.radiowaves.left.and.right" size={17} color={previewControls.vibrationEnabled ? colors.primary : colors.muted} />
-                      <Text style={[styles.previewTestText, { color: colors.foreground }]}>測試震動</Text>
-                      <Text style={[styles.previewTestStatus, { color: previewControls.vibrationEnabled ? colors.primary : colors.muted }]}>{previewControls.vibrationEnabled ? "已開啟" : "已關閉"}</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="測試補給提示音與文字語音"
-                      style={({ pressed }) => [styles.previewTestButton, { borderColor: colors.border, opacity: pressed ? 0.65 : 1 }]}
-                      onPress={previewControls.onTestSound}
-                    >
-                      <IconSymbol name="speaker.wave.2.fill" size={17} color={previewControls.soundEnabled || previewControls.ttsEnabled ? colors.primary : colors.muted} />
-                      <Text style={[styles.previewTestText, { color: colors.foreground }]}>測試音效與語音</Text>
-                      <Text style={[styles.previewTestStatus, { color: previewControls.soundEnabled || previewControls.ttsEnabled ? colors.primary : colors.muted }]}>{previewControls.soundEnabled || previewControls.ttsEnabled ? "依開關測試" : "皆已關閉"}</Text>
-                    </Pressable>
                   </View>
                 )}
               </View>
@@ -392,28 +359,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
     textAlign: "right",
-  },
-  previewControlList: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  previewTestButton: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-  },
-  previewTestText: {
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  previewTestStatus: {
-    fontSize: 12,
-    fontWeight: "700",
   },
   dismissBtn: {
     paddingVertical: 12,

@@ -71,4 +71,10 @@ describe("small-screen readability guardrails", () => {
     expect(speedCurveSource).toContain("selectedBasis ? colors.onAccent : colors.muted");
     expect(shareCardSource).toContain("color: colors.onAccent, fontSize: 14, fontWeight: \"600\"");
   });
+
+  it("keeps custom supply category and trigger selectors legible in both themes", () => {
+    expect(settingsSource).toContain('target === "energy" ? colors.warning : colors.accent');
+    expect(settingsSource).toContain('target === "energy" ? colors.onWarning : colors.onAccent');
+    expect(settingsSource).toContain('supplyForm.triggerType === type ? colors.onAccent : colors.foreground');
+  });
 });
