@@ -18,6 +18,7 @@ const env = {
 const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
+  owner: "jason123453021",
   version: "1.0.3",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
@@ -159,6 +160,11 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
     reactCompiler: false,
+  },
+  extra: {
+    eas: {
+      projectId: "af286610-25f1-45e5-afcc-6c30040d4124",
+    },
   },
   // 明確禁用 NitroModules
   runtimeVersion: "1.0.3",

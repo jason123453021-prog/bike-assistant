@@ -1742,6 +1742,37 @@
 - [x] 在補給預覽區加入依目前回饋開關運作的震動與提示音實測
 - [x] 顯示目前重複提醒與長下坡暫停提醒的即時設定摘要
 - [x] 新增預覽選項、回饋測試與設定摘要回歸測試，完成完整 Android 驗證
+- [x] 重現並擷取 `expo config --json` 在 Android 建置初始化中的完整失敗原因：專案端與隔離無 Git／無 `.env` 環境皆成功，無法重現遠端 EAS init 失敗
+- [x] 確認專案設定與相依未發現可修正的 Android 初始化衝突；遠端 EAS init 屬發佈服務工作程序失敗，非 App 原始碼錯誤
+- [x] 重新驗證 Expo 設定解析、TypeScript、lint、173 passed／1 skipped 與 Android Hermes bundle 5.72 MB
+- [ ] 檢查本機 Android SDK、Java、Gradle 與 Expo 原生 prebuild 先決條件
+- [ ] 以本機 Android 工具鏈準備 release APK 建置，不使用 EAS 雲端初始化
+- [ ] 驗證本機 release APK 產物、簽章狀態與安裝相容性限制
+- [x] 對照最近發佈錯誤與先前成功的 Expo 設定／本地 bundle 驗證，確認並非專案回歸：最近 checkpoint 後僅有 todo.md 變更
+- [x] 確認 Android 發佈初始化失敗的專案端與服務端責任邊界：Expo 設定與 Android bundle 可重現通過，失敗位於遠端 EAS init 工作程序
+- [x] 重新核對 app.config.ts／app.json 設定來源、JSON 輸出與 plugins 套件存在性：採用 app.config.ts，所有自訂與官方插件均可解析
+- [x] 以 Expo CLI 驗證完整設定輸出，模擬無版本控制與無環境檔的初始化條件：`npx expo config --json` 與隔離 EAS 環境皆成功
+- [x] 未發現可重現的 Expo 設定問題；已完成 TypeScript、lint、173 passed／1 skipped、Android prebuild 與 Hermes bundle 5.72 MB 驗證
+- [x] 檢查專案 Git 儲存庫初始化與目前版本控制狀態：已初始化且已有 main 分支與 origin 遠端，不需要再次執行 git init
+- [x] 檢查 Expo 動態設定是否配置正確的 EAS projectId：目前未配置；EAS projectId 為雲端帳戶資源 ID，不能以本機 App ID 猜測或偽造
+- [x] 驗證 Git 與 EAS projectId 前置條件：Git、Expo JSON、Android prebuild 與 bundle 均正常；需由具 EAS 權限的發佈服務完成 project:init 後寫入有效 projectId
+- [x] 檢查 Expo EAS CLI 是否可用、是否已安全登入，以及目前帳戶能否存取本專案：CLI 未登入；已透過使用者已登入的 Expo 網頁帳戶確認並建立專案
+- [x] 在具備有效 Expo 帳戶權限時初始化／重新連結 EAS 專案，取得有效 projectId：已建立 `bike-assistant` EAS 專案
+- [x] 驗證並寫入 `extra.eas.projectId`，確認 Expo 設定輸出正確：owner 與 projectId 已解析於 `expo config --json`
+- [x] 比對最新 EAS init failed 工作程序與既有錯誤：僅工作識別碼不同，仍為 `project:init`／`expo config --json` 遠端初始化失敗，無新增專案端線索
+- [x] 重新驗證 Expo 設定、Git 遠端、EAS projectId 前置條件與可修復範圍：Git 與設定輸出正常；有效 EAS projectId 仍需具帳戶權限的遠端初始化程序建立
+- [x] 調查可由手機瀏覽器操作、無需 Android SDK 的免費 APK 雲端建置方案
+- [x] 比對候選服務對現有 Expo 專案、自訂插件、Git 來源與簽章需求的限制
+- [x] 比對 Android 發佈卡在 1% 的工作狀態與既有 EAS 初始化失敗：1% 仍為遠端初始化階段，與 `project:init` 阻塞一致
+- [x] 檢查專案端可觀測的發佈前置條件：目前僅有待辦與研究文件未保存，Expo 設定仍可成功輸出，無 App 設定回歸
+- [x] 對照最新 EAS init failed 工作識別碼與既有初始化阻塞：錯誤型態一致，皆在遠端 `project:init` 與 `expo config --json` 階段中止
+- [x] 整理最新工作識別碼與專案端驗證結果，供發佈服務端重設處理：最新 worker identity 為 `1@cfworkers-deploy-android-worker-675799485c-76j2g@`，需平台端查詢其完整初始化日誌
+- [x] 查證 Expo Go Android 搖動開發選單是否提供使用者可關閉的現行設定：官方文件僅列出搖動為觸發開發選單方式，Expo Go 未提供可靠的使用者關閉開關
+- [x] 在不能關閉時整理不需正式 APK 的低干擾實測替代方式：Expo Go 無法做騎乘震動實測的等效替代，應限於靜態功能驗證；實際騎乘需等待無開發選單的 standalone APK
+- [x] 重新核對 Expo 設定輸出內的 `extra.eas.projectId` 與 EAS 所需欄位：已解析為 `af286610-25f1-45e5-afcc-6c30040d4124`
+- [x] 檢查 EAS CLI 的登入狀態、專案資訊與可用權限，不讀取或輸出憑證：本機 CLI 未登入，但使用者已在 Expo 網頁帳戶 `jason123453021` 建立專案
+- [x] 在有效 Expo 帳戶權限下初始化 EAS projectId 並寫回 Expo 動態設定：已加入 owner 與服務端簽發 projectId，`expo config --json` 與 TypeScript 驗證成功
+- [x] 完成 EAS projectId 關聯後驗證：lint 0 errors、173 passed／1 skipped、Android Hermes bundle 5.72 MB
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
