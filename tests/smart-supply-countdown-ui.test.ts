@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const mapSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"), "utf8");
 const modalSource = readFileSync(resolve(process.cwd(), "components/supply-modal.tsx"), "utf8");
 const feedbackSource = readFileSync(resolve(process.cwd(), "lib/feedback-service.ts"), "utf8");
+const settingsSource = readFileSync(resolve(process.cwd(), "app/(tabs)/settings.tsx"), "utf8");
 
 describe("smart supply countdown UI", () => {
   it("shows countdown status and restarts only after explicit confirmation", () => {
@@ -56,6 +57,19 @@ describe("smart supply countdown UI", () => {
     expect(modalSource).toContain("hitSlop={6}");
     expect(modalSource).toContain("energyButton");
     expect(modalSource).toContain("waterButton");
+  });
+
+  it("provides a settings-only preview that opens both supply sections without writing ride, countdown, or notification state", () => {
+    expect(settingsSource).toContain('const [supplyPreview, setSupplyPreview] = useState({ energy: false, water: false })');
+    expect(settingsSource).toContain('accessibilityLabel="預覽雙補給彈窗"');
+    expect(settingsSource).toContain('onPress={() => setSupplyPreview({ energy: true, water: true })}');
+    expect(settingsSource).toContain("<SupplyModal");
+    expect(settingsSource).toContain("calorieAlert={supplyPreview.energy}");
+    expect(settingsSource).toContain("waterAlert={supplyPreview.water}");
+    expect(settingsSource).toContain('onConfirmCalorie={() => setSupplyPreview((current) => ({ ...current, energy: false }))}');
+    expect(settingsSource).toContain('onConfirmWater={() => setSupplyPreview((current) => ({ ...current, water: false }))}');
+    expect(settingsSource).not.toContain("scheduleSmartSupplyDueNotification");
+    expect(settingsSource).not.toContain("setBackgroundSupplyReminderPending");
   });
 
   it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {

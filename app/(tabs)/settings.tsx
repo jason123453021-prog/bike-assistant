@@ -26,6 +26,7 @@ import { useRide } from "@/lib/ride-context";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-profile";
 import { RidePermissionReadiness } from "@/components/ride-permission-readiness";
+import { SupplyModal } from "@/components/supply-modal";
 
 
 import Constants from "expo-constants";
@@ -82,6 +83,7 @@ export default function SettingsScreen() {
     mode: "add" | "edit";
     item: SupplyItem | null;
   }>({ visible: false, mode: "add", item: null });
+  const [supplyPreview, setSupplyPreview] = useState({ energy: false, water: false });
 
   const [supplyForm, setSupplyForm] = useState<SupplyItem>({
     id: "",
@@ -542,6 +544,22 @@ export default function SettingsScreen() {
               </View>
               <Switch value={(settings.caloriePauseOnDownhill ?? false) || (settings.waterPauseOnDownhill ?? false)} onValueChange={(v) => updateSettings({ caloriePauseOnDownhill: v, waterPauseOnDownhill: v })} trackColor={{ false: colors.border, true: colors.primary }} />
             </View>
+          </View>
+          <Divider colors={colors} />
+          <View style={styles.supplyPreviewArea}>
+            <View style={styles.supplyPreviewCopy}>
+              <Text style={[styles.supplyPreviewTitle, { color: colors.foreground }]}>預覽補給彈窗</Text>
+              <Text style={[styles.supplyPreviewHint, { color: colors.muted }]}>以雙補給模式預覽按鈕、分區與互動；不會建立通知或改變倒數。</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="預覽雙補給彈窗"
+              style={({ pressed }) => [styles.supplyPreviewButton, { backgroundColor: colors.primary, opacity: pressed ? 0.82 : 1 }]}
+              onPress={() => setSupplyPreview({ energy: true, water: true })}
+            >
+              <IconSymbol name="bell.badge.fill" size={17} color="#FFFFFF" />
+              <Text style={styles.supplyPreviewButtonText}>預覽</Text>
+            </Pressable>
           </View>
         </View>}
 
@@ -1224,6 +1242,13 @@ export default function SettingsScreen() {
           </View>
         </SafeAreaView>
       </Modal>
+      <SupplyModal
+        calorieAlert={supplyPreview.energy}
+        waterAlert={supplyPreview.water}
+        onConfirmCalorie={() => setSupplyPreview((current) => ({ ...current, energy: false }))}
+        onConfirmWater={() => setSupplyPreview((current) => ({ ...current, water: false }))}
+        onDismiss={() => setSupplyPreview({ energy: false, water: false })}
+      />
     </ScreenContainer>
   );
 }
@@ -1586,6 +1611,39 @@ const styles = StyleSheet.create({
   },
   editConfirmText: {
     fontSize: 15,
+    fontWeight: "700",
+  },
+  supplyPreviewArea: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+  },
+  supplyPreviewCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  supplyPreviewTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  supplyPreviewHint: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  supplyPreviewButton: {
+    minHeight: 44,
+    minWidth: 86,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  supplyPreviewButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
     fontWeight: "700",
   },
   modalOverlay: {
