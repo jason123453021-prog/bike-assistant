@@ -238,11 +238,14 @@ export async function clearSmartSupplyDueNotification(type: "calorie" | "water")
 export async function showSupplyNotification(
   type: SupplyNotificationKind,
   recommendation?: SupplyNotificationRecommendation,
+  customItemId?: string,
 ) {
   const Notifications = await getLocalNotifications();
   if (!Notifications) return;
 
-  const title = type === "calorie" ? "🍌 補給提醒" : type === "water" ? "💧 補水提醒" : "補給提醒";
+  const isEnergy = type === "calorie" || type === "custom-energy";
+  const isWater = type === "water" || type === "custom-water";
+  const title = isEnergy ? "🍌 補給提醒" : isWater ? "💧 補水提醒" : "補給提醒";
   const body = type === "calorie"
     ? recommendation?.energyKcal
       ? `建議補充約 ${recommendation.energyKcal} kcal${recommendation.carbohydrateG ? `（${recommendation.carbohydrateG} g 碳水）` : ""}${recommendation.reason ? `；${recommendation.reason}` : ""}`
@@ -251,7 +254,11 @@ export async function showSupplyNotification(
       ? recommendation?.waterMl
         ? `建議補充約 ${recommendation.waterMl} ml 水分${recommendation.reason ? `；${recommendation.reason}` : ""}`
         : "水分不足，請補充水分！"
-      : "已達自訂補給間隔，請依騎乘狀況補充能量與水分。";
+      : type === "custom-energy"
+        ? "自訂能量補給已到期，請在 App 內確認。"
+        : type === "custom-water"
+          ? "自訂補水已到期，請在 App 內確認。"
+          : "已達補給間隔，請在 App 內確認。";
   try {
     await configureSupplyNotificationActions();
     await Notifications.scheduleNotificationAsync({
@@ -261,7 +268,7 @@ export async function showSupplyNotification(
         sound: true,
         badge: 1,
         categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
-        data: { type: "supply_reminder", supplyKind: type },
+        data: { type: "supply_reminder", supplyKind: type, customItemId },
       } as any,
       trigger: null,
     });

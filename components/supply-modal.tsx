@@ -24,8 +24,8 @@ export interface SupplyModalProps {
   onDismiss: () => void;
   /** 智慧倒數到期後必須明確確認，不能暫時關閉。 */
   allowSnooze?: boolean;
-  /** 自訂補給品提醒清單（優先級排序） */
-  customSupplyAlerts?: { id: string; name: string; onConfirm: () => void }[];
+  /** 自訂補給品提醒清單，依附於能量或補水的共用提醒流程。 */
+  customSupplyAlerts?: { id: string; name: string; target: "energy" | "water"; onConfirm: () => void }[];
 }
 
 export function SupplyModal({
@@ -144,26 +144,26 @@ export function SupplyModal({
                 </View>
               )}
 
-              {/* 自訂補給品提醒區塊 */}
+              {/* 自訂補給品提醒區塊：沿用能量或補水的共用語意與確認方式。 */}
               {customSupplyAlerts.map((alert) => (
-                <View key={alert.id} style={[styles.alertBlock, { borderColor: "#9C27B0" + "55", backgroundColor: "#9C27B0" + "12" }]}>
+                <View key={alert.id} style={[styles.alertBlock, { borderColor: (alert.target === "energy" ? "#F59E0B" : "#4FC3F7") + "55", backgroundColor: (alert.target === "energy" ? "#F59E0B" : "#4FC3F7") + "12" }]}>
                   <View style={styles.alertBlockHeader}>
-                    <View style={[styles.alertIconWrap, { backgroundColor: "#9C27B0" + "22" }]}>
-                      <IconSymbol name="star.fill" size={28} color="#9C27B0" />
+                    <View style={[styles.alertIconWrap, { backgroundColor: (alert.target === "energy" ? "#F59E0B" : "#4FC3F7") + "22" }]}> 
+                      <IconSymbol name={alert.target === "energy" ? "flame.fill" : "drop.fill"} size={28} color={alert.target === "energy" ? "#F59E0B" : "#1595C9"} />
                     </View>
                     <View style={styles.alertBlockText}>
-                      <Text style={[styles.alertBlockTitle, { color: "#9C27B0" }]}>{alert.name}</Text>
-                      <Text style={[styles.alertBlockSub, { color: colors.muted }]}>是時候補充 {alert.name} 了</Text>
+                      <Text style={[styles.alertBlockTitle, { color: alert.target === "energy" ? "#F59E0B" : "#1595C9" }]}>{alert.name}</Text>
+                      <Text style={[styles.alertBlockSub, { color: colors.muted }]}>{alert.target === "energy" ? "請補給能量，提醒設定與能量共用。" : "請補給水分，提醒設定與補水共用。"}</Text>
                     </View>
                   </View>
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`確認已補給${alert.name}`}
                     hitSlop={6}
-                    style={({ pressed }) => [styles.confirmBtn, styles.customButton, { opacity: pressed ? 0.82 : 1 }]}
+                    style={({ pressed }) => [styles.confirmBtn, alert.target === "energy" ? styles.energyButton : styles.waterButton, { opacity: pressed ? 0.82 : 1 }]}
                     onPress={alert.onConfirm}
                   >
-                    <Text style={styles.confirmText}>已補給</Text>
+                    <Text style={styles.confirmText}>{alert.target === "energy" ? "已補給能量" : "已補給水分"}</Text>
                   </Pressable>
                 </View>
               ))}

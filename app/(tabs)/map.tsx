@@ -847,7 +847,7 @@ export default function MapScreen() {
     if (!calorieStillPending) clearSupplyRepeatTimer();
   }, [calorieAlert, clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
 
-  const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind) => {
+  const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind, customItemId?: string) => {
     if (settings.supplyCalculationMode === "smart" && (kind === "calorie" || kind === "water")) return;
     const until = Date.now() + 5 * 60 * 1000;
     if (kind === "calorie" || kind === "water") {
@@ -857,6 +857,14 @@ export default function MapScreen() {
       if (supplyRepeatTimerRef.current) {
         clearInterval(supplyRepeatTimerRef.current);
         supplyRepeatTimerRef.current = null;
+      }
+    } else if (kind === "custom-energy" || kind === "custom-water") {
+      if (customItemId) {
+        customSupplyAlertsRef.current = { ...customSupplyAlertsRef.current, [customItemId]: false };
+        setCustomSupplyAlerts(customSupplyAlertsRef.current);
+        setActiveSupplyAlerts((current) => current.filter((id) => id !== customItemId));
+        const tracker = supplyItemsTrackerRef.current[customItemId];
+        if (tracker?.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
       }
     } else {
       const intervalKind = kind.replace("interval-", "") as SupplyIntervalKind;
@@ -871,13 +879,16 @@ export default function MapScreen() {
 
   const processSupplyNotificationAction = useCallback((action: SupplyNotificationAction) => {
     if (action.action === "snooze") {
-      handleSnoozeSupply(action.kind);
+      handleSnoozeSupply(action.kind, action.customItemId);
       return;
     }
     if (action.kind === "calorie") handleConfirmCalorieSupply();
     else if (action.kind === "water") handleConfirmWaterSupply();
-    else handleConfirmIntervalSupply(action.kind.replace("interval-", "") as SupplyIntervalKind);
-  }, [handleConfirmCalorieSupply, handleConfirmIntervalSupply, handleConfirmWaterSupply, handleSnoozeSupply]);
+    else if (action.kind === "custom-energy" || action.kind === "custom-water") {
+      const item = settings.supplyItems.find((candidate) => candidate.id === action.customItemId);
+      if (item) handleConfirmCustomSupply(item.id, item.triggerType);
+    } else handleConfirmIntervalSupply(action.kind.replace("interval-", "") as SupplyIntervalKind);
+  }, [handleConfirmCalorieSupply, handleConfirmCustomSupply, handleConfirmIntervalSupply, handleConfirmWaterSupply, handleSnoozeSupply, settings.supplyItems]);
 
   useEffect(() => {
     const processQueuedActions = async () => {
@@ -1226,6 +1237,9 @@ export default function MapScreen() {
   const triggerCustomSupplyReminder = useCallback(
     async (supplyItem: any) => {
       if (!supplyItem.enabled) return;
+      const target = supplyItem.target === "water" ? "water" : "calorie";
+      const pauseOnDownhill = target === "water" ? settings.waterPauseOnDownhill : settings.caloriePauseOnDownhill;
+      const repeatUntilDismissed = target === "water" ? settings.waterRepeatUntilDismissed : settings.calorieRepeatUntilDismissed;
 
       // 初始化追蹤器
       if (!supplyItemsTrackerRef.current[supplyItem.id]) {
@@ -1247,7 +1261,7 @@ export default function MapScreen() {
       // 更新最後海拔
       lastAscentRef.current = stateRef.current.totalAscent;
 
-      if (supplyItem.pauseOnDownhill && isDownhill && !customSupplyAlertsRef.current[supplyItem.id]) {
+      if (pauseOnDownhill && isDownhill && !customSupplyAlertsRef.current[supplyItem.id]) {
         // 下坡時暫停提醒但仍計數，不觸發提醒
         return;
       }
@@ -1265,16 +1279,8 @@ export default function MapScreen() {
 
       if (!shouldTrigger) return;
 
-      // 根據重複模式決定是否顯示
-      if (supplyItem.repeatMode === "once" && tracker.triggered) {
-        return; // 只提醒一次，已觸發過則不再提醒
-      }
-      if (supplyItem.repeatMode === "off") {
-        return; // 不提醒
-      }
-
-      // 如果已經在提醒中且未關閉時重複提醒未啟用，則不再觸發
-      if (customSupplyAlertsRef.current[supplyItem.id] && !supplyItem.repeatUntilDismissed) {
+      // 同一品項待確認時不重複建立彈窗；重複提醒交由共用間隔處理。
+      if (customSupplyAlertsRef.current[supplyItem.id]) {
         return;
       }
 
@@ -1298,30 +1304,20 @@ export default function MapScreen() {
 
       // 播放回饋
       if (settings.vibrationEnabled) vibrateWarning();
-      if (settings.ttsEnabled) void speakSupplyReminder("calorie", true);
+      if (settings.ttsEnabled) void speakSupplyReminder(target, true);
       if (settings.soundEnabled) {
         try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
       }
-      if (settings.notificationEnabled) showSupplyNotification("calorie");
+      if (settings.notificationEnabled) void showSupplyNotification(target === "calorie" ? "custom-energy" : "custom-water", undefined, supplyItem.id);
 
-      // 單次提醒自動關閉功能
-      if (supplyItem.autoDismissSeconds && supplyItem.autoDismissSeconds > 0) {
-        if (tracker.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
-        tracker.dismissTimeoutId = setTimeout(() => {
-          customSupplyAlertsRef.current = { ...customSupplyAlertsRef.current, [supplyItem.id]: false };
-          setCustomSupplyAlerts(customSupplyAlertsRef.current);
-          setActiveSupplyAlerts((prev) => prev.filter((id) => id !== supplyItem.id));
-          tracker.dismissTimeoutId = null;
-        }, supplyItem.autoDismissSeconds * 1000);
-      }
-
-      // 未關閉時重複提醒功能
-      if (supplyItem.repeatUntilDismissed) {
+      // 使用全域重複間隔與對應類別的未關閉時重複提醒開關。
+      const repeatSec = settings.supplyReminderRepeatSec ?? 60;
+      if (repeatUntilDismissed && repeatSec > 0) {
         if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
         tracker.repeatIntervalId = setInterval(() => {
           if (customSupplyAlertsRef.current[supplyItem.id]) {
             if (settings.vibrationEnabled) vibrateWarning();
-            if (settings.ttsEnabled) void speakSupplyReminder("calorie", true);
+            if (settings.ttsEnabled) void speakSupplyReminder(target, true);
             if (settings.soundEnabled) {
               try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
             }
@@ -1331,7 +1327,7 @@ export default function MapScreen() {
               tracker.repeatIntervalId = null;
             }
           }
-        }, 5000);
+        }, repeatSec * 1000);
       }
     },
     [settings, alertPlayer]
@@ -1983,11 +1979,31 @@ export default function MapScreen() {
           const newSweatSince = currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
           const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(nextCountdown, "calorie", currentState.elapsed);
           const smartWaterRemainingSec = smartSupplyCountdownRemainingSec(nextCountdown, "water", currentState.elapsed);
+          const manualEnergyKind: SupplyIntervalKind | null = !isSmartSupplyMode
+            ? (settings.supplyEnergyTimeIntervalEnabled ? "energy-time" : settings.supplyEnergyDistanceIntervalEnabled ? "energy-distance" : null)
+            : null;
+          const manualWaterKind: SupplyIntervalKind | null = !isSmartSupplyMode
+            ? (settings.supplyWaterTimeIntervalEnabled ? "water-time" : settings.supplyWaterDistanceIntervalEnabled ? "water-distance" : null)
+            : null;
+          const manualEnergyProgress = manualEnergyKind === "energy-time"
+            ? (currentState.elapsed - (intervalSupplyTrackerRef.current[manualEnergyKind] ?? 0)) / Math.max(1, settings.supplyEnergyTimeIntervalMinutes * 60)
+            : manualEnergyKind === "energy-distance"
+              ? ((currentState.distance / 1000) - (intervalSupplyTrackerRef.current[manualEnergyKind] ?? 0)) / Math.max(0.1, settings.supplyEnergyDistanceIntervalKm)
+              : 0;
+          const manualWaterProgress = manualWaterKind === "water-time"
+            ? (currentState.elapsed - (intervalSupplyTrackerRef.current[manualWaterKind] ?? 0)) / Math.max(1, settings.supplyWaterTimeIntervalMinutes * 60)
+            : manualWaterKind === "water-distance"
+              ? ((currentState.distance / 1000) - (intervalSupplyTrackerRef.current[manualWaterKind] ?? 0)) / Math.max(0.1, settings.supplyWaterDistanceIntervalKm)
+              : 0;
           const calPct = isSmartSupplyMode && nextCountdown
             ? Math.min(1, 1 - Math.max(0, smartCalorieRemainingSec ?? 0) / Math.max(1, nextCountdown.calorieDurationSec))
+            : manualEnergyKind
+              ? Math.min(1, Math.max(0, manualEnergyProgress))
             : Math.min(1, newCalories / supplyPlan.calorieTriggerKcal);
           const waterPct = isSmartSupplyMode && nextCountdown
             ? Math.min(1, 1 - Math.max(0, smartWaterRemainingSec ?? 0) / Math.max(1, nextCountdown.waterDurationSec))
+            : manualWaterKind
+              ? Math.min(1, Math.max(0, manualWaterProgress))
             : Math.min(1, newSweatSince / supplyPlan.waterTriggerMl);
 
           Animated.timing(calorieAnim, { toValue: calPct, duration: 500, useNativeDriver: false }).start();
@@ -2002,7 +2018,7 @@ export default function MapScreen() {
           // 智慧模式改由倒數到期觸發；固定模式維持累積門檻相容行為。
           const calorieDue = isSmartSupplyMode
             ? isSmartSupplyCountdownDue(nextCountdown, "calorie", currentState.elapsed)
-            : calPct >= 1;
+            : !manualEnergyKind && calPct >= 1;
           if (calorieDue && !calorieReminderSentRef.current && !pendingCalorieRef.current) {
             console.log(`[補給] 能量${isSmartSupplyMode ? "倒數到期" : `達到${supplyPlan.source}閾值`}`);
             if (settings.caloriePauseOnDownhill && isDownhill && !calorieAlert) {
@@ -2017,7 +2033,7 @@ export default function MapScreen() {
 
           const waterDue = isSmartSupplyMode
             ? isSmartSupplyCountdownDue(nextCountdown, "water", currentState.elapsed)
-            : waterPct >= 1;
+            : !manualWaterKind && waterPct >= 1;
           if (waterDue && !waterReminderSentRef.current && !pendingWaterRef.current) {
             console.log(`[補給] 水分${isSmartSupplyMode ? "倒數到期" : `達到${supplyPlan.source}閾值`}`);
             if (settings.waterPauseOnDownhill && isDownhill && !waterAlert) {
@@ -2725,6 +2741,32 @@ export default function MapScreen() {
   const sweatCurrent = Math.round(state.sweatSinceLastRefill);
   const calorieTarget = Math.round(dashboardSupplyPlan.calorieTriggerKcal);
   const sweatTarget = Math.round(dashboardSupplyPlan.waterTriggerMl);
+  const manualEnergyDashboard = settings.supplyCalculationMode !== "smart"
+    ? settings.supplyEnergyTimeIntervalEnabled
+      ? {
+          label: "能量時間",
+          value: `${formatDuration(Math.max(0, state.elapsed - (intervalSupplyTrackerRef.current["energy-time"] ?? 0)))} / ${settings.supplyEnergyTimeIntervalMinutes} 分鐘`,
+        }
+      : settings.supplyEnergyDistanceIntervalEnabled
+        ? {
+            label: "能量距離",
+            value: `${Math.max(0, (state.distance / 1000) - (intervalSupplyTrackerRef.current["energy-distance"] ?? 0)).toFixed(1)} / ${settings.supplyEnergyDistanceIntervalKm} km`,
+          }
+        : null
+    : null;
+  const manualWaterDashboard = settings.supplyCalculationMode !== "smart"
+    ? settings.supplyWaterTimeIntervalEnabled
+      ? {
+          label: "補水時間",
+          value: `${formatDuration(Math.max(0, state.elapsed - (intervalSupplyTrackerRef.current["water-time"] ?? 0)))} / ${settings.supplyWaterTimeIntervalMinutes} 分鐘`,
+        }
+      : settings.supplyWaterDistanceIntervalEnabled
+        ? {
+            label: "補水距離",
+            value: `${Math.max(0, (state.distance / 1000) - (intervalSupplyTrackerRef.current["water-distance"] ?? 0)).toFixed(1)} / ${settings.supplyWaterDistanceIntervalKm} km`,
+          }
+        : null
+    : null;
   const waterProgress = sweatCurrent / sweatTarget;
   const waterBarColor = waterProgress < 0.5 ? "#4FC3F7" : waterProgress < 0.8 ? "#F59E0B" : "#EF4444";
   const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(smartSupplyCountdown, "calorie", state.elapsed);
@@ -3114,11 +3156,13 @@ export default function MapScreen() {
               <View style={styles.progressHeader}>
                 <View style={styles.progressLabelRow}>
                   <IconSymbol name="flame.fill" size={13} color="#F59E0B" />
-                  <Text style={styles.progressLabel}>{settings.supplyCalculationMode === "smart" ? "能量倒數" : "卡路里"}</Text>
+                  <Text style={styles.progressLabel}>{settings.supplyCalculationMode === "smart" ? "能量倒數" : manualEnergyDashboard?.label ?? "卡路里"}</Text>
                 </View>
                 <Text style={styles.progressValue}>
                   {settings.supplyCalculationMode === "smart"
                     ? smartCalorieStatus
+                    : manualEnergyDashboard
+                      ? manualEnergyDashboard.value
                     : `${Math.round(state.calories)} / ${calorieTarget} kcal`}
                 </Text>
               </View>
@@ -3187,7 +3231,7 @@ export default function MapScreen() {
               <View style={styles.progressHeader}>
                 <View style={styles.progressLabelRow}>
                   <IconSymbol name="drop.fill" size={13} color={waterBarColor} />
-                  <Text style={styles.progressLabel}>{settings.supplyCalculationMode === "smart" ? "補水倒數" : "水分流失"}</Text>
+                  <Text style={styles.progressLabel}>{settings.supplyCalculationMode === "smart" ? "補水倒數" : manualWaterDashboard?.label ?? "水分流失"}</Text>
                   {sweatRateLabel && (
                     <View style={[styles.ratePill, { backgroundColor: waterBarColor + "30" }]}>
                       <Text style={[styles.rateText, { color: waterBarColor }]}>{sweatRateLabel}</Text>
@@ -3197,6 +3241,8 @@ export default function MapScreen() {
                 <Text style={styles.progressValue}>
                   {settings.supplyCalculationMode === "smart"
                     ? smartWaterStatus
+                    : manualWaterDashboard
+                      ? manualWaterDashboard.value
                     : `${sweatCurrent} / ${sweatTarget} ml`}
                 </Text>
               </View>
@@ -3339,27 +3385,32 @@ export default function MapScreen() {
             return {
               id,
               name: item?.name || 'Unknown',
+              target: item?.target ?? "energy",
               onConfirm: () => handleConfirmCustomSupply(id, item?.triggerType || 'time'),
             };
           }),
           ...(intervalSupplyAlerts["energy-time"] ? [{
             id: "supply-interval-energy-time",
             name: `能量時間提醒（每 ${settings.supplyEnergyTimeIntervalMinutes} 分鐘）`,
+            target: "energy" as const,
             onConfirm: () => handleConfirmIntervalSupply("energy-time"),
           }] : []),
           ...(intervalSupplyAlerts["energy-distance"] ? [{
             id: "supply-interval-energy-distance",
             name: `能量距離提醒（每 ${settings.supplyEnergyDistanceIntervalKm} km）`,
+            target: "energy" as const,
             onConfirm: () => handleConfirmIntervalSupply("energy-distance"),
           }] : []),
           ...(intervalSupplyAlerts["water-time"] ? [{
             id: "supply-interval-water-time",
             name: `補水時間提醒（每 ${settings.supplyWaterTimeIntervalMinutes} 分鐘）`,
+            target: "water" as const,
             onConfirm: () => handleConfirmIntervalSupply("water-time"),
           }] : []),
           ...(intervalSupplyAlerts["water-distance"] ? [{
             id: "supply-interval-water-distance",
             name: `補水距離提醒（每 ${settings.supplyWaterDistanceIntervalKm} km）`,
+            target: "water" as const,
             onConfirm: () => handleConfirmIntervalSupply("water-distance"),
           }] : []),
         ]}

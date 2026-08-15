@@ -73,16 +73,34 @@ export const DEFAULT_SIMPLIFIED_FIELD_ORDER: SimplifiedFieldKey[] = [
 export interface SupplyItem {
   id: string;                    // 唯一識別符
   name: string;                  // 補給品名稱
+  target: "energy" | "water";   // 併入既有能量或補水提醒流程
   triggerType: "time" | "distance"; // 觸發方式：時間或距離
   triggerValue?: number;         // 觸發值（公里）- 距離觸發用
   triggerHours?: number;         // 時（時間觸發用）
   triggerMinutes?: number;       // 分（時間觸發用）
   triggerSeconds?: number;       // 秒（時間觸發用）
-  repeatMode: "once" | "every" | "off"; // 重複模式：只提醒一次/每次/不提醒
   enabled: boolean;              // 是否啟用
-  repeatUntilDismissed?: boolean; // 未關閉時重複提醒
-  autoDismissSeconds?: number;   // 單次提醒自動關閉延遲（秒）
-  pauseOnDownhill?: boolean;     // 長下坡暫停提醒
+}
+
+function normalizeSupplyItems(value: unknown): SupplyItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): SupplyItem[] => {
+    if (!item || typeof item !== "object") return [];
+    const legacy = item as Record<string, unknown>;
+    if (typeof legacy.id !== "string" || typeof legacy.name !== "string") return [];
+    const triggerType = legacy.triggerType === "distance" ? "distance" : "time";
+    return [{
+      id: legacy.id,
+      name: legacy.name.trim() || "自訂補給品",
+      target: legacy.target === "water" ? "water" : "energy",
+      triggerType,
+      triggerValue: triggerType === "distance" && typeof legacy.triggerValue === "number" ? legacy.triggerValue : undefined,
+      triggerHours: triggerType === "time" && typeof legacy.triggerHours === "number" ? legacy.triggerHours : undefined,
+      triggerMinutes: triggerType === "time" && typeof legacy.triggerMinutes === "number" ? legacy.triggerMinutes : undefined,
+      triggerSeconds: triggerType === "time" && typeof legacy.triggerSeconds === "number" ? legacy.triggerSeconds : undefined,
+      enabled: legacy.enabled !== false,
+    }];
+  });
 }
 
 export type SupplyCalculationMode = "smart" | "custom";
@@ -316,6 +334,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           ...DEFAULT_SETTINGS,
           ...savedWithoutRemovedSettings,
           ...migratedIntervalSettings,
+          supplyItems: normalizeSupplyItems(saved.supplyItems),
           birthday: normalizeBirthday(saved.birthday),
           age: calculateAgeFromBirthday(saved.birthday) ?? saved.age ?? DEFAULT_SETTINGS.age,
           autoPersonalMetricsEnabled: true,
@@ -325,6 +344,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           normalModeFieldOrder: mergedOrder,
           simplifiedModeFieldOrder: mergedSimplifiedOrder,
         };
+        if (nextSettings.supplyEnergyTimeIntervalEnabled && nextSettings.supplyEnergyDistanceIntervalEnabled) {
+          nextSettings.supplyEnergyDistanceIntervalEnabled = false;
+        }
+        if (nextSettings.supplyWaterTimeIntervalEnabled && nextSettings.supplyWaterDistanceIntervalEnabled) {
+          nextSettings.supplyWaterDistanceIntervalEnabled = false;
+        }
         setSettings(nextSettings);
         void AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(nextSettings));
       }
@@ -376,9 +401,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addSupplyItem = async (item: SupplyItem) => {
+    const normalized = normalizeSupplyItems([item])[0];
+    if (!normalized) return;
     const next = {
       ...settings,
-      supplyItems: [...settings.supplyItems, item],
+      supplyItems: [...settings.supplyItems, normalized],
     };
     setSettings(next);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
@@ -387,8 +414,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const updateSupplyItem = async (id: string, partial: Partial<SupplyItem>) => {
     const next = {
       ...settings,
-      supplyItems: settings.supplyItems.map((item) =>
-        item.id === id ? { ...item, ...partial } : item
+      supplyItems: settings.supplyItems.flatMap((item) =>
+        item.id === id ? normalizeSupplyItems([{ ...item, ...partial }]) : [item]
       ),
     };
     setSettings(next);

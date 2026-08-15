@@ -6,9 +6,9 @@ import {
 } from "../lib/supply-notification-action-model";
 // 此測試只驗證資料解析，不需載入 React Native 的本機通知層。
 
-const responseFor = (actionIdentifier: string, supplyKind: string) => ({
+const responseFor = (actionIdentifier: string, supplyKind: string, customItemId?: string) => ({
   actionIdentifier,
-  notification: { request: { content: { data: { type: "supply_reminder", supplyKind } } } },
+  notification: { request: { content: { data: { type: "supply_reminder", supplyKind, customItemId } } } },
 });
 
 describe("parseSupplyNotificationAction", () => {
@@ -30,6 +30,14 @@ describe("parseSupplyNotificationAction", () => {
     expect(parseSupplyNotificationAction(responseFor(SUPPLY_CONFIRM_ACTION, "interval-energy-time"))).toEqual({
       action: "confirm",
       kind: "interval-energy-time",
+    });
+  });
+
+  it("保留自訂補水品項識別，讓確認操作回到同一共用提醒流程", () => {
+    expect(parseSupplyNotificationAction(responseFor(SUPPLY_CONFIRM_ACTION, "custom-water", "electrolyte-water"))).toEqual({
+      action: "confirm",
+      kind: "custom-water",
+      customItemId: "electrolyte-water",
     });
   });
 

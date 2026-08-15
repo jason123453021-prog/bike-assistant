@@ -5,6 +5,8 @@ export const SUPPLY_CONFIRM_ACTION = "SUPPLY_CONFIRM";
 export type SupplyNotificationKind =
   | "calorie"
   | "water"
+  | "custom-energy"
+  | "custom-water"
   | "interval-energy-time"
   | "interval-energy-distance"
   | "interval-water-time"
@@ -14,6 +16,7 @@ export type SupplyNotificationActionType = "snooze" | "confirm";
 export interface SupplyNotificationAction {
   action: SupplyNotificationActionType;
   kind: SupplyNotificationKind;
+  customItemId?: string;
 }
 
 type NotificationResponseLike = {
@@ -24,6 +27,8 @@ type NotificationResponseLike = {
 function isSupplyKind(value: unknown): value is SupplyNotificationKind {
   return value === "calorie"
     || value === "water"
+    || value === "custom-energy"
+    || value === "custom-water"
     || value === "interval-energy-time"
     || value === "interval-energy-distance"
     || value === "interval-water-time"
@@ -37,7 +42,8 @@ export function parseSupplyNotificationAction(response: NotificationResponseLike
   const record = data as Record<string, unknown>;
   if (record.type !== "supply_reminder" || !isSupplyKind(record.supplyKind)) return null;
 
-  if (response.actionIdentifier === SUPPLY_CONFIRM_ACTION) return { action: "confirm", kind: record.supplyKind };
-  if (response.actionIdentifier === SUPPLY_SNOOZE_ACTION) return { action: "snooze", kind: record.supplyKind };
+  const customItemId = typeof record.customItemId === "string" ? record.customItemId : undefined;
+  if (response.actionIdentifier === SUPPLY_CONFIRM_ACTION) return { action: "confirm", kind: record.supplyKind, customItemId };
+  if (response.actionIdentifier === SUPPLY_SNOOZE_ACTION) return { action: "snooze", kind: record.supplyKind, customItemId };
   return null;
 }

@@ -86,16 +86,13 @@ export default function SettingsScreen() {
   const [supplyForm, setSupplyForm] = useState<SupplyItem>({
     id: "",
     name: "",
+    target: "energy",
     triggerType: "time",
     triggerValue: 10,
     triggerHours: 0,
     triggerMinutes: 5,
     triggerSeconds: 0,
-    repeatMode: "every",
     enabled: true,
-    repeatUntilDismissed: false,
-    autoDismissSeconds: 0,
-    pauseOnDownhill: false,
   });
 
   const openSupplyModal = (item?: SupplyItem) => {
@@ -106,16 +103,13 @@ export default function SettingsScreen() {
       setSupplyForm({
         id: Date.now().toString(),
         name: "",
+        target: "energy",
         triggerType: "time",
         triggerValue: 10,
         triggerHours: 0,
         triggerMinutes: 5,
         triggerSeconds: 0,
-        repeatMode: "every",
         enabled: true,
-        repeatUntilDismissed: false,
-        autoDismissSeconds: 0,
-        pauseOnDownhill: false,
       });
       setSupplyModal({ visible: true, mode: "add", item: null });
     }
@@ -434,7 +428,10 @@ export default function SettingsScreen() {
               label="能量：按時間提醒"
               value={settings.supplyEnergyTimeIntervalEnabled}
               colors={colors}
-              onToggle={(enabled) => updateSettings({ supplyEnergyTimeIntervalEnabled: enabled })}
+              onToggle={(enabled) => updateSettings({
+                supplyEnergyTimeIntervalEnabled: enabled,
+                ...(enabled ? { supplyEnergyDistanceIntervalEnabled: false } : {}),
+              })}
             />
             {settings.supplyEnergyTimeIntervalEnabled && <NumberRow
               icon="clock.fill"
@@ -451,7 +448,10 @@ export default function SettingsScreen() {
               label="能量：按距離提醒"
               value={settings.supplyEnergyDistanceIntervalEnabled}
               colors={colors}
-              onToggle={(enabled) => updateSettings({ supplyEnergyDistanceIntervalEnabled: enabled })}
+              onToggle={(enabled) => updateSettings({
+                supplyEnergyDistanceIntervalEnabled: enabled,
+                ...(enabled ? { supplyEnergyTimeIntervalEnabled: false } : {}),
+              })}
             />
             {settings.supplyEnergyDistanceIntervalEnabled && <NumberRow
               icon="location.fill"
@@ -476,7 +476,10 @@ export default function SettingsScreen() {
               label="補水：按時間提醒"
               value={settings.supplyWaterTimeIntervalEnabled}
               colors={colors}
-              onToggle={(enabled) => updateSettings({ supplyWaterTimeIntervalEnabled: enabled })}
+              onToggle={(enabled) => updateSettings({
+                supplyWaterTimeIntervalEnabled: enabled,
+                ...(enabled ? { supplyWaterDistanceIntervalEnabled: false } : {}),
+              })}
             />
             {settings.supplyWaterTimeIntervalEnabled && <NumberRow
               icon="clock.fill"
@@ -493,7 +496,10 @@ export default function SettingsScreen() {
               label="補水：按距離提醒"
               value={settings.supplyWaterDistanceIntervalEnabled}
               colors={colors}
-              onToggle={(enabled) => updateSettings({ supplyWaterDistanceIntervalEnabled: enabled })}
+              onToggle={(enabled) => updateSettings({
+                supplyWaterDistanceIntervalEnabled: enabled,
+                ...(enabled ? { supplyWaterTimeIntervalEnabled: false } : {}),
+              })}
             />
             {settings.supplyWaterDistanceIntervalEnabled && <NumberRow
               icon="location.fill"
@@ -563,7 +569,7 @@ export default function SettingsScreen() {
                       >
                         <Text style={[styles.rowLabel, { color: colors.foreground }]}>{item.name}</Text>
                         <Text style={[styles.rowHint, { color: colors.muted, fontSize: 12 }]}>
-                          {item.triggerType === "time" ? `每 ${item.triggerHours || 0}h ${item.triggerMinutes || 0}m ${item.triggerSeconds || 0}s` : `每 ${item.triggerValue} 公里`} • {item.repeatMode === "once" ? "只提醒一次" : item.repeatMode === "every" ? "每次提醒" : "不提醒"}
+                          {item.target === "water" ? "補水共用提醒" : "能量共用提醒"} • {item.triggerType === "time" ? `每 ${item.triggerHours || 0}h ${item.triggerMinutes || 0}m ${item.triggerSeconds || 0}s` : `每 ${item.triggerValue} 公里`}
                         </Text>
                       </Pressable>
                     </View>
@@ -1053,6 +1059,35 @@ export default function SettingsScreen() {
                 />
               </View>
 
+              <View style={{ marginBottom: 24 /* internal spacing */ }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 8 /* internal spacing */ }}>
+                  整合提醒類別
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 12 /* internal spacing */, lineHeight: 18 }}>
+                  通知、語音、震動、重複提醒與下坡暫停會沿用此類別的共用設定。
+                </Text>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  {(["energy", "water"] as const).map((target) => (
+                    <Pressable
+                      key={target}
+                      style={({ pressed }) => ([
+                        styles.chipButton,
+                        {
+                          backgroundColor: supplyForm.target === target ? (target === "energy" ? "#D97706" : "#0284C7") : colors.background,
+                          borderColor: supplyForm.target === target ? (target === "energy" ? "#D97706" : "#0284C7") : colors.border,
+                          opacity: pressed ? 0.7 : 1,
+                        },
+                      ])}
+                      onPress={() => setSupplyForm({ ...supplyForm, target })}
+                    >
+                      <Text style={{ color: supplyForm.target === target ? "#fff" : colors.foreground, fontWeight: "600", fontSize: 14 }}>
+                        {target === "energy" ? "能量補給" : "補水"}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
               {/* 觸發方式 */}
               <View style={{ marginBottom: 24 /* internal spacing */ }}>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
@@ -1163,81 +1198,6 @@ export default function SettingsScreen() {
                 </View>
               )}
 
-              {/* 重複模式 */}
-              <View style={{ marginBottom: 16 /* internal spacing */ }}>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 6 /* internal spacing */ }}>
-                  重複模式
-                </Text>
-                <View style={{ gap: 8 }}>
-                  {(["once", "every", "off"] as const).map((mode) => (
-                    <Pressable
-                      key={mode}
-                      style={({ pressed }) => ([
-                        styles.modeButton,
-                        {
-                          backgroundColor: supplyForm.repeatMode === mode ? colors.primary : colors.background,
-                          borderColor: supplyForm.repeatMode === mode ? colors.primary : colors.border,
-                          opacity: pressed ? 0.7 : 1,
-                        },
-                      ])}
-                      onPress={() => setSupplyForm({ ...supplyForm, repeatMode: mode })}
-                    >
-                      <Text
-                        style={{
-                          color: supplyForm.repeatMode === mode ? "#fff" : colors.foreground,
-                          fontWeight: "600",
-                          fontSize: 14,
-                        }}
-                      >
-                        {mode === "once" ? "只提醒一次" : mode === "every" ? "每次提醒" : "不提醒"}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-
-              {/* 高級提醒功能 */}
-              <View style={{ marginBottom: 20 /* internal spacing */, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
-                  高級提醒功能
-                </Text>
-
-                {/* 未關閉時重複提醒 */}
-                <View style={{ marginBottom: 14 /* internal spacing */, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                      未關閉時重複提醒
-                    </Text>
-                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-                      彈窗未確認時持續提醒
-                    </Text>
-                  </View>
-                  <Switch
-                    value={supplyForm.repeatUntilDismissed ?? false}
-                    onValueChange={(v) => setSupplyForm({ ...supplyForm, repeatUntilDismissed: v })}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                  />
-                </View>
-
-                {/* 自動關閉功能已移除 - 彈窗現在只能通過音量鍵或按鈕手動關閉 */}
-
-                {/* 長下坡暫停提醒 */}
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                      長下坡暫停提醒
-                    </Text>
-                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-                      下坡時暫停提醒但仍計數
-                    </Text>
-                  </View>
-                  <Switch
-                    value={supplyForm.pauseOnDownhill ?? false}
-                    onValueChange={(v) => setSupplyForm({ ...supplyForm, pauseOnDownhill: v })}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                  />
-                </View>
-              </View>
             </ScrollView>
 
             {/* 固定底部按鈕區域 */}

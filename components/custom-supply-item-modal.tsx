@@ -5,7 +5,7 @@
  * - 新增補給品
  * - 編輯補給品
  * - 設置觸發方式（時間或距離）
- * - 設置重複模式
+ * - 指定能量或補水類別，並使用共用的通知與重複提醒設定
  */
 
 import React, { useEffect, useState } from 'react';
@@ -39,41 +39,35 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
 }) => {
   const colors = useColors();
   const [name, setName] = useState('');
+  const [target, setTarget] = useState<'energy' | 'water'>('energy');
   const [triggerType, setTriggerType] = useState<'time' | 'distance'>('time');
   const [triggerValue, setTriggerValue] = useState(5); // 距離：公里
   const [triggerHours, setTriggerHours] = useState(0);
   const [triggerMinutes, setTriggerMinutes] = useState(30);
   const [triggerSeconds, setTriggerSeconds] = useState(0);
-  const [repeatMode, setRepeatMode] = useState<'once' | 'every' | 'off'>('every');
   const [enabled, setEnabled] = useState(true);
-  const [repeatUntilDismissed, setRepeatUntilDismissed] = useState(true);
-  const [pauseOnDownhill, setPauseOnDownhill] = useState(false);
 
   // 初始化表單
   useEffect(() => {
     if (item) {
       setName(item.name);
+      setTarget(item.target);
       setTriggerType(item.triggerType);
       setTriggerValue(item.triggerValue || 5);
       setTriggerHours(item.triggerHours || 0);
       setTriggerMinutes(item.triggerMinutes || 30);
       setTriggerSeconds(item.triggerSeconds || 0);
-      setRepeatMode(item.repeatMode);
       setEnabled(item.enabled);
-      setRepeatUntilDismissed(item.repeatUntilDismissed ?? true);
-      setPauseOnDownhill(item.pauseOnDownhill ?? false);
     } else {
       // 新增時重置表單
       setName('');
+      setTarget('energy');
       setTriggerType('time');
       setTriggerValue(5);
       setTriggerHours(0);
       setTriggerMinutes(30);
       setTriggerSeconds(0);
-      setRepeatMode('every');
       setEnabled(true);
-      setRepeatUntilDismissed(true);
-      setPauseOnDownhill(false);
     }
   }, [visible, item]);
 
@@ -109,15 +103,13 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
     const newItem: SupplyItem = {
       id: item?.id || `supply-${Date.now()}`,
       name: name.trim(),
+      target,
       triggerType,
       triggerValue: triggerType === 'distance' ? triggerValue : undefined,
       triggerHours: triggerType === 'time' ? triggerHours : undefined,
       triggerMinutes: triggerType === 'time' ? triggerMinutes : undefined,
       triggerSeconds: triggerType === 'time' ? triggerSeconds : undefined,
-      repeatMode,
       enabled,
-      repeatUntilDismissed,
-      pauseOnDownhill,
     };
 
     onSave(newItem);
@@ -179,6 +171,27 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
               onValueChange={setEnabled}
               trackColor={{ false: colors.border, true: colors.primary }}
             />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.label, { color: colors.foreground }]}>整合提醒類別</Text>
+            <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 4 }}>
+              通知、語音、震動、重複提醒與下坡暫停會沿用所選能量或補水的共用設定。
+            </Text>
+            <View style={[styles.segmentControl, { marginTop: 12 }]}>
+              <Pressable
+                onPress={() => setTarget('energy')}
+                style={[styles.segmentButton, { backgroundColor: target === 'energy' ? '#D97706' : colors.surface }]}
+              >
+                <Text style={[styles.segmentText, { color: target === 'energy' ? '#fff' : colors.foreground }]}>能量補給</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setTarget('water')}
+                style={[styles.segmentButton, { backgroundColor: target === 'water' ? '#0284C7' : colors.surface }]}
+              >
+                <Text style={[styles.segmentText, { color: target === 'water' ? '#fff' : colors.foreground }]}>補水</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* 觸發方式 */}
@@ -325,112 +338,6 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
             </View>
           )}
 
-          {/* 重複模式 */}
-          <View style={styles.section}>
-            <Text style={[styles.label, { color: colors.foreground }]}>
-              重複模式
-            </Text>
-            <View style={styles.segmentControl}>
-              <Pressable
-                onPress={() => setRepeatMode('once')}
-                style={[
-                  styles.segmentButton,
-                  repeatMode === 'once' && {
-                    backgroundColor: colors.primary,
-                  },
-                  repeatMode !== 'once' && {
-                    backgroundColor: colors.surface,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    {
-                      color: repeatMode === 'once' ? '#fff' : colors.foreground,
-                    },
-                  ]}
-                >
-                  只提醒一次
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setRepeatMode('every')}
-                style={[
-                  styles.segmentButton,
-                  repeatMode === 'every' && {
-                    backgroundColor: colors.primary,
-                  },
-                  repeatMode !== 'every' && {
-                    backgroundColor: colors.surface,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    {
-                      color: repeatMode === 'every' ? '#fff' : colors.foreground,
-                    },
-                  ]}
-                >
-                  每次重複
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setRepeatMode('off')}
-                style={[
-                  styles.segmentButton,
-                  repeatMode === 'off' && {
-                    backgroundColor: colors.primary,
-                  },
-                  repeatMode !== 'off' && {
-                    backgroundColor: colors.surface,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    {
-                      color: repeatMode === 'off' ? '#fff' : colors.foreground,
-                    },
-                  ]}
-                >
-                  不提醒
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* 進階選項 */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              進階選項
-            </Text>
-
-            <View style={[styles.switchRow, { marginTop: 12 }]}>
-              <Text style={[styles.label, { color: colors.foreground }]}>
-                未關閉時重複提醒
-              </Text>
-              <Switch
-                value={repeatUntilDismissed}
-                onValueChange={setRepeatUntilDismissed}
-                trackColor={{ false: colors.border, true: colors.primary }}
-              />
-            </View>
-
-            <View style={[styles.switchRow, { marginTop: 12 }]}>
-              <Text style={[styles.label, { color: colors.foreground }]}>
-                長下坡暫停提醒
-              </Text>
-              <Switch
-                value={pauseOnDownhill}
-                onValueChange={setPauseOnDownhill}
-                trackColor={{ false: colors.border, true: colors.primary }}
-              />
-            </View>
-          </View>
         </ScrollView>
 
         {/* 按鈕欄 */}
