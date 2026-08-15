@@ -1803,6 +1803,10 @@
 - [x] 移除自訂補給品表單的「整合提醒類別」選擇區與補給彈窗預覽入口
 - [x] 清理補給預覽狀態、彈窗掛載與回歸測試，保留正式騎乘提醒規則
 - [x] 驗證設定頁、正式補給提醒與 Android bundle 不受影響；TypeScript、lint、182 passed／1 skipped 與 Android Hermes bundle 5.71 MB 均通過
+- [x] 盤點 Android 15 BOOT_COMPLETED 前景音訊服務警告、Android 15 無邊框淘汰 API、Android 16 方向限制與 R8 最佳化可修正範圍
+- [x] 完成全專案 TypeScript、廢碼、依賴、定位／音訊／計時器資源釋放、資料寫入節流與防呆稽核
+- [x] 實作可安全驗證的 Android 相容性、效能與介面適配修正，不新增 NitroModules 或 C++ 依賴
+- [x] 完成全量靜態檢查、測試、Android bundle 與設定檢核，撰寫自我檢測與優化摘要報告
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌

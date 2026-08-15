@@ -43,7 +43,6 @@ import { Accelerometer } from "expo-sensors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
-import { router } from "expo-router";
 import Svg, { Circle } from "react-native-svg";
 
 import { useRide } from "@/lib/ride-context";
@@ -393,7 +392,7 @@ export default function MapScreen() {
   }, [gpxRoute]);
 
   // 即時軌跡
-  const [liveTrail, setLiveTrail] = useState<Array<{ latitude: number; longitude: number; segmentStart?: boolean }>>([]);
+  const [liveTrail, setLiveTrail] = useState<{ latitude: number; longitude: number; segmentStart?: boolean }[]>([]);
 
   // 坡度
   const [currentGrade, setCurrentGrade] = useState(0);
@@ -750,7 +749,7 @@ export default function MapScreen() {
       repeatIntervalId: null,
     };
     vibrateLight();
-  }, [state.elapsed, state.distance, settings.supplyItems, settings.ttsEnabled]);
+  }, [state.elapsed, state.distance]);
 
   const handleConfirmIntervalSupply = useCallback((kind: SupplyIntervalKind) => {
     const current = stateRef.current;
@@ -763,7 +762,7 @@ export default function MapScreen() {
     setIntervalSupplyAlerts(nextAlerts);
     if (!Object.values(nextAlerts).some(Boolean)) clearIntervalSupplyRepeatTimer();
     if (settings.vibrationEnabled) vibrateSuccess();
-  }, [clearIntervalSupplyRepeatTimer, settings.ttsEnabled, settings.vibrationEnabled]);
+  }, [clearIntervalSupplyRepeatTimer, settings.vibrationEnabled]);
 
   const handleConfirmCalorieSupply = useCallback(() => {
     setCalorieAlert(false);

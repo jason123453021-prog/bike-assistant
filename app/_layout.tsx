@@ -27,8 +27,6 @@ import { clearLegacyFavoritesCache } from "@/lib/legacy-favorites-cleanup";
 import { setupNotifications } from "@/lib/feedback-service";
 // 必須在頂層引入以確保 TaskManager 任務被定義
 import "@/lib/background-location";
-import { RideTrackingNative } from "@/lib/ride-tracking-native";
-import { usePermissionMonitoring } from "@/lib/use-permission-monitoring";
 import { startSupplyNotificationActionListener } from "@/lib/supply-notification-actions";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -41,8 +39,6 @@ export const unstable_settings = {
 // ─── Inner layout (inside ThemeProvider, can safely use useThemeContext) ───────
 function InnerLayout() {
   const { colorScheme } = useThemeContext();
-
-  usePermissionMonitoring();
 
   return (
     <>
@@ -107,24 +103,6 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => startSupplyNotificationActionListener(), []);
-
-  // 在 App 啟動時檢查電池最佳化狀況
-  useEffect(() => {
-    const checkBatteryOptimization = async () => {
-      try {
-        const isIgnoring = await RideTrackingNative.isIgnoringBatteryOptimizations();
-        if (!isIgnoring) {
-          console.warn("[App] App is in battery optimization list, requesting exemption");
-          // 主動要求用戶設定
-          await RideTrackingNative.requestIgnoreBatteryOptimizations();
-        }
-      } catch (error) {
-        console.error("[App] Failed to check battery optimization:", error);
-      }
-    };
-
-    checkBatteryOptimization();
-  }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -21,7 +21,6 @@ describe("Expo Go notification compatibility", () => {
     const startupFiles = [
       "lib/feedback-service.ts",
       "lib/background-location.ts",
-      "lib/foreground-service/foreground-service-manager.ts",
       "lib/permissions-manager.ts",
     ];
 
@@ -30,5 +29,6 @@ describe("Expo Go notification compatibility", () => {
       expect(source).not.toMatch(/import\s+\*\s+as\s+Notifications\s+from\s+["']expo-notifications["']/);
       expect(source).toContain("getLocalNotifications");
     }
+    expect(existsSync(resolve(projectRoot, "lib/foreground-service/foreground-service-manager.ts"))).toBe(false);
   });
 });

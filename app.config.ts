@@ -20,14 +20,15 @@ const config: ExpoConfig = {
   slug: env.appSlug,
   owner: "jason123453021",
   version: "1.0.3",
-  orientation: "portrait",
+  // Android 16 會忽略大螢幕的強制方向；改採自適應視窗與 Safe Area 佈局。
+  orientation: "default",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
   newArchEnabled: false,
   jsEngine: "hermes",
   ios: {
-    supportsTablet: false,
+    supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -70,12 +71,13 @@ const config: ExpoConfig = {
       "android.permission.VIBRATE",
       // 喚醒鎖：防止 GPS 追蹤被系統中斷
       "android.permission.WAKE_LOCK",
-      // 開機自啟：恢復背景服務
-      "android.permission.RECEIVE_BOOT_COMPLETED",
-      // 懸浮窗權限：顯示騎乘中的浮動提示
-      "android.permission.SYSTEM_ALERT_WINDOW",
       // 電池最佳化白名單：確保背景位置追蹤不被系統中斷
       "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+    ],
+    // 套件若宣告開機接收或懸浮窗，均從最終 manifest 明確移除：本 App 僅由使用者開始騎乘後啟動 location 前景服務。
+    blockedPermissions: [
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.SYSTEM_ALERT_WINDOW",
     ],
     intentFilters: [
       {
@@ -104,10 +106,9 @@ const config: ExpoConfig = {
     favicon: "./assets/images/favicon.png",
   },
   plugins: [
-    require("./plugins/with-foreground-service-plugin.js"),
-    require("./plugins/with-audio-boot-receiver-fix.js"),
-    require("./plugins/with-gradle-manifest-fix.js"),
     "expo-router",
+    "expo-font",
+    "expo-asset",
     [
       "expo-location",
       {
@@ -153,6 +154,9 @@ const config: ExpoConfig = {
           compileSdkVersion: 36,
           minSdkVersion: 24,
           targetSdkVersion: 36,
+          // Android release 版採用官方 R8 壓縮與資源縮減；每次發佈前均以 release bundle 驗證。
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
         },
       },
     ],

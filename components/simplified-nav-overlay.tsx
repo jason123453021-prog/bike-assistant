@@ -106,7 +106,7 @@ export function SimplifiedNavOverlay({
 
   return (
     <Pressable style={styles.overlay} onPress={onDismiss}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <StatusBar barStyle="light-content" />
 
       {/* 頂部：方向指引 */}
       {f.showDirection ? (
