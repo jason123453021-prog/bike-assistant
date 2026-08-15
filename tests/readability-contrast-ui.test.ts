@@ -20,6 +20,9 @@ describe("small-screen readability guardrails", () => {
     expect(settingsSource).toContain('rowHint: { fontSize: 13, lineHeight: 18');
     expect(settingsSource).toContain('supplyPreviewHint: {\n    fontSize: 13');
     expect(settingsSource).toContain('borderWidth: 1,\n    borderRadius: 16');
+    expect(settingsSource).toContain('settings.gpsAccuracy === level ? colors.onAccent : colors.foreground');
+    expect(settingsSource).toContain('name="bell.badge.fill" size={16} color={colors.onAccent}');
+    expect(settingsSource).toContain('style={[styles.supplyPreviewOptionText, { color: colors.onAccent }]}');
   });
 
   it("keeps history search, filters, and empty states above the former compact type scale", () => {

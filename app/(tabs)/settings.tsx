@@ -409,16 +409,17 @@ export default function SettingsScreen() {
                   onPress={() => updateSettings({ gpsAccuracy: level })}
                 >
                   <Text style={{
-                    color: settings.gpsAccuracy === level ? "#fff" : colors.foreground,
-                    fontSize: 11,
-                    fontWeight: "600",
+                    color: settings.gpsAccuracy === level ? colors.onAccent : colors.foreground,
+                    fontSize: 12,
+                    fontWeight: "700",
                     textAlign: "center",
                   }}>
                     {level === "power_saving" ? "🔋 省電" : level === "standard" ? "⚖️ 標準" : "📡 高精度"}
                   </Text>
                   <Text style={{
-                    color: settings.gpsAccuracy === level ? "rgba(255,255,255,0.8)" : colors.muted,
-                    fontSize: 10,
+                    color: settings.gpsAccuracy === level ? colors.onAccent : colors.muted,
+                    fontSize: 11,
+                    fontWeight: "600",
                     textAlign: "center",
                     marginTop: 2,
                   }}>
@@ -620,8 +621,8 @@ export default function SettingsScreen() {
               style={({ pressed }) => [styles.supplyPreviewOption, { backgroundColor: colors.primary, opacity: pressed ? 0.82 : 1 }]}
               onPress={() => setSupplyPreview({ energy: true, water: true })}
             >
-              <IconSymbol name="bell.badge.fill" size={16} color="#FFFFFF" />
-              <Text style={styles.supplyPreviewOptionText}>雙補給</Text>
+              <IconSymbol name="bell.badge.fill" size={16} color={colors.onAccent} />
+              <Text style={[styles.supplyPreviewOptionText, { color: colors.onAccent }]}>雙補給</Text>
             </Pressable>
           </View>
         </View>}
