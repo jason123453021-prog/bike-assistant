@@ -26,7 +26,6 @@ import { useRide } from "@/lib/ride-context";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-profile";
 import { RidePermissionReadiness } from "@/components/ride-permission-readiness";
-import { SupplyModal } from "@/components/supply-modal";
 
 
 import Constants from "expo-constants";
@@ -83,26 +82,6 @@ export default function SettingsScreen() {
     mode: "add" | "edit";
     item: SupplyItem | null;
   }>({ visible: false, mode: "add", item: null });
-  const [supplyPreview, setSupplyPreview] = useState({ energy: false, water: false });
-
-  const getUnifiedSupplySettingLabel = (energyEnabled: boolean, waterEnabled: boolean) => {
-    if (energyEnabled && waterEnabled) return "能量與補水皆開啟";
-    if (energyEnabled) return "僅能量開啟";
-    if (waterEnabled) return "僅補水開啟";
-    return "已關閉";
-  };
-
-  const supplyPreviewSummary = {
-    repeatInterval: settings.supplyReminderRepeatSec > 0 ? `每 ${settings.supplyReminderRepeatSec} 秒` : "已停用",
-    repeatUntilDismissed: getUnifiedSupplySettingLabel(
-      settings.calorieRepeatUntilDismissed ?? false,
-      settings.waterRepeatUntilDismissed ?? false,
-    ),
-    pauseOnDownhill: getUnifiedSupplySettingLabel(
-      settings.caloriePauseOnDownhill ?? false,
-      settings.waterPauseOnDownhill ?? false,
-    ),
-  };
 
   const [supplyForm, setSupplyForm] = useState<SupplyItem>({
     id: "",
@@ -564,42 +543,6 @@ export default function SettingsScreen() {
               </View>
               <Switch value={(settings.caloriePauseOnDownhill ?? false) || (settings.waterPauseOnDownhill ?? false)} onValueChange={(v) => updateSettings({ caloriePauseOnDownhill: v, waterPauseOnDownhill: v })} trackColor={{ false: colors.border, true: colors.primary }} />
             </View>
-          </View>
-          <Divider colors={colors} />
-          <View style={styles.supplyPreviewArea}>
-            <View style={styles.supplyPreviewCopy}>
-              <Text style={[styles.supplyPreviewTitle, { color: colors.foreground }]}>預覽補給彈窗</Text>
-              <Text style={[styles.supplyPreviewHint, { color: colors.muted }]}>選擇能量、補水或雙補給模式；所有操作只會停留在預覽，不會建立通知或改變倒數。</Text>
-            </View>
-          </View>
-          <View style={styles.supplyPreviewOptions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="預覽能量補給彈窗"
-              style={({ pressed }) => [styles.supplyPreviewOption, { backgroundColor: "#D97706", opacity: pressed ? 0.82 : 1 }]}
-              onPress={() => setSupplyPreview({ energy: true, water: false })}
-            >
-              <IconSymbol name="flame.fill" size={16} color="#FFFFFF" />
-              <Text style={styles.supplyPreviewOptionText}>能量</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="預覽補水彈窗"
-              style={({ pressed }) => [styles.supplyPreviewOption, { backgroundColor: "#0284C7", opacity: pressed ? 0.82 : 1 }]}
-              onPress={() => setSupplyPreview({ energy: false, water: true })}
-            >
-              <IconSymbol name="drop.fill" size={16} color="#FFFFFF" />
-              <Text style={styles.supplyPreviewOptionText}>補水</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="預覽雙補給彈窗"
-              style={({ pressed }) => [styles.supplyPreviewOption, { backgroundColor: colors.primary, opacity: pressed ? 0.82 : 1 }]}
-              onPress={() => setSupplyPreview({ energy: true, water: true })}
-            >
-              <IconSymbol name="bell.badge.fill" size={16} color={colors.onAccent} />
-              <Text style={[styles.supplyPreviewOptionText, { color: colors.onAccent }]}>雙補給</Text>
-            </Pressable>
           </View>
         </View>}
 
@@ -1117,35 +1060,6 @@ export default function SettingsScreen() {
                 />
               </View>
 
-              <View style={{ marginBottom: 24 /* internal spacing */ }}>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 8 /* internal spacing */ }}>
-                  整合提醒類別
-                </Text>
-                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 12 /* internal spacing */, lineHeight: 18 }}>
-                  通知、語音、震動、重複提醒與下坡暫停會沿用此類別的共用設定。
-                </Text>
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  {(["energy", "water"] as const).map((target) => (
-                    <Pressable
-                      key={target}
-                      style={({ pressed }) => ([
-                        styles.chipButton,
-                        {
-                          backgroundColor: supplyForm.target === target ? (target === "energy" ? colors.warning : colors.accent) : colors.background,
-                          borderColor: supplyForm.target === target ? (target === "energy" ? colors.warning : colors.accent) : colors.border,
-                          opacity: pressed ? 0.7 : 1,
-                        },
-                      ])}
-                      onPress={() => setSupplyForm({ ...supplyForm, target })}
-                    >
-                      <Text style={{ color: supplyForm.target === target ? (target === "energy" ? colors.onWarning : colors.onAccent) : colors.foreground, fontWeight: "600", fontSize: 14 }}>
-                        {target === "energy" ? "能量補給" : "補水"}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-
               {/* 觸發方式 */}
               <View style={{ marginBottom: 24 /* internal spacing */ }}>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
@@ -1282,14 +1196,6 @@ export default function SettingsScreen() {
           </View>
         </SafeAreaView>
       </Modal>
-      <SupplyModal
-        calorieAlert={supplyPreview.energy}
-        waterAlert={supplyPreview.water}
-        onConfirmCalorie={() => setSupplyPreview((current) => ({ ...current, energy: false }))}
-        onConfirmWater={() => setSupplyPreview((current) => ({ ...current, water: false }))}
-        onDismiss={() => setSupplyPreview({ energy: false, water: false })}
-        previewSummary={supplyPreviewSummary}
-      />
     </ScreenContainer>
   );
 }
@@ -1652,41 +1558,6 @@ const styles = StyleSheet.create({
   },
   editConfirmText: {
     fontSize: 15,
-    fontWeight: "700",
-  },
-  supplyPreviewArea: {
-    paddingTop: 14,
-    paddingBottom: 10,
-  },
-  supplyPreviewCopy: {
-    flex: 1,
-    gap: 3,
-  },
-  supplyPreviewTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  supplyPreviewHint: {
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  supplyPreviewOptions: {
-    flexDirection: "row",
-    gap: 8,
-    paddingBottom: 14,
-  },
-  supplyPreviewOption: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-  },
-  supplyPreviewOptionText: {
-    color: "#FFFFFF",
-    fontSize: 13,
     fontWeight: "700",
   },
   modalOverlay: {

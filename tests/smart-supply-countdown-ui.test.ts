@@ -59,30 +59,20 @@ describe("smart supply countdown UI", () => {
     expect(modalSource).toContain("waterButton");
   });
 
-  it("provides settings-only energy, water, and dual-supply previews without writing ride, countdown, or notification state", () => {
-    expect(settingsSource).toContain('const [supplyPreview, setSupplyPreview] = useState({ energy: false, water: false })');
-    expect(settingsSource).toContain('accessibilityLabel="預覽能量補給彈窗"');
-    expect(settingsSource).toContain('accessibilityLabel="預覽補水彈窗"');
-    expect(settingsSource).toContain('accessibilityLabel="預覽雙補給彈窗"');
-    expect(settingsSource).toContain('onPress={() => setSupplyPreview({ energy: true, water: false })}');
-    expect(settingsSource).toContain('onPress={() => setSupplyPreview({ energy: false, water: true })}');
-    expect(settingsSource).toContain('onPress={() => setSupplyPreview({ energy: true, water: true })}');
-    expect(settingsSource).toContain("<SupplyModal");
-    expect(settingsSource).toContain("calorieAlert={supplyPreview.energy}");
-    expect(settingsSource).toContain("waterAlert={supplyPreview.water}");
-    expect(settingsSource).toContain('onConfirmCalorie={() => setSupplyPreview((current) => ({ ...current, energy: false }))}');
-    expect(settingsSource).toContain('onConfirmWater={() => setSupplyPreview((current) => ({ ...current, water: false }))}');
-    expect(settingsSource).not.toContain("scheduleSmartSupplyDueNotification");
-    expect(settingsSource).not.toContain("setBackgroundSupplyReminderPending");
+  it("does not expose a settings-only supply modal preview", () => {
+    expect(settingsSource).not.toContain("supplyPreview");
+    expect(settingsSource).not.toContain("<SupplyModal");
+    expect(settingsSource).not.toContain("預覽補給彈窗");
+    expect(settingsSource).not.toContain("整合提醒類別");
+    expect(modalSource).not.toContain("previewSummary");
   });
 
-  it("keeps the active repeat/downhill setting summary but exposes no reminder feedback test controls", () => {
-    expect(settingsSource).toContain("repeatInterval: settings.supplyReminderRepeatSec");
+  it("keeps advanced reminder settings while exposing no preview or feedback test controls", () => {
+    expect(settingsSource).toContain("未關閉時重複提醒間隔");
     expect(settingsSource).toContain("calorieRepeatUntilDismissed");
     expect(settingsSource).toContain("waterRepeatUntilDismissed");
     expect(settingsSource).toContain("caloriePauseOnDownhill");
     expect(settingsSource).toContain("waterPauseOnDownhill");
-    expect(settingsSource).toContain("previewSummary={supplyPreviewSummary}");
     expect(settingsSource).not.toContain("testPreviewAlertSound");
     expect(settingsSource).not.toContain("testCustomSupplyFeedback");
     expect(settingsSource).not.toContain("testSupplySoundAndSpeech");
@@ -90,9 +80,7 @@ describe("smart supply countdown UI", () => {
     expect(modalSource).not.toContain("previewControls");
     expect(modalSource).not.toContain("測試震動");
     expect(modalSource).not.toContain("測試音效與語音");
-    expect(modalSource).toContain("預覽提醒設定");
-    expect(modalSource).toContain("重複提醒間隔");
-    expect(modalSource).toContain("長下坡暫停提醒");
+    expect(modalSource).not.toContain("預覽提醒設定");
   });
 
   it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {

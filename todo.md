@@ -1800,6 +1800,9 @@
 - [x] 修正自訂補給品的能量／補水與時間／距離選取按鈕，在深淺主題下均使用 onAccent 前景
 - [x] 完整移除補給預覽及自訂補給品中的震動、音效與語音測試功能，不影響正式騎乘提醒
 - [x] 更新補給提醒回歸測試，驗證測試入口不存在且正式提醒仍保留；TypeScript、lint、182 passed／1 skipped 與 Android bundle 5.72 MB 均通過
+- [x] 移除自訂補給品表單的「整合提醒類別」選擇區與補給彈窗預覽入口
+- [x] 清理補給預覽狀態、彈窗掛載與回歸測試，保留正式騎乘提醒規則
+- [x] 驗證設定頁、正式補給提醒與 Android bundle 不受影響；TypeScript、lint、182 passed／1 skipped 與 Android Hermes bundle 5.71 MB 均通過
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌

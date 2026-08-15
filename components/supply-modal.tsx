@@ -26,12 +26,6 @@ export interface SupplyModalProps {
   allowSnooze?: boolean;
   /** 自訂補給品提醒清單，依附於能量或補水的共用提醒流程。 */
   customSupplyAlerts?: { id: string; name: string; target: "energy" | "water"; onConfirm: () => void }[];
-  /** 設定頁預覽才會傳入，讓使用者辨識目前正在採用的提醒規則。 */
-  previewSummary?: {
-    repeatInterval: string;
-    repeatUntilDismissed: string;
-    pauseOnDownhill: string;
-  };
 }
 
 export function SupplyModal({
@@ -42,7 +36,6 @@ export function SupplyModal({
   onDismiss,
   allowSnooze = true,
   customSupplyAlerts = [],
-  previewSummary,
 }: SupplyModalProps) {
   const colors = useColors();
   const visible = calorieAlert || waterAlert || customSupplyAlerts.length > 0;
@@ -176,19 +169,6 @@ export function SupplyModal({
               ))}
             </View>
 
-            {previewSummary && (
-              <View style={[styles.previewPanel, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                <Text style={[styles.previewPanelTitle, { color: colors.foreground }]}>預覽提醒設定</Text>
-                {previewSummary && (
-                  <View style={styles.previewSummaryList}>
-                    <PreviewSummaryRow label="重複提醒間隔" value={previewSummary.repeatInterval} colors={colors} />
-                    <PreviewSummaryRow label="未關閉時重複提醒" value={previewSummary.repeatUntilDismissed} colors={colors} />
-                    <PreviewSummaryRow label="長下坡暫停提醒" value={previewSummary.pauseOnDownhill} colors={colors} />
-                  </View>
-                )}
-              </View>
-            )}
-
             <Text style={[styles.safetyHint, { color: colors.muted }]}>請分別確認已完成的補給項目。</Text>
 
             {allowSnooze && (
@@ -208,15 +188,6 @@ export function SupplyModal({
         </Animated.View>
       </View>
     </Modal>
-  );
-}
-
-function PreviewSummaryRow({ label, value, colors }: { label: string; value: string; colors: ReturnType<typeof useColors> }) {
-  return (
-    <View style={styles.previewSummaryRow}>
-      <Text style={[styles.previewSummaryLabel, { color: colors.muted }]}>{label}</Text>
-      <Text style={[styles.previewSummaryValue, { color: colors.foreground }]}>{value}</Text>
-    </View>
   );
 }
 
@@ -329,36 +300,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     textAlign: "center",
     paddingHorizontal: 10,
-  },
-  previewPanel: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    gap: 12,
-  },
-  previewPanelTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  previewSummaryList: {
-    gap: 8,
-  },
-  previewSummaryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  previewSummaryLabel: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "600",
-  },
-  previewSummaryValue: {
-    fontSize: 13,
-    fontWeight: "800",
-    textAlign: "right",
   },
   dismissBtn: {
     paddingVertical: 12,

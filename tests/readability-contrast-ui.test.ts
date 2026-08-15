@@ -21,13 +21,10 @@ describe("small-screen readability guardrails", () => {
     expect(containerSource).toContain('style={{ backgroundColor: colors.background }}');
   });
 
-  it("uses readable shared type scales for settings rows and preview guidance", () => {
+  it("uses readable shared type scales for settings rows and selector controls", () => {
     expect(settingsSource).toContain('rowHint: { fontSize: 13, lineHeight: 18');
-    expect(settingsSource).toContain('supplyPreviewHint: {\n    fontSize: 13');
     expect(settingsSource).toContain('borderWidth: 1,\n    borderRadius: 16');
     expect(settingsSource).toContain('settings.gpsAccuracy === level ? colors.onAccent : colors.foreground');
-    expect(settingsSource).toContain('name="bell.badge.fill" size={16} color={colors.onAccent}');
-    expect(settingsSource).toContain('style={[styles.supplyPreviewOptionText, { color: colors.onAccent }]}');
   });
 
   it("keeps history search, filters, and empty states above the former compact type scale", () => {
@@ -72,9 +69,8 @@ describe("small-screen readability guardrails", () => {
     expect(shareCardSource).toContain("color: colors.onAccent, fontSize: 14, fontWeight: \"600\"");
   });
 
-  it("keeps custom supply category and trigger selectors legible in both themes", () => {
-    expect(settingsSource).toContain('target === "energy" ? colors.warning : colors.accent');
-    expect(settingsSource).toContain('target === "energy" ? colors.onWarning : colors.onAccent');
+  it("keeps the remaining custom supply trigger selector legible in both themes", () => {
+    expect(settingsSource).not.toContain("整合提醒類別");
     expect(settingsSource).toContain('supplyForm.triggerType === type ? colors.onAccent : colors.foreground');
   });
 });
