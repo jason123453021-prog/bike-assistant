@@ -27,6 +27,8 @@ import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-profile";
 import { RidePermissionReadiness } from "@/components/ride-permission-readiness";
 import { SupplyModal } from "@/components/supply-modal";
+import { vibrateWarning } from "@/lib/feedback-service";
+import { useAudioPlayer } from "expo-audio";
 
 
 import Constants from "expo-constants";
@@ -84,6 +86,47 @@ export default function SettingsScreen() {
     item: SupplyItem | null;
   }>({ visible: false, mode: "add", item: null });
   const [supplyPreview, setSupplyPreview] = useState({ energy: false, water: false });
+  const previewAlertPlayer = useAudioPlayer(require("../../assets/sounds/alert.mp3"));
+
+  const getUnifiedSupplySettingLabel = (energyEnabled: boolean, waterEnabled: boolean) => {
+    if (energyEnabled && waterEnabled) return "能量與補水皆開啟";
+    if (energyEnabled) return "僅能量開啟";
+    if (waterEnabled) return "僅補水開啟";
+    return "已關閉";
+  };
+
+  const supplyPreviewSummary = {
+    repeatInterval: settings.supplyReminderRepeatSec > 0 ? `每 ${settings.supplyReminderRepeatSec} 秒` : "已停用",
+    repeatUntilDismissed: getUnifiedSupplySettingLabel(
+      settings.calorieRepeatUntilDismissed ?? false,
+      settings.waterRepeatUntilDismissed ?? false,
+    ),
+    pauseOnDownhill: getUnifiedSupplySettingLabel(
+      settings.caloriePauseOnDownhill ?? false,
+      settings.waterPauseOnDownhill ?? false,
+    ),
+  };
+
+  const testPreviewVibration = () => {
+    if (!settings.vibrationEnabled) {
+      Alert.alert("震動回饋已關閉", "請先在「回饋設定」開啟震動回饋，再測試實際的補給提醒震動。");
+      return;
+    }
+    void vibrateWarning();
+  };
+
+  const testPreviewAlertSound = () => {
+    if (!settings.soundEnabled) {
+      Alert.alert("音效提醒已關閉", "請先在「回饋設定」開啟音效提醒，再測試實際的補給提示音。");
+      return;
+    }
+    try {
+      previewAlertPlayer.seekTo(0);
+      previewAlertPlayer.play();
+    } catch {}
+  };
+
+  useEffect(() => () => { previewAlertPlayer.release(); }, [previewAlertPlayer]);
 
   const [supplyForm, setSupplyForm] = useState<SupplyItem>({
     id: "",
@@ -549,16 +592,36 @@ export default function SettingsScreen() {
           <View style={styles.supplyPreviewArea}>
             <View style={styles.supplyPreviewCopy}>
               <Text style={[styles.supplyPreviewTitle, { color: colors.foreground }]}>預覽補給彈窗</Text>
-              <Text style={[styles.supplyPreviewHint, { color: colors.muted }]}>以雙補給模式預覽按鈕、分區與互動；不會建立通知或改變倒數。</Text>
+              <Text style={[styles.supplyPreviewHint, { color: colors.muted }]}>選擇能量、補水或雙補給模式；所有操作只會停留在預覽，不會建立通知或改變倒數。</Text>
             </View>
+          </View>
+          <View style={styles.supplyPreviewOptions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="預覽能量補給彈窗"
+              style={({ pressed }) => [styles.supplyPreviewOption, { backgroundColor: "#D97706", opacity: pressed ? 0.82 : 1 }]}
+              onPress={() => setSupplyPreview({ energy: true, water: false })}
+            >
+              <IconSymbol name="flame.fill" size={16} color="#FFFFFF" />
+              <Text style={styles.supplyPreviewOptionText}>能量</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="預覽補水彈窗"
+              style={({ pressed }) => [styles.supplyPreviewOption, { backgroundColor: "#0284C7", opacity: pressed ? 0.82 : 1 }]}
+              onPress={() => setSupplyPreview({ energy: false, water: true })}
+            >
+              <IconSymbol name="drop.fill" size={16} color="#FFFFFF" />
+              <Text style={styles.supplyPreviewOptionText}>補水</Text>
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="預覽雙補給彈窗"
-              style={({ pressed }) => [styles.supplyPreviewButton, { backgroundColor: colors.primary, opacity: pressed ? 0.82 : 1 }]}
+              style={({ pressed }) => [styles.supplyPreviewOption, { backgroundColor: colors.primary, opacity: pressed ? 0.82 : 1 }]}
               onPress={() => setSupplyPreview({ energy: true, water: true })}
             >
-              <IconSymbol name="bell.badge.fill" size={17} color="#FFFFFF" />
-              <Text style={styles.supplyPreviewButtonText}>預覽</Text>
+              <IconSymbol name="bell.badge.fill" size={16} color="#FFFFFF" />
+              <Text style={styles.supplyPreviewOptionText}>雙補給</Text>
             </Pressable>
           </View>
         </View>}
@@ -1248,6 +1311,13 @@ export default function SettingsScreen() {
         onConfirmCalorie={() => setSupplyPreview((current) => ({ ...current, energy: false }))}
         onConfirmWater={() => setSupplyPreview((current) => ({ ...current, water: false }))}
         onDismiss={() => setSupplyPreview({ energy: false, water: false })}
+        previewControls={{
+          vibrationEnabled: settings.vibrationEnabled,
+          soundEnabled: settings.soundEnabled,
+          onTestVibration: testPreviewVibration,
+          onTestSound: testPreviewAlertSound,
+        }}
+        previewSummary={supplyPreviewSummary}
       />
     </ScreenContainer>
   );
@@ -1614,10 +1684,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   supplyPreviewArea: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
   supplyPreviewCopy: {
     flex: 1,
@@ -1631,19 +1699,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
   },
-  supplyPreviewButton: {
+  supplyPreviewOptions: {
+    flexDirection: "row",
+    gap: 8,
+    paddingBottom: 14,
+  },
+  supplyPreviewOption: {
+    flex: 1,
     minHeight: 44,
-    minWidth: 86,
     borderRadius: 12,
-    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 5,
   },
-  supplyPreviewButtonText: {
+  supplyPreviewOptionText: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
   },
   modalOverlay: {

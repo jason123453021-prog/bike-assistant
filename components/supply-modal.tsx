@@ -26,6 +26,19 @@ export interface SupplyModalProps {
   allowSnooze?: boolean;
   /** 自訂補給品提醒清單，依附於能量或補水的共用提醒流程。 */
   customSupplyAlerts?: { id: string; name: string; target: "energy" | "water"; onConfirm: () => void }[];
+  /** 設定頁預覽才會傳入；測試仍遵循目前的震動與音效開關。 */
+  previewControls?: {
+    vibrationEnabled: boolean;
+    soundEnabled: boolean;
+    onTestVibration: () => void;
+    onTestSound: () => void;
+  };
+  /** 設定頁預覽才會傳入，讓使用者在測試時辨識正在採用的提醒規則。 */
+  previewSummary?: {
+    repeatInterval: string;
+    repeatUntilDismissed: string;
+    pauseOnDownhill: string;
+  };
 }
 
 export function SupplyModal({
@@ -36,6 +49,8 @@ export function SupplyModal({
   onDismiss,
   allowSnooze = true,
   customSupplyAlerts = [],
+  previewControls,
+  previewSummary,
 }: SupplyModalProps) {
   const colors = useColors();
   const visible = calorieAlert || waterAlert || customSupplyAlerts.length > 0;
@@ -169,6 +184,43 @@ export function SupplyModal({
               ))}
             </View>
 
+            {(previewControls || previewSummary) && (
+              <View style={[styles.previewPanel, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={[styles.previewPanelTitle, { color: colors.foreground }]}>預覽提醒設定</Text>
+                {previewSummary && (
+                  <View style={styles.previewSummaryList}>
+                    <PreviewSummaryRow label="重複提醒間隔" value={previewSummary.repeatInterval} colors={colors} />
+                    <PreviewSummaryRow label="未關閉時重複提醒" value={previewSummary.repeatUntilDismissed} colors={colors} />
+                    <PreviewSummaryRow label="長下坡暫停提醒" value={previewSummary.pauseOnDownhill} colors={colors} />
+                  </View>
+                )}
+                {previewControls && (
+                  <View style={styles.previewControlList}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="測試補給提醒震動"
+                      style={({ pressed }) => [styles.previewTestButton, { borderColor: colors.border, opacity: pressed ? 0.65 : 1 }]}
+                      onPress={previewControls.onTestVibration}
+                    >
+                      <IconSymbol name="iphone.radiowaves.left.and.right" size={17} color={previewControls.vibrationEnabled ? colors.primary : colors.muted} />
+                      <Text style={[styles.previewTestText, { color: colors.foreground }]}>測試震動</Text>
+                      <Text style={[styles.previewTestStatus, { color: previewControls.vibrationEnabled ? colors.primary : colors.muted }]}>{previewControls.vibrationEnabled ? "已開啟" : "已關閉"}</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="測試補給提示音"
+                      style={({ pressed }) => [styles.previewTestButton, { borderColor: colors.border, opacity: pressed ? 0.65 : 1 }]}
+                      onPress={previewControls.onTestSound}
+                    >
+                      <IconSymbol name="music.note" size={17} color={previewControls.soundEnabled ? colors.primary : colors.muted} />
+                      <Text style={[styles.previewTestText, { color: colors.foreground }]}>測試提示音</Text>
+                      <Text style={[styles.previewTestStatus, { color: previewControls.soundEnabled ? colors.primary : colors.muted }]}>{previewControls.soundEnabled ? "已開啟" : "已關閉"}</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            )}
+
             <Text style={[styles.safetyHint, { color: colors.muted }]}>請分別確認已完成的補給項目。</Text>
 
             {allowSnooze && (
@@ -188,6 +240,15 @@ export function SupplyModal({
         </Animated.View>
       </View>
     </Modal>
+  );
+}
+
+function PreviewSummaryRow({ label, value, colors }: { label: string; value: string; colors: ReturnType<typeof useColors> }) {
+  return (
+    <View style={styles.previewSummaryRow}>
+      <Text style={[styles.previewSummaryLabel, { color: colors.muted }]}>{label}</Text>
+      <Text style={[styles.previewSummaryValue, { color: colors.foreground }]}>{value}</Text>
+    </View>
   );
 }
 
@@ -300,6 +361,57 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     textAlign: "center",
     paddingHorizontal: 10,
+  },
+  previewPanel: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
+  },
+  previewPanelTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  previewSummaryList: {
+    gap: 8,
+  },
+  previewSummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  previewSummaryLabel: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  previewSummaryValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right",
+  },
+  previewControlList: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  previewTestButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  previewTestText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  previewTestStatus: {
+    fontSize: 10,
+    fontWeight: "600",
   },
   dismissBtn: {
     paddingVertical: 12,
