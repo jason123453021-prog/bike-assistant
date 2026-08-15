@@ -30,6 +30,7 @@ export interface SupplyModalProps {
   previewControls?: {
     vibrationEnabled: boolean;
     soundEnabled: boolean;
+    ttsEnabled: boolean;
     onTestVibration: () => void;
     onTestSound: () => void;
   };
@@ -208,13 +209,13 @@ export function SupplyModal({
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="測試補給提示音"
+                      accessibilityLabel="測試補給提示音與文字語音"
                       style={({ pressed }) => [styles.previewTestButton, { borderColor: colors.border, opacity: pressed ? 0.65 : 1 }]}
                       onPress={previewControls.onTestSound}
                     >
-                      <IconSymbol name="music.note" size={17} color={previewControls.soundEnabled ? colors.primary : colors.muted} />
-                      <Text style={[styles.previewTestText, { color: colors.foreground }]}>測試提示音</Text>
-                      <Text style={[styles.previewTestStatus, { color: previewControls.soundEnabled ? colors.primary : colors.muted }]}>{previewControls.soundEnabled ? "已開啟" : "已關閉"}</Text>
+                      <IconSymbol name="speaker.wave.2.fill" size={17} color={previewControls.soundEnabled || previewControls.ttsEnabled ? colors.primary : colors.muted} />
+                      <Text style={[styles.previewTestText, { color: colors.foreground }]}>測試音效與語音</Text>
+                      <Text style={[styles.previewTestStatus, { color: previewControls.soundEnabled || previewControls.ttsEnabled ? colors.primary : colors.muted }]}>{previewControls.soundEnabled || previewControls.ttsEnabled ? "依開關測試" : "皆已關閉"}</Text>
                     </Pressable>
                   </View>
                 )}

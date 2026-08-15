@@ -81,6 +81,9 @@ describe("smart supply countdown UI", () => {
     expect(settingsSource).toContain("void vibrateWarning()");
     expect(settingsSource).toContain("previewAlertPlayer.seekTo(0)");
     expect(settingsSource).toContain("previewAlertPlayer.play()");
+    expect(settingsSource).toContain("const testSupplySoundAndSpeech");
+    expect(settingsSource).toContain("void speakSupplyReminder(type, true)");
+    expect(settingsSource).toContain('const type = supplyPreview.energy ? "calorie" : "water"');
     expect(settingsSource).toContain("repeatInterval: settings.supplyReminderRepeatSec");
     expect(settingsSource).toContain("calorieRepeatUntilDismissed");
     expect(settingsSource).toContain("waterRepeatUntilDismissed");
@@ -89,10 +92,19 @@ describe("smart supply countdown UI", () => {
     expect(settingsSource).toContain("previewControls={{");
     expect(settingsSource).toContain("previewSummary={supplyPreviewSummary}");
     expect(modalSource).toContain('accessibilityLabel="測試補給提醒震動"');
-    expect(modalSource).toContain('accessibilityLabel="測試補給提示音"');
+    expect(modalSource).toContain('accessibilityLabel="測試補給提示音與文字語音"');
+    expect(modalSource).toContain("測試音效與語音");
     expect(modalSource).toContain("預覽提醒設定");
     expect(modalSource).toContain("重複提醒間隔");
     expect(modalSource).toContain("長下坡暫停提醒");
+  });
+
+  it("provides a no-side-effect feedback test for custom supply items using their selected category", () => {
+    expect(settingsSource).toContain("const testCustomSupplyFeedback");
+    expect(settingsSource).toContain('testSupplySoundAndSpeech(supplyForm.target === "water" ? "water" : "calorie")');
+    expect(settingsSource).toContain('accessibilityLabel={`測試自訂${supplyForm.target === "energy" ? "能量" : "補水"}補給提醒`}');
+    expect(settingsSource).toContain("不會建立通知、倒數或儲存此品項");
+    expect(settingsSource).not.toContain("showSupplyNotification(supplyForm");
   });
 
   it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {
