@@ -18,6 +18,10 @@ export interface SupplyPlanInput {
 export interface SupplyPlan {
   calorieTriggerKcal: number;
   waterTriggerMl: number;
+  /** 智慧模式下，下次補能量提醒的倒數秒數。 */
+  energyCountdownSec: number;
+  /** 智慧模式下，下次補水提醒的倒數秒數。 */
+  waterCountdownSec: number;
   energyRecommendationKcal: number;
   carbohydrateRecommendationG: number;
   waterRecommendationMl: number;
@@ -30,6 +34,8 @@ const SMART_ENERGY_TRIGGER_RANGE = { min: 160, max: 280 } as const;
 const SMART_WATER_TRIGGER_RANGE = { min: 100, max: 250 } as const;
 const SMART_WATER_RECOMMENDATION_RANGE = { min: 150, max: 250 } as const;
 const MICRO_SIP_INTERVAL_MINUTES = 12.5;
+const SMART_WATER_COUNTDOWN_RANGE_SEC = { min: 10 * 60, max: 15 * 60 } as const;
+const SMART_ENERGY_COUNTDOWN_RANGE_SEC = { min: 20 * 60, max: 90 * 60 } as const;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -46,6 +52,37 @@ function carbohydrateTargetGPerHour(elapsedSec: number, intensityFactor: number,
   const durationBonus = elapsedSec >= 4 * 60 * 60 ? 10 : elapsedSec >= 3 * 60 * 60 ? 5 : 0;
   const heatBonus = environmentLoad >= 0.7 && intensityFactor >= 0.75 ? 5 : 0;
   return clamp(base + durationBonus + heatBonus, 20, 90);
+}
+
+/**
+ * 將既有的科學化補給模型轉為下一次提醒的時間。
+ * 補水固定維持 10–15 分鐘的可耐受小量節奏；高汗率、強度、熱負荷與長時段會提前。
+ * 能量則依每小時碳水目標推導，較短且低強度的活動不會過早強制補給。
+ */
+function deriveCountdowns(
+  elapsedSec: number,
+  intensity: number,
+  sweatRatePerHour: number,
+  environmentLoad: number,
+  carbohydrateGPerHour: number,
+  energyTriggerKcal: number,
+): { energyCountdownSec: number; waterCountdownSec: number } {
+  const intensityLoad = clamp((intensity - 0.6) / 0.55, 0, 1);
+  const sweatLoad = clamp((sweatRatePerHour - 350) / 1_450, 0, 1);
+  const durationLoad = elapsedSec >= 3 * 60 * 60 ? 1 : elapsedSec >= 2 * 60 * 60 ? 0.6 : elapsedSec >= 60 * 60 ? 0.25 : 0;
+  const waterCountdownSec = Math.round(clamp(
+    15 * 60 - sweatLoad * 150 - intensityLoad * 60 - environmentLoad * 70 - durationLoad * 30,
+    SMART_WATER_COUNTDOWN_RANGE_SEC.min,
+    SMART_WATER_COUNTDOWN_RANGE_SEC.max,
+  ));
+  const energyCountdownSec = carbohydrateGPerHour <= 0
+    ? (intensity >= 0.9 ? 40 : 45) * 60
+    : Math.round(clamp(
+        (energyTriggerKcal / Math.max(1, carbohydrateGPerHour * 4)) * 3600,
+        SMART_ENERGY_COUNTDOWN_RANGE_SEC.min,
+        SMART_ENERGY_COUNTDOWN_RANGE_SEC.max,
+      ));
+  return { energyCountdownSec, waterCountdownSec };
 }
 
 /**
@@ -72,6 +109,8 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
     return {
       calorieTriggerKcal: calorieBase,
       waterTriggerMl: waterBase,
+      energyCountdownSec: SMART_ENERGY_COUNTDOWN_RANGE_SEC.max,
+      waterCountdownSec: SMART_WATER_COUNTDOWN_RANGE_SEC.max,
       energyRecommendationKcal,
       carbohydrateRecommendationG: carbohydrateG,
       waterRecommendationMl,
@@ -94,6 +133,14 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
     SMART_WATER_TRIGGER_RANGE.max,
   ));
   const source = input.weatherAvailable ? "smart" : "smart-offline-fallback";
+  const { energyCountdownSec, waterCountdownSec } = deriveCountdowns(
+    input.elapsedSec,
+    intensity,
+    sweatRate,
+    environmentLoad,
+    carbohydrateG,
+    smartEnergyTriggerKcal,
+  );
   const reasonParts = [
     "全自動智慧計畫（約每 10–15 分鐘小量補水）",
     intensityLoad >= 0.3 ? "騎乘強度較高" : "騎乘強度一般",
@@ -105,6 +152,8 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
     // 智慧模式永遠只由個人、騎乘與環境資料決定；絕不讀取手動自訂門檻。
     calorieTriggerKcal: smartEnergyTriggerKcal,
     waterTriggerMl: smartWaterTriggerMl,
+    energyCountdownSec,
+    waterCountdownSec,
     energyRecommendationKcal,
     carbohydrateRecommendationG: carbohydrateG,
     waterRecommendationMl,

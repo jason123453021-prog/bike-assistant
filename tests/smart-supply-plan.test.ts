@@ -44,6 +44,8 @@ describe("smart supply plan", () => {
     expect(heatStress.waterRecommendationMl).toBeGreaterThanOrEqual(150);
     expect(heatStress.waterTriggerMl).toBeLessThanOrEqual(250);
     expect(heatStress.waterTriggerMl).toBeGreaterThanOrEqual(100);
+    expect(heatStress.waterCountdownSec).toBeLessThan(mild.waterCountdownSec);
+    expect(heatStress.energyCountdownSec).toBeLessThan(mild.energyCountdownSec);
   });
 
   it("keeps smart triggers independent from any manual custom thresholds", () => {
@@ -69,6 +71,10 @@ describe("smart supply plan", () => {
     expect(longHard.carbohydrateRecommendationG).toBeGreaterThanOrEqual(80);
     expect(longHard.carbohydrateRecommendationG).toBeLessThanOrEqual(90);
     expect(longHard.reason).toContain("全自動智慧計畫");
+    expect(shortEasy.energyCountdownSec).toBeGreaterThanOrEqual(40 * 60);
+    expect(longHard.energyCountdownSec).toBeLessThan(shortEasy.energyCountdownSec);
+    expect(longHard.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
+    expect(longHard.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
   });
 
   it("uses an explainable offline fallback when environment data is unavailable", () => {

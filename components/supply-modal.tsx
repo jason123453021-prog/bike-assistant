@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Animated,
+  Modal,
 } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -14,14 +15,6 @@ export interface SupplyModalProps {
   calorieAlert: boolean;
   /** 水分補給提醒是否觸發 */
   waterAlert: boolean;
-  /** 建議補水量 ml */
-  recommendedMl?: number;
-  /** 建議補充能量 kcal */
-  recommendedEnergyKcal?: number;
-  /** 建議補充碳水化合物 g */
-  recommendedCarbohydrateG?: number;
-  /** 智慧計算本次建議的主要原因 */
-  recommendationReason?: string;
   /** 按下「已補充卡路里」 */
   onConfirmCalorie: () => void;
   /** 按下「已補充水分」 */
@@ -35,10 +28,6 @@ export interface SupplyModalProps {
 export function SupplyModal({
   calorieAlert,
   waterAlert,
-  recommendedMl,
-  recommendedEnergyKcal,
-  recommendedCarbohydrateG,
-  recommendationReason,
   onConfirmCalorie,
   onConfirmWater,
   onDismiss,
@@ -63,8 +52,16 @@ export function SupplyModal({
 
   const bothAlert = calorieAlert && waterAlert;
 
-  return visible ? (
-    <View style={[styles.overlay, { pointerEvents: "box-none" }]}>
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      hardwareAccelerated
+      onRequestClose={onDismiss}
+    >
+      <View style={styles.overlay}>
         <Animated.View
           style={[
             styles.card,
@@ -81,8 +78,8 @@ export function SupplyModal({
             {bothAlert || customSupplyAlerts.length > 0 ? "補給提醒" : calorieAlert ? "補充能量" : "補充水分"}
           </Text>
           {bothAlert && (
-            <Text style={[styles.bothSubtitle, { color: colors.muted }]}>
-              卡路里與水分均已達到補給閾值，請分別補充
+            <Text style={[styles.bothSubtitle, { color: colors.muted }]}> 
+              請補給能量與水分，完成後分別確認
             </Text>
           )}
 
@@ -95,20 +92,9 @@ export function SupplyModal({
                 </View>
                 <View style={styles.alertBlockText}>
                   <Text style={[styles.alertBlockTitle, { color: "#F59E0B" }]}>能量補充</Text>
-                  <Text style={[styles.alertBlockSub, { color: colors.muted }]}> 
-                    {recommendedEnergyKcal
-                      ? `建議補充約 ${recommendedEnergyKcal} kcal 能量`
-                      : "已消耗大量卡路里，建議補充能量棒或食物"}
-                  </Text>
+                  <Text style={[styles.alertBlockSub, { color: colors.muted }]}>請補給能量，完成後點選下方按鈕開始下一輪倒數。</Text>
                 </View>
               </View>
-              {recommendedEnergyKcal && (
-                <View style={[styles.tipBox, { backgroundColor: "#F59E0B" + "15", borderColor: "#F59E0B" + "35" }]}> 
-                  <Text style={[styles.tipText, { color: "#F59E0B" }]}> 
-                    建議一次補充約 {recommendedEnergyKcal} kcal{recommendedCarbohydrateG ? `（約 ${recommendedCarbohydrateG} g 碳水）` : ""}
-                  </Text>
-                </View>
-              )}
               <Pressable
                 style={({ pressed }) => [styles.confirmBtn, { backgroundColor: "#F59E0B", opacity: pressed ? 0.8 : 1 }]}
                 onPress={onConfirmCalorie}
@@ -127,20 +113,9 @@ export function SupplyModal({
                 </View>
                 <View style={styles.alertBlockText}>
                   <Text style={[styles.alertBlockTitle, { color: "#4FC3F7" }]}>水分補充</Text>
-                  <Text style={[styles.alertBlockSub, { color: colors.muted }]}>
-                    {recommendedMl
-                      ? `汗液流失達補水條件，建議補充 ${recommendedMl} ml`
-                      : "水分流失達到補水條件，建議立即補充水分"}
-                  </Text>
+                  <Text style={[styles.alertBlockSub, { color: colors.muted }]}>請補給水分，完成後點選下方按鈕開始下一輪倒數。</Text>
                 </View>
               </View>
-              {recommendedMl && (
-                <View style={[styles.tipBox, { backgroundColor: "#4FC3F7" + "15", borderColor: "#4FC3F7" + "35" }]}>
-                  <Text style={[styles.tipText, { color: "#4FC3F7" }]}>
-                    💧 建議一次補充 {recommendedMl} ml，小口慢飲效果更佳
-                  </Text>
-                </View>
-              )}
               <Pressable
                 style={({ pressed }) => [styles.confirmBtn, { backgroundColor: "#4FC3F7", opacity: pressed ? 0.8 : 1 }]}
                 onPress={onConfirmWater}
@@ -173,12 +148,6 @@ export function SupplyModal({
             </View>
           ))}
 
-          {recommendationReason && (calorieAlert || waterAlert) && (
-            <Text style={[styles.safetyHint, { color: colors.muted }]}> 
-              智慧計算依據：{recommendationReason}
-            </Text>
-          )}
-
           <Text style={[styles.safetyHint, { color: colors.muted }]}> 
             為避免改變系統音量行為，實體音量鍵維持調整音量；請直接點選上方放大的「已補給」按鈕快速確認。
           </Text>
@@ -195,7 +164,8 @@ export function SupplyModal({
           </Pressable>
         </Animated.View>
       </View>
-  ) : null;
+    </Modal>
+  );
 }
 
 const styles = StyleSheet.create({

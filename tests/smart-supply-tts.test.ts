@@ -6,19 +6,14 @@ const feedbackSource = readFileSync(resolve(process.cwd(), "lib/feedback-service
 const mapSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"), "utf8");
 
 describe("smart supply speech reminders", () => {
-  it("formats offline energy and hydration announcements with exact recommendations and reasons", () => {
-    expect(feedbackSource).toContain("formatSmartSupplyReminder");
-    expect(feedbackSource).toContain("plan.energyRecommendationKcal");
-    expect(feedbackSource).toContain("plan.carbohydrateRecommendationG");
-    expect(feedbackSource).toContain("plan.waterRecommendationMl");
-    expect(feedbackSource).toContain("原因：${plan.reason}");
-    expect(feedbackSource).toContain("speakSmartSupplyReminder");
+  it("uses generic energy and hydration announcements without exposing calculated amounts", () => {
+    expect(feedbackSource).toContain("speakSupplyReminder");
+    expect(mapSource).not.toContain("speakSmartSupplyReminder");
+    expect(mapSource).toContain("void speakSupplyReminder(type, true)");
   });
 
-  it("uses smart speech for initial, repeated, and recovered pending reminders while respecting ttsEnabled", () => {
-    expect(mapSource).toContain('settings.supplyCalculationMode === "smart" && recommendation');
+  it("uses generic speech for initial, repeated, and recovered pending reminders while respecting ttsEnabled", () => {
     expect(mapSource).toContain("if (!settings.ttsEnabled) return");
-    expect(mapSource).toContain("speakSmartSupplyReminder(type, recommendation, true)");
     expect(mapSource).toContain("speakPlannedSupplyReminder(type, recommendation)");
     expect(mapSource).toContain("pendingSupplyPlansRef.current[type] = recommendation");
     expect(mapSource).toContain('speakPlannedSupplyReminder("calorie", pendingSupplyPlansRef.current.calorie)');

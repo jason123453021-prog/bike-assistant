@@ -24,7 +24,8 @@ describe("smart supply priority", () => {
 
   it("explains that smart mode does not read manual thresholds and removes threshold editors", () => {
     expect(settingsSource).toContain("智慧計畫完全由 FTP");
-    expect(settingsSource).toContain("每次 150–250 mL");
+    expect(settingsSource).toContain("下一次補水與補能量的倒數");
+    expect(settingsSource).toContain("按下已補給後");
     expect(settingsSource).not.toContain("能量門檻基準");
     expect(settingsSource).not.toContain("汗液流失提醒閾值");
   });

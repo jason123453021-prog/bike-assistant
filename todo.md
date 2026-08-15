@@ -1691,6 +1691,11 @@
 - [x] 新增自動汗率校正回歸測試，完成 TypeScript、零 lint advisory、139 passed／1 skipped 與 Android Hermes bundle 5.66 MB 驗證
 - [x] 嚴格隔離活動詳情地圖手勢與外層頁面捲動，僅允許活動摘要以下的黑色內容區觸發頁面捲動
 - [x] 降低活動詳情 Leaflet 地圖資料同步與重繪負載，完成手勢與效能回歸驗證（142 passed／1 skipped、Android Hermes bundle 5.66 MB）
+- [x] 排查 Expo Go 開發者選單被喚起的來源，確認 App 觸控手勢不會造成誤觸並提供穩定實機測試方式（未發現 App 主動註冊開發者選單、搖晃或三指手勢）
+- [x] 將智慧補給改為全自動倒數計時，依 FTP、體重、強度、時間、坡度與環境因素安排下次補水／補能量
+- [x] 智慧補給僅在按下已補給後重新計算並啟動下一輪倒數，未確認時保留彈窗與讀數
+- [x] 移除智慧補給的建議毫升、熱量與碳水顯示，僅提示補給水分或補給能量
+- [x] 修正 Expo Go 騎乘時智慧補給未顯示彈窗，完成回歸測試與 Android bundle 驗證（146 passed／1 skipped、Android Hermes bundle 5.67 MB）
 - [ ] 新增回歸測試、完成 TypeScript、完整測試與 Android bundle 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）

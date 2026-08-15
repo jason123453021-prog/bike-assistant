@@ -76,6 +76,10 @@ export interface BackgroundState {
   supplyCalculationMode?: "smart" | "custom";
   calorieReminderSent: boolean;
   waterReminderSent: boolean;
+  smartCalorieCountdownStartedElapsedSec?: number;
+  smartWaterCountdownStartedElapsedSec?: number;
+  smartCalorieCountdownDurationSec?: number;
+  smartWaterCountdownDurationSec?: number;
   rideStartedAt: number;
   supplyIntervalReminderEnabled: boolean;
   supplyTimeIntervalEnabled: boolean;
@@ -294,15 +298,29 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       // 一個背景回呼可能包含多個位置點；只需保存該批次最新完整快照即可。
       await saveRideSessionSnapshot(recoverySession);
 
+      const elapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
+      if (state.supplyCalculationMode === "smart") {
+        state.smartCalorieCountdownStartedElapsedSec ??= 0;
+        state.smartWaterCountdownStartedElapsedSec ??= 0;
+        state.smartCalorieCountdownDurationSec = latestSupplyPlan.energyCountdownSec;
+        state.smartWaterCountdownDurationSec = latestSupplyPlan.waterCountdownSec;
+      }
+      const calorieDue = state.supplyCalculationMode === "smart"
+        ? elapsedSec >= (state.smartCalorieCountdownStartedElapsedSec ?? 0) + (state.smartCalorieCountdownDurationSec ?? latestSupplyPlan.energyCountdownSec)
+        : state.calories >= activeCalorieThreshold;
+      const waterDue = state.supplyCalculationMode === "smart"
+        ? elapsedSec >= (state.smartWaterCountdownStartedElapsedSec ?? 0) + (state.smartWaterCountdownDurationSec ?? latestSupplyPlan.waterCountdownSec)
+        : state.sweatLossMl >= activeWaterThreshold;
+
       // 檢查補給提醒
-      if (state.calories >= activeCalorieThreshold && !state.calorieReminderSent) {
+      if (calorieDue && !state.calorieReminderSent) {
         state.calorieReminderSent = true;
         const Notifications = await getLocalNotifications();
         if (Notifications) {
           await Notifications.scheduleNotificationAsync({
             content: {
               title: "🍌 補給提醒",
-              body: `建議補充約 ${latestSupplyPlan.energyRecommendationKcal} kcal（${latestSupplyPlan.carbohydrateRecommendationG} g 碳水）；${latestSupplyPlan.reason}`,
+              body: state.supplyCalculationMode === "smart" ? "請補給能量，完成後點選已補給以開始下一輪倒數。" : `建議補充約 ${latestSupplyPlan.energyRecommendationKcal} kcal（${latestSupplyPlan.carbohydrateRecommendationG} g 碳水）；${latestSupplyPlan.reason}`,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
               data: { type: "supply_reminder", supplyKind: "calorie" },
@@ -313,14 +331,14 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         }
       }
 
-      if (state.sweatLossMl >= activeWaterThreshold && !state.waterReminderSent) {
+      if (waterDue && !state.waterReminderSent) {
         state.waterReminderSent = true;
         const Notifications = await getLocalNotifications();
         if (Notifications) {
           await Notifications.scheduleNotificationAsync({
             content: {
               title: "💧 補水提醒",
-              body: `建議補充約 ${latestSupplyPlan.waterRecommendationMl} ml 水分；${latestSupplyPlan.reason}`,
+              body: state.supplyCalculationMode === "smart" ? "請補給水分，完成後點選已補給以開始下一輪倒數。" : `建議補充約 ${latestSupplyPlan.waterRecommendationMl} ml 水分；${latestSupplyPlan.reason}`,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
               data: { type: "supply_reminder", supplyKind: "water" },
@@ -331,7 +349,6 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         }
       }
 
-      const elapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
       const timeIntervalSec = (state.supplyTimeIntervalMinutes ?? 0) * 60;
       if (
         state.supplyIntervalReminderEnabled &&
@@ -430,6 +447,8 @@ export async function initBackgroundState(params: {
     supplyCalculationMode: params.supplyCalculationMode ?? "custom",
     calorieReminderSent: false,
     waterReminderSent: false,
+    smartCalorieCountdownStartedElapsedSec: 0,
+    smartWaterCountdownStartedElapsedSec: 0,
     rideStartedAt: startedAt,
     supplyIntervalReminderEnabled: params.supplyIntervalReminderEnabled,
     supplyTimeIntervalEnabled: params.supplyTimeIntervalEnabled,
@@ -500,10 +519,18 @@ export async function acknowledgeBackgroundSupplyReminder(kind: "calorie" | "wat
     if (!stateStr) return;
     const state: BackgroundState = JSON.parse(stateStr);
     if (kind === "calorie") {
-      state.calories = 0;
+      if (state.supplyCalculationMode === "smart") {
+        state.smartCalorieCountdownStartedElapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
+      } else {
+        state.calories = 0;
+      }
       state.calorieReminderSent = false;
     } else {
-      state.sweatLossMl = 0;
+      if (state.supplyCalculationMode === "smart") {
+        state.smartWaterCountdownStartedElapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
+      } else {
+        state.sweatLossMl = 0;
+      }
       state.waterReminderSent = false;
     }
     await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));

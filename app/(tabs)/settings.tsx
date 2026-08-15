@@ -408,7 +408,7 @@ export default function SettingsScreen() {
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
             <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
               {settings.supplyCalculationMode === "smart"
-                ? "智慧計畫完全由 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨決定；補水會採約每 10–15 分鐘、每次 150–250 mL 的小量分次建議。離線時仍以本機個人與騎乘資料安全計算。"
+                ? "智慧計畫完全由 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨決定；系統只會顯示下一次補水與補能量的倒數。按下已補給後，才會依最新條件重新安排下一輪。離線時仍以本機個人與騎乘資料安全計算。"
                 : "使用既有固定提醒規則；這些數值只會在手動模式生效。"}
             </Text>
           </View>
@@ -423,7 +423,7 @@ export default function SettingsScreen() {
           />
           {settings.supplyCalculationMode === "smart" ? (
             <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-              <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>智慧補給會依即時能量與水分閾值提醒，已停用固定時間／距離間隔，避免重複或衝突通知。</Text>
+              <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>智慧補給會依下一次倒數到期提醒，已停用固定時間／距離間隔，避免重複或衝突通知。</Text>
             </View>
           ) : settings.supplyIntervalReminderEnabled && <>
             <Divider colors={colors} />

@@ -70,7 +70,6 @@ import {
   vibrateWarning,
   vibrateSuccess,
   speakSupplyReminder,
-  speakSmartSupplyReminder,
   speakAutoPause,
   speakAutoResume,
   showSupplyNotification,
@@ -103,6 +102,14 @@ import {
   calculatePersonalizedCalories,
 } from "@/lib/personalized-ride-calculations";
 import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
+import {
+  createSmartSupplyCountdown,
+  isSmartSupplyCountdownDue,
+  refreshSmartSupplyCountdown,
+  restartSmartSupplyCountdown,
+  smartSupplyCountdownRemainingSec,
+  type SmartSupplyCountdown,
+} from "@/lib/smart-supply-countdown";
 import { deriveAutomaticSweatCalibration } from "@/lib/supply-calibration";
 import {
   startBackgroundLocationTracking,
@@ -458,6 +465,13 @@ export default function MapScreen() {
   const [supplyRecommendedMl, setSupplyRecommendedMl] = useState<number | undefined>(undefined);
   const [supplyRecommendation, setSupplyRecommendation] = useState<SupplyPlan | undefined>(undefined);
   const [activeSupplyPlan, setActiveSupplyPlan] = useState<SupplyPlan | undefined>(undefined);
+  const [smartSupplyCountdown, setSmartSupplyCountdown] = useState<SmartSupplyCountdown | null>(null);
+  const smartSupplyCountdownRef = useRef<SmartSupplyCountdown | null>(null);
+
+  const syncSmartSupplyCountdown = useCallback((nextCountdown: SmartSupplyCountdown | null) => {
+    smartSupplyCountdownRef.current = nextCountdown;
+    setSmartSupplyCountdown(nextCountdown);
+  }, []);
 
   const calorieReminderSentRef = useRef(false);
   const waterReminderSentRef = useRef(false);
@@ -701,17 +715,29 @@ export default function MapScreen() {
 
   const handleConfirmCalorieSupply = useCallback(() => {
     setCalorieAlert(false);
-    dispatch({ type: "CONSUME_CALORIES" });
+    const confirmedPlan = pendingSupplyPlansRef.current.calorie ?? supplyRecommendation;
+    if (settings.supplyCalculationMode === "smart" && confirmedPlan && smartSupplyCountdownRef.current) {
+      syncSmartSupplyCountdown(
+        restartSmartSupplyCountdown(
+          smartSupplyCountdownRef.current,
+          "calorie",
+          confirmedPlan,
+          stateRef.current.elapsed,
+        ),
+      );
+    } else {
+      dispatch({ type: "CONSUME_CALORIES" });
+    }
     dispatch({
       type: "SUPPLY_CONFIRMED",
       confirmation: {
         type: "energy",
         timestamp: Date.now(),
         elapsedSec: stateRef.current.elapsed,
-        recommendedEnergyKcal: supplyRecommendation?.energyRecommendationKcal,
-        recommendedCarbohydrateG: supplyRecommendation?.carbohydrateRecommendationG,
-        source: supplyRecommendation?.source,
-        reason: supplyRecommendation?.reason,
+        recommendedEnergyKcal: confirmedPlan?.energyRecommendationKcal,
+        recommendedCarbohydrateG: confirmedPlan?.carbohydrateRecommendationG,
+        source: confirmedPlan?.source,
+        reason: confirmedPlan?.reason,
       },
     });
     calorieAnim.setValue(0);
@@ -724,21 +750,33 @@ export default function MapScreen() {
     void acknowledgeBackgroundSupplyReminder("calorie");
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!pendingWaterRef.current) clearSupplyRepeatTimer();
-  }, [calorieAnim, clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, supplyRecommendation]);
+  }, [calorieAnim, clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, syncSmartSupplyCountdown]);
 
   const handleConfirmWaterSupply = useCallback(() => {
     setWaterAlert(false);
     setSupplyRecommendedMl(undefined);
-    dispatch({ type: "CONSUME_WATER" });
+    const confirmedPlan = pendingSupplyPlansRef.current.water ?? supplyRecommendation;
+    if (settings.supplyCalculationMode === "smart" && confirmedPlan && smartSupplyCountdownRef.current) {
+      syncSmartSupplyCountdown(
+        restartSmartSupplyCountdown(
+          smartSupplyCountdownRef.current,
+          "water",
+          confirmedPlan,
+          stateRef.current.elapsed,
+        ),
+      );
+    } else {
+      dispatch({ type: "CONSUME_WATER" });
+    }
     dispatch({
       type: "SUPPLY_CONFIRMED",
       confirmation: {
         type: "water",
         timestamp: Date.now(),
         elapsedSec: stateRef.current.elapsed,
-        recommendedWaterMl: supplyRecommendation?.waterRecommendationMl ?? supplyRecommendedMl,
-        source: supplyRecommendation?.source,
-        reason: supplyRecommendation?.reason,
+        recommendedWaterMl: confirmedPlan?.waterRecommendationMl ?? supplyRecommendedMl,
+        source: confirmedPlan?.source,
+        reason: confirmedPlan?.reason,
       },
     });
     waterAnim.setValue(0);
@@ -751,7 +789,7 @@ export default function MapScreen() {
     void acknowledgeBackgroundSupplyReminder("water");
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!pendingCalorieRef.current) clearSupplyRepeatTimer();
-  }, [clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, supplyRecommendation, supplyRecommendedMl, waterAnim]);
+  }, [clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
 
   const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind) => {
     const until = Date.now() + 5 * 60 * 1000;
@@ -1010,13 +1048,9 @@ export default function MapScreen() {
         if (recommendation) deferredSupplySpeechPlansRef.current[type] = recommendation;
         return;
       }
-      if (settings.supplyCalculationMode === "smart" && recommendation) {
-        void speakSmartSupplyReminder(type, recommendation, true);
-        return;
-      }
       void speakSupplyReminder(type, true);
     },
-    [settings.supplyCalculationMode, settings.ttsEnabled],
+    [settings.ttsEnabled],
   );
 
   const resumeDeferredSupplySpeech = useCallback(() => {
@@ -1029,14 +1063,12 @@ export default function MapScreen() {
 
     if (caloriePending && caloriePlan) {
       delete deferredSupplySpeechPlansRef.current.calorie;
-      if (settings.supplyCalculationMode === "smart") void speakSmartSupplyReminder("calorie", caloriePlan, true);
-      else void speakSupplyReminder("calorie", true);
+      void speakSupplyReminder("calorie", true);
     } else if (waterPending && waterPlan) {
       delete deferredSupplySpeechPlansRef.current.water;
-      if (settings.supplyCalculationMode === "smart") void speakSmartSupplyReminder("water", waterPlan, true);
-      else void speakSupplyReminder("water", true);
+      void speakSupplyReminder("water", true);
     }
-  }, [settings.supplyCalculationMode, settings.ttsEnabled]);
+  }, [settings.ttsEnabled]);
 
   // ─── 補給提醒 ────────────────────────────────────────────────────────────────
   const triggerSupplyReminder = useCallback(
@@ -1058,7 +1090,7 @@ export default function MapScreen() {
         try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
       }
       if (settings.notificationEnabled) {
-        void showSupplyNotification(type, recommendation ? {
+        void showSupplyNotification(type, settings.supplyCalculationMode === "smart" ? undefined : recommendation ? {
           energyKcal: recommendation.energyRecommendationKcal,
           carbohydrateG: recommendation.carbohydrateRecommendationG,
           waterMl: recommendation.waterRecommendationMl,
@@ -1072,7 +1104,7 @@ export default function MapScreen() {
 
       // 單次提醒自動關閉功能
       const autoDismissSeconds = type === "calorie" ? settings.calorieAutoDismissSeconds : settings.waterAutoDismissSeconds;
-      if (autoDismissSeconds && autoDismissSeconds > 0) {
+      if (settings.supplyCalculationMode !== "smart" && autoDismissSeconds && autoDismissSeconds > 0) {
         setTimeout(() => {
           if (type === "calorie") {
             setCalorieAlert(false);
@@ -1803,10 +1835,25 @@ export default function MapScreen() {
             weatherAvailable: Boolean(currentWeather),
           });
           setActiveSupplyPlan(supplyPlan);
+          const isSmartSupplyMode = settings.supplyCalculationMode === "smart";
+          const nextCountdown = isSmartSupplyMode
+            ? (smartSupplyCountdownRef.current
+              ? refreshSmartSupplyCountdown(smartSupplyCountdownRef.current, supplyPlan)
+              : createSmartSupplyCountdown(supplyPlan, currentState.elapsed))
+            : null;
+          if (isSmartSupplyMode && nextCountdown) {
+            syncSmartSupplyCountdown(nextCountdown);
+          }
           const newCalories = currentState.calories + calIncrement;
-          const calPct = Math.min(1, newCalories / supplyPlan.calorieTriggerKcal);
           const newSweatSince = currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
-          const waterPct = Math.min(1, newSweatSince / supplyPlan.waterTriggerMl);
+          const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(nextCountdown, "calorie", currentState.elapsed);
+          const smartWaterRemainingSec = smartSupplyCountdownRemainingSec(nextCountdown, "water", currentState.elapsed);
+          const calPct = isSmartSupplyMode && nextCountdown
+            ? Math.min(1, 1 - Math.max(0, smartCalorieRemainingSec ?? 0) / Math.max(1, nextCountdown.calorieDurationSec))
+            : Math.min(1, newCalories / supplyPlan.calorieTriggerKcal);
+          const waterPct = isSmartSupplyMode && nextCountdown
+            ? Math.min(1, 1 - Math.max(0, smartWaterRemainingSec ?? 0) / Math.max(1, nextCountdown.waterDurationSec))
+            : Math.min(1, newSweatSince / supplyPlan.waterTriggerMl);
 
           Animated.timing(calorieAnim, { toValue: calPct, duration: 500, useNativeDriver: false }).start();
           Animated.timing(waterAnim, { toValue: waterPct, duration: 500, useNativeDriver: false }).start();
@@ -1817,11 +1864,14 @@ export default function MapScreen() {
           isDownhillRef.current = isDownhill;
           if (!isDownhill) resumeDeferredSupplySpeech();
 
-          // 卡路里提醒邏輯
-          if (calPct >= 1 && !calorieReminderSentRef.current) {
-            console.log(`[補給] 卡路里達到${supplyPlan.source}閾值: ${newCalories}/${supplyPlan.calorieTriggerKcal} (${(calPct*100).toFixed(1)}%)`);
+          // 智慧模式改由倒數到期觸發；固定模式維持累積門檻相容行為。
+          const calorieDue = isSmartSupplyMode
+            ? isSmartSupplyCountdownDue(nextCountdown, "calorie", currentState.elapsed)
+            : calPct >= 1;
+          if (calorieDue && !calorieReminderSentRef.current && !pendingCalorieRef.current) {
+            console.log(`[補給] 能量${isSmartSupplyMode ? "倒數到期" : `達到${supplyPlan.source}閾值`}`);
             if (settings.caloriePauseOnDownhill && isDownhill && !calorieAlert) {
-              // 下坡時暫停提醒但仍計數
+              // 下坡時暫停提醒，倒數與待確認狀態均保留。
               console.log('[補給] 下坡時暫停卡路里提醒');
             } else {
               calorieReminderSentRef.current = true;
@@ -1830,11 +1880,13 @@ export default function MapScreen() {
             }
           }
 
-          // 水分提醒邏輯
-          if (waterPct >= 1 && !waterReminderSentRef.current) {
-            console.log(`[補給] 水分達到${supplyPlan.source}閾值: ${newSweatSince}/${supplyPlan.waterTriggerMl} (${(waterPct*100).toFixed(1)}%)`);
+          const waterDue = isSmartSupplyMode
+            ? isSmartSupplyCountdownDue(nextCountdown, "water", currentState.elapsed)
+            : waterPct >= 1;
+          if (waterDue && !waterReminderSentRef.current && !pendingWaterRef.current) {
+            console.log(`[補給] 水分${isSmartSupplyMode ? "倒數到期" : `達到${supplyPlan.source}閾值`}`);
             if (settings.waterPauseOnDownhill && isDownhill && !waterAlert) {
-              // 下坡時暫停提醒但仍計數
+              // 下坡時暫停提醒，倒數與待確認狀態均保留。
               console.log('[補給] 下坡時暫停水分提醒');
             } else {
               waterReminderSentRef.current = true;
@@ -1983,6 +2035,7 @@ export default function MapScreen() {
     dispatch({ type: "START", hydrationThresholdMl });
     calorieReminderSentRef.current = false;
     waterReminderSentRef.current = false;
+    syncSmartSupplyCountdown(null);
     calorieAnim.setValue(0);
     waterAnim.setValue(0);
     lastLocationRef.current = null;
@@ -2088,7 +2141,7 @@ export default function MapScreen() {
       const l = await Location.getLastKnownPositionAsync();
       if (l) updateWeather(l.coords.latitude, l.coords.longitude);
     }, WEATHER_INTERVAL);
-  }, [clearIntervalSupplyRepeatTimer, currentPos, dispatch, estimateAgeYears, estimateFtpW, hydrationThresholdMl, gpxRoute, settings, updateWeather, calorieAnim, waterAnim]);
+  }, [clearIntervalSupplyRepeatTimer, currentPos, dispatch, estimateAgeYears, estimateFtpW, hydrationThresholdMl, gpxRoute, settings, syncSmartSupplyCountdown, updateWeather, calorieAnim, waterAnim]);
 
   const handlePause = useCallback(() => {
     pausedElapsedRef.current = state.elapsed;
@@ -2127,6 +2180,7 @@ export default function MapScreen() {
           clearSupplyRepeatTimer();
           setCalorieAlert(false);
           setWaterAlert(false);
+          syncSmartSupplyCountdown(null);
           customSupplyAlertsRef.current = {};
           setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
           supplyItemsTrackerRef.current = {}; // 重置自訂補給品追蹤器
@@ -2221,7 +2275,7 @@ export default function MapScreen() {
         },
       },
     ]);
-  }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, state.distance, state.elapsed, updateSettings]);
+  }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, state.distance, state.elapsed, syncSmartSupplyCountdown, updateSettings]);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {
@@ -2480,6 +2534,14 @@ export default function MapScreen() {
   const sweatTarget = Math.round(dashboardSupplyPlan.waterTriggerMl);
   const waterProgress = sweatCurrent / sweatTarget;
   const waterBarColor = waterProgress < 0.5 ? "#4FC3F7" : waterProgress < 0.8 ? "#F59E0B" : "#EF4444";
+  const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(smartSupplyCountdown, "calorie", state.elapsed);
+  const smartWaterRemainingSec = smartSupplyCountdownRemainingSec(smartSupplyCountdown, "water", state.elapsed);
+  const smartCalorieStatus = pendingCalorieRef.current || calorieAlert
+    ? "請補給能量"
+    : smartCalorieRemainingSec === null ? "計算中" : `下次 ${formatDuration(smartCalorieRemainingSec)}`;
+  const smartWaterStatus = pendingWaterRef.current || waterAlert
+    ? "請補給水分"
+    : smartWaterRemainingSec === null ? "計算中" : `下次 ${formatDuration(smartWaterRemainingSec)}`;
 
   const sweatRateLabel = isActive && state.currentSweatRatePerHour > 0
     ? formatSweatRate(state.currentSweatRatePerHour)
@@ -2859,10 +2921,12 @@ export default function MapScreen() {
               <View style={styles.progressHeader}>
                 <View style={styles.progressLabelRow}>
                   <IconSymbol name="flame.fill" size={13} color="#F59E0B" />
-                  <Text style={styles.progressLabel}>卡路里</Text>
+                  <Text style={styles.progressLabel}>{settings.supplyCalculationMode === "smart" ? "能量倒數" : "卡路里"}</Text>
                 </View>
                 <Text style={styles.progressValue}>
-                  {Math.round(state.calories)} / {calorieTarget} kcal{settings.supplyCalculationMode === "smart" ? " · 智慧" : ""}
+                  {settings.supplyCalculationMode === "smart"
+                    ? smartCalorieStatus
+                    : `${Math.round(state.calories)} / ${calorieTarget} kcal`}
                 </Text>
               </View>
               <View style={styles.progressTrack}>
@@ -2930,14 +2994,18 @@ export default function MapScreen() {
               <View style={styles.progressHeader}>
                 <View style={styles.progressLabelRow}>
                   <IconSymbol name="drop.fill" size={13} color={waterBarColor} />
-                  <Text style={styles.progressLabel}>水分流失</Text>
+                  <Text style={styles.progressLabel}>{settings.supplyCalculationMode === "smart" ? "補水倒數" : "水分流失"}</Text>
                   {sweatRateLabel && (
                     <View style={[styles.ratePill, { backgroundColor: waterBarColor + "30" }]}>
                       <Text style={[styles.rateText, { color: waterBarColor }]}>{sweatRateLabel}</Text>
                     </View>
                   )}
                 </View>
-                <Text style={styles.progressValue}>{sweatCurrent} / {sweatTarget} ml{settings.supplyCalculationMode === "smart" ? " · 智慧" : ""}</Text>
+                <Text style={styles.progressValue}>
+                  {settings.supplyCalculationMode === "smart"
+                    ? smartWaterStatus
+                    : `${sweatCurrent} / ${sweatTarget} ml`}
+                </Text>
               </View>
               <View style={styles.progressTrack}>
                 <Animated.View style={[styles.progressFill, { width: waterWidth, backgroundColor: waterBarColor }]} />
@@ -3072,10 +3140,6 @@ export default function MapScreen() {
       <SupplyModal
         calorieAlert={calorieAlert}
         waterAlert={waterAlert}
-        recommendedMl={supplyRecommendedMl}
-        recommendedEnergyKcal={supplyRecommendation?.energyRecommendationKcal}
-        recommendedCarbohydrateG={supplyRecommendation?.carbohydrateRecommendationG}
-        recommendationReason={supplyRecommendation?.reason}
         customSupplyAlerts={[
           ...sortedActiveAlerts.map(id => {
             const item = settings.supplyItems.find(i => i.id === id);
