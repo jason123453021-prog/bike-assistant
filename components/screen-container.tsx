@@ -2,6 +2,7 @@ import { View, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { cn } from "@/lib/utils";
+import { useColors } from "@/hooks/use-colors";
 
 export interface ScreenContainerProps extends ViewProps {
   /**
@@ -68,6 +69,7 @@ export function ScreenContainer({
   ...props
 }: ScreenContainerProps) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
 
   // Dynamic bottom padding calculation to prevent UI from being hidden behind system navigation bar
   // Uses Math.max to ensure minimum spacing is maintained
@@ -84,6 +86,7 @@ export function ScreenContainer({
         "bg-background",
         containerClassName
       )}
+      style={{ backgroundColor: colors.background }}
       {...props}
     >
       <SafeAreaView

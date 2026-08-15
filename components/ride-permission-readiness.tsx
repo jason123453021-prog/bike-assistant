@@ -113,18 +113,18 @@ export function RidePermissionReadiness() {
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 14, marginBottom: 16 },
+  card: { borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 16 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 7 },
   headerIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1 },
-  title: { fontSize: 15, fontWeight: '700' },
-  subtitle: { fontSize: 11, lineHeight: 16, marginTop: 1 },
+  title: { fontSize: 17, fontWeight: '800' },
+  subtitle: { fontSize: 13, lineHeight: 19, fontWeight: '500', marginTop: 2 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   itemIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1 },
-  itemTitle: { fontSize: 13, fontWeight: '600' },
-  itemHint: { fontSize: 10, lineHeight: 14, marginTop: 2 },
-  action: { minHeight: 36, borderWidth: 1, borderRadius: 9, justifyContent: 'center', paddingHorizontal: 10 },
-  actionText: { fontSize: 11, fontWeight: '700' },
-  note: { fontSize: 10, lineHeight: 15, marginTop: 5 },
+  itemTitle: { fontSize: 15, fontWeight: '700' },
+  itemHint: { fontSize: 12, lineHeight: 17, fontWeight: '500', marginTop: 3 },
+  action: { minHeight: 44, borderWidth: 1, borderRadius: 10, justifyContent: 'center', paddingHorizontal: 12 },
+  actionText: { fontSize: 13, fontWeight: '800' },
+  note: { fontSize: 12, lineHeight: 18, fontWeight: '500', marginTop: 7 },
 });

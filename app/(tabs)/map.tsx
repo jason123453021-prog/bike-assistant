@@ -3748,10 +3748,10 @@ const bigMetricStyles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.06)",
   },
   wideCell: {},
-  label: { color: "rgba(255,255,255,0.38)", fontSize: 10, marginBottom: 3 /* internal spacing */, letterSpacing: 0.3 },
+  label: { color: "rgba(255,255,255,0.76)", fontSize: 11, fontWeight: "700", marginBottom: 3 /* internal spacing */, letterSpacing: 0.3 },
   valueRow: { flexDirection: "row", alignItems: "baseline", gap: 3 },
   value: { fontWeight: "700", fontVariant: ["tabular-nums"] },
-  unit: { fontSize: 10, color: "rgba(255,255,255,0.35)" },
+  unit: { fontSize: 11, color: "rgba(255,255,255,0.72)", fontWeight: "600" },
 });
 
 // ─── 樣式 ─────────────────────────────────────────────────────────────────────
@@ -3761,18 +3761,18 @@ const styles = StyleSheet.create({
 
   navBar: {
     position: "absolute",
-    left: 16,
-    right: 80,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.75)",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
+  left: 16,
+  right: 80,
+  flexDirection: "row",
+  alignItems: "center",
+    backgroundColor: "rgba(5,16,10,0.94)",
+  borderRadius: 12,
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  gap: 8,
   },
-  navText: { flex: 1, color: "#fff", fontSize: 14, fontWeight: "600" },
-  navDist: { color: "#00E676", fontSize: 12, fontWeight: "700" },
+  navText: { flex: 1, color: "#fff", fontSize: 16, fontWeight: "800" },
+  navDist: { color: "#7FFFC7", fontSize: 14, fontWeight: "800" },
 
   toolBar: { position: "absolute", gap: 10, zIndex: 30 },
   pinAddressOverlay: {
@@ -3787,31 +3787,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingLeft: 14,
-    paddingRight: 6,
-    borderRadius: 14,
-    backgroundColor: "rgba(20,20,24,0.96)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+  paddingRight: 6,
+  borderRadius: 14,
+    backgroundColor: "rgba(7,18,11,0.98)",
+  borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.56)",
   },
-  pinAddressInput: { flex: 1, color: "#fff", fontSize: 14, minHeight: 44 },
+  pinAddressInput: { flex: 1, color: "#fff", fontSize: 16, fontWeight: "600", minHeight: 44 },
   pinAddressSearchButton: {
     minWidth: 58,
     alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 10,
-    marginVertical: 4,
-    backgroundColor: "#007AFF",
+  borderRadius: 10,
+  marginVertical: 4,
+    backgroundColor: "#087B5A",
   },
   pinAddressSearchButtonDisabled: { opacity: 0.58 },
-  pinAddressSearchText: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  pinAddressSearchText: { color: "#fff", fontSize: 14, fontWeight: "800" },
   pinAddressResults: {
-    marginTop: 8,
-    overflow: "hidden",
-    borderRadius: 14,
-    backgroundColor: "rgba(20,20,24,0.97)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+  marginTop: 8,
+  overflow: "hidden",
+  borderRadius: 14,
+    backgroundColor: "rgba(7,18,11,0.98)",
+  borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
   },
   pinAddressResultsTitle: {
     paddingHorizontal: 14,
@@ -3827,13 +3827,13 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: "rgba(255,255,255,0.12)",
   },
-  pinAddressResultTitle: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  pinAddressResultMeta: { marginTop: 3, color: "rgba(255,255,255,0.58)", fontSize: 11 },
+  pinAddressResultTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  pinAddressResultMeta: { marginTop: 4, color: "rgba(255,255,255,0.92)", fontSize: 13, fontWeight: "600" },
   toolBtn: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: "rgba(0,0,0,0.7)",
     alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.15)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.32)",
   },
   toolBtnActive: { backgroundColor: "rgba(0,122,255,0.2)", borderColor: "#007AFF" },
   touchGuardToolBtnActive: { backgroundColor: "rgba(52,199,89,0.22)", borderColor: "#34C759" },
@@ -3865,7 +3865,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   touchGuardProgressText: { position: "absolute", top: 13, color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
-  touchGuardProgressLabel: { position: "absolute", top: 29, color: "rgba(255,255,255,0.76)", fontSize: 8, fontWeight: "700" },
+  touchGuardProgressLabel: { position: "absolute", top: 29, color: "rgba(255,255,255,0.9)", fontSize: 9, fontWeight: "800" },
   touchGuardUnlockSuccess: {
     position: "absolute",
     right: 10,
@@ -3919,7 +3919,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
-  noRouteText: { color: "rgba(255,255,255,0.5)", fontSize: 11 },
+  noRouteText: { color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: "600" },
 
   // 轉彎指示橫幅
   turnBanner: {
@@ -3966,7 +3966,7 @@ const styles = StyleSheet.create({
   },
   straightBannerIcon: { fontSize: 16 },
   straightBannerText: { color: "#fff", fontSize: 13, fontWeight: "600", flex: 1 },
-  straightBannerDist: { color: "rgba(255,255,255,0.6)", fontSize: 11 },
+  straightBannerDist: { color: "rgba(255,255,255,0.86)", fontSize: 12, fontWeight: "600" },
 
   // 自動暫停／騎乘定位狀態卡
   rideTrackingStatusCard: {
@@ -4013,14 +4013,14 @@ const styles = StyleSheet.create({
 
   // 底部面板（統計面板移至地圖下方）
   panel: {
-    position: "absolute",
-    bottom: 0, left: 0, right: 0,
-    backgroundColor: "rgba(13, 13, 26, 0.75)",
+  position: "absolute",
+  bottom: 0, left: 0, right: 0,
+    backgroundColor: "rgba(7, 17, 11, 0.97)",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.08)",
+    borderTopColor: "rgba(255,255,255,0.42)",
     overflow: "hidden",
   },
   handleArea: {
@@ -4029,7 +4029,7 @@ const styles = StyleSheet.create({
   },
   panelHandle: {
     width: 36, height: 4,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.72)",
     borderRadius: 2,
     marginBottom: 6 /* internal spacing */,
   },
@@ -4039,8 +4039,8 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 2 /* internal spacing */,
   },
-  weatherItem: { color: "rgba(255,255,255,0.45)", fontSize: 11 },
-  weatherSep: { color: "rgba(255,255,255,0.2)", fontSize: 11 },
+  weatherItem: { color: "rgba(255,255,255,0.94)", fontSize: 13, fontWeight: "700" },
+  weatherSep: { color: "rgba(255,255,255,0.78)", fontSize: 13 },
   pausedBadge: {
     backgroundColor: "rgba(245,158,11,0.2)",
     borderRadius: 6,
@@ -4048,14 +4048,14 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     marginLeft: 6,
   },
-  pausedText: { color: "#F59E0B", fontSize: 11, fontWeight: "600" },
+  pausedText: { color: "#FFD27D", fontSize: 12, fontWeight: "800" },
 
   // 六格儀表板
   sixGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255,255,255,0.06)",
+    borderTopColor: "rgba(255,255,255,0.16)",
     marginTop: 2,
   },
   sportSelector: {
@@ -4072,11 +4072,11 @@ const styles = StyleSheet.create({
     gap: 2,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.045)",
+    borderColor: "rgba(255,255,255,0.26)",
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
   sportChoiceIcon: { fontSize: 17 },
-  sportChoiceLabel: { color: "rgba(255,255,255,0.63)", fontSize: 10, fontWeight: "700", textAlign: "center" },
+  sportChoiceLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "800", textAlign: "center" },
   preRideControls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
   sportInlineTrigger: {
     minWidth: 88,
@@ -4090,7 +4090,7 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   sportInlineIcon: { fontSize: 18 },
-  sportInlineLabel: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
+  sportInlineLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
   sportPickerBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.56)" },
   sportPickerSheet: {
     backgroundColor: "#151515",
@@ -4119,13 +4119,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRightWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.07)",
+    borderColor: "rgba(255,255,255,0.16)",
     paddingHorizontal: 4,
   },
-  sportMetricLabel: { color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: "700", textAlign: "center" },
+  sportMetricLabel: { color: "rgba(255,255,255,0.84)", fontSize: 12, fontWeight: "800", textAlign: "center" },
   sportMetricValueRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "center", marginTop: 6 },
   sportMetricValue: { color: "#fff", fontSize: 22, fontWeight: "800", letterSpacing: -0.7 },
-  sportMetricUnit: { color: "rgba(255,255,255,0.56)", fontSize: 10, marginLeft: 3 },
+  sportMetricUnit: { color: "rgba(255,255,255,0.8)", fontSize: 11, marginLeft: 3, fontWeight: "600" },
 
   // 展開區域
   expandedSection: {
@@ -4137,9 +4137,9 @@ const styles = StyleSheet.create({
   progressSection: {},
   progressHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 /* internal spacing */ },
   progressLabelRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  progressLabel: { color: "rgba(255,255,255,0.5)", fontSize: 11 },
-  progressValue: { color: "rgba(255,255,255,0.7)", fontSize: 11 },
-  progressTrack: { height: 4, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" },
+  progressLabel: { color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: "600" },
+  progressValue: { color: "rgba(255,255,255,0.94)", fontSize: 12, fontWeight: "700" },
+  progressTrack: { height: 5, backgroundColor: "rgba(255,255,255,0.22)", borderRadius: 3, overflow: "hidden" },
   progressFill: { height: 4, borderRadius: 2 },
   ratePill: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 },
   rateText: { fontSize: 10, fontWeight: "600" },
@@ -4173,13 +4173,13 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingTop: 4,
   },
-  expandHintText: { color: "rgba(255,255,255,0.25)", fontSize: 10 },
+  expandHintText: { color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: "600" },
 
   // 總爬升資訊列
   ascentRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 10,
     paddingVertical: 10,
     marginBottom: 12 /* internal spacing */,
@@ -4197,9 +4197,9 @@ const styles = StyleSheet.create({
     height: 24,
     backgroundColor: "rgba(255,255,255,0.1)",
   },
-  ascentLabel: { color: "rgba(255,255,255,0.38)", fontSize: 10 },
+  ascentLabel: { color: "rgba(255,255,255,0.78)", fontSize: 11, fontWeight: "600" },
   ascentValue: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "700" },
-  ascentUnit: { color: "rgba(255,255,255,0.35)", fontSize: 10 },
+  ascentUnit: { color: "rgba(255,255,255,0.74)", fontSize: 11, fontWeight: "600" },
   // 崩潰恢復橫幅
   recoveryBanner: {
     position: "absolute",

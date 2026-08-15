@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
     maxHeight: "86%",
     borderRadius: 20,
     alignItems: "stretch",
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     overflow: "hidden",
   },
   cardContent: {
@@ -278,8 +278,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   mainTitle: {
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 22,
+    fontWeight: "800",
     textAlign: "center",
     lineHeight: 26,
   },
@@ -321,13 +321,13 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   alertBlockTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    lineHeight: 21,
+    fontSize: 17,
+    fontWeight: "800",
+    lineHeight: 23,
   },
   alertBlockSub: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
   },
   confirmBtn: {
     minHeight: 66,
@@ -351,14 +351,14 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   confirmHint: {
-    fontSize: 12,
+    fontSize: 13,
     lineHeight: 16,
     fontWeight: "600",
     color: "rgba(255,255,255,0.84)",
   },
   safetyHint: {
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: "center",
     paddingHorizontal: 10,
   },
@@ -369,8 +369,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   previewPanelTitle: {
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "800",
   },
   previewSummaryList: {
     gap: 8,
@@ -383,12 +383,13 @@ const styles = StyleSheet.create({
   },
   previewSummaryLabel: {
     flex: 1,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
   },
   previewSummaryValue: {
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 13,
+    fontWeight: "800",
     textAlign: "right",
   },
   previewControlList: {
@@ -406,12 +407,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   previewTestText: {
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 13,
+    fontWeight: "800",
   },
   previewTestStatus: {
-    fontSize: 10,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "700",
   },
   dismissBtn: {
     paddingVertical: 12,

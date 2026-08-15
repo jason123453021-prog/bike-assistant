@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 18, fontWeight: "700" },
+  headerTitle: { fontSize: 20, fontWeight: "800" },
   content: { padding: 20, paddingBottom: 40 },
 
   // 路線命名
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   nameLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  nameLabel: { fontSize: 14, fontWeight: "600" },
+  nameLabel: { fontSize: 15, fontWeight: "700" },
   nameInput: {
     fontSize: 17,
     fontWeight: "600",
@@ -358,23 +358,23 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     letterSpacing: -0.3,
   },
-  nameHint: { fontSize: 11, marginTop: 2 },
+  nameHint: { fontSize: 13, lineHeight: 18, marginTop: 3 },
 
   mediaSection: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, marginBottom: 16 },
   mediaHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   addMediaButton: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
-  addMediaButtonText: { color: "#fff", fontSize: 12, fontWeight: "800" },
+  addMediaButtonText: { color: "#fff", fontSize: 13, fontWeight: "800" },
   mediaPreviewRow: { gap: 10, paddingRight: 4 },
   mediaPreviewItem: { width: 114, height: 88, borderRadius: 11, overflow: "visible" },
   mediaPreviewImage: { width: "100%", height: "100%", borderRadius: 11, backgroundColor: "#111" },
   videoPreview: { width: "100%", height: "100%", borderRadius: 11, alignItems: "center", justifyContent: "center" },
   videoPlayGlyph: { color: "#fff", fontSize: 24, marginBottom: 3 },
-  videoPreviewLabel: { fontSize: 11, fontWeight: "700" },
+  videoPreviewLabel: { fontSize: 12, fontWeight: "800" },
   removeMediaButton: { position: "absolute", top: -7, right: -7, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "#F04438" },
   removeMediaButtonText: { color: "#fff", fontSize: 17, lineHeight: 19, fontWeight: "700" },
   mediaEmptyState: { height: 76, borderWidth: StyleSheet.hairlineWidth, borderStyle: "dashed", borderRadius: 11, alignItems: "center", justifyContent: "center", gap: 3 },
   mediaEmptyIcon: { fontSize: 22, lineHeight: 24, fontWeight: "300" },
-  mediaEmptyText: { fontSize: 12 },
+  mediaEmptyText: { fontSize: 13, fontWeight: "600" },
 
   // Stats
   statsPanel: {
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-  panelTitle: { fontSize: 15, fontWeight: "600", marginBottom: 12 },
+  panelTitle: { fontSize: 17, fontWeight: "800", marginBottom: 12 },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -396,9 +396,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 10,
   },
-  statValue: { fontWeight: "600", letterSpacing: -0.5, fontSize: 18 },
-  statUnit: { fontSize: 10, marginTop: 2 },
-  statLabel: { fontSize: 11, marginTop: 4 },
+  statValue: { fontWeight: "800", letterSpacing: -0.5, fontSize: 20 },
+  statUnit: { fontSize: 12, fontWeight: "700", marginTop: 2 },
+  statLabel: { fontSize: 13, fontWeight: "600", marginTop: 4 },
 
   // Chart
   chartSection: {
@@ -407,13 +407,13 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-  sectionTitle: { fontSize: 15, fontWeight: "600", marginBottom: 16 },
+  sectionTitle: { fontSize: 17, fontWeight: "800", marginBottom: 16 },
   chartRow: { flexDirection: "row", alignItems: "center", gap: 16 },
   legend: { flex: 1, gap: 8 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 8 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { flex: 1, fontSize: 12 },
-  legendPct: { fontSize: 12, fontWeight: "600" },
+  legendText: { flex: 1, fontSize: 13, fontWeight: "600" },
+  legendPct: { fontSize: 13, fontWeight: "800" },
 
   // Buttons
   shareBtn: {

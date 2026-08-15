@@ -19,7 +19,7 @@ export default function TabLayout() {
   // 移除友誼查詢邏輯
 
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
-  const tabBarHeight = 60 + bottomPadding;
+  const tabBarHeight = 68 + bottomPadding;
 
   return (
     <Tabs
@@ -29,12 +29,12 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          paddingTop: 8,
+          paddingTop: 9,
           paddingBottom: bottomPadding,
           height: tabBarHeight,
-          backgroundColor: colors.background,
+          backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopWidth: 1,
         },
         tabBarShowLabel: true,
       }}
@@ -110,7 +110,8 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabLabel: {
-    fontSize: 10,
+    fontSize: 12,
+    lineHeight: 16,
     marginTop: 2,
   },
 });

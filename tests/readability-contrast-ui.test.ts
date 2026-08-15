@@ -1,0 +1,53 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const containerSource = readFileSync(resolve(process.cwd(), "components/screen-container.tsx"), "utf8");
+const settingsSource = readFileSync(resolve(process.cwd(), "app/(tabs)/settings.tsx"), "utf8");
+const historySource = readFileSync(resolve(process.cwd(), "app/(tabs)/history.tsx"), "utf8");
+const mapSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"), "utf8");
+const themeSource = readFileSync(resolve(process.cwd(), "theme.config.js"), "utf8");
+const themeProviderSource = readFileSync(resolve(process.cwd(), "lib/theme-provider.tsx"), "utf8");
+const elevationChartSource = readFileSync(resolve(process.cwd(), "components/activity-elevation-chart.tsx"), "utf8");
+const permissionReadinessSource = readFileSync(resolve(process.cwd(), "components/ride-permission-readiness.tsx"), "utf8");
+
+describe("small-screen readability guardrails", () => {
+  it("keeps the screen background synchronized with the active runtime color palette", () => {
+    expect(containerSource).toContain('style={{ backgroundColor: colors.background }}');
+  });
+
+  it("uses readable shared type scales for settings rows and preview guidance", () => {
+    expect(settingsSource).toContain('rowHint: { fontSize: 13, lineHeight: 18');
+    expect(settingsSource).toContain('supplyPreviewHint: {\n    fontSize: 13');
+    expect(settingsSource).toContain('borderWidth: 1,\n    borderRadius: 16');
+  });
+
+  it("keeps history search, filters, and empty states above the former compact type scale", () => {
+    expect(historySource).toContain('sportFilterText: { fontSize: 12, fontWeight: "800" }');
+    expect(historySource).toContain('emptySubtitle: { fontSize: 15');
+    expect(historySource).toContain('recordCard: {\n    padding: 14,\n    borderRadius: 14,\n    borderWidth: 1');
+  });
+
+  it("uses high-contrast dark navigation overlays for dashboard labels and progress text", () => {
+    expect(mapSource).toContain('backgroundColor: "rgba(7, 17, 11, 0.97)"');
+    expect(mapSource).toContain('sportChoiceLabel: { color: "#FFFFFF", fontSize: 12');
+    expect(mapSource).toContain('weatherItem: { color: "rgba(255,255,255,0.94)", fontSize: 13');
+    expect(mapSource).toContain('navText: { flex: 1, color: "#fff", fontSize: 16');
+  });
+
+  it("provides elevated, inset and on-accent tokens for both themes", () => {
+    expect(themeSource).toContain('surfaceElevated:');
+    expect(themeSource).toContain('surfaceInset:');
+    expect(themeSource).toContain('onAccent:');
+    expect(themeProviderSource).toContain('"color-surfaceElevated"');
+    expect(themeProviderSource).toContain('"color-onAccent"');
+  });
+
+  it("keeps charts and permission readiness cards driven by runtime theme colors", () => {
+    expect(elevationChartSource).toContain('const colors = useColors();');
+    expect(elevationChartSource).toContain('fill={colors.surfaceInset}');
+    expect(elevationChartSource).toContain('stroke={colors.accent}');
+    expect(permissionReadinessSource).toContain("action: { minHeight: 44");
+    expect(permissionReadinessSource).toContain("subtitle: { fontSize: 13, lineHeight: 19");
+  });
+});

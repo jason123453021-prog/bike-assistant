@@ -3,8 +3,10 @@ import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import type { LocationPoint } from "@/lib/ride-context";
 import { buildElevationSamples, downsampleElevationSamples } from "@/lib/activity-analysis-data";
+import { useColors } from "@/hooks/use-colors";
 
 export function ActivityElevationChart({ route }: { route: LocationPoint[] }) {
+  const colors = useColors();
   const [width, setWidth] = useState(0);
   const [selectedRatio, setSelectedRatio] = useState<number | null>(null);
   const samples = useMemo(() => downsampleElevationSamples(buildElevationSamples(route)), [route]);
@@ -20,7 +22,7 @@ export function ActivityElevationChart({ route }: { route: LocationPoint[] }) {
   const selected = selectedIndex === null ? null : samples[selectedIndex];
 
   if (samples.length < 2) {
-    return <Text style={styles.empty}>此活動沒有足夠的 GPS 海拔資料可繪製海拔曲線。</Text>;
+    return <Text style={[styles.empty, { color: colors.muted }]}>此活動沒有足夠的 GPS 海拔資料可繪製海拔曲線。</Text>;
   }
 
   const pointAt = (sample: typeof samples[number], index: number) => {
@@ -37,10 +39,10 @@ export function ActivityElevationChart({ route }: { route: LocationPoint[] }) {
   const filledPath = `${linePath} L ${last.x} ${padding.top + plotHeight} L ${first.x} ${padding.top + plotHeight} Z`;
 
   return (
-    <View style={styles.card} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
       <View style={styles.header}>
-        <Text style={styles.title}>海拔</Text>
-        <Text style={styles.range}>{Math.round(minElevation)}–{Math.round(maxElevation)} m</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>海拔</Text>
+        <Text style={[styles.range, { color: colors.muted }]}>{Math.round(minElevation)}–{Math.round(maxElevation)} m</Text>
       </View>
       {width > 0 && <View
         onStartShouldSetResponder={() => true}
@@ -50,36 +52,36 @@ export function ActivityElevationChart({ route }: { route: LocationPoint[] }) {
         onResponderRelease={() => setSelectedRatio(null)}
       >
         <Svg width={width} height={chartHeight}>
-          <Rect x={padding.left} y={padding.top} width={plotWidth} height={plotHeight} fill="rgba(255,255,255,0.02)" />
+          <Rect x={padding.left} y={padding.top} width={plotWidth} height={plotHeight} fill={colors.surfaceInset} />
           {[0, 0.5, 1].map((ratio) => {
             const y = padding.top + plotHeight - ratio * plotHeight;
-            return <Line key={ratio} x1={padding.left} x2={padding.left + plotWidth} y1={y} y2={y} stroke="rgba(255,255,255,0.14)" strokeWidth={StyleSheet.hairlineWidth} />;
+            return <Line key={ratio} x1={padding.left} x2={padding.left + plotWidth} y1={y} y2={y} stroke={colors.border} strokeWidth={1} />;
           })}
-          <Path d={filledPath} fill="rgba(148,163,184,0.48)" />
-          <Path d={linePath} fill="none" stroke="#CBD5E1" strokeWidth={2} />
+          <Path d={filledPath} fill={`${colors.accent}35`} />
+          <Path d={linePath} fill="none" stroke={colors.accent} strokeWidth={2.5} />
           {selected && selectedIndex !== null && (() => {
             const point = pointAt(selected, selectedIndex);
             return <>
-              <Line x1={point.x} x2={point.x} y1={padding.top} y2={padding.top + plotHeight} stroke="#60A5FA" strokeWidth={1} />
-              <Circle cx={point.x} cy={point.y} r={4} fill="#60A5FA" stroke="#fff" strokeWidth={1.5} />
+              <Line x1={point.x} x2={point.x} y1={padding.top} y2={padding.top + plotHeight} stroke={colors.accent} strokeWidth={1} />
+              <Circle cx={point.x} cy={point.y} r={4} fill={colors.accent} stroke={colors.surface} strokeWidth={2} />
             </>;
           })()}
-          <SvgText x={4} y={padding.top + 4} fill="rgba(255,255,255,0.55)" fontSize={10}>{Math.round(maxElevation)}</SvgText>
-          <SvgText x={4} y={padding.top + plotHeight} fill="rgba(255,255,255,0.55)" fontSize={10}>{Math.round(minElevation)}</SvgText>
-          <SvgText x={padding.left} y={chartHeight - 4} fill="rgba(255,255,255,0.55)" fontSize={10}>0 km</SvgText>
-          <SvgText x={padding.left + plotWidth - 30} y={chartHeight - 4} fill="rgba(255,255,255,0.55)" fontSize={10}>{distanceTotal.toFixed(1)} km</SvgText>
+          <SvgText x={4} y={padding.top + 4} fill={colors.muted} fontSize={11}>{Math.round(maxElevation)}</SvgText>
+          <SvgText x={4} y={padding.top + plotHeight} fill={colors.muted} fontSize={11}>{Math.round(minElevation)}</SvgText>
+          <SvgText x={padding.left} y={chartHeight - 4} fill={colors.muted} fontSize={11}>0 km</SvgText>
+          <SvgText x={padding.left + plotWidth - 34} y={chartHeight - 4} fill={colors.muted} fontSize={11}>{distanceTotal.toFixed(1)} km</SvgText>
         </Svg>
       </View>}
-      <Text style={styles.readout}>{selected ? `${selected.distanceKm.toFixed(2)} km · ${Math.round(selected.elevationM)} m${selected.grade === undefined ? "" : ` · ${selected.grade.toFixed(1)}%`}` : "拖曳曲線查看距離、海拔與坡度"}</Text>
+      <Text style={[styles.readout, { color: colors.muted }]}>{selected ? `${selected.distanceKm.toFixed(2)} km · ${Math.round(selected.elevationM)} m${selected.grade === undefined ? "" : ` · ${selected.grade.toFixed(1)}%`}` : "拖曳曲線查看距離、海拔與坡度"}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 16, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.045)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.1)", padding: 14 },
+  card: { marginTop: 16, borderRadius: 14, borderWidth: 1, padding: 14 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  title: { color: "#fff", fontSize: 16, fontWeight: "800" },
-  range: { color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: "700" },
-  readout: { color: "rgba(255,255,255,0.55)", fontSize: 11, marginTop: 7, textAlign: "center" },
-  empty: { color: "rgba(255,255,255,0.55)", fontSize: 12, lineHeight: 18, marginTop: 14 },
+  title: { fontSize: 17, fontWeight: "800" },
+  range: { fontSize: 13, fontWeight: "700" },
+  readout: { fontSize: 13, lineHeight: 19, fontWeight: "600", marginTop: 9, textAlign: "center" },
+  empty: { fontSize: 14, lineHeight: 20, fontWeight: "500", marginTop: 14 },
 });

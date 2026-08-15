@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 /* internal spacing */ },
   header: { marginBottom: 20 /* internal spacing */ },
   title: { fontSize: 28, fontWeight: "700", letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, marginTop: 4 },
+  subtitle: { fontSize: 15, lineHeight: 21, fontWeight: "500", marginTop: 5 },
 
   // Weight Card
   weightCard: {
@@ -629,8 +629,8 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16 /* internal spacing */,
   },
-  weightCardTitle: { fontSize: 15, fontWeight: "600", marginBottom: 2 /* internal spacing */ },
-  weightCardSub: { fontSize: 12, marginBottom: 14 /* internal spacing */ },
+  weightCardTitle: { fontSize: 17, fontWeight: "700", marginBottom: 4 /* internal spacing */ },
+  weightCardSub: { fontSize: 13, lineHeight: 19, marginBottom: 14 /* internal spacing */ },
   totalMassRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -639,8 +639,8 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  totalMassLabel: { fontSize: 12 },
-  totalMassValue: { fontSize: 16, fontWeight: "700" },
+  totalMassLabel: { fontSize: 13, fontWeight: "500" },
+  totalMassValue: { fontSize: 17, fontWeight: "800" },
 
   // Import
   importBtn: {
@@ -654,8 +654,8 @@ const styles = StyleSheet.create({
   },
   importIconWrap: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center" },
   importTextWrap: { flex: 1 },
-  importTitle: { fontSize: 15, fontWeight: "600" },
-  importSubtitle: { fontSize: 12, marginTop: 2 },
+  importTitle: { fontSize: 17, fontWeight: "700" },
+  importSubtitle: { fontSize: 13, lineHeight: 18, marginTop: 3 },
 
   // Error
   errorBox: {
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 16 /* internal spacing */,
   },
-  routeName: { fontSize: 15, fontWeight: "600", flex: 1 },
+  routeName: { fontSize: 16, fontWeight: "700", flex: 1 },
 
   // Stats Grid
   statsGrid: {
@@ -697,33 +697,33 @@ const styles = StyleSheet.create({
     borderRightWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  statValue: { fontSize: 18, fontWeight: "600" },
-  statLabel: { fontSize: 12, marginTop: 4 },
+  statValue: { fontSize: 20, fontWeight: "800" },
+  statLabel: { fontSize: 13, fontWeight: "600", marginTop: 4 },
 
   routePreview: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 12, marginBottom: 16, overflow: "hidden" },
   routePreviewHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  routePreviewHint: { fontSize: 10 },
+  routePreviewHint: { fontSize: 12, fontWeight: "600" },
   routePreviewLegend: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4, marginTop: 4 },
-  routePreviewLegendText: { fontSize: 11 },
+  routePreviewLegendText: { fontSize: 12, fontWeight: "600" },
 
   routeConfirmCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 16, marginBottom: 16 },
   routeConfirmHeading: { flexDirection: "row", gap: 11, alignItems: "center" },
   routeConfirmIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   routeConfirmMain: { fontSize: 27, fontWeight: "700", letterSpacing: -0.5 },
-  routeConfirmSub: { fontSize: 12, marginTop: 2 },
-  routeConfirmFactors: { fontSize: 11, lineHeight: 16, marginTop: 13 },
+  routeConfirmSub: { fontSize: 13, lineHeight: 18, marginTop: 3 },
+  routeConfirmFactors: { fontSize: 12, lineHeight: 18, marginTop: 13 },
   energyCarryCard: { marginTop: 13, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12 },
   energyCarryHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 8 },
-  energyCarryTitle: { fontSize: 13, fontWeight: "700" },
-  energyCarryUnit: { fontSize: 10, flexShrink: 1, textAlign: "right" },
+  energyCarryTitle: { fontSize: 14, fontWeight: "800" },
+  energyCarryUnit: { fontSize: 12, flexShrink: 1, textAlign: "right", fontWeight: "600" },
   energyCarryCounts: { flexDirection: "row", alignItems: "center", marginTop: 11 },
   energyCarryCount: { flex: 1 },
-  energyCarryLabel: { fontSize: 11 },
+  energyCarryLabel: { fontSize: 12, fontWeight: "600" },
   energyCarryValue: { fontSize: 25, fontWeight: "700", marginTop: 2 },
   energyCarrySuffix: { fontSize: 13, fontWeight: "600" },
   energyCarryDivider: { width: StyleSheet.hairlineWidth, height: 34, marginHorizontal: 12 },
-  energyCarryFactors: { fontSize: 10, lineHeight: 15, marginTop: 10 },
-  routeConfirmNotice: { fontSize: 11, lineHeight: 16, marginTop: 7 },
+  energyCarryFactors: { fontSize: 12, lineHeight: 18, marginTop: 10 },
+  routeConfirmNotice: { fontSize: 12, lineHeight: 18, marginTop: 8 },
   startRouteBtn: { marginTop: 15, minHeight: 48, borderRadius: 13, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   startRouteBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 

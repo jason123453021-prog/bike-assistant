@@ -1773,6 +1773,18 @@
 - [x] 檢查 EAS CLI 的登入狀態、專案資訊與可用權限，不讀取或輸出憑證：本機 CLI 未登入，但使用者已在 Expo 網頁帳戶 `jason123453021` 建立專案
 - [x] 在有效 Expo 帳戶權限下初始化 EAS projectId 並寫回 Expo 動態設定：已加入 owner 與服務端簽發 projectId，`expo config --json` 與 TypeScript 驗證成功
 - [x] 完成 EAS projectId 關聯後驗證：lint 0 errors、173 passed／1 skipped、Android Hermes bundle 5.72 MB
+- [x] 盤點導航、紀錄與設定頁的色彩令牌、文字樣式與卡片邊界來源
+- [x] 提升小螢幕文字、次要說明、表單列、搜尋列與空狀態的對比與閱讀層級
+- [x] 新增可讀性回歸檢查，完成小螢幕可讀性守門、TypeScript、lint、179 passed／1 skipped 與 Android Hermes bundle 5.72 MB 驗證
+- [x] 盤點所有主要畫面的現有文字對比、字級、卡片、按鈕與導航列不一致問題
+- [x] 研究現代行動運動 App 的高對比、低干擾、單手操作與動態資訊層級原則
+- [x] 建立全 App 共用的色彩、字級、間距、表面與互動元件視覺規範
+- [x] 逐頁改善導航、路線、紀錄、設定、活動詳情、全螢幕媒體與彈窗
+- [x] 新增全頁可讀性守門測試，完成 TypeScript、lint、179 passed／1 skipped 與 Android Hermes bundle 5.72 MB 驗證
+- [x] 盤點各路由、詳情頁、彈窗、空狀態與底部導覽列在淺色／深色模式下的樣式來源
+- [x] 定義雙主題的表面層級、文字層級、邊界、狀態色、輸入欄與互動元件規範
+- [x] 將雙主題規範套用至所有可進入頁面與彈窗，消除硬編碼白／黑造成的主題錯置
+- [x] 為淺色與深色模式新增全頁可讀性與觸控目標守門測試
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
