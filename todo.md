@@ -1704,6 +1704,8 @@
 - [x] 端到端核對背景／鎖定螢幕補給到期通知、待確認狀態保存與回到前景即時補顯示 Modal 的行為（148 passed／1 skipped、Android Hermes bundle 5.67 MB）
 - [x] GPX 路線預覽依預估時間、爬升、坡度、FTP、體重與環境自動顯示最少／最多能量補給份數
 - [x] 新增 GPX 能量補給份數估算回歸測試，完成 TypeScript、零 lint advisory、151 passed／1 skipped 與 Android Hermes bundle 5.68 MB 驗證
+- [x] 正式 APK 加入通知、精確／背景位置與電池不受限制的權限健檢與逐項系統設定引導
+- [x] 在開始騎乘前提醒未完成的背景騎乘必要設定，新增回歸測試並完成 TypeScript、零 lint advisory、154 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
 - [ ] 新增回歸測試、完成 TypeScript、完整測試與 Android bundle 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）

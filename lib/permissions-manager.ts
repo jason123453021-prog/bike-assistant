@@ -1,6 +1,8 @@
 import * as Location from 'expo-location';
-import { Platform, Linking, Alert } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { getLocalNotifications, isExpoGoRuntime } from '@/lib/local-notifications';
 
 const PERMISSIONS_ONBOARDING_KEY = 'permissions_onboarding_completed';
@@ -136,11 +138,11 @@ export class PermissionsManager {
   static async checkBatteryOptimizationWhitelist(): Promise<PermissionStatus> {
     return {
       type: 'battery_optimization',
-      name: '電池最佳化白名單',
-      description: '防止系統因省電機制關閉 App 背景進程',
+      name: '電池不受限制',
+      description: '在系統頁將本 App 設為「不受限制」，降低省電機制中斷背景騎乘的機率',
       granted: false,
       required: true,
-      systemSettingsUrl: 'android.settings.ACTION_BATTERY_SAVER_SETTINGS',
+      systemSettingsUrl: IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS,
     };
   }
 
@@ -175,20 +177,29 @@ export class PermissionsManager {
   static async openSystemSettings(permissionType: PermissionType): Promise<void> {
     try {
       if (Platform.OS === 'ios') {
-        Linking.openURL('app-settings:');
+        const { Linking } = await import('react-native');
+        await Linking.openSettings();
       } else if (Platform.OS === 'android') {
-        const packageName = 'com.jason123453021.bikeassistant';
+        const packageName = Constants.expoConfig?.android?.package;
         
         switch (permissionType) {
           case 'location':
+            await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS, {
+              data: packageName ? `package:${packageName}` : undefined,
+            });
+            break;
           case 'notification':
-            Linking.openURL(`package:${packageName}`);
+            await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.APP_NOTIFICATION_SETTINGS, {
+              extra: packageName ? { 'android.provider.extra.APP_PACKAGE': packageName } : undefined,
+            });
             break;
           case 'overlay':
-            Linking.openURL('android.settings.action.MANAGE_OVERLAY_PERMISSION');
+            await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.MANAGE_APP_OVERLAY_PERMISSION, {
+              data: packageName ? `package:${packageName}` : undefined,
+            });
             break;
           case 'battery_optimization':
-            Linking.openURL('android.settings.ACTION_BATTERY_SAVER_SETTINGS');
+            await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
             break;
         }
       }

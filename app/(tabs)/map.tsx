@@ -43,6 +43,7 @@ import { Accelerometer } from "expo-sensors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
+import { router } from "expo-router";
 import Svg, { Circle } from "react-native-svg";
 
 import { useRide } from "@/lib/ride-context";
@@ -3078,25 +3079,37 @@ export default function MapScreen() {
         {/* ── 控制按鈕 ── */}
         <View style={styles.btnRow}>
           {!isActive ? (
-            <View style={styles.preRideControls}>
+            <View style={styles.preRideControlArea}>
               <Pressable
-                accessibilityLabel="選擇運動類型"
-                style={({ pressed }) => [
-                  styles.sportInlineTrigger,
-                  { borderColor: SPORT_META[state.sportType].accent, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={() => setSportPickerVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel="前往背景騎乘準備設定"
+                style={({ pressed }) => [styles.preRideReadinessHint, { opacity: pressed ? 0.72 : 1 }]}
+                onPress={() => router.push("/settings")}
               >
-                <Text style={styles.sportInlineIcon}>{SPORT_META[state.sportType].icon}</Text>
-                <Text style={styles.sportInlineLabel}>{SPORT_META[state.sportType].label}</Text>
+                <IconSymbol name="bolt.fill" size={13} color="#00C853" />
+                <Text style={styles.preRideReadinessText}>開始前請確認通知、背景位置與電池不受限制</Text>
+                <IconSymbol name="chevron.right" size={15} color="#9AA3AE" />
               </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.startBtn, { opacity: pressed ? 0.85 : 1 }]}
-                onPress={handleStart}
-              >
-                <IconSymbol name="play.fill" size={20} color="#fff" />
-                <Text style={styles.startBtnText}>開始</Text>
-              </Pressable>
+              <View style={styles.preRideControls}>
+                <Pressable
+                  accessibilityLabel="選擇運動類型"
+                  style={({ pressed }) => [
+                    styles.sportInlineTrigger,
+                    { borderColor: SPORT_META[state.sportType].accent, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => setSportPickerVisible(true)}
+                >
+                  <Text style={styles.sportInlineIcon}>{SPORT_META[state.sportType].icon}</Text>
+                  <Text style={styles.sportInlineLabel}>{SPORT_META[state.sportType].label}</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.startBtn, { opacity: pressed ? 0.85 : 1 }]}
+                  onPress={handleStart}
+                >
+                  <IconSymbol name="play.fill" size={20} color="#fff" />
+                  <Text style={styles.startBtnText}>開始</Text>
+                </Pressable>
+              </View>
             </View>
           ) : (
             <View style={styles.activeButtons}>
@@ -3884,7 +3897,10 @@ const styles = StyleSheet.create({
   },
   sportChoiceIcon: { fontSize: 17 },
   sportChoiceLabel: { color: "rgba(255,255,255,0.63)", fontSize: 10, fontWeight: "700", textAlign: "center" },
+  preRideControlArea: { gap: 7 },
   preRideControls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
+  preRideReadinessHint: { minHeight: 28, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
+  preRideReadinessText: { color: "#B7C1CC", fontSize: 10, fontWeight: "600" },
   sportInlineTrigger: {
     minWidth: 88,
     height: 52,

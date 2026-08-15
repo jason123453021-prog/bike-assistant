@@ -25,6 +25,7 @@ import { SmartPowerSavingManager, type PowerSavingSettings } from "@/lib/power-s
 import { useRide } from "@/lib/ride-context";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-profile";
+import { RidePermissionReadiness } from "@/components/ride-permission-readiness";
 
 
 import Constants from "expo-constants";
@@ -344,6 +345,8 @@ export default function SettingsScreen() {
             <Text style={[styles.rowHint, { color: colors.muted }]}>{autoPersonalMetrics.sourceRideCount ? `依 ${autoPersonalMetrics.sourceRideCount} 次有效本機騎乘更新` : "尚無足夠功率歷史，暫用安全基準並持續校正"}</Text>
           </View>
         </View>}
+
+        <RidePermissionReadiness />
 
         {/* ── 背景 GPS 精度 ── */}
         <SectionHeader title="背景 GPS 精度" colors={colors} onToggle={() => toggleSection("gpsAccuracy")} collapsed={collapsedSections["gpsAccuracy"]} />
