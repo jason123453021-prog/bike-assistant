@@ -24,5 +24,7 @@ describe("route estimate snapshot", () => {
     expect(snapshot.estimatedWaterLossMl).toBeGreaterThan(0);
     expect(snapshot.suggestedWaterMl).toBeGreaterThan(0);
     expect(snapshot.suggestedEnergyKcal).toBeGreaterThan(0);
+    expect(snapshot.energySupplyCarry.minimumServings).toBeGreaterThan(0);
+    expect(snapshot.energySupplyCarry.maximumServings).toBeGreaterThanOrEqual(snapshot.energySupplyCarry.minimumServings);
   });
 });

@@ -3,6 +3,7 @@ import { calculatePersonalizedCalories } from "./personalized-ride-calculations"
 import { createSupplyPlan } from "./smart-supply-plan";
 import type { GpxRoute } from "./gpx-parser";
 import { estimateRouteCompletionTime, type RouteTimeEstimate } from "./route-time-estimator";
+import { estimateRouteEnergySupplyCarry, type RouteEnergySupplyCarryPlan } from "./route-energy-supply";
 
 export interface RouteEstimateSnapshot {
   time: RouteTimeEstimate;
@@ -10,6 +11,7 @@ export interface RouteEstimateSnapshot {
   estimatedWaterLossMl: number;
   suggestedWaterMl: number;
   suggestedEnergyKcal: number;
+  energySupplyCarry: RouteEnergySupplyCarryPlan;
   sourceLabel: string;
 }
 
@@ -74,12 +76,24 @@ export function buildRouteEstimateSnapshot(input: {
     environmentLoad: hydration.environmentLoad,
     weatherAvailable: input.temperatureC !== undefined,
   });
+  const energySupplyCarry = estimateRouteEnergySupplyCarry({
+    estimatedDurationSeconds: time.estimatedDurationSeconds,
+    upperDurationSeconds: time.upperDurationSeconds,
+    intensityFactor: time.intensityFactor,
+    totalAscentM: input.route.totalAscent,
+    distanceM: input.route.totalDistance,
+    temperatureC: input.temperatureC,
+    humidityPct: input.humidityPct,
+    averageHeadwindMs: time.averageHeadwindMs,
+    precipitationProb: input.precipitationProb,
+  });
   return {
     time,
     estimatedCaloriesKcal: Math.round(calorie.kcal),
     estimatedWaterLossMl: Math.round(hydration.sweatLossMl),
     suggestedWaterMl: supply.waterRecommendationMl,
     suggestedEnergyKcal: supply.energyRecommendationKcal,
+    energySupplyCarry,
     sourceLabel: "App 自動 FTP、體重、路線坡度、天氣與風向",
   };
 }

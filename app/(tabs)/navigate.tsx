@@ -397,6 +397,26 @@ export default function NavigateScreen() {
                     </View>
                   </View>
                   <Text style={[styles.routeConfirmFactors, { color: colors.muted }]}>{routeTimeEstimate.factors.join(" · ")}</Text>
+                  <View style={[styles.energyCarryCard, { backgroundColor: colors.background, borderColor: colors.border }]}> 
+                    <View style={styles.energyCarryHeader}>
+                      <Text style={[styles.energyCarryTitle, { color: colors.foreground }]}>建議攜帶能量補給</Text>
+                      <Text style={[styles.energyCarryUnit, { color: colors.muted }]}>每份約 {routeEstimate.energySupplyCarry.standardServingCarbohydrateG} g 碳水</Text>
+                    </View>
+                    <View style={styles.energyCarryCounts}>
+                      <View style={styles.energyCarryCount}>
+                        <Text style={[styles.energyCarryLabel, { color: colors.muted }]}>最少攜帶</Text>
+                        <Text style={[styles.energyCarryValue, { color: colors.accent }]}>{routeEstimate.energySupplyCarry.minimumServings} <Text style={styles.energyCarrySuffix}>份</Text></Text>
+                      </View>
+                      <View style={[styles.energyCarryDivider, { backgroundColor: colors.border }]} />
+                      <View style={styles.energyCarryCount}>
+                        <Text style={[styles.energyCarryLabel, { color: colors.muted }]}>最多攜帶</Text>
+                        <Text style={[styles.energyCarryValue, { color: colors.foreground }]}>{routeEstimate.energySupplyCarry.maximumServings} <Text style={styles.energyCarrySuffix}>份</Text></Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.energyCarryFactors, { color: colors.muted }]}>
+                      依 {routeEstimate.energySupplyCarry.factors.join("、")} 推估；最多包含高負荷或延誤備援。
+                    </Text>
+                  </View>
                   <Text style={[styles.routeConfirmNotice, { color: colors.muted }]}>不含休息、路口、交通、實際風況與路況；此為離線規劃參考。</Text>
                   <Pressable
                     style={({ pressed }) => [styles.startRouteBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.82 : 1 }]}
@@ -692,6 +712,17 @@ const styles = StyleSheet.create({
   routeConfirmMain: { fontSize: 27, fontWeight: "700", letterSpacing: -0.5 },
   routeConfirmSub: { fontSize: 12, marginTop: 2 },
   routeConfirmFactors: { fontSize: 11, lineHeight: 16, marginTop: 13 },
+  energyCarryCard: { marginTop: 13, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12 },
+  energyCarryHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 8 },
+  energyCarryTitle: { fontSize: 13, fontWeight: "700" },
+  energyCarryUnit: { fontSize: 10, flexShrink: 1, textAlign: "right" },
+  energyCarryCounts: { flexDirection: "row", alignItems: "center", marginTop: 11 },
+  energyCarryCount: { flex: 1 },
+  energyCarryLabel: { fontSize: 11 },
+  energyCarryValue: { fontSize: 25, fontWeight: "700", marginTop: 2 },
+  energyCarrySuffix: { fontSize: 13, fontWeight: "600" },
+  energyCarryDivider: { width: StyleSheet.hairlineWidth, height: 34, marginHorizontal: 12 },
+  energyCarryFactors: { fontSize: 10, lineHeight: 15, marginTop: 10 },
   routeConfirmNotice: { fontSize: 11, lineHeight: 16, marginTop: 7 },
   startRouteBtn: { marginTop: 15, minHeight: 48, borderRadius: 13, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   startRouteBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
