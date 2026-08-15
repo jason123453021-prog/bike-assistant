@@ -27,6 +27,7 @@ import { calculateSweatLoss } from "@/lib/hydration-calc";
 import { getHeadwindMs } from "@/lib/weather-service";
 import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import { evaluateTrackPoint, type TrackQualityPoint } from "@/lib/track-point-quality";
+import type { SupplyIntervalKind } from "@/lib/supply-interval";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
@@ -83,15 +84,22 @@ export interface BackgroundState {
   smartCalorieCountdownDurationSec?: number;
   smartWaterCountdownDurationSec?: number;
   rideStartedAt: number;
-  supplyIntervalReminderEnabled: boolean;
-  supplyTimeIntervalEnabled: boolean;
-  supplyTimeIntervalMinutes: number;
-  supplyDistanceIntervalEnabled: boolean;
-  supplyDistanceIntervalKm: number;
-  intervalLastTimeSec: number;
-  intervalLastDistanceKm: number;
-  intervalTimeReminderSent: boolean;
-  intervalDistanceReminderSent: boolean;
+  supplyEnergyTimeIntervalEnabled: boolean;
+  supplyEnergyTimeIntervalMinutes: number;
+  supplyEnergyDistanceIntervalEnabled: boolean;
+  supplyEnergyDistanceIntervalKm: number;
+  supplyWaterTimeIntervalEnabled: boolean;
+  supplyWaterTimeIntervalMinutes: number;
+  supplyWaterDistanceIntervalEnabled: boolean;
+  supplyWaterDistanceIntervalKm: number;
+  intervalLastEnergyTimeSec: number;
+  intervalLastEnergyDistanceKm: number;
+  intervalLastWaterTimeSec: number;
+  intervalLastWaterDistanceKm: number;
+  intervalEnergyTimeReminderSent: boolean;
+  intervalEnergyDistanceReminderSent: boolean;
+  intervalWaterTimeReminderSent: boolean;
+  intervalWaterDistanceReminderSent: boolean;
   trackingMode?: "full" | "idle_monitor";
   gpsAccuracy?: GpsAccuracyLevel;
   lastSpeedMs?: number;
@@ -385,49 +393,59 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         }
       }
 
-      const timeIntervalSec = (state.supplyTimeIntervalMinutes ?? 0) * 60;
-      if (
-        state.supplyIntervalReminderEnabled &&
-        state.supplyTimeIntervalEnabled &&
-        timeIntervalSec > 0 &&
-        elapsedSec - (state.intervalLastTimeSec ?? 0) >= timeIntervalSec &&
-        !state.intervalTimeReminderSent
-      ) {
-        state.intervalTimeReminderSent = true;
-        const Notifications = await getLocalNotifications();
-        if (Notifications) {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: "補給提醒",
-              body: `已騎乘 ${state.supplyTimeIntervalMinutes} 分鐘，建議補充能量與水分`,
-              sound: true,
-              categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
-              data: { type: "supply_reminder", supplyKind: "interval-time" },
-              priority: Notifications.AndroidNotificationPriority.HIGH,
-            },
-            trigger: null,
-          });
-        }
-      }
-
       const distanceKm = state.totalDistanceM / 1000;
-      if (
-        state.supplyIntervalReminderEnabled &&
-        state.supplyDistanceIntervalEnabled &&
-        state.supplyDistanceIntervalKm > 0 &&
-        distanceKm - (state.intervalLastDistanceKm ?? 0) >= state.supplyDistanceIntervalKm &&
-        !state.intervalDistanceReminderSent
-      ) {
-        state.intervalDistanceReminderSent = true;
+      const intervalRules: Array<{
+        kind: SupplyIntervalKind;
+        enabled: boolean;
+        interval: number;
+        since: number;
+        sent: boolean;
+        markSent: () => void;
+        title: string;
+        body: string;
+      }> = [
+        {
+          kind: "energy-time", enabled: state.supplyEnergyTimeIntervalEnabled,
+          interval: state.supplyEnergyTimeIntervalMinutes * 60, since: state.intervalLastEnergyTimeSec,
+          sent: state.intervalEnergyTimeReminderSent,
+          markSent: () => { state.intervalEnergyTimeReminderSent = true; },
+          title: "能量補給提醒", body: `已騎乘 ${state.supplyEnergyTimeIntervalMinutes} 分鐘，請補給能量`,
+        },
+        {
+          kind: "energy-distance", enabled: state.supplyEnergyDistanceIntervalEnabled,
+          interval: state.supplyEnergyDistanceIntervalKm, since: state.intervalLastEnergyDistanceKm,
+          sent: state.intervalEnergyDistanceReminderSent,
+          markSent: () => { state.intervalEnergyDistanceReminderSent = true; },
+          title: "能量補給提醒", body: `已累積騎乘 ${state.supplyEnergyDistanceIntervalKm} km，請補給能量`,
+        },
+        {
+          kind: "water-time", enabled: state.supplyWaterTimeIntervalEnabled,
+          interval: state.supplyWaterTimeIntervalMinutes * 60, since: state.intervalLastWaterTimeSec,
+          sent: state.intervalWaterTimeReminderSent,
+          markSent: () => { state.intervalWaterTimeReminderSent = true; },
+          title: "補水提醒", body: `已騎乘 ${state.supplyWaterTimeIntervalMinutes} 分鐘，請補給水分`,
+        },
+        {
+          kind: "water-distance", enabled: state.supplyWaterDistanceIntervalEnabled,
+          interval: state.supplyWaterDistanceIntervalKm, since: state.intervalLastWaterDistanceKm,
+          sent: state.intervalWaterDistanceReminderSent,
+          markSent: () => { state.intervalWaterDistanceReminderSent = true; },
+          title: "補水提醒", body: `已累積騎乘 ${state.supplyWaterDistanceIntervalKm} km，請補給水分`,
+        },
+      ];
+      for (const rule of intervalRules) {
+        const currentValue = rule.kind.endsWith("-time") ? elapsedSec : distanceKm;
+        if (!rule.enabled || rule.interval <= 0 || rule.sent || currentValue - rule.since < rule.interval) continue;
+        rule.markSent();
         const Notifications = await getLocalNotifications();
         if (Notifications) {
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: "補給提醒",
-              body: `已累積騎乘 ${state.supplyDistanceIntervalKm} km，建議補充能量與水分`,
+              title: rule.title,
+              body: rule.body,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
-              data: { type: "supply_reminder", supplyKind: "interval-distance" },
+              data: { type: "supply_reminder", supplyKind: `interval-${rule.kind}` },
               priority: Notifications.AndroidNotificationPriority.HIGH,
             },
             trigger: null,
@@ -466,11 +484,14 @@ export async function initBackgroundState(params: {
   currentLon: number;
   currentTimestamp?: number;
   currentAccuracy?: number | null;
-  supplyIntervalReminderEnabled: boolean;
-  supplyTimeIntervalEnabled: boolean;
-  supplyTimeIntervalMinutes: number;
-  supplyDistanceIntervalEnabled: boolean;
-  supplyDistanceIntervalKm: number;
+  supplyEnergyTimeIntervalEnabled: boolean;
+  supplyEnergyTimeIntervalMinutes: number;
+  supplyEnergyDistanceIntervalEnabled: boolean;
+  supplyEnergyDistanceIntervalKm: number;
+  supplyWaterTimeIntervalEnabled: boolean;
+  supplyWaterTimeIntervalMinutes: number;
+  supplyWaterDistanceIntervalEnabled: boolean;
+  supplyWaterDistanceIntervalKm: number;
   riderProfile?: BackgroundState["riderProfile"];
   environment?: BackgroundState["environment"];
 }) {
@@ -492,15 +513,22 @@ export async function initBackgroundState(params: {
     smartCalorieCountdownStartedElapsedSec: 0,
     smartWaterCountdownStartedElapsedSec: 0,
     rideStartedAt: startedAt,
-    supplyIntervalReminderEnabled: params.supplyIntervalReminderEnabled,
-    supplyTimeIntervalEnabled: params.supplyTimeIntervalEnabled,
-    supplyTimeIntervalMinutes: params.supplyTimeIntervalMinutes,
-    supplyDistanceIntervalEnabled: params.supplyDistanceIntervalEnabled,
-    supplyDistanceIntervalKm: params.supplyDistanceIntervalKm,
-    intervalLastTimeSec: 0,
-    intervalLastDistanceKm: 0,
-    intervalTimeReminderSent: false,
-    intervalDistanceReminderSent: false,
+    supplyEnergyTimeIntervalEnabled: params.supplyEnergyTimeIntervalEnabled,
+    supplyEnergyTimeIntervalMinutes: params.supplyEnergyTimeIntervalMinutes,
+    supplyEnergyDistanceIntervalEnabled: params.supplyEnergyDistanceIntervalEnabled,
+    supplyEnergyDistanceIntervalKm: params.supplyEnergyDistanceIntervalKm,
+    supplyWaterTimeIntervalEnabled: params.supplyWaterTimeIntervalEnabled,
+    supplyWaterTimeIntervalMinutes: params.supplyWaterTimeIntervalMinutes,
+    supplyWaterDistanceIntervalEnabled: params.supplyWaterDistanceIntervalEnabled,
+    supplyWaterDistanceIntervalKm: params.supplyWaterDistanceIntervalKm,
+    intervalLastEnergyTimeSec: 0,
+    intervalLastEnergyDistanceKm: 0,
+    intervalLastWaterTimeSec: 0,
+    intervalLastWaterDistanceKm: 0,
+    intervalEnergyTimeReminderSent: false,
+    intervalEnergyDistanceReminderSent: false,
+    intervalWaterTimeReminderSent: false,
+    intervalWaterDistanceReminderSent: false,
     trackingMode: "full",
     gpsAccuracy: "standard",
     riderProfile: params.riderProfile,
@@ -566,17 +594,24 @@ export async function stopBackgroundState() {
 }
 
 /** 在前台確認時間／距離補給後，將背景任務的同一項計數基準同步重置。 */
-export async function acknowledgeBackgroundSupplyInterval(kind: "time" | "distance") {
+export async function acknowledgeBackgroundSupplyInterval(kind: SupplyIntervalKind) {
   try {
     const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
     if (!stateStr) return;
     const state: BackgroundState = JSON.parse(stateStr);
-    if (kind === "time") {
-      state.intervalLastTimeSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
-      state.intervalTimeReminderSent = false;
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
+    if (kind === "energy-time") {
+      state.intervalLastEnergyTimeSec = elapsedSec;
+      state.intervalEnergyTimeReminderSent = false;
+    } else if (kind === "energy-distance") {
+      state.intervalLastEnergyDistanceKm = state.totalDistanceM / 1000;
+      state.intervalEnergyDistanceReminderSent = false;
+    } else if (kind === "water-time") {
+      state.intervalLastWaterTimeSec = elapsedSec;
+      state.intervalWaterTimeReminderSent = false;
     } else {
-      state.intervalLastDistanceKm = state.totalDistanceM / 1000;
-      state.intervalDistanceReminderSent = false;
+      state.intervalLastWaterDistanceKm = state.totalDistanceM / 1000;
+      state.intervalWaterDistanceReminderSent = false;
     }
     await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   } catch {}

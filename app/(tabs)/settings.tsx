@@ -402,9 +402,10 @@ export default function SettingsScreen() {
             onToggle={(enabled) => updateSettings(enabled
               ? {
                   supplyCalculationMode: "smart",
-                  supplyIntervalReminderEnabled: false,
-                  supplyTimeIntervalEnabled: false,
-                  supplyDistanceIntervalEnabled: false,
+                  supplyEnergyTimeIntervalEnabled: false,
+                  supplyEnergyDistanceIntervalEnabled: false,
+                  supplyWaterTimeIntervalEnabled: false,
+                  supplyWaterDistanceIntervalEnabled: false,
                 }
               : { supplyCalculationMode: "custom" })}
           />
@@ -416,54 +417,93 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <Divider colors={colors} />
-          <ToggleRow
-            icon="bell.badge.fill"
-            label={settings.supplyCalculationMode === "smart" ? "依時間／距離提醒補給（智慧模式已接管）" : "依時間／距離提醒補給"}
-            value={settings.supplyCalculationMode === "smart" ? false : settings.supplyIntervalReminderEnabled}
-            colors={colors}
-            disabled={settings.supplyCalculationMode === "smart"}
-            onToggle={(enabled) => updateSettings({ supplyIntervalReminderEnabled: enabled })}
-          />
           {settings.supplyCalculationMode === "smart" ? (
             <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-              <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>智慧補給會依下一次倒數到期提醒，已停用固定時間／距離間隔，避免重複或衝突通知。</Text>
+              <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>智慧補給會依下一次倒數到期提醒，已停用能量與補水的固定時間／距離規則，避免重複或衝突通知。</Text>
             </View>
-          ) : settings.supplyIntervalReminderEnabled && <>
-            <Divider colors={colors} />
+          ) : <>
+            <View style={styles.intervalGroupHeader}>
+              <IconSymbol name="flame.fill" size={18} color="#D97706" />
+              <View style={styles.intervalGroupTitleWrap}>
+                <Text style={[styles.intervalGroupTitle, { color: colors.foreground }]}>能量提醒</Text>
+                <Text style={[styles.intervalGroupHint, { color: colors.muted }]}>能量可分別依時間或距離提醒</Text>
+              </View>
+            </View>
             <ToggleRow
               icon="clock.fill"
-              label="按時間間隔提醒"
-              value={settings.supplyTimeIntervalEnabled}
+              label="能量：按時間提醒"
+              value={settings.supplyEnergyTimeIntervalEnabled}
               colors={colors}
-              onToggle={(enabled) => updateSettings({ supplyTimeIntervalEnabled: enabled })}
+              onToggle={(enabled) => updateSettings({ supplyEnergyTimeIntervalEnabled: enabled })}
             />
-            {settings.supplyTimeIntervalEnabled && <NumberRow
+            {settings.supplyEnergyTimeIntervalEnabled && <NumberRow
               icon="clock.fill"
-              label="時間提醒間隔"
-              value={settings.supplyTimeIntervalMinutes}
+              label="能量時間間隔"
+              value={settings.supplyEnergyTimeIntervalMinutes}
               unit="分鐘"
               colors={colors}
-              iconColor={colors.primary}
-              hint="從開始騎乘或上次確認補給後重新計時"
-              onPress={() => openEdit("supplyTimeIntervalMinutes", "時間提醒間隔", settings.supplyTimeIntervalMinutes, "分鐘")}
+              iconColor="#D97706"
+              hint="確認能量補給後重新計時"
+              onPress={() => openEdit("supplyEnergyTimeIntervalMinutes", "能量時間提醒間隔", settings.supplyEnergyTimeIntervalMinutes, "分鐘")}
             />}
-            <Divider colors={colors} />
             <ToggleRow
               icon="location.fill"
-              label="按距離間隔提醒"
-              value={settings.supplyDistanceIntervalEnabled}
+              label="能量：按距離提醒"
+              value={settings.supplyEnergyDistanceIntervalEnabled}
               colors={colors}
-              onToggle={(enabled) => updateSettings({ supplyDistanceIntervalEnabled: enabled })}
+              onToggle={(enabled) => updateSettings({ supplyEnergyDistanceIntervalEnabled: enabled })}
             />
-            {settings.supplyDistanceIntervalEnabled && <NumberRow
+            {settings.supplyEnergyDistanceIntervalEnabled && <NumberRow
               icon="location.fill"
-              label="距離提醒間隔"
-              value={settings.supplyDistanceIntervalKm}
+              label="能量距離間隔"
+              value={settings.supplyEnergyDistanceIntervalKm}
               unit="km"
               colors={colors}
-              iconColor="#9C27B0"
-              hint="從開始騎乘或上次確認補給後重新累計距離"
-              onPress={() => openEdit("supplyDistanceIntervalKm", "距離提醒間隔", settings.supplyDistanceIntervalKm, "km")}
+              iconColor="#D97706"
+              hint="確認能量補給後重新累計距離"
+              onPress={() => openEdit("supplyEnergyDistanceIntervalKm", "能量距離提醒間隔", settings.supplyEnergyDistanceIntervalKm, "km")}
+            />}
+            <Divider colors={colors} />
+            <View style={styles.intervalGroupHeader}>
+              <IconSymbol name="drop.fill" size={18} color="#0284C7" />
+              <View style={styles.intervalGroupTitleWrap}>
+                <Text style={[styles.intervalGroupTitle, { color: colors.foreground }]}>補水提醒</Text>
+                <Text style={[styles.intervalGroupHint, { color: colors.muted }]}>補水可分別依時間或距離提醒</Text>
+              </View>
+            </View>
+            <ToggleRow
+              icon="clock.fill"
+              label="補水：按時間提醒"
+              value={settings.supplyWaterTimeIntervalEnabled}
+              colors={colors}
+              onToggle={(enabled) => updateSettings({ supplyWaterTimeIntervalEnabled: enabled })}
+            />
+            {settings.supplyWaterTimeIntervalEnabled && <NumberRow
+              icon="clock.fill"
+              label="補水時間間隔"
+              value={settings.supplyWaterTimeIntervalMinutes}
+              unit="分鐘"
+              colors={colors}
+              iconColor="#0284C7"
+              hint="確認補水後重新計時"
+              onPress={() => openEdit("supplyWaterTimeIntervalMinutes", "補水時間提醒間隔", settings.supplyWaterTimeIntervalMinutes, "分鐘")}
+            />}
+            <ToggleRow
+              icon="location.fill"
+              label="補水：按距離提醒"
+              value={settings.supplyWaterDistanceIntervalEnabled}
+              colors={colors}
+              onToggle={(enabled) => updateSettings({ supplyWaterDistanceIntervalEnabled: enabled })}
+            />
+            {settings.supplyWaterDistanceIntervalEnabled && <NumberRow
+              icon="location.fill"
+              label="補水距離間隔"
+              value={settings.supplyWaterDistanceIntervalKm}
+              unit="km"
+              colors={colors}
+              iconColor="#0284C7"
+              hint="確認補水後重新累計距離"
+              onPress={() => openEdit("supplyWaterDistanceIntervalKm", "補水距離提醒間隔", settings.supplyWaterDistanceIntervalKm, "km")}
             />}
           </>}
           <Divider colors={colors} />
@@ -1358,6 +1398,10 @@ const styles = StyleSheet.create({
   rowHint: { fontSize: 11, marginTop: 2 },
   rowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
   rowValue: { fontSize: 15, fontWeight: "500" },
+  intervalGroupHeader: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6 },
+  intervalGroupTitleWrap: { flex: 1, gap: 2 },
+  intervalGroupTitle: { fontSize: 15, fontWeight: "700" },
+  intervalGroupHint: { fontSize: 11, lineHeight: 16 },
   ftpRecommendationRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 13, gap: 10 },
   autoMetricsNote: { paddingHorizontal: 16, paddingBottom: 12, paddingLeft: 46 },
   autoMetricValues: { paddingHorizontal: 16, paddingVertical: 13, gap: 4 },

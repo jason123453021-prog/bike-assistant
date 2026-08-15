@@ -156,7 +156,7 @@ import {
   type TrackQualityPoint,
 } from "@/lib/track-point-quality";
 import { SmartPowerSavingManager } from "@/lib/power-saving/smart-power-saving-system";
-import { getDueSupplyIntervals, type SupplyIntervalKind } from "@/lib/supply-interval";
+import { getDueSupplyIntervals, type SupplyIntervalKind, type SupplyIntervalTracker } from "@/lib/supply-interval";
 import {
   consumeSupplyNotificationActions,
   scheduleSupplySnooze,
@@ -686,8 +686,13 @@ export default function MapScreen() {
   const [customSupplyAlerts, setCustomSupplyAlerts] = useState<Record<string, boolean>>({});
   const customSupplyAlertsRef = useRef<Record<string, boolean>>({});
   const [activeSupplyAlerts, setActiveSupplyAlerts] = useState<string[]>([]);
-  // 通用補給間隔：與自訂補給品分開追蹤，確認後只重置對應類型的基準。
-  const intervalSupplyTrackerRef = useRef({ lastTimeSec: 0, lastDistanceKm: 0 });
+  // 手動能量／補水間隔：各自以時間與距離基準追蹤，確認後只重置對應規則。
+  const intervalSupplyTrackerRef = useRef<SupplyIntervalTracker>({
+    "energy-time": 0,
+    "energy-distance": 0,
+    "water-time": 0,
+    "water-distance": 0,
+  });
   const intervalSupplyAlertsRef = useRef<Partial<Record<SupplyIntervalKind, boolean>>>({});
   const [intervalSupplyAlerts, setIntervalSupplyAlerts] = useState<Partial<Record<SupplyIntervalKind, boolean>>>({});
   const intervalSupplyRepeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -749,14 +754,14 @@ export default function MapScreen() {
 
   const handleConfirmIntervalSupply = useCallback((kind: SupplyIntervalKind) => {
     const current = stateRef.current;
-    if (kind === "time") intervalSupplyTrackerRef.current.lastTimeSec = current.elapsed;
-    else intervalSupplyTrackerRef.current.lastDistanceKm = current.distance / 1000;
+    if (kind.endsWith("-time")) intervalSupplyTrackerRef.current[kind] = current.elapsed;
+    else intervalSupplyTrackerRef.current[kind] = current.distance / 1000;
     void acknowledgeBackgroundSupplyInterval(kind);
 
     const nextAlerts = { ...intervalSupplyAlertsRef.current, [kind]: false };
     intervalSupplyAlertsRef.current = nextAlerts;
     setIntervalSupplyAlerts(nextAlerts);
-    if (!nextAlerts.time && !nextAlerts.distance) clearIntervalSupplyRepeatTimer();
+    if (!Object.values(nextAlerts).some(Boolean)) clearIntervalSupplyRepeatTimer();
     if (settings.vibrationEnabled) vibrateSuccess();
   }, [clearIntervalSupplyRepeatTimer, settings.ttsEnabled, settings.vibrationEnabled]);
 
@@ -854,7 +859,7 @@ export default function MapScreen() {
         supplyRepeatTimerRef.current = null;
       }
     } else {
-      const intervalKind: SupplyIntervalKind = kind === "interval-time" ? "time" : "distance";
+      const intervalKind = kind.replace("interval-", "") as SupplyIntervalKind;
       intervalSnoozedUntilRef.current[intervalKind] = until;
       const nextAlerts = { ...intervalSupplyAlertsRef.current, [intervalKind]: false };
       intervalSupplyAlertsRef.current = nextAlerts;
@@ -871,7 +876,7 @@ export default function MapScreen() {
     }
     if (action.kind === "calorie") handleConfirmCalorieSupply();
     else if (action.kind === "water") handleConfirmWaterSupply();
-    else handleConfirmIntervalSupply(action.kind === "interval-time" ? "time" : "distance");
+    else handleConfirmIntervalSupply(action.kind.replace("interval-", "") as SupplyIntervalKind);
   }, [handleConfirmCalorieSupply, handleConfirmIntervalSupply, handleConfirmWaterSupply, handleSnoozeSupply]);
 
   useEffect(() => {
@@ -1338,20 +1343,26 @@ export default function MapScreen() {
 
     const dueKinds = getDueSupplyIntervals(
       {
-        enabled: settings.supplyIntervalReminderEnabled,
-        timeEnabled: settings.supplyTimeIntervalEnabled,
-        timeMinutes: settings.supplyTimeIntervalMinutes,
-        distanceEnabled: settings.supplyDistanceIntervalEnabled,
-        distanceKm: settings.supplyDistanceIntervalKm,
+        energy: {
+          timeEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyEnergyTimeIntervalEnabled,
+          timeMinutes: settings.supplyEnergyTimeIntervalMinutes,
+          distanceEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyEnergyDistanceIntervalEnabled,
+          distanceKm: settings.supplyEnergyDistanceIntervalKm,
+        },
+        water: {
+          timeEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyWaterTimeIntervalEnabled,
+          timeMinutes: settings.supplyWaterTimeIntervalMinutes,
+          distanceEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyWaterDistanceIntervalEnabled,
+          distanceKm: settings.supplyWaterDistanceIntervalKm,
+        },
       },
       intervalSupplyTrackerRef.current,
       current.elapsed,
       current.distance / 1000,
-      {
-        ...intervalSupplyAlertsRef.current,
-        time: Boolean(intervalSupplyAlertsRef.current.time || (intervalSnoozedUntilRef.current.time ?? 0) > Date.now()),
-        distance: Boolean(intervalSupplyAlertsRef.current.distance || (intervalSnoozedUntilRef.current.distance ?? 0) > Date.now()),
-      },
+      (Object.keys(intervalSupplyTrackerRef.current) as SupplyIntervalKind[]).reduce<Partial<Record<SupplyIntervalKind, boolean>>>((alerts, kind) => ({
+        ...alerts,
+        [kind]: Boolean(intervalSupplyAlertsRef.current[kind] || (intervalSnoozedUntilRef.current[kind] ?? 0) > Date.now()),
+      }), {}),
     );
     if (dueKinds.length === 0) return;
 
@@ -1362,25 +1373,30 @@ export default function MapScreen() {
     powerSavingManagerRef.current.onSupplyReminder();
     setTouchGuardEnabled(false);
     if (settings.vibrationEnabled) vibrateWarning();
-    if (settings.ttsEnabled) void speakSupplyReminder("calorie", true);
+    const dueTargets = new Set(dueKinds.map((kind) => kind.startsWith("energy-") ? "calorie" : "water"));
+    if (settings.ttsEnabled) dueTargets.forEach((target) => { void speakSupplyReminder(target, true); });
     if (settings.soundEnabled) {
       try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
     }
     if (settings.notificationEnabled) dueKinds.forEach((kind) => {
-      void showSupplyNotification(kind === "time" ? "interval-time" : "interval-distance");
+      void showSupplyNotification(`interval-${kind}`);
     });
 
     const repeatSec = settings.supplyReminderRepeatSec;
     if (repeatSec > 0 && !intervalSupplyRepeatTimerRef.current) {
       intervalSupplyRepeatTimerRef.current = setInterval(() => {
         const alerts = intervalSupplyAlertsRef.current;
-        const snoozed = (intervalSnoozedUntilRef.current.time ?? 0) > Date.now() || (intervalSnoozedUntilRef.current.distance ?? 0) > Date.now();
-        if ((!alerts.time && !alerts.distance) || snoozed) {
+        const pendingKinds = (Object.keys(intervalSupplyTrackerRef.current) as SupplyIntervalKind[])
+          .filter((kind) => alerts[kind] && (intervalSnoozedUntilRef.current[kind] ?? 0) <= Date.now());
+        if (pendingKinds.length === 0) {
           clearIntervalSupplyRepeatTimer();
           return;
         }
         if (settings.vibrationEnabled) vibrateWarning();
-        if (settings.ttsEnabled) void speakSupplyReminder("calorie", true);
+        if (settings.ttsEnabled) {
+          const targets = new Set(pendingKinds.map((kind) => kind.startsWith("energy-") ? "calorie" : "water"));
+          targets.forEach((target) => { void speakSupplyReminder(target, true); });
+        }
         if (settings.soundEnabled) {
           try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
         }
@@ -2200,7 +2216,12 @@ export default function MapScreen() {
         triggered: false,
       };
     });
-    intervalSupplyTrackerRef.current = { lastTimeSec: 0, lastDistanceKm: 0 };
+    intervalSupplyTrackerRef.current = {
+      "energy-time": 0,
+      "energy-distance": 0,
+      "water-time": 0,
+      "water-distance": 0,
+    };
     intervalSupplyAlertsRef.current = {};
     setIntervalSupplyAlerts({});
     clearIntervalSupplyRepeatTimer();
@@ -2221,11 +2242,14 @@ export default function MapScreen() {
       currentLon: lastPos?.coords.longitude ?? 0,
       currentTimestamp: lastPos?.timestamp,
       currentAccuracy: lastPos?.coords.accuracy,
-      supplyIntervalReminderEnabled: settings.supplyIntervalReminderEnabled,
-      supplyTimeIntervalEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyTimeIntervalEnabled,
-      supplyTimeIntervalMinutes: settings.supplyTimeIntervalMinutes,
-      supplyDistanceIntervalEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyDistanceIntervalEnabled,
-      supplyDistanceIntervalKm: settings.supplyDistanceIntervalKm,
+      supplyEnergyTimeIntervalEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyEnergyTimeIntervalEnabled,
+      supplyEnergyTimeIntervalMinutes: settings.supplyEnergyTimeIntervalMinutes,
+      supplyEnergyDistanceIntervalEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyEnergyDistanceIntervalEnabled,
+      supplyEnergyDistanceIntervalKm: settings.supplyEnergyDistanceIntervalKm,
+      supplyWaterTimeIntervalEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyWaterTimeIntervalEnabled,
+      supplyWaterTimeIntervalMinutes: settings.supplyWaterTimeIntervalMinutes,
+      supplyWaterDistanceIntervalEnabled: settings.supplyCalculationMode === "smart" ? false : settings.supplyWaterDistanceIntervalEnabled,
+      supplyWaterDistanceIntervalKm: settings.supplyWaterDistanceIntervalKm,
       riderProfile: {
         weightKg: settings.weight,
         heightCm: settings.height,
@@ -2307,7 +2331,12 @@ export default function MapScreen() {
           customSupplyAlertsRef.current = {};
           setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
           supplyItemsTrackerRef.current = {}; // 重置自訂補給品追蹤器
-          intervalSupplyTrackerRef.current = { lastTimeSec: 0, lastDistanceKm: 0 };
+          intervalSupplyTrackerRef.current = {
+            "energy-time": 0,
+            "energy-distance": 0,
+            "water-time": 0,
+            "water-distance": 0,
+          };
           intervalSupplyAlertsRef.current = {};
           setIntervalSupplyAlerts({});
           clearIntervalSupplyRepeatTimer();
@@ -2498,10 +2527,12 @@ export default function MapScreen() {
             }
             console.log(`[AppState] 已合併 ${newPoints.length}/${bgTrack.length} 個背景軌跡點（去重後）`);
             const restoredIntervalAlerts: Partial<Record<SupplyIntervalKind, boolean>> = {
-              time: bgState.intervalTimeReminderSent || false,
-              distance: bgState.intervalDistanceReminderSent || false,
+              "energy-time": bgState.intervalEnergyTimeReminderSent || false,
+              "energy-distance": bgState.intervalEnergyDistanceReminderSent || false,
+              "water-time": bgState.intervalWaterTimeReminderSent || false,
+              "water-distance": bgState.intervalWaterDistanceReminderSent || false,
             };
-            if (restoredIntervalAlerts.time || restoredIntervalAlerts.distance) {
+            if (Object.values(restoredIntervalAlerts).some(Boolean)) {
               intervalSupplyAlertsRef.current = restoredIntervalAlerts;
               setIntervalSupplyAlerts(restoredIntervalAlerts);
               setTouchGuardEnabled(false);
@@ -3311,15 +3342,25 @@ export default function MapScreen() {
               onConfirm: () => handleConfirmCustomSupply(id, item?.triggerType || 'time'),
             };
           }),
-          ...(intervalSupplyAlerts.time ? [{
-            id: "supply-interval-time",
-            name: `時間間隔補給（每 ${settings.supplyTimeIntervalMinutes} 分鐘）`,
-            onConfirm: () => handleConfirmIntervalSupply("time"),
+          ...(intervalSupplyAlerts["energy-time"] ? [{
+            id: "supply-interval-energy-time",
+            name: `能量時間提醒（每 ${settings.supplyEnergyTimeIntervalMinutes} 分鐘）`,
+            onConfirm: () => handleConfirmIntervalSupply("energy-time"),
           }] : []),
-          ...(intervalSupplyAlerts.distance ? [{
-            id: "supply-interval-distance",
-            name: `距離間隔補給（每 ${settings.supplyDistanceIntervalKm} km）`,
-            onConfirm: () => handleConfirmIntervalSupply("distance"),
+          ...(intervalSupplyAlerts["energy-distance"] ? [{
+            id: "supply-interval-energy-distance",
+            name: `能量距離提醒（每 ${settings.supplyEnergyDistanceIntervalKm} km）`,
+            onConfirm: () => handleConfirmIntervalSupply("energy-distance"),
+          }] : []),
+          ...(intervalSupplyAlerts["water-time"] ? [{
+            id: "supply-interval-water-time",
+            name: `補水時間提醒（每 ${settings.supplyWaterTimeIntervalMinutes} 分鐘）`,
+            onConfirm: () => handleConfirmIntervalSupply("water-time"),
+          }] : []),
+          ...(intervalSupplyAlerts["water-distance"] ? [{
+            id: "supply-interval-water-distance",
+            name: `補水距離提醒（每 ${settings.supplyWaterDistanceIntervalKm} km）`,
+            onConfirm: () => handleConfirmIntervalSupply("water-distance"),
           }] : []),
         ]}
         onConfirmCalorie={handleConfirmCalorieSupply}

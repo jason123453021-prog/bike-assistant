@@ -19,10 +19,17 @@ describe("parseSupplyNotificationAction", () => {
     });
   });
 
-  it("辨識使用者按下稍後提醒的距離間隔提醒", () => {
-    expect(parseSupplyNotificationAction(responseFor(SUPPLY_SNOOZE_ACTION, "interval-distance"))).toEqual({
+  it("辨識使用者按下稍後提醒的補水距離間隔提醒", () => {
+    expect(parseSupplyNotificationAction(responseFor(SUPPLY_SNOOZE_ACTION, "interval-water-distance"))).toEqual({
       action: "snooze",
-      kind: "interval-distance",
+      kind: "interval-water-distance",
+    });
+  });
+
+  it("辨識使用者按下已補給的能量時間間隔提醒", () => {
+    expect(parseSupplyNotificationAction(responseFor(SUPPLY_CONFIRM_ACTION, "interval-energy-time"))).toEqual({
+      action: "confirm",
+      kind: "interval-energy-time",
     });
   });
 

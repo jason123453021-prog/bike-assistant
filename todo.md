@@ -1725,6 +1725,9 @@
 - [x] 優化雙補給彈窗的資訊層級、文字可讀性、間距與按鈕觸控範圍
 - [x] 確保能量與水分的確認操作在雙區塊模式下明確隔離且不互相干擾
 - [x] 新增雙補給彈窗版面回歸測試，完成 TypeScript、零 lint advisory、165 passed／1 skipped 與 Android Hermes bundle 5.70 MB 驗證
+- [x] 將手動時間／距離補給提醒拆分為能量與補水的獨立開關、觸發方式與間隔設定
+- [x] 保持智慧補給模式與兩組手動規則互斥，並相容遷移舊版單一提醒設定
+- [x] 更新設定頁、騎乘觸發與回歸測試，完成 TypeScript、零 lint advisory、167 passed／1 skipped 與 Android Hermes bundle 5.71 MB 驗證
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌

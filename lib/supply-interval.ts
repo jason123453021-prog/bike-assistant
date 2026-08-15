@@ -1,21 +1,21 @@
-export type SupplyIntervalKind = "time" | "distance";
+export type SupplyIntervalTarget = "energy" | "water";
+export type SupplyIntervalBasis = "time" | "distance";
+export type SupplyIntervalKind = `${SupplyIntervalTarget}-${SupplyIntervalBasis}`;
 
-export interface SupplyIntervalConfig {
-  enabled: boolean;
+export interface SupplyIntervalRule {
   timeEnabled: boolean;
   timeMinutes: number;
   distanceEnabled: boolean;
   distanceKm: number;
 }
 
-export interface SupplyIntervalTracker {
-  lastTimeSec: number;
-  lastDistanceKm: number;
-}
+export type SupplyIntervalConfig = Record<SupplyIntervalTarget, SupplyIntervalRule>;
+
+export type SupplyIntervalTracker = Record<SupplyIntervalKind, number>;
 
 /**
- * 依騎乘開始後／上次確認補給後的累計時間與距離，回傳本次應顯示的提醒。
- * 可同時啟用時間與距離條件；同一條件在確認補給前只會回傳一次。
+ * 依騎乘開始後／同類別上次確認補給後的累計時間與距離，回傳本次應顯示的提醒。
+ * 能量與補水各有獨立規則；同一條件在確認前只會回傳一次。
  */
 export function getDueSupplyIntervals(
   config: SupplyIntervalConfig,
@@ -24,29 +24,31 @@ export function getDueSupplyIntervals(
   distanceKm: number,
   activeAlerts: Partial<Record<SupplyIntervalKind, boolean>>,
 ): SupplyIntervalKind[] {
-  if (!config.enabled) return [];
-
   const due: SupplyIntervalKind[] = [];
-  const timeIntervalSec = config.timeMinutes * 60;
-  if (
-    config.timeEnabled &&
-    Number.isFinite(timeIntervalSec) &&
-    timeIntervalSec > 0 &&
-    !activeAlerts.time &&
-    elapsedSec - tracker.lastTimeSec >= timeIntervalSec
-  ) {
-    due.push("time");
-  }
+  (Object.entries(config) as [SupplyIntervalTarget, SupplyIntervalRule][]).forEach(([target, rule]) => {
+    const timeKind: SupplyIntervalKind = `${target}-time`;
+    const distanceKind: SupplyIntervalKind = `${target}-distance`;
+    const timeIntervalSec = rule.timeMinutes * 60;
+    if (
+      rule.timeEnabled &&
+      Number.isFinite(timeIntervalSec) &&
+      timeIntervalSec > 0 &&
+      !activeAlerts[timeKind] &&
+      elapsedSec - tracker[timeKind] >= timeIntervalSec
+    ) {
+      due.push(timeKind);
+    }
 
-  if (
-    config.distanceEnabled &&
-    Number.isFinite(config.distanceKm) &&
-    config.distanceKm > 0 &&
-    !activeAlerts.distance &&
-    distanceKm - tracker.lastDistanceKm >= config.distanceKm
-  ) {
-    due.push("distance");
-  }
+    if (
+      rule.distanceEnabled &&
+      Number.isFinite(rule.distanceKm) &&
+      rule.distanceKm > 0 &&
+      !activeAlerts[distanceKind] &&
+      distanceKm - tracker[distanceKind] >= rule.distanceKm
+    ) {
+      due.push(distanceKind);
+    }
+  });
 
   return due;
 }

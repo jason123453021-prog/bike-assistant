@@ -2,7 +2,13 @@ export const SUPPLY_NOTIFICATION_CATEGORY = "SUPPLY_REMINDER";
 export const SUPPLY_SNOOZE_ACTION = "SUPPLY_SNOOZE";
 export const SUPPLY_CONFIRM_ACTION = "SUPPLY_CONFIRM";
 
-export type SupplyNotificationKind = "calorie" | "water" | "interval-time" | "interval-distance";
+export type SupplyNotificationKind =
+  | "calorie"
+  | "water"
+  | "interval-energy-time"
+  | "interval-energy-distance"
+  | "interval-water-time"
+  | "interval-water-distance";
 export type SupplyNotificationActionType = "snooze" | "confirm";
 
 export interface SupplyNotificationAction {
@@ -16,7 +22,12 @@ type NotificationResponseLike = {
 };
 
 function isSupplyKind(value: unknown): value is SupplyNotificationKind {
-  return value === "calorie" || value === "water" || value === "interval-time" || value === "interval-distance";
+  return value === "calorie"
+    || value === "water"
+    || value === "interval-energy-time"
+    || value === "interval-energy-distance"
+    || value === "interval-water-time"
+    || value === "interval-water-distance";
 }
 
 /** 將原生通知回應安全轉換為本機補給動作，未知資料一律忽略。 */

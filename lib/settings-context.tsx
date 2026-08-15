@@ -115,12 +115,16 @@ export interface AppSettings {
   /** 防止同一筆已完成活動重複觸發自動汗率校正。 */
   sweatRateCalibrationLastRideId?: string;
   supplyReminderRepeatSec: number; // 0 = 不重複；>0 = 每幾秒重複語音提醒
-  // 通用補給間隔：可依騎乘時間、距離或兩者提醒，不綁定特定補給品
-  supplyIntervalReminderEnabled: boolean;
-  supplyTimeIntervalEnabled: boolean;
-  supplyTimeIntervalMinutes: number;
-  supplyDistanceIntervalEnabled: boolean;
-  supplyDistanceIntervalKm: number;
+  // 手動能量提醒：可依騎乘時間、距離或兩者提醒。
+  supplyEnergyTimeIntervalEnabled: boolean;
+  supplyEnergyTimeIntervalMinutes: number;
+  supplyEnergyDistanceIntervalEnabled: boolean;
+  supplyEnergyDistanceIntervalKm: number;
+  // 手動補水提醒：可依騎乘時間、距離或兩者提醒。
+  supplyWaterTimeIntervalEnabled: boolean;
+  supplyWaterTimeIntervalMinutes: number;
+  supplyWaterDistanceIntervalEnabled: boolean;
+  supplyWaterDistanceIntervalKm: number;
   // 卡路里高級設定
   calorieRepeatUntilDismissed?: boolean; // 未關閉時重複提醒
   calorieAutoDismissSeconds?: number;    // 自動關閉延遲（秒）
@@ -203,12 +207,15 @@ const DEFAULT_SETTINGS: AppSettings = {
   sweatRateCalibrationMultiplier: 1,
   sweatRateCalibrationCount: 0,
   supplyReminderRepeatSec: 60,
-  // 升級後預設不主動開啟，須由使用者依自身補給策略啟用。
-  supplyIntervalReminderEnabled: false,
-  supplyTimeIntervalEnabled: true,
-  supplyTimeIntervalMinutes: 45,
-  supplyDistanceIntervalEnabled: false,
-  supplyDistanceIntervalKm: 20,
+  // 升級後預設不主動開啟，須由使用者依自身補給策略各自啟用。
+  supplyEnergyTimeIntervalEnabled: false,
+  supplyEnergyTimeIntervalMinutes: 45,
+  supplyEnergyDistanceIntervalEnabled: false,
+  supplyEnergyDistanceIntervalKm: 20,
+  supplyWaterTimeIntervalEnabled: false,
+  supplyWaterTimeIntervalMinutes: 20,
+  supplyWaterDistanceIntervalEnabled: false,
+  supplyWaterDistanceIntervalKm: 10,
   supplyItems: [],
   vibrationEnabled: true,
   ttsEnabled: true,
@@ -265,8 +272,30 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           weatherApiKey: _weatherApiKey,
           calorieThreshold: _legacyCalorieThreshold,
           waterThreshold: _legacyWaterThreshold,
+          supplyIntervalReminderEnabled: legacyIntervalEnabled,
+          supplyTimeIntervalEnabled: legacyTimeIntervalEnabled,
+          supplyTimeIntervalMinutes: legacyTimeIntervalMinutes,
+          supplyDistanceIntervalEnabled: legacyDistanceIntervalEnabled,
+          supplyDistanceIntervalKm: legacyDistanceIntervalKm,
           ...savedWithoutRemovedSettings
         } = saved;
+        const hasIndependentIntervalSettings = [
+          "supplyEnergyTimeIntervalEnabled",
+          "supplyEnergyDistanceIntervalEnabled",
+          "supplyWaterTimeIntervalEnabled",
+          "supplyWaterDistanceIntervalEnabled",
+        ].some((key) => Object.prototype.hasOwnProperty.call(saved, key));
+        const legacyIntervalActive = legacyIntervalEnabled === true;
+        const migratedIntervalSettings = hasIndependentIntervalSettings ? {} : {
+          supplyEnergyTimeIntervalEnabled: legacyIntervalActive && legacyTimeIntervalEnabled !== false,
+          supplyEnergyTimeIntervalMinutes: legacyTimeIntervalMinutes ?? DEFAULT_SETTINGS.supplyEnergyTimeIntervalMinutes,
+          supplyEnergyDistanceIntervalEnabled: legacyIntervalActive && legacyDistanceIntervalEnabled === true,
+          supplyEnergyDistanceIntervalKm: legacyDistanceIntervalKm ?? DEFAULT_SETTINGS.supplyEnergyDistanceIntervalKm,
+          supplyWaterTimeIntervalEnabled: legacyIntervalActive && legacyTimeIntervalEnabled !== false,
+          supplyWaterTimeIntervalMinutes: legacyTimeIntervalMinutes ?? DEFAULT_SETTINGS.supplyWaterTimeIntervalMinutes,
+          supplyWaterDistanceIntervalEnabled: legacyIntervalActive && legacyDistanceIntervalEnabled === true,
+          supplyWaterDistanceIntervalKm: legacyDistanceIntervalKm ?? DEFAULT_SETTINGS.supplyWaterDistanceIntervalKm,
+        };
         const {
           showHeartRate: _showHeartRate,
           showCadence: _showCadence,
@@ -286,6 +315,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const nextSettings: AppSettings = {
           ...DEFAULT_SETTINGS,
           ...savedWithoutRemovedSettings,
+          ...migratedIntervalSettings,
           birthday: normalizeBirthday(saved.birthday),
           age: calculateAgeFromBirthday(saved.birthday) ?? saved.age ?? DEFAULT_SETTINGS.age,
           autoPersonalMetricsEnabled: true,
