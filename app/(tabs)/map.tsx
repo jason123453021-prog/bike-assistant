@@ -177,6 +177,10 @@ import { shouldTrackRideHeading, shouldTrackRideLocation } from "@/lib/ride-trac
 import { shouldEnterIdleMonitor, shouldResumeFromIdleMonitor, type RideLocationTrackingMode } from "@/lib/idle-auto-pause";
 import { shouldSuppressRideAudioForSystemInterruption } from "@/lib/ride-audio-interruption";
 import {
+  buildNavigationDashboardSummaryKeys,
+  type NavigationDashboardSummaryKey,
+} from "@/lib/navigation-dashboard-summary";
+import {
   shouldScheduleTouchGuardRelock,
   shouldZeroLiveRideReadings,
   TOUCH_GUARD_AUTO_RELOCK_MS,
@@ -1140,6 +1144,10 @@ export default function MapScreen() {
   const DASH_PANEL_MAX = 6;
   const dashPanelFields = useMemo(() => orderedEnabledFields.slice(0, DASH_PANEL_MAX), [orderedEnabledFields]);
   const dashOverflowFields = useMemo(() => orderedEnabledFields.slice(DASH_PANEL_MAX), [orderedEnabledFields]);
+  const dashboardSummaryKeys = useMemo(
+    () => buildNavigationDashboardSummaryKeys(dashPanelFields),
+    [dashPanelFields],
+  );
   const dashFieldCount = dashPanelFields.length;
 
   // 每行3格，每格約60px；最少1行，最多不超過 SCREEN_H/3
@@ -3255,7 +3263,7 @@ export default function MapScreen() {
             ))}
         </View>
 
-        {/* ── 展開後：總爬升 + 進度條 ── */}
+        {/* ── 展開後：不重複的摘要 + 補給進度條 ── */}
         {panelExpanded && (
           <View style={styles.expandedSection}>
             {/* 超出6格的儀表板欄位（上拉展開後顯示） */}
@@ -3266,30 +3274,20 @@ export default function MapScreen() {
                 ))}
               </View>
             )}
-            {/* 總爬升資訊列 */}
+            {/* 摘要列只補上主儀表板未呈現的獨立指標；總爬升僅保留一處。 */}
             <View style={styles.ascentRow}>
-              <View style={styles.ascentItem}>
-                <IconSymbol name="arrow.up" size={13} color="#00C853" />
-                <Text style={styles.ascentLabel}>總爬升</Text>
-                <Text style={styles.ascentValue}>{Math.round(state.totalAscent)}</Text>
-                <Text style={styles.ascentUnit}>m</Text>
-              </View>
-              <View style={styles.ascentDivider} />
-              <View style={styles.ascentItem}>
-                <IconSymbol name="arrow.down" size={13} color="#4FC3F7" />
-                <Text style={styles.ascentLabel}>坡度</Text>
-                <Text style={[styles.ascentValue, { color: currentGrade > 5 ? "#F59E0B" : currentGrade > 8 ? "#EF4444" : "rgba(255,255,255,0.9)" }]}>
-                  {isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"}
-                </Text>
-                <Text style={styles.ascentUnit}>%</Text>
-              </View>
-              <View style={styles.ascentDivider} />
-              <View style={styles.ascentItem}>
-                <IconSymbol name="bolt.fill" size={13} color="#00E676" />
-                <Text style={styles.ascentLabel}>最大功率</Text>
-                <Text style={[styles.ascentValue, { color: "#00E676" }]}>{state.maxPower}</Text>
-                <Text style={styles.ascentUnit}>W</Text>
-              </View>
+              {dashboardSummaryKeys.map((metric, index) => (
+                <React.Fragment key={metric}>
+                  <DashboardSummaryMetric
+                    metric={metric}
+                    state={state}
+                    isActive={isActive}
+                    currentGrade={currentGrade}
+                    avgSpeed={avgSpeed}
+                  />
+                  {index < dashboardSummaryKeys.length - 1 ? <View style={styles.ascentDivider} /> : null}
+                </React.Fragment>
+              ))}
             </View>
             {/* 卡路里進度條 */}
             <View style={styles.progressSection}>
@@ -3820,7 +3818,7 @@ function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed }: {
     case "showPausedTime":
       return <BigMetric label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" />;
     case "showTotalAscent":
-      return <BigMetric label="累計爬升" value={state.totalAscent ? state.totalAscent.toFixed(0) : "0"} unit="m" />;
+      return <BigMetric label="總爬升" value={state.totalAscent ? state.totalAscent.toFixed(0) : "0"} unit="m" />;
     case "showCurrentAltitude":
       return <BigMetric label="目前海拔" value={state.currentAltitude ? state.currentAltitude.toFixed(0) : "--"} unit="m" />;
     case "showGradeDistribution":
@@ -3853,6 +3851,58 @@ function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed }: {
     default:
       return null;
   }
+}
+
+function DashboardSummaryMetric({ metric, state, isActive, currentGrade, avgSpeed }: {
+  metric: NavigationDashboardSummaryKey;
+  state: any;
+  isActive: boolean;
+  currentGrade: number;
+  avgSpeed: number;
+}) {
+  if (metric === "grade") {
+    const color = currentGrade > 8 ? "#EF4444" : currentGrade > 5 ? "#F59E0B" : "rgba(255,255,255,0.9)";
+    return (
+      <View style={styles.ascentItem}>
+        <IconSymbol name="arrow.down" size={13} color="#4FC3F7" />
+        <Text style={styles.ascentLabel}>坡度</Text>
+        <Text style={[styles.ascentValue, { color }]}>{isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"}</Text>
+        <Text style={styles.ascentUnit}>%</Text>
+      </View>
+    );
+  }
+
+  if (metric === "avgSpeed") {
+    return (
+      <View style={styles.ascentItem}>
+        <IconSymbol name="speedometer" size={13} color="#A7D8FF" />
+        <Text style={styles.ascentLabel}>均速</Text>
+        <Text style={styles.ascentValue}>{avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"}</Text>
+        <Text style={styles.ascentUnit}>km/h</Text>
+      </View>
+    );
+  }
+
+  if (metric === "currentAltitude") {
+    const altitude = Number.isFinite(state.currentAltitude) ? Math.round(state.currentAltitude) : "--";
+    return (
+      <View style={styles.ascentItem}>
+        <IconSymbol name="arrow.up" size={13} color="#00C853" />
+        <Text style={styles.ascentLabel}>目前海拔</Text>
+        <Text style={styles.ascentValue}>{altitude}</Text>
+        <Text style={styles.ascentUnit}>m</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.ascentItem}>
+      <IconSymbol name="bolt.fill" size={13} color="#00E676" />
+      <Text style={styles.ascentLabel}>最大功率</Text>
+      <Text style={[styles.ascentValue, { color: "#00E676" }]}>{state.maxPower}</Text>
+      <Text style={styles.ascentUnit}>W</Text>
+    </View>
+  );
 }
 
 function BigMetric({ label, value, unit, accent, highlight, warn, wide }: {
