@@ -6,7 +6,11 @@ import {
   migrateLegacyNavigationDashboardDefaults,
   type NavigationDashboardFieldKey,
 } from "./navigation-dashboard-defaults";
-import { DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS } from "./live-ride-readings";
+import {
+  DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
+  MAX_TOUCH_GUARD_UNLOCK_HOLD_MS,
+  MIN_TOUCH_GUARD_UNLOCK_HOLD_MS,
+} from "./live-ride-readings";
 
 // 正常導航模式可顯示的欄位
 export interface NormalModeFields {
@@ -161,6 +165,8 @@ export interface AppSettings {
   touchGuardEnabled: boolean;
   /** 長按此毫秒數後解除騎乘防誤觸；限定 400–5000 ms。 */
   touchGuardUnlockHoldMs: number;
+  /** 用來區分早期 1200 ms 預設與使用者後續手動選擇的自訂時間。 */
+  touchGuardUnlockHoldMsSchemaVersion: number;
   // 背景 GPS 精度
   gpsAccuracy: "power_saving" | "standard" | "high_accuracy"; // 背景 GPS 更新頻率
   // 騎乘靜止後的完全自動省電定位：切換為低功耗監測，重新移動時自動恢復。
@@ -240,6 +246,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   simplifiedNavIdleSec: 30,
   touchGuardEnabled: true,
   touchGuardUnlockHoldMs: DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
+  touchGuardUnlockHoldMsSchemaVersion: 2,
   gpsAccuracy: "standard",
   idleAutoPauseEnabled: true,
   idleAutoPauseSeconds: 120,
@@ -250,16 +257,19 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const SETTINGS_KEY = "@bike_settings";
+export const TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION = 2;
 
 /**
- * 舊版預設值曾是 1200 ms；部分裝置會把 AsyncStorage 內的數字還原成字串。
- * 因此先正規化數值，再遷移為目前的 400 ms 預設，避免設定頁持續顯示舊值。
+ * 舊版預設值曾是 1200 ms；僅未標記新版自訂設定的資料才會遷移至 400 ms。
+ * 已由使用者設定過的時間會以 schema version 保留，數字與字串資料均可安全正規化。
  */
-export function migrateTouchGuardUnlockHoldMs(value: unknown): number {
+export function migrateTouchGuardUnlockHoldMs(value: unknown, schemaVersion?: unknown): number {
   const normalized = Number(value);
-  if (normalized === 1200) return DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS;
+  if (Number(schemaVersion) !== TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION && normalized === 1200) {
+    return DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS;
+  }
   if (!Number.isFinite(normalized)) return DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS;
-  return Math.max(400, Math.min(5000, normalized));
+  return Math.max(MIN_TOUCH_GUARD_UNLOCK_HOLD_MS, Math.min(MAX_TOUCH_GUARD_UNLOCK_HOLD_MS, normalized));
 }
 
 interface SettingsContextValue {
@@ -339,7 +349,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           ...DEFAULT_SIMPLIFIED_FIELD_ORDER.filter((k) => !savedSimplifiedOrder.includes(k)),
         ];
         const migratedDashboard = migrateLegacyNavigationDashboardDefaults(savedNormalModeFields, mergedOrder);
-        const migratedUnlockHoldMs = migrateTouchGuardUnlockHoldMs(saved.touchGuardUnlockHoldMs);
+        const migratedUnlockHoldMs = migrateTouchGuardUnlockHoldMs(
+          saved.touchGuardUnlockHoldMs,
+          saved.touchGuardUnlockHoldMsSchemaVersion,
+        );
         const nextSettings: AppSettings = {
           ...DEFAULT_SETTINGS,
           ...savedWithoutRemovedSettings,
@@ -354,6 +367,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           normalModeFieldOrder: migratedDashboard.order,
           simplifiedModeFieldOrder: mergedSimplifiedOrder,
           touchGuardUnlockHoldMs: migratedUnlockHoldMs,
+          touchGuardUnlockHoldMsSchemaVersion: TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION,
         };
         if (nextSettings.supplyEnergyTimeIntervalEnabled && nextSettings.supplyEnergyDistanceIntervalEnabled) {
           nextSettings.supplyEnergyDistanceIntervalEnabled = false;
@@ -376,6 +390,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       age: calculateAgeFromBirthday(birthday) ?? settings.age,
       autoPersonalMetricsEnabled: true,
       autoRpeEnabled: true,
+      touchGuardUnlockHoldMsSchemaVersion: partial.touchGuardUnlockHoldMs !== undefined
+        ? TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION
+        : settings.touchGuardUnlockHoldMsSchemaVersion,
     };
     setSettings(next);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));

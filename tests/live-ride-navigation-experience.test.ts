@@ -6,6 +6,8 @@ import {
 } from "../lib/navigation-dashboard-defaults";
 import {
   DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
+  MAX_TOUCH_GUARD_UNLOCK_HOLD_MS,
+  MIN_TOUCH_GUARD_UNLOCK_HOLD_MS,
   shouldScheduleTouchGuardRelock,
   shouldZeroLiveRideReadings,
   TOUCH_GUARD_AUTO_RELOCK_MS,
@@ -93,10 +95,14 @@ describe("live ride navigation experience", () => {
     expect(shouldScheduleTouchGuardRelock(true, false)).toBe(false);
   });
 
-  it("migrates legacy numeric and string 1200 ms settings to the new 400 ms default", () => {
+  it("migrates only unversioned legacy 1200 ms settings while preserving current user choices", () => {
     expect(migrateTouchGuardUnlockHoldMs(1200)).toBe(400);
     expect(migrateTouchGuardUnlockHoldMs("1200")).toBe(400);
     expect(migrateTouchGuardUnlockHoldMs(undefined)).toBe(400);
     expect(migrateTouchGuardUnlockHoldMs(800)).toBe(800);
+    expect(migrateTouchGuardUnlockHoldMs(1200, 2)).toBe(1200);
+    expect(migrateTouchGuardUnlockHoldMs("1200", "2")).toBe(1200);
+    expect(migrateTouchGuardUnlockHoldMs(100, 2)).toBe(MIN_TOUCH_GUARD_UNLOCK_HOLD_MS);
+    expect(migrateTouchGuardUnlockHoldMs(9000, 2)).toBe(MAX_TOUCH_GUARD_UNLOCK_HOLD_MS);
   });
 });
