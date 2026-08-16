@@ -144,7 +144,7 @@ import {
   type CompassData,
   type GPSVector,
   getFinalDirection,
-  smoothHeading,
+  stabilizeMapHeading,
 } from "@/lib/compass-gps-optimizer";
 import {
   addTrackPoint,
@@ -464,9 +464,9 @@ export default function MapScreen() {
     let angleDiff = nextHeading - lastMapBearingRef.current;
     if (angleDiff > 180) angleDiff -= 360;
     if (angleDiff < -180) angleDiff += 360;
-    if (Math.abs(angleDiff) < 0.2) return;
+    if (Math.abs(angleDiff) < 2) return;
 
-    const followFactor = stateRef.current.currentSpeed >= 12 ? 0.78 : 0.68;
+    const followFactor = stateRef.current.currentSpeed >= 12 ? 0.68 : 0.56;
     const nextBearing = (lastMapBearingRef.current + angleDiff * followFactor + 360) % 360;
     targetBearingRef.current = nextHeading;
     lastMapBearingRef.current = nextBearing;
@@ -1697,23 +1697,23 @@ export default function MapScreen() {
 
           // ── 車頭朝前精度改善（融合電子羅盤 + GPS）──────────────────────────────────────────────────────
           // 策略：
-          //   1. 速度 > 5 km/h 且 GPS heading 有效 → 使用 GPS heading
-          //   2. 速度 ≤ 5 km/h 且羅盤可用（精度 < 30°）→ 使用羅盤
-          //   3. 兩者都可用 → 混合模式（GPS 60% + 羅盤 40%）
-          //   4. 都不可用 → 兩點 bearing 或保持上次方向
+          //   1. 地圖只採用可信 GPS 行進方向，避免手機羅盤在固定座上的微動使整張地圖打轉。
+          //   2. 羅盤僅保留為資料來源，不直接驅動地圖；低速或低精度時維持上次穩定航向。
+          //   3. GPS 精度、速度或角度變化不足時，不更新地圖旋轉。
           let rawHdg = heading ?? -1;
-          const gpsHeadingValid = rawHdg >= 0 && speedKmhRaw > 5;
+          const locationAccuracyM = loc.coords.accuracy;
+          const gpsHeadingValid = rawHdg >= 0 && speedKmhRaw >= 7 && locationAccuracyM !== null && locationAccuracyM !== undefined && locationAccuracyM <= 35;
           const compassData = compassHeadingRef.current;
           const compassValid = compassData && compassData.accuracy < 30 && (Date.now() - compassData.timestamp < 2000);
 
           if (headingUp && compassValid && gpsHeadingValid) {
-            // 混合模式：使用 compass-gps-optimizer 融合
-            const gpsVec: GPSVector = { bearing: rawHdg, accuracy: 10, speed: (speed ?? 0), timestamp: Date.now() };
+            // 穩定行進時 getFinalDirection 會優先選擇 GPS 行進向量。
+            const gpsVec: GPSVector = { bearing: rawHdg, accuracy: locationAccuracyM, speed: (speed ?? 0), timestamp: Date.now() };
             const result = getFinalDirection(compassData, gpsVec);
             rawHdg = result.heading;
           } else if (headingUp && compassValid && !gpsHeadingValid) {
-            // 低速時用羅盤（更即時的方向感知）
-            rawHdg = smoothHeading(compassData.heading, headingRef.current, 0.35);
+            // 低速或低精度時保持最後可信行進方向，不以手持裝置朝向轉動地圖。
+            rawHdg = headingRef.current;
           } else if (gpsHeadingValid) {
             // GPS heading 有效，直接使用
             // rawHdg 已是 GPS heading
@@ -1734,10 +1734,7 @@ export default function MapScreen() {
           // 更新 GPS 位置參考點
           prevGpsForBearingRef.current = { lat: latitude, lon: longitude };
           // 自適應循環平均：縮短窗口以提升轉彎反應；低速仍保留少量平均防止原地抖動。
-          const useCompassMode = headingUp && compassValid;
-          const windowSize = useCompassMode
-            ? 2
-            : (speedKmhRaw <= 5 ? 3 : speedKmhRaw >= 15 ? 3 : 4);
+          const windowSize = speedKmhRaw >= 15 ? 4 : 5;
           headingWindowRef.current.push(rawHdg);
           if (headingWindowRef.current.length > windowSize) headingWindowRef.current.shift();
           // 角度平均：轉換為向量再平均，避免 350°/10° 平均出 180° 的問題
@@ -1746,15 +1743,16 @@ export default function MapScreen() {
           const hdg = ((Math.atan2(sinSum, cosSum) * 180) / Math.PI + 360) % 360;
           headingRef.current = hdg;
           setCurrentPos({ lat: latitude, lon: longitude, heading: hdg });
-          if (followUser) {
+          if (followUser && (locationAccuracyM ?? Number.POSITIVE_INFINITY) <= 45) {
             mapRef.current?.animateCamera(
               { center: { latitude, longitude }, zoom: 17 }
             );
           }
-          // 車頭朝前模式：即時更新地圖方向；停止時停止旋轉以避免室內 GPS 漂移造成畫面打轉。
+          // 車頭朝前僅在可信 GPS 行進方向通過死區與旋轉上限後更新，避免畫面抖動。
           const currentState0 = stateRef.current;
-          if (headingUp && currentState0.status === "active" && speedKmhRaw >= 1.5) {
-            applyResponsiveMapBearing(hdg);
+          if (headingUp && currentState0.status === "active") {
+            const stabilizedBearing = stabilizeMapHeading(hdg, lastMapBearingRef.current, speedKmhRaw, locationAccuracyM);
+            if (stabilizedBearing !== null) applyResponsiveMapBearing(stabilizedBearing);
             // 根據速度動態設定俯視角（速度越快，俯視角越小）
             // 低速時保持平視（0°），高速時逐漸增加俯視角
             const pitch = speedKmhRaw >= 5 ? Math.max(0, Math.min(45, (speedKmhRaw - 5) * 1.2)) : 0;
@@ -2194,12 +2192,7 @@ export default function MapScreen() {
             timestamp: Date.now(),
           };
           compassHeadingRef.current = compassData;
-          if (compassData.accuracy < 30 && stateRef.current.status === "active") {
-            // 羅盤 callback 通常比 GPS 位置回呼更快；以較高權重平滑後立即驅動地圖。
-            const responsiveHeading = smoothHeading(compassData.heading, headingRef.current, 0.72);
-            headingRef.current = responsiveHeading;
-            applyResponsiveMapBearing(responsiveHeading);
-          }
+          // 不直接由羅盤回呼旋轉地圖：手機微振、磁干擾與 GPS 回呼競爭會導致車頭朝前嚴重晃動。
         });
         if (!active) {
           sub.remove();
@@ -2216,7 +2209,7 @@ export default function MapScreen() {
       headingSubscription?.remove();
       if (headingSubRef.current === headingSubscription) headingSubRef.current = null;
     };
-  }, [applyResponsiveMapBearing, headingUp, mapRideActive]);
+  }, [headingUp, mapRideActive]);
 
   // ─── GPX 導航邏輯 ────────────────────────────────────────────────────────────
   const handleNavigation = useCallback(

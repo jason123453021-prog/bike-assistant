@@ -31,6 +31,12 @@ const GPS_DIRECTION_PRIORITY_SPEED = 1.2; // 穩定行進後優先使用 GPS 行
 const HYBRID_WEIGHT_COMPASS = 0.4;      // 混合模式下羅盤權重
 const HYBRID_WEIGHT_GPS = 0.6;          // 混合模式下 GPS 權重
 
+/** 車頭朝前地圖只接受可信的行進方向，避免手機羅盤與低品質定位造成畫面旋轉。 */
+export const MIN_MAP_HEADING_SPEED_KMH = 7;
+export const MAX_MAP_HEADING_ACCURACY_M = 35;
+export const MAP_HEADING_DEAD_ZONE_DEG = 4;
+export const MAP_HEADING_MAX_STEP_DEG = 35;
+
 /**
  * 計算兩個方向之間的最小角度差
  */
@@ -205,6 +211,33 @@ export function smoothHeading(
   smoothed = (smoothed + 360) % 360;
 
   return Math.round(smoothed * 10) / 10;
+}
+
+/**
+ * 將可信 GPS 航向轉換為可安全套用到地圖的下一個航向。
+ * 回傳 null 表示應維持目前地圖方向，避免低速、低精度或微小抖動帶動畫面。
+ */
+export function stabilizeMapHeading(
+  candidateHeading: number,
+  previousHeading: number,
+  speedKmh: number,
+  locationAccuracyM: number | null | undefined,
+): number | null {
+  if (
+    !Number.isFinite(candidateHeading)
+    || !Number.isFinite(previousHeading)
+    || speedKmh < MIN_MAP_HEADING_SPEED_KMH
+    || locationAccuracyM === null
+    || locationAccuracyM === undefined
+    || locationAccuracyM > MAX_MAP_HEADING_ACCURACY_M
+  ) {
+    return null;
+  }
+
+  let delta = ((candidateHeading - previousHeading + 540) % 360) - 180;
+  if (Math.abs(delta) <= MAP_HEADING_DEAD_ZONE_DEG) return null;
+  delta = Math.max(-MAP_HEADING_MAX_STEP_DEG, Math.min(MAP_HEADING_MAX_STEP_DEG, delta));
+  return (previousHeading + delta + 360) % 360;
 }
 
 /**
