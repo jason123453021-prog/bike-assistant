@@ -18,7 +18,7 @@
     },
     "production": {
       "android": {
-        "buildType": "aab"
+        "buildType": "app-bundle"
       }
     },
     "dev-client": {
@@ -34,13 +34,5 @@
   },
   "cli": {
     "version": ">= 5.0.0"
-  },
-  "submit": {
-    "production": {
-      "android": {
-        "serviceAccount": "~/.eas/google-services.json",
-        "track": "internal"
-      }
-    }
   }
 }

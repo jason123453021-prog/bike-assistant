@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const configSource = readFileSync(resolve(process.cwd(), "app.config.ts"), "utf8");
+const easConfig = JSON.parse(readFileSync(resolve(process.cwd(), "eas.json"), "utf8")) as {
+  build: { production: { android: { buildType: string } } };
+  submit?: unknown;
+};
 
 describe("Android 15/16 release configuration", () => {
   it("avoids app-level boot receivers and portrait-only orientation while retaining target API 36", () => {
@@ -21,5 +25,10 @@ describe("Android 15/16 release configuration", () => {
     expect(configSource).toContain("enableShrinkResourcesInReleaseBuilds: true");
     expect(configSource).toContain('"expo-font"');
     expect(configSource).toContain('"expo-asset"');
+  });
+
+  it("uses the current EAS Android app-bundle profile without obsolete submit credentials", () => {
+    expect(easConfig.build.production.android.buildType).toBe("app-bundle");
+    expect(easConfig.submit).toBeUndefined();
   });
 });

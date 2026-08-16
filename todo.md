@@ -1810,6 +1810,9 @@
 - [x] 擷取 Expo Go 通用載入錯誤的 Metro、Android bundle 與啟動日誌證據
 - [x] 定位並修正 Expo Go 相容性、快取或啟動流程根因：Metro 同時建立 static Web SSR 與 Android 開發 bundle 時達 Node heap 上限
 - [x] 完成 Expo Go Android bundle、TypeScript、lint 與完整回歸驗證：Android bundle HTTP 200、3.97 MB；185 passed／1 skipped
+- [x] 蒐集 EAS Gradle 失敗的第一個實際錯誤、Expo 動態設定與本地 Android release 任務輸出
+- [x] 定位並修正 EAS Gradle 建置的相依、預建置或設定衝突：修正無效 EAS AAB buildType 與過時 submit 憑證欄位
+- [ ] 驗證 Expo config、Android Gradle release 任務、TypeScript、lint 與完整回歸測試；本地完整 Gradle 任務受沙盒記憶體限制中止，需以修正後 EAS 建置重新確認
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
