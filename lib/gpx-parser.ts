@@ -21,6 +21,14 @@ const CRR = 0.004;        // 滾動阻力係數（公路胎）
 const EFFICIENCY = 0.25;  // 人體肌肉代謝效率 25%
 const J_PER_KCAL = 4184;  // 焦耳/千卡
 
+/**
+ * 路線規劃檔多半不帶氣壓計海拔，直接逐點累加會把 GPS／DEM 的上下抖動誤當成爬坡。
+ * 先移除不合理的孤立尖峰，再以 5m 水平取樣、10m 垂直死區累積，保留連續真實爬升與短坡。
+ */
+export const ROUTE_ELEVATION_MIN_SAMPLE_DISTANCE_M = 5;
+export const ROUTE_ELEVATION_CHANGE_THRESHOLD_M = 10;
+const ROUTE_ELEVATION_SPIKE_GRADE_LIMIT = 60;
+
 // 天氣對空氣密度的修正（溫度影響）
 // ρ = 1.225 × (288.15 / (273.15 + T))
 function airDensity(tempC: number): number {
@@ -63,6 +71,73 @@ export interface GpxRoute {
   avgGradient: number;
   /** 最大坡度 % */
   maxGradient: number;
+}
+
+export interface RouteElevationStatistics {
+  elevations: number[];
+  totalAscent: number;
+  totalDescent: number;
+}
+
+function isIsolatedElevationSpike(points: readonly GpxPoint[], index: number): boolean {
+  if (index <= 0 || index >= points.length - 1) return false;
+  const previous = points[index - 1];
+  const current = points[index];
+  const next = points[index + 1];
+  const leftChange = current.ele - previous.ele;
+  const rightChange = next.ele - current.ele;
+  const reversesImmediately = Math.sign(leftChange) !== Math.sign(rightChange);
+  if (!reversesImmediately || Math.min(Math.abs(leftChange), Math.abs(rightChange)) < ROUTE_ELEVATION_CHANGE_THRESHOLD_M) return false;
+
+  const leftDistance = haversineDistance(previous.lat, previous.lon, current.lat, current.lon);
+  const rightDistance = haversineDistance(current.lat, current.lon, next.lat, next.lon);
+  const leftGrade = leftDistance > 0 ? Math.abs((leftChange / leftDistance) * 100) : Infinity;
+  const rightGrade = rightDistance > 0 ? Math.abs((rightChange / rightDistance) * 100) : Infinity;
+  return leftGrade >= ROUTE_ELEVATION_SPIKE_GRADE_LIMIT && rightGrade >= ROUTE_ELEVATION_SPIKE_GRADE_LIMIT;
+}
+
+/**
+ * 取得供路線預覽、時間、功率與補給估算共用的海拔統計。
+ * 海拔小幅來回變化在跨越門檻前不會計入，以免長距離 GPX 的雜訊放大總爬升。
+ */
+export function calculateRouteElevationStatistics(points: readonly GpxPoint[]): RouteElevationStatistics {
+  if (!points.length) return { elevations: [], totalAscent: 0, totalDescent: 0 };
+
+  const elevations = points.map((point, index) => {
+    if (!isIsolatedElevationSpike(points, index)) return point.ele;
+    const previous = points[index - 1];
+    const next = points[index + 1];
+    return (previous.ele + next.ele) / 2;
+  });
+
+  let totalAscent = 0;
+  let totalDescent = 0;
+  let lastSampleIndex = 0;
+  let acceptedElevation = elevations[0] ?? 0;
+
+  for (let index = 1; index < points.length; index++) {
+    const isLastPoint = index === points.length - 1;
+    const horizontalDistance = haversineDistance(
+      points[lastSampleIndex].lat,
+      points[lastSampleIndex].lon,
+      points[index].lat,
+      points[index].lon,
+    );
+    if (!isLastPoint && horizontalDistance < ROUTE_ELEVATION_MIN_SAMPLE_DISTANCE_M) continue;
+    lastSampleIndex = index;
+
+    const elevation = elevations[index] ?? acceptedElevation;
+    const change = elevation - acceptedElevation;
+    if (change >= ROUTE_ELEVATION_CHANGE_THRESHOLD_M) {
+      totalAscent += change;
+      acceptedElevation = elevation;
+    } else if (change <= -ROUTE_ELEVATION_CHANGE_THRESHOLD_M) {
+      totalDescent += Math.abs(change);
+      acceptedElevation = elevation;
+    }
+  }
+
+  return { elevations, totalAscent, totalDescent };
 }
 
 /**
@@ -161,8 +236,9 @@ export function parseGpx(xmlString: string): GpxRoute | null {
 
     // ── 計算統計 ──────────────────────────────────────────────────────────────
     let totalDistance = 0;
-    let totalAscent = 0;
-    let totalDescent = 0;
+    const elevationStats = calculateRouteElevationStatistics(points);
+    const totalAscent = elevationStats.totalAscent;
+    const totalDescent = elevationStats.totalDescent;
     const elevationProfile: { distance: number; elevation: number }[] = [];
     // 坡度分布：以 1% 為一個 bucket，0=平路(<0.5%)，1=1%，2=2%...，10+=10%以上
     const gradBuckets: Record<number, number> = {};
@@ -170,7 +246,7 @@ export function parseGpx(xmlString: string): GpxRoute | null {
     let totalClimbDist = 0;
     let weightedGradSum = 0;
 
-    elevationProfile.push({ distance: 0, elevation: points[0].ele });
+    elevationProfile.push({ distance: 0, elevation: elevationStats.elevations[0] ?? points[0].ele });
 
     for (let i = 1; i < points.length; i++) {
       const d = haversineDistance(
@@ -179,11 +255,9 @@ export function parseGpx(xmlString: string): GpxRoute | null {
       );
       totalDistance += d;
 
-      const altDiff = points[i].ele - points[i - 1].ele;
-      if (altDiff > 0) totalAscent += altDiff;
-      else totalDescent += Math.abs(altDiff);
+      const altDiff = (elevationStats.elevations[i] ?? points[i].ele) - (elevationStats.elevations[i - 1] ?? points[i - 1].ele);
 
-      elevationProfile.push({ distance: totalDistance, elevation: points[i].ele });
+      elevationProfile.push({ distance: totalDistance, elevation: elevationStats.elevations[i] ?? points[i].ele });
 
       // ── 坡度計算（僅針對有距離的段落）────────────────────────────────────
       if (d > 0.5) { // 忽略 < 0.5m 的極短段落（GPS 誤差）

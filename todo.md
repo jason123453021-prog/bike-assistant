@@ -1896,3 +1896,8 @@
 - [x] 修復 Android content URI（例如 LINE 分享）無法直接讀取，改為先轉存至 App 本機快取再解析 GPX
 - [x] 為外部分享、file URI 與無效 URI 建立 GPX 匯入回歸測試，確認錯誤訊息可理解且不暴露原生例外
 - [x] 完成型別、lint 與測試驗證，重啟開發服務並保存修復版本（TypeScript 0 errors；lint 0 warnings／0 errors；209 passed／1 skipped）
+
+## GPX 路線海拔校正（2026-08-16）
+- [x] 盤點 GPX 路線預覽、時間預估、功率與補給估算使用的爬升／下降資料來源，定位海拔雜訊累加問題
+- [x] 對 GPX 海拔建立保守平滑與最小累計變化門檻，避免微小抖動被重複計入總爬升與總下降
+- [x] 新增海拔雜訊、連續真實爬升及資料流整合回歸測試，完成型別、lint、測試驗證與版本保存（TypeScript 0 errors；lint 0 warnings／0 errors；212 passed／1 skipped）
