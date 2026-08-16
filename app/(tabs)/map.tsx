@@ -171,6 +171,11 @@ import {
 import { shouldTrackRideHeading, shouldTrackRideLocation } from "@/lib/ride-tracking-lifecycle";
 import { shouldEnterIdleMonitor, shouldResumeFromIdleMonitor, type RideLocationTrackingMode } from "@/lib/idle-auto-pause";
 import { shouldSuppressRideAudioForSystemInterruption } from "@/lib/ride-audio-interruption";
+import {
+  shouldScheduleTouchGuardRelock,
+  shouldZeroLiveRideReadings,
+  TOUCH_GUARD_AUTO_RELOCK_MS,
+} from "@/lib/live-ride-readings";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -433,6 +438,20 @@ export default function MapScreen() {
   const [mapRideActive, setMapRideActive] = useState(false);
   const [isAppForeground, setIsAppForeground] = useState(true);
 
+  const applyResponsiveMapBearing = useCallback((nextHeading: number) => {
+    if (!headingUp || !mapRideActive || stateRef.current.status !== "active") return;
+    let angleDiff = nextHeading - lastMapBearingRef.current;
+    if (angleDiff > 180) angleDiff -= 360;
+    if (angleDiff < -180) angleDiff += 360;
+    if (Math.abs(angleDiff) < 0.2) return;
+
+    const followFactor = stateRef.current.currentSpeed >= 12 ? 0.78 : 0.68;
+    const nextBearing = (lastMapBearingRef.current + angleDiff * followFactor + 360) % 360;
+    targetBearingRef.current = nextHeading;
+    lastMapBearingRef.current = nextBearing;
+    mapRef.current?.setBearing(nextBearing, true);
+  }, [mapRideActive]);
+
   useEffect(() => {
     if (!mapRideActive || !sportTrackingPolicy.autoPause.requiresStillness) {
       motionStillRef.current = true;
@@ -459,6 +478,7 @@ export default function MapScreen() {
   const [touchGuardHoldProgress, setTouchGuardHoldProgress] = useState(0);
   const touchGuardHoldStartedAtRef = useRef<number | null>(null);
   const touchGuardHoldTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const touchGuardRelockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showTouchGuardUnlockSuccess, setShowTouchGuardUnlockSuccess] = useState(false);
   const touchGuardUnlockSuccessOpacity = useRef(new Animated.Value(0)).current;
   const touchGuardUnlockSuccessScale = useRef(new Animated.Value(0.82)).current;
@@ -941,6 +961,18 @@ export default function MapScreen() {
     setTouchGuardHoldProgress(0);
   }, []);
 
+  const scheduleTouchGuardRelock = useCallback(() => {
+    if (touchGuardRelockTimerRef.current) {
+      clearTimeout(touchGuardRelockTimerRef.current);
+      touchGuardRelockTimerRef.current = null;
+    }
+    if (!shouldScheduleTouchGuardRelock(settings.touchGuardEnabled, isActive)) return;
+    touchGuardRelockTimerRef.current = setTimeout(() => {
+      setTouchGuardEnabled(true);
+      touchGuardRelockTimerRef.current = null;
+    }, TOUCH_GUARD_AUTO_RELOCK_MS);
+  }, [isActive, settings.touchGuardEnabled]);
+
   const beginTouchGuardHoldProgress = useCallback(() => {
     if (!touchGuardEnabled || !isActive) return;
     resetTouchGuardHoldProgress();
@@ -984,10 +1016,12 @@ export default function MapScreen() {
     if (settings.vibrationEnabled) vibrateLight();
     showTouchGuardUnlockSuccessFeedback();
     setTouchGuardEnabled(false);
-  }, [settings.vibrationEnabled, showTouchGuardUnlockSuccessFeedback, touchGuardEnabled]);
+    scheduleTouchGuardRelock();
+  }, [scheduleTouchGuardRelock, settings.vibrationEnabled, showTouchGuardUnlockSuccessFeedback, touchGuardEnabled]);
 
   useEffect(() => () => {
     resetTouchGuardHoldProgress();
+    if (touchGuardRelockTimerRef.current) clearTimeout(touchGuardRelockTimerRef.current);
     touchGuardUnlockSuccessOpacity.stopAnimation();
     touchGuardUnlockSuccessScale.stopAnimation();
   }, [resetTouchGuardHoldProgress, touchGuardUnlockSuccessOpacity, touchGuardUnlockSuccessScale]);
@@ -1630,12 +1664,11 @@ export default function MapScreen() {
           }
           // 更新 GPS 位置參考點
           prevGpsForBearingRef.current = { lat: latitude, lon: longitude };
-          // 自適應循環平均：根據速度調整平均窗口大小
-          // 羅盤模式時窗口更小（更靈敏），因為羅盤已經提供即時方向
+          // 自適應循環平均：縮短窗口以提升轉彎反應；低速仍保留少量平均防止原地抖動。
           const useCompassMode = headingUp && compassValid;
           const windowSize = useCompassMode
-            ? (speedKmhRaw <= 5 ? 5 : 3)
-            : (speedKmhRaw <= 5 ? 11 : speedKmhRaw >= 15 ? 7 : 9);
+            ? 2
+            : (speedKmhRaw <= 5 ? 3 : speedKmhRaw >= 15 ? 3 : 4);
           headingWindowRef.current.push(rawHdg);
           if (headingWindowRef.current.length > windowSize) headingWindowRef.current.shift();
           // 角度平均：轉換為向量再平均，避免 350°/10° 平均出 180° 的問題
@@ -1649,28 +1682,10 @@ export default function MapScreen() {
               { center: { latitude, longitude }, zoom: 17 }
             );
           }
-          // 車頭朝前模式：僅在騎乘中且速度足夠時更新地圖方向和俯視角
+          // 車頭朝前模式：即時更新地圖方向；停止時停止旋轉以避免室內 GPS 漂移造成畫面打轉。
           const currentState0 = stateRef.current;
-          if (headingUp && currentState0.status === "active" && speedKmhRaw >= 2) {
-            // 平滑旋轉：計算最短旋轉路徑（避免 350° -> 10° 時旋轉 340°）
-            targetBearingRef.current = hdg;
-            let angleDiff = hdg - lastMapBearingRef.current;
-            if (angleDiff > 180) angleDiff -= 360;
-            if (angleDiff < -180) angleDiff += 360;
-            
-            // 只在角度變化超過 0.3° 時更新地圖，提高靈敏度
-            // 速度越快，靈敏度越高（閾值越小）
-            const sensitivityThreshold = speedKmhRaw >= 20 ? 0.2 : speedKmhRaw >= 10 ? 0.3 : 0.4;
-            if (Math.abs(angleDiff) > sensitivityThreshold) {
-              const { width, height } = Dimensions.get("window");
-              const isPortrait = height > width;
-              // 速度越快，平滑係數越大（更快地跟隨方向變化）
-              const smoothFactor = speedKmhRaw >= 20 ? (isPortrait ? 0.7 : 0.65) : (isPortrait ? 0.6 : 0.5);
-              const newBearing = (lastMapBearingRef.current + angleDiff * smoothFactor) % 360;
-              lastMapBearingRef.current = newBearing;
-              mapRef.current?.setBearing(newBearing, true);
-            }
-            
+          if (headingUp && currentState0.status === "active" && speedKmhRaw >= 1.5) {
+            applyResponsiveMapBearing(hdg);
             // 根據速度動態設定俯視角（速度越快，俯視角越小）
             // 低速時保持平視（0°），高速時逐漸增加俯視角
             const pitch = speedKmhRaw >= 5 ? Math.max(0, Math.min(45, (speedKmhRaw - 5) * 1.2)) : 0;
@@ -1698,15 +1713,27 @@ export default function MapScreen() {
           // 3. 連續計數：需連續 4 次低速才暫停
           // 4. 不對稱閾值：暫停 1.5 km/h，恢復 3 km/h（避免頻繁切換）
           
+          const displacementM = prevPosRef.current
+            ? haversine(prevPosRef.current.lat, prevPosRef.current.lon, latitude, longitude)
+            : null;
+          const driftFilterM = Math.min(GPS_DRIFT_FILTER_M, sportTrackingPolicy.gpsDistanceIntervalM);
+          const autoPausePolicy = SPORT_TRACKING_POLICIES[currentState.sportType].autoPause;
+          const shouldZeroReadings = mapRideActive && shouldZeroLiveRideReadings({
+            rawSpeedKmh: speedKmh,
+            displacementM,
+            accuracyM: loc.coords.accuracy,
+            motionStill: motionStillRef.current,
+            pauseThresholdKmh: autoPausePolicy.speedBelowKmh,
+            driftThresholdM: driftFilterM,
+          });
           let smoothedSpeed = speedKmh;
           
           // GPS 漂移過濾
           if (prevPosRef.current) {
-            const dist = haversine(prevPosRef.current.lat, prevPosRef.current.lon, latitude, longitude);
-            const driftFilterM = Math.min(GPS_DRIFT_FILTER_M, sportTrackingPolicy.gpsDistanceIntervalM);
-            if (dist < driftFilterM) {
-              // GPS 漂移，保持上一個有效速度
-              smoothedSpeed = lastValidSpeedRef.current;
+            if (shouldZeroReadings) {
+              // 停紅燈或室內時的定位漂移不可延續上一筆速度。
+              smoothedSpeed = 0;
+              lastValidSpeedRef.current = 0;
             } else {
               // 有效移動，更新有效速度
               lastValidSpeedRef.current = speedKmh;
@@ -1720,7 +1747,6 @@ export default function MapScreen() {
           const avgSpeed = speedWindowRef.current.reduce((a, b) => a + b, 0) / speedWindowRef.current.length;
           
           // 自動暫停/恢復邏輯
-          const autoPausePolicy = SPORT_TRACKING_POLICIES[currentState.sportType].autoPause;
           if (currentState.status === "active") {
             const satisfiesStillness = !autoPausePolicy.requiresStillness || motionStillRef.current;
             if (autoPausePolicy.mode === "automatic" && avgSpeed < autoPausePolicy.speedBelowKmh && satisfiesStillness) {
@@ -1754,6 +1780,15 @@ export default function MapScreen() {
             // 集成情感化 UX - 自動恢復反饋
             EmotionalUXManager.onRideResumed().catch((error: any) => console.warn("Auto resume emotional UX failed:", error));
             if (settings.ttsEnabled) speakAutoResume(true);
+            return;
+          }
+
+          if (shouldZeroReadings) {
+            // 不追加軌跡、不更新距離／均速／爬升／卡路里；只讓即時速度與功率安全歸零。
+            powerWindowRef.current = [];
+            prevSpeedMsRef.current = 0;
+            setCurrentGrade(0);
+            dispatch({ type: "LIVE_READINGS_STATIONARY" });
             return;
           }
 
@@ -2081,11 +2116,19 @@ export default function MapScreen() {
       try {
         const sub = await Location.watchHeadingAsync((heading) => {
           if (!active) return;
-          compassHeadingRef.current = {
-            heading: heading.trueHeading >= 0 ? heading.trueHeading : heading.magHeading,
+          const nextHeading = heading.trueHeading >= 0 ? heading.trueHeading : heading.magHeading;
+          const compassData: CompassData = {
+            heading: nextHeading,
             accuracy: heading.accuracy ?? 999,
             timestamp: Date.now(),
           };
+          compassHeadingRef.current = compassData;
+          if (compassData.accuracy < 30 && stateRef.current.status === "active") {
+            // 羅盤 callback 通常比 GPS 位置回呼更快；以較高權重平滑後立即驅動地圖。
+            const responsiveHeading = smoothHeading(compassData.heading, headingRef.current, 0.72);
+            headingRef.current = responsiveHeading;
+            applyResponsiveMapBearing(responsiveHeading);
+          }
         });
         headingSubRef.current = sub;
       } catch (e) {
@@ -2098,7 +2141,7 @@ export default function MapScreen() {
       headingSubRef.current?.remove();
       headingSubRef.current = null;
     };
-  }, [headingUp, mapRideActive]);
+  }, [applyResponsiveMapBearing, headingUp, mapRideActive]);
 
   // ─── GPX 導航邏輯 ────────────────────────────────────────────────────────────
   const handleNavigation = useCallback(

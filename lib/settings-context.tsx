@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { calculateAgeFromBirthday, normalizeBirthday } from "./personal-profile";
+import {
+  DEFAULT_NAVIGATION_FIELD_ORDER,
+  migrateLegacyNavigationDashboardDefaults,
+  type NavigationDashboardFieldKey,
+} from "./navigation-dashboard-defaults";
+import { DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS } from "./live-ride-readings";
 
 // 正常導航模式可顯示的欄位
 export interface NormalModeFields {
@@ -35,21 +41,12 @@ export interface SimplifiedModeFields {
 }
 
 // 儀表板欄位 key 型別
-export type NormalFieldKey = keyof NormalModeFields;
+export type NormalFieldKey = NavigationDashboardFieldKey;
 export type SimplifiedFieldKey = keyof SimplifiedModeFields;
 
 // 預設欄位排序（與 NormalModeFields key 對應）
 export const DEFAULT_FIELD_ORDER: NormalFieldKey[] = [
-  "showElapsed",
-  "showSpeed",
-  "showDistance",
-  "showGrade",
-  "showPower",
-  "showAvgSpeed",
-  "showCalories",
-  "showPausedTime",
-  "showTotalAscent",
-  "showCurrentAltitude",
+  ...DEFAULT_NAVIGATION_FIELD_ORDER,
 ];
 
 // 精簡模式欄位預設排序
@@ -184,10 +181,10 @@ const DEFAULT_NORMAL_FIELDS: NormalModeFields = {
   showDistance: true,
   showGrade: true,
   showPower: true,
-  showAvgSpeed: true,
+  showAvgSpeed: false,
   showCalories: false,
   showPausedTime: false,
-  showTotalAscent: false,
+  showTotalAscent: true,
   showCurrentAltitude: false,
   showGradeDistribution: false,
 };
@@ -242,7 +239,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   simplifiedNavMode: "off",
   simplifiedNavIdleSec: 30,
   touchGuardEnabled: true,
-  touchGuardUnlockHoldMs: 1200,
+  touchGuardUnlockHoldMs: DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
   gpsAccuracy: "standard",
   idleAutoPauseEnabled: true,
   idleAutoPauseSeconds: 120,
@@ -330,6 +327,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           ...savedSimplifiedOrder.filter((k: SimplifiedFieldKey) => DEFAULT_SIMPLIFIED_FIELD_ORDER.includes(k)),
           ...DEFAULT_SIMPLIFIED_FIELD_ORDER.filter((k) => !savedSimplifiedOrder.includes(k)),
         ];
+        const migratedDashboard = migrateLegacyNavigationDashboardDefaults(savedNormalModeFields, mergedOrder);
+        const migratedUnlockHoldMs = saved.touchGuardUnlockHoldMs === 1200
+          ? DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS
+          : Math.max(400, Math.min(5000, Number(saved.touchGuardUnlockHoldMs) || DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS));
         const nextSettings: AppSettings = {
           ...DEFAULT_SETTINGS,
           ...savedWithoutRemovedSettings,
@@ -339,10 +340,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           age: calculateAgeFromBirthday(saved.birthday) ?? saved.age ?? DEFAULT_SETTINGS.age,
           autoPersonalMetricsEnabled: true,
           autoRpeEnabled: true,
-          normalModeFields: { ...DEFAULT_NORMAL_FIELDS, ...savedNormalModeFields },
+          normalModeFields: { ...DEFAULT_NORMAL_FIELDS, ...migratedDashboard.fields },
           simplifiedModeFields: { ...DEFAULT_SIMPLIFIED_FIELDS, ...(saved.simplifiedModeFields ?? {}) },
-          normalModeFieldOrder: mergedOrder,
+          normalModeFieldOrder: migratedDashboard.order,
           simplifiedModeFieldOrder: mergedSimplifiedOrder,
+          touchGuardUnlockHoldMs: migratedUnlockHoldMs,
         };
         if (nextSettings.supplyEnergyTimeIntervalEnabled && nextSettings.supplyEnergyDistanceIntervalEnabled) {
           nextSettings.supplyEnergyDistanceIntervalEnabled = false;

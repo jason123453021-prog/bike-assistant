@@ -1823,6 +1823,11 @@
 - [x] 取得 EAS Run gradlew 實際根因：react-native-reanimated 4.1.6 的 assertNewArchitectureEnabledTask 因 newArchEnabled=false 失敗
 - [x] 啟用 Expo SDK 54 受管理新架構設定、建立 Reanimated 建置守門並驗證 preview Android 預建置
 - [ ] 重新提交 preview APK，確認 Run gradlew 已越過 Reanimated 新架構任務
+- [x] 將導航儀表板右下角預設欄位由均速改為累計爬升
+- [x] 在停紅燈或室內靜止時凍結速度、功率等即時讀數並避免 GPS 漂移造成假讀數
+- [x] 提高車頭朝前地圖航向更新靈敏度，同時保留低速防抖
+- [x] 將長按解除預設值改為 400ms，並修正解鎖後自動重新鎖定的狀態流程
+- [x] 新增對應回歸測試，驗證騎乘儀表板、靜止資料與觸控鎖定行為（TypeScript 0 errors；191 passed／1 skipped）
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌

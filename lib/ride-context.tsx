@@ -212,6 +212,8 @@ type RideAction =
   | { type: "RESET" }
   | { type: "TICK"; elapsed: number }
   | { type: "PAUSE_TICK" }
+  /** 停止或室內定位漂移時只重設畫面上的即時讀數，不寫入軌跡或統計。 */
+  | { type: "LIVE_READINGS_STATIONARY" }
   | { type: "LOCATION_UPDATE"; point: LocationPoint; power: number; calories: number; ascent: number; distanceM?: number }
   | { type: "SWEAT_UPDATE"; sweatLossMl: number; sweatRatePerHour: number; intensityLabel: string }
   | { type: "CONSUME_CALORIES" }
@@ -312,6 +314,13 @@ function rideReducer(state: RideState, action: RideAction): RideState {
     case "PAUSE_TICK":
       // 暫停時只更新 totalPausedSec，不更新 elapsed
       return { ...state, totalPausedSec: state.totalPausedSec + 1 };
+
+    case "LIVE_READINGS_STATIONARY":
+      return {
+        ...state,
+        currentSpeed: 0,
+        currentPower: 0,
+      };
 
     case "LOCATION_UPDATE": {
       const { point, power, calories, ascent, distanceM } = action;
