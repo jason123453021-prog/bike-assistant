@@ -1,12 +1,15 @@
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
+import { createHash } from "node:crypto";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { MODEL_GOVERNANCE, SPORT_MODEL_PROFILES } from "../../lib/model-governance";
+import { MODEL_UPDATE_SCHEMA_VERSION, serializeModelPayload, type RemoteModelPayload } from "../../lib/model-update-contract";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -60,6 +63,25 @@ async function startServer() {
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
+  });
+
+  /**
+   * 唯讀且不需帳號的受控模型發佈端。模型調整僅能由已審核的部署版本更新，
+   * 用戶端仍會驗證結構、來源、數值範圍與 SHA-256 後才快取套用。
+   */
+  app.get("/api/model-update/manifest", (_req, res) => {
+    const payload: RemoteModelPayload = {
+      schemaVersion: MODEL_UPDATE_SCHEMA_VERSION,
+      issuedAt: "2026-08-16T00:00:00.000Z",
+      model: {
+        version: MODEL_GOVERNANCE.version,
+        sourceIds: MODEL_GOVERNANCE.sources.map((source) => source.id),
+        profiles: SPORT_MODEL_PROFILES,
+      },
+    };
+    const payloadSha256 = createHash("sha256").update(serializeModelPayload(payload), "utf8").digest("hex");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.json({ ...payload, payloadSha256 });
   });
 
   app.use(

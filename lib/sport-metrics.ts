@@ -52,6 +52,21 @@ export const SPORT_TRACKING_POLICIES: Record<SportType, SportTrackingPolicy> = O
   }),
 ) as Record<SportType, SportTrackingPolicy>;
 
+/** 讀取目前有效模型，讓下一次啟動驗證過的離線快取可立即帶入導航。 */
+export function getSportTrackingPolicy(sportType: SportType): SportTrackingPolicy {
+  const tracking = getSportModelProfile(sportType).tracking;
+  return {
+    gpsDistanceIntervalM: tracking.gpsDistanceIntervalM,
+    stationaryDriftThresholdM: tracking.stationaryDriftThresholdM,
+    autoPause: {
+      mode: tracking.autoPauseMode,
+      speedBelowKmh: tracking.autoPauseSpeedBelowKmh,
+      stillForSeconds: tracking.autoPauseStillForSeconds,
+      requiresStillness: tracking.requiresStillness,
+    },
+  };
+}
+
 export function formatPaceFromKmh(speedKmh: number): string {
   if (!Number.isFinite(speedKmh) || speedKmh <= 0.05) return "--'--\"";
   const secondsPerKm = Math.round(3600 / speedKmh);

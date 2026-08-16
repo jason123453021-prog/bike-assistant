@@ -15,6 +15,8 @@ const env = {
   androidPackage: bundleId,
   // 隱私政策公開 URL（Google Play 上架必填）
   privacyPolicyUrl: "https://bikeassist-bdbkimdc.manus.space/privacy",
+  // 僅用於每七天一次的已審核模型清單驗證；離線時不影響任何騎乘功能。
+  modelUpdateManifestUrl: "https://bikeassist-bdbkimdc.manus.space/api/model-update/manifest",
 };
 
 const config: ExpoConfig = {
@@ -171,6 +173,7 @@ const config: ExpoConfig = {
     reactCompiler: false,
   },
   extra: {
+    modelUpdateManifestUrl: env.modelUpdateManifestUrl,
     eas: {
       projectId: "af286610-25f1-45e5-afcc-6c30040d4124",
     },

@@ -51,11 +51,12 @@ import {
   calculateGapPaceSecPerKm,
   calculateVamMPerHour,
   estimateSportCalories,
+  getSportTrackingPolicy,
   smoothSpeedKmh,
   SPORT_META,
-  SPORT_TRACKING_POLICIES,
   type SportType,
 } from "@/lib/sport-metrics";
+import { getModelRevision, subscribeModelUpdates } from "@/lib/model-governance";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday } from "@/lib/personal-profile";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
@@ -354,7 +355,12 @@ export default function MapScreen() {
   // 崩潰恢復
   const [showRecoveryAlert, setShowRecoveryAlert] = useState(false);
   const [recoverySnapshot, setRecoverySnapshot] = useState<Partial<import("@/lib/ride-context").RideState> | null>(null);
-  const sportTrackingPolicy = SPORT_TRACKING_POLICIES[state.sportType];
+  const [modelRevision, setModelRevision] = useState(getModelRevision);
+  useEffect(() => subscribeModelUpdates(setModelRevision), []);
+  const sportTrackingPolicy = useMemo(
+    () => getSportTrackingPolicy(state.sportType),
+    [modelRevision, state.sportType],
+  );
 
   // 匯入 GPX 與釘選 OSRM 路徑分開保存，讓使用者可選擇清除或並存顯示。
   const [pinnedNavigationLayers, setPinnedNavigationLayers] = useState<PinnedNavigationLayer<GpxRoute>[]>([]);
@@ -1719,7 +1725,7 @@ export default function MapScreen() {
             ? haversine(prevPosRef.current.lat, prevPosRef.current.lon, latitude, longitude)
             : null;
           const driftFilterM = sportTrackingPolicy.stationaryDriftThresholdM;
-          const autoPausePolicy = SPORT_TRACKING_POLICIES[currentState.sportType].autoPause;
+          const autoPausePolicy = getSportTrackingPolicy(currentState.sportType).autoPause;
           const shouldZeroReadings = mapRideActive && shouldZeroLiveRideReadings({
             rawSpeedKmh: speedKmh,
             displacementM,

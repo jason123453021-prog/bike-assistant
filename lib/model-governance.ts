@@ -87,6 +87,36 @@ export const SPORT_MODEL_PROFILES: Record<GovernedSportType, SportModelProfile> 
   },
 };
 
+let activeModelVersion: string = MODEL_GOVERNANCE.version;
+let activeSportModelProfiles: Record<GovernedSportType, SportModelProfile> = SPORT_MODEL_PROFILES;
+let modelRevision = 0;
+const modelUpdateListeners = new Set<(revision: number) => void>();
+
+export function getActiveModelVersion(): string {
+  return activeModelVersion;
+}
+
+export function getModelRevision(): number {
+  return modelRevision;
+}
+
+export function subscribeModelUpdates(listener: (revision: number) => void): () => void {
+  modelUpdateListeners.add(listener);
+  return () => modelUpdateListeners.delete(listener);
+}
+
+export function getActiveSportModelProfiles(): Record<GovernedSportType, SportModelProfile> {
+  return activeSportModelProfiles;
+}
+
+/** 僅由完成結構與 SHA-256 驗證的更新服務呼叫。 */
+export function applyVerifiedSportModelProfiles(version: string, profiles: Record<GovernedSportType, SportModelProfile>) {
+  activeModelVersion = version;
+  activeSportModelProfiles = profiles;
+  modelRevision += 1;
+  modelUpdateListeners.forEach((listener) => listener(modelRevision));
+}
+
 export function getSportModelProfile(sportType: GovernedSportType = "cycling"): SportModelProfile {
-  return SPORT_MODEL_PROFILES[sportType];
+  return activeSportModelProfiles[sportType];
 }

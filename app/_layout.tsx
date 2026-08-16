@@ -28,6 +28,7 @@ import { setupNotifications } from "@/lib/feedback-service";
 // 必須在頂層引入以確保 TaskManager 任務被定義
 import "@/lib/background-location";
 import { startSupplyNotificationActionListener } from "@/lib/supply-notification-actions";
+import { checkModelUpdateOnAppLaunch } from "@/lib/model-update-service";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -93,6 +94,11 @@ export default function RootLayout() {
 
   useEffect(() => {
     setupNotifications().catch(() => {});
+  }, []);
+
+  // 靜默模型檢查最多每七天執行一次；騎乘開始後不再發起網路請求。
+  useEffect(() => {
+    void checkModelUpdateOnAppLaunch();
   }, []);
 
   // 升級後立即釋放已移除「最愛路線」功能留下的單一舊版快取鍵。
