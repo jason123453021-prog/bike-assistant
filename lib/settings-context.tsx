@@ -8,8 +8,7 @@ import {
 } from "./navigation-dashboard-defaults";
 import {
   DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
-  MAX_TOUCH_GUARD_UNLOCK_HOLD_MS,
-  MIN_TOUCH_GUARD_UNLOCK_HOLD_MS,
+  TOUCH_GUARD_UNLOCK_HOLD_PRESETS,
 } from "./live-ride-readings";
 
 // 正常導航模式可顯示的欄位
@@ -163,7 +162,7 @@ export interface AppSettings {
   simplifiedNavIdleSec: number; // 自動模式開啟前的閒置秒數（預設 30 秒）
   // 騎乘防誤觸：鎖定時仍可直接閱讀資訊，僅阻擋地圖與控制誤觸
   touchGuardEnabled: boolean;
-  /** 長按此毫秒數後解除騎乘防誤觸；限定 400–5000 ms。 */
+  /** 長按此毫秒數後解除騎乘防誤觸；設定頁僅提供 400、800、1200 ms。 */
   touchGuardUnlockHoldMs: number;
   /** 用來區分早期 1200 ms 預設與使用者後續手動選擇的自訂時間。 */
   touchGuardUnlockHoldMsSchemaVersion: number;
@@ -260,8 +259,8 @@ const SETTINGS_KEY = "@bike_settings";
 export const TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION = 2;
 
 /**
- * 舊版預設值曾是 1200 ms；僅未標記新版自訂設定的資料才會遷移至 400 ms。
- * 已由使用者設定過的時間會以 schema version 保留，數字與字串資料均可安全正規化。
+ * 舊版預設值曾是 1200 ms；僅未標記新版設定的資料才會遷移至 400 ms。
+ * 目前設定頁只允許三個快速選項，既有的任意數值會安全收斂至最接近的選項。
  */
 export function migrateTouchGuardUnlockHoldMs(value: unknown, schemaVersion?: unknown): number {
   const normalized = Number(value);
@@ -269,7 +268,9 @@ export function migrateTouchGuardUnlockHoldMs(value: unknown, schemaVersion?: un
     return DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS;
   }
   if (!Number.isFinite(normalized)) return DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS;
-  return Math.max(MIN_TOUCH_GUARD_UNLOCK_HOLD_MS, Math.min(MAX_TOUCH_GUARD_UNLOCK_HOLD_MS, normalized));
+  return TOUCH_GUARD_UNLOCK_HOLD_PRESETS.reduce((nearest, preset) => (
+    Math.abs(preset - normalized) < Math.abs(nearest - normalized) ? preset : nearest
+  ));
 }
 
 interface SettingsContextValue {

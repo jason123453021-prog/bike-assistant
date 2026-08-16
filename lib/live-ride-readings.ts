@@ -1,7 +1,6 @@
 /** 騎乘進行中，對停止與室內 GPS 漂移使用的保守即時讀數保護。 */
 export const DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS = 400;
-export const MIN_TOUCH_GUARD_UNLOCK_HOLD_MS = 400;
-export const MAX_TOUCH_GUARD_UNLOCK_HOLD_MS = 5_000;
+export const TOUCH_GUARD_UNLOCK_HOLD_PRESETS = [400, 800, 1200] as const;
 export const TOUCH_GUARD_AUTO_RELOCK_MS = 3_000;
 
 export function shouldScheduleTouchGuardRelock(

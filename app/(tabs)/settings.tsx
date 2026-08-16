@@ -26,11 +26,7 @@ import { useRide } from "@/lib/ride-context";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-profile";
 import { RidePermissionReadiness } from "@/components/ride-permission-readiness";
-import {
-  DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
-  MAX_TOUCH_GUARD_UNLOCK_HOLD_MS,
-  MIN_TOUCH_GUARD_UNLOCK_HOLD_MS,
-} from "@/lib/live-ride-readings";
+import { TOUCH_GUARD_UNLOCK_HOLD_PRESETS } from "@/lib/live-ride-readings";
 
 
 import Constants from "expo-constants";
@@ -57,22 +53,6 @@ export default function SettingsScreen() {
   const [powerSavingSettings, setPowerSavingSettings] = useState<PowerSavingSettings>(
     powerSavingManagerRef.current.getSettings(),
   );
-  const [touchGuardUnlockHoldDraft, setTouchGuardUnlockHoldDraft] = useState(
-    String(settings.touchGuardUnlockHoldMs),
-  );
-
-  useEffect(() => {
-    setTouchGuardUnlockHoldDraft(String(settings.touchGuardUnlockHoldMs));
-  }, [settings.touchGuardUnlockHoldMs]);
-
-  const commitTouchGuardUnlockHoldMs = () => {
-    const parsed = Number.parseInt(touchGuardUnlockHoldDraft, 10);
-    const milliseconds = Number.isFinite(parsed)
-      ? Math.max(MIN_TOUCH_GUARD_UNLOCK_HOLD_MS, Math.min(MAX_TOUCH_GUARD_UNLOCK_HOLD_MS, parsed))
-      : DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS;
-    setTouchGuardUnlockHoldDraft(String(milliseconds));
-    void updateSettings({ touchGuardUnlockHoldMs: milliseconds });
-  };
 
   useEffect(() => {
     let mounted = true;
@@ -724,24 +704,38 @@ export default function SettingsScreen() {
             onToggle={(enabled) => updateSettings({ touchGuardEnabled: enabled })}
           />
           <Divider colors={colors} />
-          <View style={styles.row}>
+          <View style={[styles.row, { alignItems: "flex-start" }]}>
             <IconSymbol name="lock.fill" size={18} color={colors.muted} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>長按解除時間</Text>
-              <Text style={[styles.rowHint, { color: colors.muted }]}>預設 400；可自訂 400–5000，鎖定時仍可閱讀地圖與數據</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>預設 400 毫秒；選擇常用解除時間</Text>
+              <View style={styles.touchGuardPresetRow}>
+                {TOUCH_GUARD_UNLOCK_HOLD_PRESETS.map((milliseconds) => {
+                  const selected = settings.touchGuardUnlockHoldMs === milliseconds;
+                  return (
+                    <Pressable
+                      key={milliseconds}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected, disabled: !settings.touchGuardEnabled }}
+                      onPress={() => void updateSettings({ touchGuardUnlockHoldMs: milliseconds })}
+                      disabled={!settings.touchGuardEnabled}
+                      style={({ pressed }) => [
+                        styles.touchGuardPreset,
+                        {
+                          backgroundColor: selected ? colors.accent : colors.surface,
+                          borderColor: selected ? colors.accent : colors.border,
+                          opacity: pressed || !settings.touchGuardEnabled ? 0.6 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={{ color: selected ? colors.onAccent : colors.foreground, fontSize: 14, fontWeight: "800" }}>
+                        {milliseconds} ms
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
-            <TextInput
-              style={[styles.numericInput, { color: colors.foreground, borderColor: colors.border }]}
-              value={touchGuardUnlockHoldDraft}
-              onChangeText={(value) => setTouchGuardUnlockHoldDraft(value.replace(/[^0-9]/g, ""))}
-              onEndEditing={commitTouchGuardUnlockHoldMs}
-              keyboardType="number-pad"
-              returnKeyType="done"
-              editable={settings.touchGuardEnabled}
-              maxLength={4}
-              selectTextOnFocus
-            />
-            <Text style={[styles.rowHint, { color: colors.muted, marginLeft: 6 }]}>毫秒</Text>
           </View>
         </View>}
 
@@ -1555,6 +1549,20 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     fontSize: 14,
     textAlign: "center",
+  },
+  touchGuardPresetRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+  },
+  touchGuardPreset: {
+    minWidth: 64,
+    minHeight: 36,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    borderWidth: 1,
   },
   guardModeRow: {
     flexDirection: "row",
