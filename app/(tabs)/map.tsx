@@ -1233,24 +1233,7 @@ export default function MapScreen() {
         }, autoDismissSeconds * 1000);
       }
 
-      // 未關閉時重複提醒功能
-      const repeatUntilDismissed = type === "calorie" ? settings.calorieRepeatUntilDismissed : settings.waterRepeatUntilDismissed;
-      if (repeatUntilDismissed) {
-        const repeatInterval = setInterval(() => {
-          const isPending = type === "calorie" ? pendingCalorieRef.current : pendingWaterRef.current;
-          if (isPending && supplySnoozedUntilRef.current[type] <= Date.now()) {
-            if (settings.vibrationEnabled) vibrateWarning();
-            speakPlannedSupplyReminder(type, recommendation);
-            if (settings.soundEnabled) {
-              try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
-            }
-          } else {
-            clearInterval(repeatInterval);
-          }
-        }, 5000);
-      }
-
-      // 啟動重複提醒計時器（若已有則不重複啟動）
+      // 唯一的重複提醒間隔：0 代表關閉，正值同時套用能量與補水。
       const repeatSec = settings.supplyReminderRepeatSec ?? 60;
       if (repeatSec > 0 && !supplyRepeatTimerRef.current) {
         supplyRepeatTimerRef.current = setInterval(() => {
@@ -1287,7 +1270,6 @@ export default function MapScreen() {
       if (!supplyItem.enabled) return;
       const target = supplyItem.target === "water" ? "water" : "calorie";
       const pauseOnDownhill = target === "water" ? settings.waterPauseOnDownhill : settings.caloriePauseOnDownhill;
-      const repeatUntilDismissed = target === "water" ? settings.waterRepeatUntilDismissed : settings.calorieRepeatUntilDismissed;
 
       // 初始化追蹤器
       if (!supplyItemsTrackerRef.current[supplyItem.id]) {
@@ -1358,9 +1340,9 @@ export default function MapScreen() {
       }
       if (settings.notificationEnabled) void showSupplyNotification(target === "calorie" ? "custom-energy" : "custom-water", undefined, supplyItem.id);
 
-      // 使用全域重複間隔與對應類別的未關閉時重複提醒開關。
+      // 使用唯一的全域重複間隔；0 代表關閉。
       const repeatSec = settings.supplyReminderRepeatSec ?? 60;
-      if (repeatUntilDismissed && repeatSec > 0) {
+      if (repeatSec > 0) {
         if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
         tracker.repeatIntervalId = setInterval(() => {
           if (customSupplyAlertsRef.current[supplyItem.id]) {

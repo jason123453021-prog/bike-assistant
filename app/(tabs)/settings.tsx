@@ -522,21 +522,14 @@ export default function SettingsScreen() {
             unit="秒"
             colors={colors}
             iconColor={colors.primary}
-            hint={settings.supplyReminderRepeatSec === 0 ? "已停用重複提醒" : `每 ${settings.supplyReminderRepeatSec} 秒語音重複提醒一次`}
+            hint={settings.supplyReminderRepeatSec === 0 ? "已關閉重複提醒" : `彈窗未確認時，每 ${settings.supplyReminderRepeatSec} 秒重複提醒一次`}
             onPress={() => openEdit("supplyReminderRepeatSec", "重複提醒間隔（秒，0 = 停用）", settings.supplyReminderRepeatSec, "秒")}
           />
           <Divider colors={colors} />
 
-          {/* 補給提醒高級功能（統一設定） */}
+          {/* 補給提醒選項 */}
           <View style={{ marginVertical: 8 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>補給提醒高級功能</Text>
-            <View style={{ marginBottom: 12 /* internal spacing */, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>未關閉時重複提醒</Text>
-                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>彈窗未確認時持續提醒（卡路里和水分）</Text>
-              </View>
-              <Switch value={(settings.calorieRepeatUntilDismissed ?? false) || (settings.waterRepeatUntilDismissed ?? false)} onValueChange={(v) => updateSettings({ calorieRepeatUntilDismissed: v, waterRepeatUntilDismissed: v })} trackColor={{ false: colors.border, true: colors.primary }} />
-            </View>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>補給提醒選項</Text>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>長下坡暫停提醒</Text>

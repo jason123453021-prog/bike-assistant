@@ -67,10 +67,11 @@ describe("smart supply countdown UI", () => {
     expect(modalSource).not.toContain("previewSummary");
   });
 
-  it("keeps advanced reminder settings while exposing no preview or feedback test controls", () => {
+  it("uses one reminder interval setting while exposing no preview or feedback test controls", () => {
     expect(settingsSource).toContain("未關閉時重複提醒間隔");
-    expect(settingsSource).toContain("calorieRepeatUntilDismissed");
-    expect(settingsSource).toContain("waterRepeatUntilDismissed");
+    expect(settingsSource).toContain("0 = 停用");
+    expect(settingsSource).not.toContain("calorieRepeatUntilDismissed");
+    expect(settingsSource).not.toContain("waterRepeatUntilDismissed");
     expect(settingsSource).toContain("caloriePauseOnDownhill");
     expect(settingsSource).toContain("waterPauseOnDownhill");
     expect(settingsSource).not.toContain("testPreviewAlertSound");
@@ -81,6 +82,14 @@ describe("smart supply countdown UI", () => {
     expect(modalSource).not.toContain("測試震動");
     expect(modalSource).not.toContain("測試音效與語音");
     expect(modalSource).not.toContain("預覽提醒設定");
+  });
+
+  it("uses the shared reminder interval for smart, interval, and custom supply alerts", () => {
+    expect(mapSource).toContain("// 唯一的重複提醒間隔：0 代表關閉，正值同時套用能量與補水。");
+    expect(mapSource).toContain("// 使用唯一的全域重複間隔；0 代表關閉。");
+    expect(mapSource).not.toContain("calorieRepeatUntilDismissed");
+    expect(mapSource).not.toContain("waterRepeatUntilDismissed");
+    expect(mapSource).not.toContain("}, 5000);");
   });
 
   it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {

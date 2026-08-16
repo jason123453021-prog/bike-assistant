@@ -132,7 +132,8 @@ export interface AppSettings {
   sweatRateCalibrationCount: number;
   /** 防止同一筆已完成活動重複觸發自動汗率校正。 */
   sweatRateCalibrationLastRideId?: string;
-  supplyReminderRepeatSec: number; // 0 = 不重複；>0 = 每幾秒重複語音提醒
+  /** 唯一的未確認補給重複提醒設定：0 = 關閉；>0 = 每幾秒重複提醒。 */
+  supplyReminderRepeatSec: number;
   // 手動能量提醒：可依騎乘時間、距離或兩者提醒。
   supplyEnergyTimeIntervalEnabled: boolean;
   supplyEnergyTimeIntervalMinutes: number;
@@ -144,11 +145,9 @@ export interface AppSettings {
   supplyWaterDistanceIntervalEnabled: boolean;
   supplyWaterDistanceIntervalKm: number;
   // 卡路里高級設定
-  calorieRepeatUntilDismissed?: boolean; // 未關閉時重複提醒
   calorieAutoDismissSeconds?: number;    // 自動關閉延遲（秒）
   caloriePauseOnDownhill?: boolean;      // 長下坡暫停提醒
   // 水分高級設定
-  waterRepeatUntilDismissed?: boolean;   // 未關閉時重複提醒
   waterAutoDismissSeconds?: number;      // 自動關閉延遲（秒）
   waterPauseOnDownhill?: boolean;        // 長下坡暫停提醒
   supplyItems: SupplyItem[];   // 自訂補給品清單
@@ -314,6 +313,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           supplyTimeIntervalMinutes: legacyTimeIntervalMinutes,
           supplyDistanceIntervalEnabled: legacyDistanceIntervalEnabled,
           supplyDistanceIntervalKm: legacyDistanceIntervalKm,
+          calorieRepeatUntilDismissed: _legacyCalorieRepeatUntilDismissed,
+          waterRepeatUntilDismissed: _legacyWaterRepeatUntilDismissed,
           ...savedWithoutRemovedSettings
         } = saved;
         const hasIndependentIntervalSettings = [
