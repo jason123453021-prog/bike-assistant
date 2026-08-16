@@ -102,7 +102,9 @@ const config: ExpoConfig = {
   },
   web: {
     bundler: "metro",
-    output: "static",
+    // 本 App 的主要目標為 Android；以單頁模式提供管理預覽，
+    // 避免靜態 SSR 與 Expo Go Android bundle 同時建立大型 Metro 圖譜。
+    output: "single",
     favicon: "./assets/images/favicon.png",
   },
   plugins: [

@@ -1807,6 +1807,9 @@
 - [x] 完成全專案 TypeScript、廢碼、依賴、定位／音訊／計時器資源釋放、資料寫入節流與防呆稽核
 - [x] 實作可安全驗證的 Android 相容性、效能與介面適配修正，不新增 NitroModules 或 C++ 依賴
 - [x] 完成全量靜態檢查、測試、Android bundle 與設定檢核，撰寫自我檢測與優化摘要報告
+- [x] 擷取 Expo Go 通用載入錯誤的 Metro、Android bundle 與啟動日誌證據
+- [x] 定位並修正 Expo Go 相容性、快取或啟動流程根因：Metro 同時建立 static Web SSR 與 Android 開發 bundle 時達 Node heap 上限
+- [x] 完成 Expo Go Android bundle、TypeScript、lint 與完整回歸驗證：Android bundle HTTP 200、3.97 MB；185 passed／1 skipped
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌
