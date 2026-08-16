@@ -92,6 +92,14 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).not.toContain("}, 5000);");
   });
 
+  it("offers 0, 30, and 60 second reminder interval quick choices while retaining manual editing", () => {
+    expect(settingsSource).toContain("快速設定");
+    expect(settingsSource).toContain("[0, 30, 60].map");
+    expect(settingsSource).toContain('updateSettings({ supplyReminderRepeatSec: seconds })');
+    expect(settingsSource).toContain('openEdit("supplyReminderRepeatSec"');
+    expect(settingsSource).toContain("關閉補給重複提醒");
+  });
+
   it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {
     expect(mapSource).toContain("const smartCalorieDue = bgState.supplyCalculationMode === \"smart\"");
     expect(mapSource).toContain("const smartWaterDue = bgState.supplyCalculationMode === \"smart\"");

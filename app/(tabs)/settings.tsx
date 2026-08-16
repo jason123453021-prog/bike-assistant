@@ -525,6 +525,33 @@ export default function SettingsScreen() {
             hint={settings.supplyReminderRepeatSec === 0 ? "已關閉重複提醒" : `彈窗未確認時，每 ${settings.supplyReminderRepeatSec} 秒重複提醒一次`}
             onPress={() => openEdit("supplyReminderRepeatSec", "重複提醒間隔（秒，0 = 停用）", settings.supplyReminderRepeatSec, "秒")}
           />
+          <View style={styles.supplyRepeatPresetRow}>
+            <Text style={[styles.supplyRepeatPresetLabel, { color: colors.muted }]}>快速設定</Text>
+            {[0, 30, 60].map((seconds) => {
+              const selected = settings.supplyReminderRepeatSec === seconds;
+              return (
+                <Pressable
+                  key={seconds}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={seconds === 0 ? "關閉補給重複提醒" : `每 ${seconds} 秒重複提醒`}
+                  onPress={() => void updateSettings({ supplyReminderRepeatSec: seconds })}
+                  style={({ pressed }) => [
+                    styles.supplyRepeatPreset,
+                    {
+                      backgroundColor: selected ? colors.accent : colors.surface,
+                      borderColor: selected ? colors.accent : colors.border,
+                      opacity: pressed ? 0.65 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: selected ? colors.onAccent : colors.foreground, fontSize: 14, fontWeight: "800" }}>
+                    {seconds === 0 ? "關閉" : `${seconds} 秒`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <Divider colors={colors} />
 
           {/* 補給提醒選項 */}
@@ -1549,6 +1576,27 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   touchGuardPreset: {
+    minWidth: 64,
+    minHeight: 36,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  supplyRepeatPresetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 4,
+    paddingBottom: 12,
+  },
+  supplyRepeatPresetLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginRight: 2,
+  },
+  supplyRepeatPreset: {
     minWidth: 64,
     minHeight: 36,
     paddingHorizontal: 10,
