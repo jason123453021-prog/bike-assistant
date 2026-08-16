@@ -1891,3 +1891,8 @@
 - [x] 新增啟用補給與補水提醒總開關，關閉時停止智慧、手動與自訂補給的倒數、彈窗、通知、語音、音效、震動及重複提醒
 - [x] 關閉總開關時停用補給提醒相關設定控制，重新開啟後恢復原有可調整狀態與設定值
 - [x] 整合前景與背景生命週期，新增總開關關閉／重啟的回歸測試並完成品質驗證與版本保存（TypeScript 0 errors；lint 0 warnings／0 errors；207 passed／1 skipped）
+
+## LINE 外部 GPX 匯入修復（2026-08-16）
+- [x] 修復 Android content URI（例如 LINE 分享）無法直接讀取，改為先轉存至 App 本機快取再解析 GPX
+- [x] 為外部分享、file URI 與無效 URI 建立 GPX 匯入回歸測試，確認錯誤訊息可理解且不暴露原生例外
+- [x] 完成型別、lint 與測試驗證，重啟開發服務並保存修復版本（TypeScript 0 errors；lint 0 warnings／0 errors；209 passed／1 skipped）
