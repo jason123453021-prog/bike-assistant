@@ -6,6 +6,8 @@ const mapSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"), "ut
 const modalSource = readFileSync(resolve(process.cwd(), "components/supply-modal.tsx"), "utf8");
 const feedbackSource = readFileSync(resolve(process.cwd(), "lib/feedback-service.ts"), "utf8");
 const settingsSource = readFileSync(resolve(process.cwd(), "app/(tabs)/settings.tsx"), "utf8");
+const settingsContextSource = readFileSync(resolve(process.cwd(), "lib/settings-context.tsx"), "utf8");
+const backgroundSource = readFileSync(resolve(process.cwd(), "lib/background-location.ts"), "utf8");
 
 describe("smart supply countdown UI", () => {
   it("shows countdown status and restarts only after explicit confirmation", () => {
@@ -98,6 +100,24 @@ describe("smart supply countdown UI", () => {
     expect(settingsSource).toContain('updateSettings({ supplyReminderRepeatSec: seconds })');
     expect(settingsSource).toContain('openEdit("supplyReminderRepeatSec"');
     expect(settingsSource).toContain("關閉補給重複提醒");
+  });
+
+  it("provides a master supply switch that stops foreground and background reminders while preserving user preferences", () => {
+    expect(settingsContextSource).toContain("supplyReminderEnabled: boolean");
+    expect(settingsContextSource).toContain("supplyReminderEnabled: true");
+    expect(settingsContextSource).toContain("supplyReminderEnabled: saved.supplyReminderEnabled !== false");
+    expect(settingsSource).toContain("啟用補給與補水提醒");
+    expect(settingsSource).toContain("disabled={supplyControlsDisabled}");
+    expect(settingsSource).toContain("const supplyControlsDisabled = !settings.supplyReminderEnabled");
+    expect(mapSource).toContain("clearAllActiveSupplyReminders");
+    expect(mapSource).toContain("if (!settings.supplyReminderEnabled) return;");
+    expect(mapSource).toContain("setBackgroundSupplyReminderEnabled(false)");
+    expect(mapSource).toContain("settings.supplyReminderEnabled && bgState && bgState.supplyReminderEnabled !== false");
+    expect(backgroundSource).toContain("supplyReminderEnabled?: boolean");
+    expect(backgroundSource).toContain("const supplyReminderEnabled = state.supplyReminderEnabled !== false");
+    expect(backgroundSource).toContain("setBackgroundSupplyReminderEnabled");
+    expect(feedbackSource).toContain("clearAllSupplyNotifications");
+    expect(feedbackSource).toContain('data?.type === "supply_reminder"');
   });
 
   it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {

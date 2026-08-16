@@ -35,6 +35,7 @@ import {
   Text,
   TextInput,
   View,
+  Vibration,
 } from "react-native";
 import LeafletMapView, { type LeafletMapHandle, type NavigationRouteOverlay } from "@/components/leaflet-map";
 import * as Location from "expo-location";
@@ -75,6 +76,7 @@ import {
   speakAutoResume,
   scheduleSmartSupplyDueNotification,
   clearAllSmartSupplyDueNotifications,
+  clearAllSupplyNotifications,
   clearSmartSupplyDueNotification,
   showSupplyNotification,
   showRidingNotification,
@@ -127,6 +129,7 @@ import {
   updateBackgroundEnvironment,
   updateBackgroundSmartSupplyCountdown,
   setBackgroundSupplyReminderPending,
+  setBackgroundSupplyReminderEnabled,
   clearBackgroundData,
   acknowledgeBackgroundSupplyInterval,
   acknowledgeBackgroundSupplyReminder,
@@ -749,6 +752,62 @@ export default function MapScreen() {
     }
   }, []);
 
+  const previousSupplyReminderEnabledRef = useRef(settings.supplyReminderEnabled);
+  const clearAllActiveSupplyReminders = useCallback(() => {
+    clearSupplyRepeatTimer();
+    clearIntervalSupplyRepeatTimer();
+    Object.values(supplyItemsTrackerRef.current).forEach((tracker) => {
+      if (tracker.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
+      if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+    });
+    customSupplyAlertsRef.current = {};
+    setCustomSupplyAlerts({});
+    setActiveSupplyAlerts([]);
+    intervalSupplyAlertsRef.current = {};
+    setIntervalSupplyAlerts({});
+    intervalSnoozedUntilRef.current = {};
+    setCalorieAlert(false);
+    setWaterAlert(false);
+    setSupplyRecommendedMl(undefined);
+    setSupplyRecommendation(undefined);
+    syncSmartSupplyCountdown(null);
+    calorieReminderSentRef.current = false;
+    waterReminderSentRef.current = false;
+    void stopSpeech();
+    try { alertPlayer.pause(); } catch {}
+    Vibration.cancel();
+    void clearAllSupplyNotifications();
+    void setBackgroundSupplyReminderEnabled(false);
+  }, [alertPlayer, clearIntervalSupplyRepeatTimer, clearSupplyRepeatTimer, syncSmartSupplyCountdown]);
+
+  useEffect(() => {
+    const wasEnabled = previousSupplyReminderEnabledRef.current;
+    if (!settings.supplyReminderEnabled) {
+      clearAllActiveSupplyReminders();
+    } else if (!wasEnabled) {
+      const elapsed = stateRef.current.elapsed;
+      const distanceKm = stateRef.current.distance / 1000;
+      intervalSupplyTrackerRef.current = {
+        "energy-time": elapsed,
+        "energy-distance": distanceKm,
+        "water-time": elapsed,
+        "water-distance": distanceKm,
+      };
+      intervalSnoozedUntilRef.current = {};
+      supplyItemsTrackerRef.current = Object.fromEntries(
+        settings.supplyItems.filter((item) => item.enabled).map((item) => [item.id, {
+          lastTriggerTime: elapsed,
+          lastTriggerDistance: distanceKm,
+          triggered: false,
+          dismissTimeoutId: null,
+          repeatIntervalId: null,
+        }]),
+      );
+      void setBackgroundSupplyReminderEnabled(true);
+    }
+    previousSupplyReminderEnabledRef.current = settings.supplyReminderEnabled;
+  }, [clearAllActiveSupplyReminders, settings.supplyItems, settings.supplyReminderEnabled]);
+
   useEffect(() => {
     customSupplyAlertsRef.current = customSupplyAlerts;
   }, [customSupplyAlerts]);
@@ -911,6 +970,7 @@ export default function MapScreen() {
   }, [clearIntervalSupplyRepeatTimer, settings.supplyCalculationMode]);
 
   const processSupplyNotificationAction = useCallback((action: SupplyNotificationAction) => {
+    if (!settings.supplyReminderEnabled) return;
     if (action.action === "snooze") {
       handleSnoozeSupply(action.kind, action.customItemId);
       return;
@@ -921,7 +981,7 @@ export default function MapScreen() {
       const item = settings.supplyItems.find((candidate) => candidate.id === action.customItemId);
       if (item) handleConfirmCustomSupply(item.id, item.triggerType);
     } else handleConfirmIntervalSupply(action.kind.replace("interval-", "") as SupplyIntervalKind);
-  }, [handleConfirmCalorieSupply, handleConfirmCustomSupply, handleConfirmIntervalSupply, handleConfirmWaterSupply, handleSnoozeSupply, settings.supplyItems]);
+  }, [handleConfirmCalorieSupply, handleConfirmCustomSupply, handleConfirmIntervalSupply, handleConfirmWaterSupply, handleSnoozeSupply, settings.supplyItems, settings.supplyReminderEnabled]);
 
   useEffect(() => {
     const processQueuedActions = async () => {
@@ -1170,7 +1230,7 @@ export default function MapScreen() {
   );
 
   const resumeDeferredSupplySpeech = useCallback(() => {
-    if (isDownhillRef.current || !settings.ttsEnabled) return;
+    if (!settings.supplyReminderEnabled || isDownhillRef.current || !settings.ttsEnabled) return;
     const now = Date.now();
     const caloriePlan = deferredSupplySpeechPlansRef.current.calorie;
     const waterPlan = deferredSupplySpeechPlansRef.current.water;
@@ -1184,11 +1244,12 @@ export default function MapScreen() {
       delete deferredSupplySpeechPlansRef.current.water;
       void speakSupplyReminder("water", true);
     }
-  }, [settings.ttsEnabled]);
+  }, [settings.supplyReminderEnabled, settings.ttsEnabled]);
 
   // ─── 補給提醒 ────────────────────────────────────────────────────────────────
   const triggerSupplyReminder = useCallback(
     async (type: "calorie" | "water", recommendation?: SupplyPlan) => {
+      if (!settings.supplyReminderEnabled) return;
       if (supplySnoozedUntilRef.current[type] > Date.now()) return;
       powerSavingManagerRef.current.onSupplyReminder();
       setTouchGuardEnabled(false);
@@ -1267,6 +1328,7 @@ export default function MapScreen() {
   // ─── 自訂補給品觸發邏輯 ────────────────────────────────────────────────────────
   const triggerCustomSupplyReminder = useCallback(
     async (supplyItem: any) => {
+      if (!settings.supplyReminderEnabled) return;
       if (!supplyItem.enabled) return;
       const target = supplyItem.target === "water" ? "water" : "calorie";
       const pauseOnDownhill = target === "water" ? settings.waterPauseOnDownhill : settings.caloriePauseOnDownhill;
@@ -1364,6 +1426,7 @@ export default function MapScreen() {
   );
 
   const triggerIntervalSupplyReminder = useCallback(() => {
+    if (!settings.supplyReminderEnabled) return;
     const current = stateRef.current;
     if (current.status !== "active") return;
 
@@ -1982,7 +2045,7 @@ export default function MapScreen() {
             weatherAvailable: Boolean(currentWeather),
           });
           setActiveSupplyPlan(supplyPlan);
-          const isSmartSupplyMode = settings.supplyCalculationMode === "smart";
+          const isSmartSupplyMode = settings.supplyReminderEnabled && settings.supplyCalculationMode === "smart";
           const currentCountdown = smartSupplyCountdownRef.current;
           const refreshedCountdown = isSmartSupplyMode && currentCountdown
             ? refreshSmartSupplyCountdown(currentCountdown, supplyPlan)
@@ -2012,10 +2075,10 @@ export default function MapScreen() {
           const newSweatSince = currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
           const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(nextCountdown, "calorie", currentState.elapsed);
           const smartWaterRemainingSec = smartSupplyCountdownRemainingSec(nextCountdown, "water", currentState.elapsed);
-          const manualEnergyKind: SupplyIntervalKind | null = !isSmartSupplyMode
+          const manualEnergyKind: SupplyIntervalKind | null = settings.supplyReminderEnabled && !isSmartSupplyMode
             ? (settings.supplyEnergyTimeIntervalEnabled ? "energy-time" : settings.supplyEnergyDistanceIntervalEnabled ? "energy-distance" : null)
             : null;
-          const manualWaterKind: SupplyIntervalKind | null = !isSmartSupplyMode
+          const manualWaterKind: SupplyIntervalKind | null = settings.supplyReminderEnabled && !isSmartSupplyMode
             ? (settings.supplyWaterTimeIntervalEnabled ? "water-time" : settings.supplyWaterDistanceIntervalEnabled ? "water-distance" : null)
             : null;
           const manualEnergyProgress = manualEnergyKind === "energy-time"
@@ -2049,9 +2112,9 @@ export default function MapScreen() {
           if (!isDownhill) resumeDeferredSupplySpeech();
 
           // 智慧模式改由倒數到期觸發；固定模式維持累積門檻相容行為。
-          const calorieDue = isSmartSupplyMode
+          const calorieDue = settings.supplyReminderEnabled && (isSmartSupplyMode
             ? isSmartSupplyCountdownDue(nextCountdown, "calorie", currentState.elapsed)
-            : !manualEnergyKind && calPct >= 1;
+            : !manualEnergyKind && calPct >= 1);
           if (calorieDue && !calorieReminderSentRef.current && !pendingCalorieRef.current) {
             if (settings.caloriePauseOnDownhill && isDownhill && !calorieAlert) {
               // 下坡時暫停提醒，倒數與待確認狀態均保留。
@@ -2061,9 +2124,9 @@ export default function MapScreen() {
             }
           }
 
-          const waterDue = isSmartSupplyMode
+          const waterDue = settings.supplyReminderEnabled && (isSmartSupplyMode
             ? isSmartSupplyCountdownDue(nextCountdown, "water", currentState.elapsed)
-            : !manualWaterKind && waterPct >= 1;
+            : !manualWaterKind && waterPct >= 1);
           if (waterDue && !waterReminderSentRef.current && !pendingWaterRef.current) {
             if (settings.waterPauseOnDownhill && isDownhill && !waterAlert) {
               // 下坡時暫停提醒，倒數與待確認狀態均保留。
@@ -2074,7 +2137,7 @@ export default function MapScreen() {
           }
 
           // ── 自訂補給品觸發 ──
-          if (settings.supplyItems && settings.supplyItems.length > 0) {
+          if (settings.supplyReminderEnabled && settings.supplyItems && settings.supplyItems.length > 0) {
             for (const supplyItem of settings.supplyItems) {
               triggerCustomSupplyReminder(supplyItem);
             }
@@ -2302,6 +2365,7 @@ export default function MapScreen() {
       calorieThreshold: settings.calorieThreshold,
       waterThreshold: hydrationThresholdMl,
       supplyCalculationMode: settings.supplyCalculationMode,
+      supplyReminderEnabled: settings.supplyReminderEnabled,
       sportType: state.sportType,
       currentLat: lastPos?.coords.latitude ?? 0,
       currentLon: lastPos?.coords.longitude ?? 0,
@@ -2551,7 +2615,7 @@ export default function MapScreen() {
             dispatch({ type: "RESUME" });
             if (settings.ttsEnabled) speak("已偵測到重新移動，恢復騎乘紀錄", true);
           }
-          if (bgState) {
+          if (settings.supplyReminderEnabled && bgState && bgState.supplyReminderEnabled !== false) {
             const backgroundElapsedSec = Math.max(0, Math.floor((Date.now() - (bgState.rideStartedAt || Date.now())) / 1000));
             const smartCalorieDue = bgState.supplyCalculationMode === "smart"
               && typeof bgState.smartCalorieCountdownDurationSec === "number"
@@ -2572,7 +2636,7 @@ export default function MapScreen() {
               void setBackgroundSupplyReminderPending("water", true);
             }
           }
-          if (bgState && bgTrack.length > 0) {
+          if (settings.supplyReminderEnabled && bgState && bgState.supplyReminderEnabled !== false && bgTrack.length > 0) {
             // 只合併尚未同步的背景點，並再次套用品質檢核，防止鎖定期間的延遲批次產生跨區直線。
             const newPoints = filterTrackPointBatch(
               bgTrack
@@ -2637,7 +2701,7 @@ export default function MapScreen() {
       appStateRef.current = nextState;
     });
     return () => { subscription.remove(); };
-  }, [mapRideActive, dispatch, rideLocationTrackingMode, settings.ttsEnabled]);
+  }, [mapRideActive, dispatch, rideLocationTrackingMode, settings.supplyReminderEnabled, settings.ttsEnabled]);
 
 
   // ─── GPS 精度即時切換（騎乘中更改設定時自動重啟背景追蹤）────────────────────────────
@@ -3248,7 +3312,7 @@ export default function MapScreen() {
             </View>
 
             {/* 自訂補給品進度條 */}
-            {settings.supplyItems.filter(s => s.enabled).map(item => {
+            {settings.supplyReminderEnabled && settings.supplyItems.filter(s => s.enabled).map(item => {
               const tracker = supplyItemsTrackerRef.current[item.id] || { lastTriggerTime: 0, lastTriggerDistance: 0, triggered: false };
               let progress = 0;
               let currentVal = 0;
@@ -3453,8 +3517,8 @@ export default function MapScreen() {
 
       {/* ── 補給 Modal ── */}
       <SupplyModal
-        calorieAlert={calorieAlert}
-        waterAlert={waterAlert}
+        calorieAlert={settings.supplyReminderEnabled && calorieAlert}
+        waterAlert={settings.supplyReminderEnabled && waterAlert}
         customSupplyAlerts={[
           ...sortedActiveAlerts.map(id => {
             const item = settings.supplyItems.find(i => i.id === id);

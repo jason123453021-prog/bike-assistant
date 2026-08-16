@@ -127,6 +127,8 @@ export interface AppSettings {
   waterThreshold: number;
   /** smart：依個人、騎乘與環境資料全自動調整提醒；custom：採用保守本機預設。 */
   supplyCalculationMode: SupplyCalculationMode;
+  /** 補給與補水提醒的總開關；關閉時保留所有偏好設定但不再觸發任何提醒。 */
+  supplyReminderEnabled: boolean;
   /** 由本機多次有效騎乘與智慧補水確認自動更新的汗率倍率，限制為保守範圍。 */
   sweatRateCalibrationMultiplier: number;
   sweatRateCalibrationCount: number;
@@ -223,6 +225,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   waterThreshold: 500,
   // 新安裝預設使用全自動智慧計畫；舊自訂值只保留供相容性遷移，永不影響智慧模式。
   supplyCalculationMode: "smart",
+  supplyReminderEnabled: true,
   sweatRateCalibrationMultiplier: 1,
   sweatRateCalibrationCount: 0,
   supplyReminderRepeatSec: 60,
@@ -359,6 +362,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           ...DEFAULT_SETTINGS,
           ...savedWithoutRemovedSettings,
           ...migratedIntervalSettings,
+          // 舊版資料沒有此欄位時，維持既有補給提醒可用；只有明確 false 才關閉。
+          supplyReminderEnabled: saved.supplyReminderEnabled !== false,
           supplyItems: normalizeSupplyItems(saved.supplyItems),
           birthday: normalizeBirthday(saved.birthday),
           age: calculateAgeFromBirthday(saved.birthday) ?? saved.age ?? DEFAULT_SETTINGS.age,

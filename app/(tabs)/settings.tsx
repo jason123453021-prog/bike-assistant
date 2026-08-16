@@ -49,6 +49,7 @@ export default function SettingsScreen() {
     restingHeartRate: settings.restingHeartRate,
   });
   const currentAge = calculateAgeFromBirthday(settings.birthday) ?? settings.age;
+  const supplyControlsDisabled = !settings.supplyReminderEnabled;
   const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
   const [powerSavingSettings, setPowerSavingSettings] = useState<PowerSavingSettings>(
     powerSavingManagerRef.current.getSettings(),
@@ -391,10 +392,26 @@ export default function SettingsScreen() {
         <SectionHeader title="補給提醒" colors={colors} onToggle={() => toggleSection("supply")} collapsed={collapsedSections["supply"]} />
         {!collapsedSections["supply"] && <View style={[styles.section, { borderColor: colors.border }]}> 
           <ToggleRow
+            icon="bell.badge.fill"
+            label="啟用補給與補水提醒"
+            value={settings.supplyReminderEnabled}
+            colors={colors}
+            onToggle={(enabled) => updateSettings({ supplyReminderEnabled: enabled })}
+          />
+          <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+            <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
+              {settings.supplyReminderEnabled
+                ? "啟用後會依智慧、手動與自訂規則安排補給與補水提醒。"
+                : "已關閉所有補給與補水提醒；倒數、彈窗、通知、語音、音效、震動與重複提醒均已停止，以下設定暫時不可調整。"}
+            </Text>
+          </View>
+          <Divider colors={colors} />
+          <ToggleRow
             icon="bolt.fill"
             label="智慧補給計算"
             value={settings.supplyCalculationMode === "smart"}
             colors={colors}
+            disabled={supplyControlsDisabled}
             onToggle={(enabled) => updateSettings(enabled
               ? {
                   supplyCalculationMode: "smart",
@@ -430,6 +447,7 @@ export default function SettingsScreen() {
               label="能量：按時間提醒"
               value={settings.supplyEnergyTimeIntervalEnabled}
               colors={colors}
+              disabled={supplyControlsDisabled}
               onToggle={(enabled) => updateSettings({
                 supplyEnergyTimeIntervalEnabled: enabled,
                 ...(enabled ? { supplyEnergyDistanceIntervalEnabled: false } : {}),
@@ -443,6 +461,7 @@ export default function SettingsScreen() {
               colors={colors}
               iconColor="#D97706"
               hint="確認能量補給後重新計時"
+              disabled={supplyControlsDisabled}
               onPress={() => openEdit("supplyEnergyTimeIntervalMinutes", "能量時間提醒間隔", settings.supplyEnergyTimeIntervalMinutes, "分鐘")}
             />}
             <ToggleRow
@@ -450,6 +469,7 @@ export default function SettingsScreen() {
               label="能量：按距離提醒"
               value={settings.supplyEnergyDistanceIntervalEnabled}
               colors={colors}
+              disabled={supplyControlsDisabled}
               onToggle={(enabled) => updateSettings({
                 supplyEnergyDistanceIntervalEnabled: enabled,
                 ...(enabled ? { supplyEnergyTimeIntervalEnabled: false } : {}),
@@ -463,6 +483,7 @@ export default function SettingsScreen() {
               colors={colors}
               iconColor="#D97706"
               hint="確認能量補給後重新累計距離"
+              disabled={supplyControlsDisabled}
               onPress={() => openEdit("supplyEnergyDistanceIntervalKm", "能量距離提醒間隔", settings.supplyEnergyDistanceIntervalKm, "km")}
             />}
             <Divider colors={colors} />
@@ -478,6 +499,7 @@ export default function SettingsScreen() {
               label="補水：按時間提醒"
               value={settings.supplyWaterTimeIntervalEnabled}
               colors={colors}
+              disabled={supplyControlsDisabled}
               onToggle={(enabled) => updateSettings({
                 supplyWaterTimeIntervalEnabled: enabled,
                 ...(enabled ? { supplyWaterDistanceIntervalEnabled: false } : {}),
@@ -491,6 +513,7 @@ export default function SettingsScreen() {
               colors={colors}
               iconColor="#0284C7"
               hint="確認補水後重新計時"
+              disabled={supplyControlsDisabled}
               onPress={() => openEdit("supplyWaterTimeIntervalMinutes", "補水時間提醒間隔", settings.supplyWaterTimeIntervalMinutes, "分鐘")}
             />}
             <ToggleRow
@@ -498,6 +521,7 @@ export default function SettingsScreen() {
               label="補水：按距離提醒"
               value={settings.supplyWaterDistanceIntervalEnabled}
               colors={colors}
+              disabled={supplyControlsDisabled}
               onToggle={(enabled) => updateSettings({
                 supplyWaterDistanceIntervalEnabled: enabled,
                 ...(enabled ? { supplyWaterTimeIntervalEnabled: false } : {}),
@@ -511,6 +535,7 @@ export default function SettingsScreen() {
               colors={colors}
               iconColor="#0284C7"
               hint="確認補水後重新累計距離"
+              disabled={supplyControlsDisabled}
               onPress={() => openEdit("supplyWaterDistanceIntervalKm", "補水距離提醒間隔", settings.supplyWaterDistanceIntervalKm, "km")}
             />}
           </>}
@@ -523,6 +548,7 @@ export default function SettingsScreen() {
             colors={colors}
             iconColor={colors.primary}
             hint={settings.supplyReminderRepeatSec === 0 ? "已關閉重複提醒" : `彈窗未確認時，每 ${settings.supplyReminderRepeatSec} 秒重複提醒一次`}
+            disabled={supplyControlsDisabled}
             onPress={() => openEdit("supplyReminderRepeatSec", "重複提醒間隔（秒，0 = 停用）", settings.supplyReminderRepeatSec, "秒")}
           />
           <View style={styles.supplyRepeatPresetRow}>
@@ -533,19 +559,20 @@ export default function SettingsScreen() {
                 <Pressable
                   key={seconds}
                   accessibilityRole="button"
-                  accessibilityState={{ selected }}
+                  accessibilityState={{ selected, disabled: supplyControlsDisabled }}
                   accessibilityLabel={seconds === 0 ? "關閉補給重複提醒" : `每 ${seconds} 秒重複提醒`}
+                  disabled={supplyControlsDisabled}
                   onPress={() => void updateSettings({ supplyReminderRepeatSec: seconds })}
                   style={({ pressed }) => [
                     styles.supplyRepeatPreset,
                     {
-                      backgroundColor: selected ? colors.accent : colors.surface,
-                      borderColor: selected ? colors.accent : colors.border,
-                      opacity: pressed ? 0.65 : 1,
+                      backgroundColor: selected && !supplyControlsDisabled ? colors.accent : colors.surface,
+                      borderColor: selected && !supplyControlsDisabled ? colors.accent : colors.border,
+                      opacity: supplyControlsDisabled ? 0.45 : pressed ? 0.65 : 1,
                     },
                   ]}
                 >
-                  <Text style={{ color: selected ? colors.onAccent : colors.foreground, fontSize: 14, fontWeight: "800" }}>
+                  <Text style={{ color: selected && !supplyControlsDisabled ? colors.onAccent : supplyControlsDisabled ? colors.muted : colors.foreground, fontSize: 14, fontWeight: "800" }}>
                     {seconds === 0 ? "關閉" : `${seconds} 秒`}
                   </Text>
                 </Pressable>
@@ -555,21 +582,21 @@ export default function SettingsScreen() {
           <Divider colors={colors} />
 
           {/* 補給提醒選項 */}
-          <View style={{ marginVertical: 8 }}>
+          <View style={{ marginVertical: 8, opacity: supplyControlsDisabled ? 0.45 : 1 }}>
             <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>補給提醒選項</Text>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>長下坡暫停提醒</Text>
                 <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>下坡時暫停提醒但仍計數（卡路里和水分）</Text>
               </View>
-              <Switch value={(settings.caloriePauseOnDownhill ?? false) || (settings.waterPauseOnDownhill ?? false)} onValueChange={(v) => updateSettings({ caloriePauseOnDownhill: v, waterPauseOnDownhill: v })} trackColor={{ false: colors.border, true: colors.primary }} />
+              <Switch disabled={supplyControlsDisabled} value={(settings.caloriePauseOnDownhill ?? false) || (settings.waterPauseOnDownhill ?? false)} onValueChange={(v) => updateSettings({ caloriePauseOnDownhill: v, waterPauseOnDownhill: v })} trackColor={{ false: colors.border, true: colors.primary }} />
             </View>
           </View>
         </View>}
 
         {/* ── 自訂補給品清單 ── */}
         <SectionHeader title="自訂補給品" colors={colors} onToggle={() => toggleSection("customSupply")} collapsed={collapsedSections["customSupply"]} />
-        {!collapsedSections["customSupply"] && <View style={[styles.section, { borderColor: colors.border }]}>
+        {!collapsedSections["customSupply"] && <View style={[styles.section, { borderColor: colors.border }, supplyControlsDisabled && { opacity: 0.45 }]}>
           {/* 快速新延預設補給品已移除 */}
           {settings.supplyItems.length === 0 ? (
             <View style={{ padding: 16, alignItems: "center" }}>
@@ -584,10 +611,12 @@ export default function SettingsScreen() {
                       <Switch
                         value={item.enabled}
                         onValueChange={(v) => updateSupplyItem(item.id, { enabled: v })}
+                        disabled={supplyControlsDisabled}
                       />
                       <Pressable
                         style={{ flex: 1 }}
                         onPress={() => openSupplyModal(item)}
+                        disabled={supplyControlsDisabled}
                       >
                         <Text style={[styles.rowLabel, { color: colors.foreground }]}>{item.name}</Text>
                         <Text style={[styles.rowHint, { color: colors.muted, fontSize: 12 }]}>
@@ -597,8 +626,9 @@ export default function SettingsScreen() {
                     </View>
                   </View>
                   <Pressable
-                    style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                    style={({ pressed }) => [{ opacity: supplyControlsDisabled ? 0.45 : pressed ? 0.6 : 1 }]}
                     onPress={() => handleDeleteSupply(item.id)}
+                    disabled={supplyControlsDisabled}
                   >
                     <IconSymbol name="trash.fill" size={18} color={colors.error} />
                   </Pressable>
@@ -609,8 +639,9 @@ export default function SettingsScreen() {
           )}
           <Divider colors={colors} />
           <Pressable
-            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
+            style={({ pressed }) => [styles.row, { opacity: supplyControlsDisabled ? 0.45 : pressed ? 0.7 : 1 }]}
             onPress={() => openSupplyModal()}
+            disabled={supplyControlsDisabled}
           >
             <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
             <Text style={[styles.rowLabel, { color: colors.primary }]}>新增補給品</Text>
@@ -1269,15 +1300,16 @@ function Divider({ colors }: { colors: any }) {
 }
 
 function NumberRow({
-  icon, label, value, unit, colors, iconColor, hint, onPress,
+  icon, label, value, unit, colors, iconColor, hint, onPress, disabled = false,
 }: {
   icon: string; label: string; value: number; unit: string;
-  colors: any; iconColor?: string; hint?: string; onPress: () => void;
+  colors: any; iconColor?: string; hint?: string; onPress: () => void; disabled?: boolean;
 }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
+      style={({ pressed }) => [styles.row, { opacity: disabled ? 0.45 : pressed ? 0.7 : 1 }]}
       onPress={onPress}
+      disabled={disabled}
     >
       <IconSymbol name={icon as any} size={18} color={iconColor ?? colors.muted} />
       <View style={{ flex: 1 }}>

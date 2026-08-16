@@ -78,6 +78,8 @@ export interface BackgroundState {
   calorieThreshold: number;
   waterThreshold: number;
   supplyCalculationMode?: "smart" | "custom";
+  /** 補給與補水提醒總開關；背景定位仍記錄軌跡，但不得排程提醒。 */
+  supplyReminderEnabled?: boolean;
   sportType?: SportType;
   calorieReminderSent: boolean;
   waterReminderSent: boolean;
@@ -346,18 +348,19 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       await saveRideSessionSnapshot(recoverySession);
 
       const elapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
-      if (state.supplyCalculationMode === "smart") {
+      const supplyReminderEnabled = state.supplyReminderEnabled !== false;
+      if (supplyReminderEnabled && state.supplyCalculationMode === "smart") {
         state.smartCalorieCountdownStartedElapsedSec ??= 0;
         state.smartWaterCountdownStartedElapsedSec ??= 0;
         state.smartCalorieCountdownDurationSec = latestSupplyPlan.energyCountdownSec;
         state.smartWaterCountdownDurationSec = latestSupplyPlan.waterCountdownSec;
       }
-      const calorieDue = state.supplyCalculationMode === "smart"
+      const calorieDue = supplyReminderEnabled && (state.supplyCalculationMode === "smart"
         ? elapsedSec >= (state.smartCalorieCountdownStartedElapsedSec ?? 0) + (state.smartCalorieCountdownDurationSec ?? latestSupplyPlan.energyCountdownSec)
-        : state.calories >= activeCalorieThreshold;
-      const waterDue = state.supplyCalculationMode === "smart"
+        : state.calories >= activeCalorieThreshold);
+      const waterDue = supplyReminderEnabled && (state.supplyCalculationMode === "smart"
         ? elapsedSec >= (state.smartWaterCountdownStartedElapsedSec ?? 0) + (state.smartWaterCountdownDurationSec ?? latestSupplyPlan.waterCountdownSec)
-        : state.sweatLossMl >= activeWaterThreshold;
+        : state.sweatLossMl >= activeWaterThreshold);
 
       // 檢查補給提醒
       if (calorieDue && !state.calorieReminderSent) {
@@ -408,28 +411,28 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         body: string;
       }> = [
         {
-          kind: "energy-time", enabled: state.supplyEnergyTimeIntervalEnabled,
+          kind: "energy-time", enabled: supplyReminderEnabled && state.supplyEnergyTimeIntervalEnabled,
           interval: state.supplyEnergyTimeIntervalMinutes * 60, since: state.intervalLastEnergyTimeSec,
           sent: state.intervalEnergyTimeReminderSent,
           markSent: () => { state.intervalEnergyTimeReminderSent = true; },
           title: "能量補給提醒", body: `已騎乘 ${state.supplyEnergyTimeIntervalMinutes} 分鐘，請補給能量`,
         },
         {
-          kind: "energy-distance", enabled: state.supplyEnergyDistanceIntervalEnabled,
+          kind: "energy-distance", enabled: supplyReminderEnabled && state.supplyEnergyDistanceIntervalEnabled,
           interval: state.supplyEnergyDistanceIntervalKm, since: state.intervalLastEnergyDistanceKm,
           sent: state.intervalEnergyDistanceReminderSent,
           markSent: () => { state.intervalEnergyDistanceReminderSent = true; },
           title: "能量補給提醒", body: `已累積騎乘 ${state.supplyEnergyDistanceIntervalKm} km，請補給能量`,
         },
         {
-          kind: "water-time", enabled: state.supplyWaterTimeIntervalEnabled,
+          kind: "water-time", enabled: supplyReminderEnabled && state.supplyWaterTimeIntervalEnabled,
           interval: state.supplyWaterTimeIntervalMinutes * 60, since: state.intervalLastWaterTimeSec,
           sent: state.intervalWaterTimeReminderSent,
           markSent: () => { state.intervalWaterTimeReminderSent = true; },
           title: "補水提醒", body: `已騎乘 ${state.supplyWaterTimeIntervalMinutes} 分鐘，請補給水分`,
         },
         {
-          kind: "water-distance", enabled: state.supplyWaterDistanceIntervalEnabled,
+          kind: "water-distance", enabled: supplyReminderEnabled && state.supplyWaterDistanceIntervalEnabled,
           interval: state.supplyWaterDistanceIntervalKm, since: state.intervalLastWaterDistanceKm,
           sent: state.intervalWaterDistanceReminderSent,
           markSent: () => { state.intervalWaterDistanceReminderSent = true; },
@@ -483,6 +486,7 @@ export async function initBackgroundState(params: {
   calorieThreshold: number;
   waterThreshold: number;
   supplyCalculationMode?: "smart" | "custom";
+  supplyReminderEnabled?: boolean;
   sportType?: SportType;
   currentLat: number;
   currentLon: number;
@@ -512,6 +516,7 @@ export async function initBackgroundState(params: {
     calorieThreshold: params.calorieThreshold,
     waterThreshold: params.waterThreshold,
     supplyCalculationMode: params.supplyCalculationMode ?? "custom",
+    supplyReminderEnabled: params.supplyReminderEnabled !== false,
     sportType: params.sportType ?? "cycling",
     calorieReminderSent: false,
     waterReminderSent: false,
@@ -542,6 +547,31 @@ export async function initBackgroundState(params: {
   await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   // 清空舊軌跡
   await AsyncStorage.setItem(BG_TRACK_KEY, JSON.stringify([]));
+}
+
+/** 同步補給總開關至背景任務；切換時以當前騎乘基準重新開始，避免補開後立即補發舊提醒。 */
+export async function setBackgroundSupplyReminderEnabled(enabled: boolean) {
+  try {
+    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+    if (!stateStr) return;
+    const state: BackgroundState = JSON.parse(stateStr);
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
+    const distanceKm = state.totalDistanceM / 1000;
+    state.supplyReminderEnabled = enabled;
+    state.calorieReminderSent = false;
+    state.waterReminderSent = false;
+    state.intervalEnergyTimeReminderSent = false;
+    state.intervalEnergyDistanceReminderSent = false;
+    state.intervalWaterTimeReminderSent = false;
+    state.intervalWaterDistanceReminderSent = false;
+    state.intervalLastEnergyTimeSec = elapsedSec;
+    state.intervalLastWaterTimeSec = elapsedSec;
+    state.intervalLastEnergyDistanceKm = distanceKm;
+    state.intervalLastWaterDistanceKm = distanceKm;
+    state.smartCalorieCountdownStartedElapsedSec = elapsedSec;
+    state.smartWaterCountdownStartedElapsedSec = elapsedSec;
+    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+  } catch {}
 }
 
 /** 前景取得新天氣時，更新背景任務的本機環境摘要；不需在背景額外發起網路請求。 */

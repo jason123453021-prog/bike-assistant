@@ -243,6 +243,21 @@ export async function clearAllSmartSupplyDueNotifications() {
   ]);
 }
 
+/** 僅移除補給／補水通知，保留騎乘中的常駐狀態通知與其他 App 通知。 */
+export async function clearAllSupplyNotifications() {
+  const Notifications = await getLocalNotifications();
+  if (!Notifications) return;
+  try {
+    await clearAllSmartSupplyDueNotifications();
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    await Promise.all(
+      presented
+        .filter((notification) => notification.request.content.data?.type === "supply_reminder")
+        .map((notification) => Notifications.dismissNotificationAsync(notification.request.identifier).catch(() => {})),
+    );
+  } catch {}
+}
+
 export async function showSupplyNotification(
   type: SupplyNotificationKind,
   recommendation?: SupplyNotificationRecommendation,
