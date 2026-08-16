@@ -28,6 +28,7 @@ import { getHeadwindMs } from "@/lib/weather-service";
 import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import { evaluateTrackPoint, type TrackQualityPoint } from "@/lib/track-point-quality";
 import type { SupplyIntervalKind } from "@/lib/supply-interval";
+import type { SportType } from "@/lib/sport-metrics";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
@@ -77,6 +78,7 @@ export interface BackgroundState {
   calorieThreshold: number;
   waterThreshold: number;
   supplyCalculationMode?: "smart" | "custom";
+  sportType?: SportType;
   calorieReminderSent: boolean;
   waterReminderSent: boolean;
   smartCalorieCountdownStartedElapsedSec?: number;
@@ -156,6 +158,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       let activeWaterThreshold = state.waterThreshold;
       let latestSupplyPlan: SupplyPlan = createSupplyPlan({
         mode: state.supplyCalculationMode ?? "custom",
+        sportType: state.sportType ?? "cycling",
         calorieThresholdKcal: state.calorieThreshold,
         waterThresholdMl: state.waterThreshold,
         elapsedSec: Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000)),
@@ -480,6 +483,7 @@ export async function initBackgroundState(params: {
   calorieThreshold: number;
   waterThreshold: number;
   supplyCalculationMode?: "smart" | "custom";
+  sportType?: SportType;
   currentLat: number;
   currentLon: number;
   currentTimestamp?: number;
@@ -508,6 +512,7 @@ export async function initBackgroundState(params: {
     calorieThreshold: params.calorieThreshold,
     waterThreshold: params.waterThreshold,
     supplyCalculationMode: params.supplyCalculationMode ?? "custom",
+    sportType: params.sportType ?? "cycling",
     calorieReminderSent: false,
     waterReminderSent: false,
     smartCalorieCountdownStartedElapsedSec: 0,

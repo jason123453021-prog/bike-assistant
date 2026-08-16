@@ -25,7 +25,8 @@ export interface LiveRideReadingSample {
 export function shouldZeroLiveRideReadings(sample: LiveRideReadingSample): boolean {
   const speedKmh = Number.isFinite(sample.rawSpeedKmh) ? Math.max(0, sample.rawSpeedKmh) : 0;
   const noReliableMovement = sample.displacementM !== null && sample.displacementM < sample.driftThresholdM;
-  if (noReliableMovement) return true;
+  const stationarySpeedLimit = sample.pauseThresholdKmh + 1.5;
+  if (noReliableMovement && sample.motionStill && speedKmh <= stationarySpeedLimit) return true;
 
   if (sample.motionStill && speedKmh <= sample.pauseThresholdKmh) return true;
 

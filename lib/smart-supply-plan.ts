@@ -1,7 +1,11 @@
+import { getSportModelProfile, type GovernedSportType } from "./model-governance";
+
 export type SupplyCalculationMode = "smart" | "custom";
 
 export interface SupplyPlanInput {
   mode: SupplyCalculationMode;
+  /** 未提供時保留舊版單車相容行為。 */
+  sportType?: GovernedSportType;
   /** 僅供舊版固定模式相容；智慧模式不讀取此值。 */
   calorieThresholdKcal?: number;
   /** 僅供舊版固定模式相容；智慧模式不讀取此值。 */
@@ -92,14 +96,16 @@ function deriveCountdowns(
  * 固定模式僅保留舊版資料相容。
  */
 export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
+  const sportProfile = getSportModelProfile(input.sportType ?? "cycling");
   const intensity = clamp(input.intensityFactor, 0, 1.25);
   const environmentLoad = clamp(input.environmentLoad, 0, 1);
   const sweatRate = clamp(input.sweatRatePerHour, 350, 1_800);
-  const carbohydrateG = carbohydrateTargetGPerHour(input.elapsedSec, intensity, environmentLoad);
+  const carbohydrateG = carbohydrateTargetGPerHour(input.elapsedSec, intensity, environmentLoad)
+    * sportProfile.supply.carbohydrateRateMultiplier;
   const energyRecommendationKcal = Math.round(carbohydrateG * 4);
   const durationHydrationLoad = input.elapsedSec >= 3 * 60 * 60 ? 0.08 : input.elapsedSec >= 2 * 60 * 60 ? 0.05 : input.elapsedSec >= 60 * 60 ? 0.02 : 0;
   const waterRecommendationMl = Math.round(clamp(
-    sweatRate * (MICRO_SIP_INTERVAL_MINUTES / 60),
+    sweatRate * sportProfile.supply.hydrationRateMultiplier * (MICRO_SIP_INTERVAL_MINUTES / 60),
     SMART_WATER_RECOMMENDATION_RANGE.min,
     SMART_WATER_RECOMMENDATION_RANGE.max,
   ));
@@ -129,7 +135,7 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
   ));
   const smartWaterTriggerMl = Math.round(clamp(
     // 汗率 × 約 12.5 分鐘，再依熱負荷／長時段稍微提前提醒。
-    sweatRate * (MICRO_SIP_INTERVAL_MINUTES / 60) * (1 - environmentLoad * 0.12 - durationHydrationLoad),
+    sweatRate * sportProfile.supply.hydrationRateMultiplier * (MICRO_SIP_INTERVAL_MINUTES / 60) * (1 - environmentLoad * 0.12 - durationHydrationLoad),
     SMART_WATER_TRIGGER_RANGE.min,
     SMART_WATER_TRIGGER_RANGE.max,
   ));

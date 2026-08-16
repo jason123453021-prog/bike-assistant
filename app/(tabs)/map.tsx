@@ -73,6 +73,7 @@ import {
   speakAutoPause,
   speakAutoResume,
   scheduleSmartSupplyDueNotification,
+  clearAllSmartSupplyDueNotifications,
   clearSmartSupplyDueNotification,
   showSupplyNotification,
   showRidingNotification,
@@ -1038,6 +1039,7 @@ export default function MapScreen() {
     : DEFAULT_HYDRATION_THRESHOLD_ML;
   const fallbackSupplyPlan = useMemo(() => createSupplyPlan({
     mode: settings.supplyCalculationMode,
+    sportType: state.sportType,
     calorieThresholdKcal: settings.calorieThreshold,
     waterThresholdMl: hydrationThresholdMl,
     elapsedSec: state.elapsed,
@@ -1047,7 +1049,7 @@ export default function MapScreen() {
     sweatRatePerHour: state.currentSweatRatePerHour || 550,
     environmentLoad: Math.min(1, Math.max(0, ((state.currentSweatRatePerHour || 550) - 550) / 1_000)),
     weatherAvailable: false,
-  }), [estimateFtpW, hydrationThresholdMl, settings.calorieThreshold, settings.supplyCalculationMode, settings.weight, state.currentPower, state.currentSweatRatePerHour, state.elapsed]);
+  }), [estimateFtpW, hydrationThresholdMl, settings.calorieThreshold, settings.supplyCalculationMode, settings.weight, state.currentPower, state.currentSweatRatePerHour, state.elapsed, state.sportType]);
   const dashboardSupplyPlan = activeSupplyPlan ?? fallbackSupplyPlan;
 
   // ─── 底部面板滑桿 ─────────────────────────────────────────────────────────────
@@ -1716,7 +1718,7 @@ export default function MapScreen() {
           const displacementM = prevPosRef.current
             ? haversine(prevPosRef.current.lat, prevPosRef.current.lon, latitude, longitude)
             : null;
-          const driftFilterM = Math.min(GPS_DRIFT_FILTER_M, sportTrackingPolicy.gpsDistanceIntervalM);
+          const driftFilterM = sportTrackingPolicy.stationaryDriftThresholdM;
           const autoPausePolicy = SPORT_TRACKING_POLICIES[currentState.sportType].autoPause;
           const shouldZeroReadings = mapRideActive && shouldZeroLiveRideReadings({
             rawSpeedKmh: speedKmh,
@@ -1972,6 +1974,7 @@ export default function MapScreen() {
 
           const supplyPlan = createSupplyPlan({
             mode: settings.supplyCalculationMode,
+            sportType: currentState.sportType,
             calorieThresholdKcal: settings.calorieThreshold,
             waterThresholdMl: hydrationThresholdMl,
             elapsedSec: currentState.elapsed,
@@ -2296,6 +2299,7 @@ export default function MapScreen() {
       calorieThreshold: settings.calorieThreshold,
       waterThreshold: hydrationThresholdMl,
       supplyCalculationMode: settings.supplyCalculationMode,
+      sportType: state.sportType,
       currentLat: lastPos?.coords.latitude ?? 0,
       currentLon: lastPos?.coords.longitude ?? 0,
       currentTimestamp: lastPos?.timestamp,
@@ -2381,11 +2385,22 @@ export default function MapScreen() {
           
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           await cancelRidingNotification();
+          await clearAllSmartSupplyDueNotifications();
           // 結束騎乘清除補給重複提醒計時器
           clearSupplyRepeatTimer();
           setCalorieAlert(false);
           setWaterAlert(false);
           syncSmartSupplyCountdown(null);
+          calorieReminderSentRef.current = false;
+          waterReminderSentRef.current = false;
+          pendingCalorieRef.current = false;
+          pendingWaterRef.current = false;
+          pendingSupplyPlansRef.current = {};
+          deferredSupplySpeechPlansRef.current = {};
+          supplySnoozedUntilRef.current = { calorie: 0, water: 0 };
+          setSupplyRecommendedMl(undefined);
+          setSupplyRecommendation(undefined);
+          setActiveSupplyPlan(undefined);
           customSupplyAlertsRef.current = {};
           setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
           supplyItemsTrackerRef.current = {}; // 重置自訂補給品追蹤器
@@ -2467,6 +2482,20 @@ export default function MapScreen() {
                 });
               }
             }
+            // 僅在本機儲存成功後重設本次騎乘暫態；保留目前位置與外部導航圖層。
+            setLiveTrail([]);
+            setCurrentGrade(0);
+            prevAltRef.current = null;
+            prevPosRef.current = null;
+            prevGpsForBearingRef.current = null;
+            lastLocationRef.current = null;
+            lastAcceptedTrackPointRef.current = null;
+            speedWindowRef.current = [];
+            powerWindowRef.current = [];
+            gradeWindowRef.current = [];
+            prevSpeedMsRef.current = 0;
+            lowSpeedCountRef.current = 0;
+            dispatch({ type: "RESET" });
             setShowSummary(true);
             if (settings.vibrationEnabled) vibrateSuccess();
           } catch {

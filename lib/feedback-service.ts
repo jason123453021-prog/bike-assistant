@@ -235,6 +235,14 @@ export async function clearSmartSupplyDueNotification(type: "calorie" | "water")
   } catch {}
 }
 
+/** 騎乘完成時同步取消所有智慧能量／補水倒數，並移除已在通知列呈現的提醒。 */
+export async function clearAllSmartSupplyDueNotifications() {
+  await Promise.all([
+    clearSmartSupplyDueNotification("calorie"),
+    clearSmartSupplyDueNotification("water"),
+  ]);
+}
+
 export async function showSupplyNotification(
   type: SupplyNotificationKind,
   recommendation?: SupplyNotificationRecommendation,

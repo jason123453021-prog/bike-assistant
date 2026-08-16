@@ -1,4 +1,6 @@
-export type SportType = "cycling" | "running" | "hiking" | "trail_running";
+import { getSportModelProfile, type GovernedSportType } from "./model-governance";
+
+export type SportType = GovernedSportType;
 
 export interface SpeedSample {
   speedKmh: number;
@@ -12,6 +14,7 @@ export interface AltitudeSample {
 
 export interface SportTrackingPolicy {
   gpsDistanceIntervalM: number;
+  stationaryDriftThresholdM: number;
   autoPause: {
     mode: "automatic" | "suggest";
     speedBelowKmh: number;
@@ -33,12 +36,21 @@ export const SPORT_META: Record<SportType, { label: string; icon: string; gpxTyp
   trail_running: { label: "越野跑", icon: "🏃‍♂️", gpxType: "Trail Running", accent: "#E65A27" },
 };
 
-export const SPORT_TRACKING_POLICIES: Record<SportType, SportTrackingPolicy> = {
-  cycling: { gpsDistanceIntervalM: 5, autoPause: { mode: "automatic", speedBelowKmh: 3, stillForSeconds: 15, requiresStillness: false } },
-  running: { gpsDistanceIntervalM: 3, autoPause: { mode: "automatic", speedBelowKmh: 3, stillForSeconds: 20, requiresStillness: true } },
-  hiking: { gpsDistanceIntervalM: 1.5, autoPause: { mode: "suggest", speedBelowKmh: 0.5, stillForSeconds: 120, requiresStillness: false } },
-  trail_running: { gpsDistanceIntervalM: 3, autoPause: { mode: "automatic", speedBelowKmh: 3, stillForSeconds: 20, requiresStillness: true } },
-};
+export const SPORT_TRACKING_POLICIES: Record<SportType, SportTrackingPolicy> = Object.fromEntries(
+  (Object.keys(SPORT_META) as SportType[]).map((sportType) => {
+    const tracking = getSportModelProfile(sportType).tracking;
+    return [sportType, {
+      gpsDistanceIntervalM: tracking.gpsDistanceIntervalM,
+      stationaryDriftThresholdM: tracking.stationaryDriftThresholdM,
+      autoPause: {
+        mode: tracking.autoPauseMode,
+        speedBelowKmh: tracking.autoPauseSpeedBelowKmh,
+        stillForSeconds: tracking.autoPauseStillForSeconds,
+        requiresStillness: tracking.requiresStillness,
+      },
+    }];
+  }),
+) as Record<SportType, SportTrackingPolicy>;
 
 export function formatPaceFromKmh(speedKmh: number): string {
   if (!Number.isFinite(speedKmh) || speedKmh <= 0.05) return "--'--\"";
@@ -99,6 +111,7 @@ export function estimateSportCalories(params: {
   gradePct?: number;
   vamMPerHour?: number;
 }): number {
+  const profile = getSportModelProfile(params.sportType);
   const weightKg = Math.max(25, params.weightKg || 70);
   const minutes = Math.max(0, params.durationSec) / 60;
   const grade = Math.max(0, params.gradePct ?? 0);
@@ -119,7 +132,7 @@ export function estimateSportCalories(params: {
       mets = speed < 16 ? 6.8 : speed < 22 ? 8 : 10;
       break;
   }
-  return (mets * 3.5 * weightKg / 200) * minutes;
+  return (mets * profile.calorieMetMultiplier * 3.5 * weightKg / 200) * minutes;
 }
 
 export function buildSportDashboardMetrics(params: {
