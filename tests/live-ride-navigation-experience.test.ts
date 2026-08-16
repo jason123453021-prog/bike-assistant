@@ -10,6 +10,7 @@ import {
   shouldZeroLiveRideReadings,
   TOUCH_GUARD_AUTO_RELOCK_MS,
 } from "../lib/live-ride-readings";
+import { migrateTouchGuardUnlockHoldMs } from "../lib/settings-context";
 
 describe("live ride navigation experience", () => {
   it("defaults the sixth dashboard slot to total ascent instead of average speed", () => {
@@ -90,5 +91,12 @@ describe("live ride navigation experience", () => {
     expect(shouldScheduleTouchGuardRelock(true, true)).toBe(true);
     expect(shouldScheduleTouchGuardRelock(false, true)).toBe(false);
     expect(shouldScheduleTouchGuardRelock(true, false)).toBe(false);
+  });
+
+  it("migrates legacy numeric and string 1200 ms settings to the new 400 ms default", () => {
+    expect(migrateTouchGuardUnlockHoldMs(1200)).toBe(400);
+    expect(migrateTouchGuardUnlockHoldMs("1200")).toBe(400);
+    expect(migrateTouchGuardUnlockHoldMs(undefined)).toBe(400);
+    expect(migrateTouchGuardUnlockHoldMs(800)).toBe(800);
   });
 });

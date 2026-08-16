@@ -1856,3 +1856,7 @@
 - [x] 蒐集 Metro、Expo 設定與 Android bundle 端點診斷資訊，定位「Failed to download remote update」根因
 - [x] 採取最小修正以恢復 Expo Go 開發連線，避免影響正式 APK 的每週模型檢查
 - [x] 驗證 Expo Go Android bundle 端點與完整型別／回歸測試，保存穩定版本（Android bundle 連續 HTTP 200；TypeScript 0 errors；199 passed／1 skipped）
+
+## 長按解除鎖定預設值（2026-08-16）
+- [x] 修正既有本機設定仍保留 1200 ms 時未自動遷移為 400 ms 的問題
+- [x] 驗證設定頁顯示、持久化載入與長按解鎖流程均使用 400 ms 預設，保存修復版本（數字與字串 1200 ms 均遷移；TypeScript 0 errors；200 passed／1 skipped）

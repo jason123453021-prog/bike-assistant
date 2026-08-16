@@ -251,6 +251,17 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const SETTINGS_KEY = "@bike_settings";
 
+/**
+ * 舊版預設值曾是 1200 ms；部分裝置會把 AsyncStorage 內的數字還原成字串。
+ * 因此先正規化數值，再遷移為目前的 400 ms 預設，避免設定頁持續顯示舊值。
+ */
+export function migrateTouchGuardUnlockHoldMs(value: unknown): number {
+  const normalized = Number(value);
+  if (normalized === 1200) return DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS;
+  if (!Number.isFinite(normalized)) return DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS;
+  return Math.max(400, Math.min(5000, normalized));
+}
+
 interface SettingsContextValue {
   settings: AppSettings;
   updateSettings: (partial: Partial<AppSettings>) => Promise<void>;
@@ -328,9 +339,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           ...DEFAULT_SIMPLIFIED_FIELD_ORDER.filter((k) => !savedSimplifiedOrder.includes(k)),
         ];
         const migratedDashboard = migrateLegacyNavigationDashboardDefaults(savedNormalModeFields, mergedOrder);
-        const migratedUnlockHoldMs = saved.touchGuardUnlockHoldMs === 1200
-          ? DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS
-          : Math.max(400, Math.min(5000, Number(saved.touchGuardUnlockHoldMs) || DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS));
+        const migratedUnlockHoldMs = migrateTouchGuardUnlockHoldMs(saved.touchGuardUnlockHoldMs);
         const nextSettings: AppSettings = {
           ...DEFAULT_SETTINGS,
           ...savedWithoutRemovedSettings,
