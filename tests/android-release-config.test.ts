@@ -20,9 +20,10 @@ describe("Android 15/16 release configuration", () => {
     expect(configSource).toContain('"android.permission.SYSTEM_ALERT_WINDOW"');
   });
 
-  it("uses Expo-supported release optimization and required asset plugins", () => {
-    expect(configSource).toContain("enableMinifyInReleaseBuilds: true");
-    expect(configSource).toContain("enableShrinkResourcesInReleaseBuilds: true");
+  it("keeps R8 optimization for production while allowing conservative preview APK builds", () => {
+    expect(configSource).toContain('const isProductionEasBuild = process.env.EAS_BUILD_PROFILE === "production"');
+    expect(configSource).toContain("enableMinifyInReleaseBuilds: isProductionEasBuild");
+    expect(configSource).toContain("enableShrinkResourcesInReleaseBuilds: isProductionEasBuild");
     expect(configSource).toContain('"expo-font"');
     expect(configSource).toContain('"expo-asset"');
   });

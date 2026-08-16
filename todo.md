@@ -1813,6 +1813,10 @@
 - [x] 蒐集 EAS Gradle 失敗的第一個實際錯誤、Expo 動態設定與本地 Android release 任務輸出
 - [x] 定位並修正 EAS Gradle 建置的相依、預建置或設定衝突：修正無效 EAS AAB buildType 與過時 submit 憑證欄位
 - [ ] 驗證 Expo config、Android Gradle release 任務、TypeScript、lint 與完整回歸測試；本地完整 Gradle 任務受沙盒記憶體限制中止，需以修正後 EAS 建置重新確認
+- [ ] 取得重新建置後雲端 Run gradle 的首個 FAILURE／Caused by 例外區段
+- [ ] 依實際 Gradle 例外完成原生建置根因修正與 release 回歸驗證
+- [x] 盤點並降低目前 Android release 設定中不必要的 R8、資源縮減與多 ABI 編譯複雜度
+- [x] 以保守 release 設定完成 Expo config、preview 預建置與完整品質驗證；雲端 EAS 重新建立 APK 待確認
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌

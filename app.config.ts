@@ -3,6 +3,8 @@ import type { ExpoConfig } from "expo/config";
 
 const bundleId = "com.jason123453021.bikeassistant";
 const schemeFromBundleId = "manus20260617";
+// APK 預覽版本優先追求可重現建置；R8 與資源縮減僅保留於正式 AAB 發佈。
+const isProductionEasBuild = process.env.EAS_BUILD_PROFILE === "production";
 
 const env = {
   appName: "單車助手",
@@ -156,9 +158,9 @@ const config: ExpoConfig = {
           compileSdkVersion: 36,
           minSdkVersion: 24,
           targetSdkVersion: 36,
-          // Android release 版採用官方 R8 壓縮與資源縮減；每次發佈前均以 release bundle 驗證。
-          enableMinifyInReleaseBuilds: true,
-          enableShrinkResourcesInReleaseBuilds: true,
+          // Preview APK 避免 R8／資源縮減額外增加 Gradle 記憶體與規則處理；正式 AAB 維持最佳化。
+          enableMinifyInReleaseBuilds: isProductionEasBuild,
+          enableShrinkResourcesInReleaseBuilds: isProductionEasBuild,
         },
       },
     ],
