@@ -17,4 +17,27 @@ describe("app health guardrails", () => {
     expect(containerSource).toContain("SafeAreaView");
     expect(containerSource).toContain('edges = ["top", "left", "right"]');
   });
+
+  it("keeps a recoverable copy until the completed activity has been stored", () => {
+    const saveRecordIndex = mapSource.indexOf("const savedRecordId = await saveRecord");
+    const clearSnapshotIndex = mapSource.indexOf("await clearSnapshot();", saveRecordIndex);
+
+    expect(saveRecordIndex).toBeGreaterThan(-1);
+    expect(clearSnapshotIndex).toBeGreaterThan(saveRecordIndex);
+    expect(mapSource).toContain('if (!savedRecordId) throw new Error("活動記錄未建立")');
+  });
+
+  it("releases late GPS and heading subscriptions instead of retaining listeners after unmount", () => {
+    expect(mapSource).toContain("let locationSubscription: Location.LocationSubscription | null = null");
+    expect(mapSource).toContain("let headingSubscription: Location.LocationSubscription | null = null");
+    expect(mapSource).toContain("if (!active) {\n        sub.remove();\n        return;");
+    expect(mapSource).toContain("locationSubscription?.remove();");
+    expect(mapSource).toContain("headingSubscription?.remove();");
+  });
+
+  it("keeps custom supply tracker data explicit and removes high-frequency supply debug logs", () => {
+    expect(mapSource).toContain("type CustomSupplyTracker = {");
+    expect(mapSource).not.toContain("Record<string, any>");
+    expect(mapSource).not.toContain("console.log(`[補給]");
+  });
 });

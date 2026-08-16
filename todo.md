@@ -1860,3 +1860,9 @@
 ## 長按解除鎖定預設值（2026-08-16）
 - [x] 修正既有本機設定仍保留 1200 ms 時未自動遷移為 400 ms 的問題
 - [x] 驗證設定頁顯示、持久化載入與長按解鎖流程均使用 400 ms 預設，保存修復版本（數字與字串 1200 ms 均遷移；TypeScript 0 errors；200 passed／1 skipped）
+
+## 全專案自我檢測與效能優化（2026-08-16）
+- [x] 建立 TypeScript、lint、Expo Doctor、測試與 Android bundle 的健康度基線，盤點警告與失敗項目
+- [x] 稽核並清理可重現的廢碼、重複匯入、開發輸出與不相容相依設定
+- [x] 稽核地圖／儀表板重繪、定位與計時器監聽清理、本機軌跡寫入節流、權限／定位中斷／儲存失敗防呆與螢幕適配
+- [x] 實作必要修正與回歸測試，完成建置前驗證、優化摘要與版本保存（TypeScript 0 errors；lint 0 warnings／0 errors；Expo Doctor 18/18；203 passed／1 skipped；Android Hermes 5.72 MB）

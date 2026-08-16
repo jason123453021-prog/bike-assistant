@@ -188,8 +188,15 @@ const TURN_ANGLE_DEG = 30;
 const AUTO_PAUSE_RESUME_THRESHOLD = 3; // 自動恢復速度閾值（km/h）- 高於暫停閾值，避免頻繁切換
 const WEATHER_INTERVAL = 10 * 60 * 1000;
 const LOCATION_INTERVAL_SEC = 3;
-const GPS_DRIFT_FILTER_M = 3; // GPS 漂移過濾：距離小於此值時視為漂移，不更新速度
 const AUTO_RECENTER_AFTER_INTERACTION_MS = 12_000;
+
+type CustomSupplyTracker = {
+  lastTriggerTime: number;
+  lastTriggerDistance: number;
+  triggered: boolean;
+  dismissTimeoutId: ReturnType<typeof setTimeout> | null;
+  repeatIntervalId: ReturnType<typeof setInterval> | null;
+};
 
 // 底部面板高度：螢幕下方三分之一（收縮）/ 五分之三（展開）
 const PANEL_COLLAPSED_H = Math.round(SCREEN_H / 3);
@@ -358,7 +365,7 @@ export default function MapScreen() {
   const [modelRevision, setModelRevision] = useState(getModelRevision);
   useEffect(() => subscribeModelUpdates(setModelRevision), []);
   const sportTrackingPolicy = useMemo(
-    () => getSportTrackingPolicy(state.sportType),
+    () => getSportTrackingPolicy(state.sportType, modelRevision),
     [modelRevision, state.sportType],
   );
 
@@ -457,7 +464,7 @@ export default function MapScreen() {
     targetBearingRef.current = nextHeading;
     lastMapBearingRef.current = nextBearing;
     mapRef.current?.setBearing(nextBearing, true);
-  }, [mapRideActive]);
+  }, [headingUp, mapRideActive]);
 
   useEffect(() => {
     if (!mapRideActive || !sportTrackingPolicy.autoPause.requiresStillness) {
@@ -706,7 +713,7 @@ export default function MapScreen() {
 
   // ── 自訂補給品追蹤 ──
   // 記錄每個補給品上次觸發的時間（秒）或距離（公里）
-  const supplyItemsTrackerRef = useRef<Record<string, any>>({});
+  const supplyItemsTrackerRef = useRef<Record<string, CustomSupplyTracker>>({});
   // 追蹤器結構: { lastTriggerTime, lastTriggerDistance, triggered, dismissTimeoutId, repeatIntervalId }
   // 自訂補給品提醒狀態
   const [customSupplyAlerts, setCustomSupplyAlerts] = useState<Record<string, boolean>>({});
@@ -1583,6 +1590,7 @@ export default function MapScreen() {
       return;
     }
     let active = true;
+    let locationSubscription: Location.LocationSubscription | null = null;
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
@@ -2063,13 +2071,10 @@ export default function MapScreen() {
             ? isSmartSupplyCountdownDue(nextCountdown, "calorie", currentState.elapsed)
             : !manualEnergyKind && calPct >= 1;
           if (calorieDue && !calorieReminderSentRef.current && !pendingCalorieRef.current) {
-            console.log(`[補給] 能量${isSmartSupplyMode ? "倒數到期" : `達到${supplyPlan.source}閾值`}`);
             if (settings.caloriePauseOnDownhill && isDownhill && !calorieAlert) {
               // 下坡時暫停提醒，倒數與待確認狀態均保留。
-              console.log('[補給] 下坡時暫停卡路里提醒');
             } else {
               calorieReminderSentRef.current = true;
-              console.log('[補給] 觸發卡路里提醒');
               triggerSupplyReminder("calorie", supplyPlan);
             }
           }
@@ -2078,13 +2083,10 @@ export default function MapScreen() {
             ? isSmartSupplyCountdownDue(nextCountdown, "water", currentState.elapsed)
             : !manualWaterKind && waterPct >= 1;
           if (waterDue && !waterReminderSentRef.current && !pendingWaterRef.current) {
-            console.log(`[補給] 水分${isSmartSupplyMode ? "倒數到期" : `達到${supplyPlan.source}閾值`}`);
             if (settings.waterPauseOnDownhill && isDownhill && !waterAlert) {
               // 下坡時暫停提醒，倒數與待確認狀態均保留。
-              console.log('[補給] 下坡時暫停水分提醒');
             } else {
               waterReminderSentRef.current = true;
-              console.log('[補給] 觸發水分提醒');
               triggerSupplyReminder("water", supplyPlan);
             }
           }
@@ -2102,12 +2104,18 @@ export default function MapScreen() {
           }
         }
       );
+      if (!active) {
+        sub.remove();
+        return;
+      }
+      locationSubscription = sub;
       locationSubRef.current = sub;
     })();
 
     return () => {
       active = false;
-      locationSubRef.current?.remove();
+      locationSubscription?.remove();
+      if (locationSubRef.current === locationSubscription) locationSubRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [followUser, mapRideActive, isNavigating, gpxRoute, rideLocationTrackingMode, settings]);
@@ -2121,6 +2129,7 @@ export default function MapScreen() {
       return;
     }
     let active = true;
+    let headingSubscription: Location.LocationSubscription | null = null;
     (async () => {
       try {
         const sub = await Location.watchHeadingAsync((heading) => {
@@ -2139,16 +2148,20 @@ export default function MapScreen() {
             applyResponsiveMapBearing(responsiveHeading);
           }
         });
+        if (!active) {
+          sub.remove();
+          return;
+        }
+        headingSubscription = sub;
         headingSubRef.current = sub;
-      } catch (e) {
-        // 羅盤不可用（例如 Web 平台），静默失敗
-        console.warn('watchHeadingAsync not available:', e);
+      } catch {
+        // 羅盤不可用（例如 Web 平台）時保留 GPS 航向，不中斷騎乘流程。
       }
     })();
     return () => {
       active = false;
-      headingSubRef.current?.remove();
-      headingSubRef.current = null;
+      headingSubscription?.remove();
+      if (headingSubRef.current === headingSubscription) headingSubRef.current = null;
     };
   }, [applyResponsiveMapBearing, headingUp, mapRideActive]);
 
@@ -2281,6 +2294,8 @@ export default function MapScreen() {
         lastTriggerTime: 0,
         lastTriggerDistance: 0,
         triggered: false,
+        dismissTimeoutId: null,
+        repeatIntervalId: null,
       };
     });
     intervalSupplyTrackerRef.current = {
@@ -2346,8 +2361,8 @@ export default function MapScreen() {
         ttsEnabled: settings.ttsEnabled,
         language: 'zh-TW',
       });
-    } catch (error) {
-      console.warn('Emotional UX initialization failed:', error);
+    } catch {
+      // 情感化回饋為非核心增強；初始化失敗不應影響定位與騎乘紀錄。
     }
 
     const loc = await Location.getLastKnownPositionAsync();
@@ -2356,7 +2371,7 @@ export default function MapScreen() {
       const l = await Location.getLastKnownPositionAsync();
       if (l) updateWeather(l.coords.latitude, l.coords.longitude);
     }, WEATHER_INTERVAL);
-  }, [clearIntervalSupplyRepeatTimer, currentPos, dispatch, estimateAgeYears, estimateFtpW, hydrationThresholdMl, gpxRoute, settings, syncSmartSupplyCountdown, updateWeather, calorieAnim, waterAnim]);
+  }, [clearIntervalSupplyRepeatTimer, currentPos, dispatch, estimateAgeYears, estimateFtpW, hydrationThresholdMl, gpxRoute, settings, state.sportType, syncSmartSupplyCountdown, updateWeather, calorieAnim, waterAnim]);
 
   const handlePause = useCallback(() => {
     pausedElapsedRef.current = state.elapsed;
@@ -2420,14 +2435,8 @@ export default function MapScreen() {
           setIntervalSupplyAlerts({});
           clearIntervalSupplyRepeatTimer();
 
-          // 結束騎乘前先保存節流中的最新恢復快照，再清除恢復資料。
+          // 結束騎乘前先保存節流中的最新恢復快照。恢復資料會保留至活動記錄確實寫入成功。
           await flushRecoverySnapshot();
-          // 結束騎乘清除崩潰恢復快照
-          await clearSnapshot();
-          if (recoverySessionRef.current) {
-            await completeRideSession(recoverySessionRef.current);
-            recoverySessionRef.current = null;
-          }
           // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新；個人設定與環境摘要只保存在裝置上。
           try {
             const environmentSummary = environmentSummaryRef.current;
@@ -2449,6 +2458,14 @@ export default function MapScreen() {
               },
             });
             setSummaryRecordId(savedRecordId);
+            if (!savedRecordId) throw new Error("活動記錄未建立");
+
+            // 僅在歷史活動已成功保存後清除恢復資料，避免儲存空間不足時遺失本次騎乘。
+            await clearSnapshot();
+            if (recoverySessionRef.current) {
+              await completeRideSession(recoverySessionRef.current);
+              recoverySessionRef.current = null;
+            }
             if (savedRecordId) {
               const calibrationResult = deriveAutomaticSweatCalibration({
                 rides: [
@@ -2514,8 +2531,8 @@ export default function MapScreen() {
           // 集成情感化 UX - 騎乘完成反饋
           try {
             await EmotionalUXManager.onRideCompleted(state.elapsed, state.distance);
-          } catch (error) {
-            console.warn('Ride completed emotional UX failed:', error);
+          } catch {
+            // 完成回饋為非核心增強；失敗不影響已保存的活動。
           }
         },
       },

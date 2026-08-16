@@ -53,7 +53,7 @@ export const SPORT_TRACKING_POLICIES: Record<SportType, SportTrackingPolicy> = O
 ) as Record<SportType, SportTrackingPolicy>;
 
 /** 讀取目前有效模型，讓下一次啟動驗證過的離線快取可立即帶入導航。 */
-export function getSportTrackingPolicy(sportType: SportType): SportTrackingPolicy {
+export function getSportTrackingPolicy(sportType: SportType, _modelRevision?: number): SportTrackingPolicy {
   const tracking = getSportModelProfile(sportType).tracking;
   return {
     gpsDistanceIntervalM: tracking.gpsDistanceIntervalM,
