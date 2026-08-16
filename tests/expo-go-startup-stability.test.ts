@@ -13,6 +13,8 @@ describe("Expo Go startup stability", () => {
   });
 
   it("keeps the Metro preview memory-bounded and production-like", () => {
+    expect(packageSource).toContain("--offline");
+    expect(packageSource).toContain("EXPO_NO_INTERACTIVE=1");
     expect(packageSource).toContain("--no-dev");
     expect(packageSource).toContain("--minify");
     expect(packageSource).toContain("--max-workers 1");

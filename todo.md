@@ -1851,3 +1851,8 @@
 - [x] 建立 App 開啟時每七天至多一次的靜默模型更新檢查；騎乘期間不連線檢查，無網路時立即回退至已驗證本機版本
 - [x] 驗證模型套件版本、結構、來源與完整性，僅在通過檢查時套用本機快取
 - [x] 為啟動／騎乘觸發、離線回退與無效更新拒絕情境新增回歸測試，完成品質驗證與版本保存（Expo config 與模型端點有效；TypeScript 0 errors；199 passed／1 skipped）
+
+## Expo Go 遠端更新下載失敗（2026-08-16）
+- [x] 蒐集 Metro、Expo 設定與 Android bundle 端點診斷資訊，定位「Failed to download remote update」根因
+- [x] 採取最小修正以恢復 Expo Go 開發連線，避免影響正式 APK 的每週模型檢查
+- [x] 驗證 Expo Go Android bundle 端點與完整型別／回歸測試，保存穩定版本（Android bundle 連續 HTTP 200；TypeScript 0 errors；199 passed／1 skipped）
