@@ -27,7 +27,8 @@ const config: ExpoConfig = {
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
-  newArchEnabled: false,
+  // Expo SDK 54 的 Reanimated 4 需要此官方 React Native 架構；未加入任何自訂 NitroModules 或 C++ 原生模組。
+  newArchEnabled: true,
   jsEngine: "hermes",
   ios: {
     supportsTablet: true,
@@ -174,7 +175,7 @@ const config: ExpoConfig = {
       projectId: "af286610-25f1-45e5-afcc-6c30040d4124",
     },
   },
-  // 明確禁用 NitroModules
+  // 專案仍不使用任何自訂 NitroModules 或 C++ 原生模組。
   runtimeVersion: "1.0.3",
 };
 

@@ -1817,6 +1817,12 @@
 - [ ] 依實際 Gradle 例外完成原生建置根因修正與 release 回歸驗證
 - [x] 盤點並降低目前 Android release 設定中不必要的 R8、資源縮減與多 ABI 編譯複雜度
 - [x] 以保守 release 設定完成 Expo config、preview 預建置與完整品質驗證；雲端 EAS 重新建立 APK 待確認
+- [ ] 蒐集 EAS Run gradlew 可取得的詳細失敗證據，對照本地 release Gradle 診斷
+- [ ] 清理並重新生成 Android 原生層，掃描 package.json 與 Expo plugins 的不相容原生 C++ 模組或過時外掛
+- [ ] 修正確認的 Android 建置根因，完成 release 品質驗證並於確認後重新提交 preview APK
+- [x] 取得 EAS Run gradlew 實際根因：react-native-reanimated 4.1.6 的 assertNewArchitectureEnabledTask 因 newArchEnabled=false 失敗
+- [x] 啟用 Expo SDK 54 受管理新架構設定、建立 Reanimated 建置守門並驗證 preview Android 預建置
+- [ ] 重新提交 preview APK，確認 Run gradlew 已越過 Reanimated 新架構任務
 
 ## Expo Go 啟動失敗修正（2026-08-14）
 - [ ] 蒐集 Expo Go 載入失敗的 Metro 與執行期錯誤日誌

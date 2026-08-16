@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const configSource = readFileSync(resolve(process.cwd(), "app.config.ts"), "utf8");
+const packageSource = readFileSync(resolve(process.cwd(), "package.json"), "utf8");
 const easConfig = JSON.parse(readFileSync(resolve(process.cwd(), "eas.json"), "utf8")) as {
   build: { production: { android: { buildType: string } } };
   submit?: unknown;
@@ -26,6 +27,12 @@ describe("Android 15/16 release configuration", () => {
     expect(configSource).toContain("enableShrinkResourcesInReleaseBuilds: isProductionEasBuild");
     expect(configSource).toContain('"expo-font"');
     expect(configSource).toContain('"expo-asset"');
+  });
+
+  it("keeps the Expo SDK 54 new architecture enabled for Reanimated 4", () => {
+    expect(configSource).toContain("newArchEnabled: true");
+    expect(packageSource).toContain('"react-native-reanimated"');
+    expect(configSource).not.toContain("newArchEnabled: false");
   });
 
   it("uses the current EAS Android app-bundle profile without obsolete submit credentials", () => {
