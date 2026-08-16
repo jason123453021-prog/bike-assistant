@@ -23,10 +23,11 @@ const J_PER_KCAL = 4184;  // 焦耳/千卡
 
 /**
  * 路線規劃檔多半不帶氣壓計海拔，直接逐點累加會把 GPS／DEM 的上下抖動誤當成爬坡。
- * 先移除不合理的孤立尖峰，再以 5m 水平取樣、10m 垂直死區累積，保留連續真實爬升與短坡。
+ * 僅使用原始 GPX 的座標與 `<ele>` 值：先移除不合理的孤立尖峰，再以 50m 水平重採樣、25m 垂直門檻累加。
+ * 此設定適用於密集規劃 GPX，避免數萬個原始內插海拔點將細微起伏重複累加成不合理總爬升。
  */
-export const ROUTE_ELEVATION_MIN_SAMPLE_DISTANCE_M = 5;
-export const ROUTE_ELEVATION_CHANGE_THRESHOLD_M = 10;
+export const ROUTE_ELEVATION_MIN_SAMPLE_DISTANCE_M = 50;
+export const ROUTE_ELEVATION_CHANGE_THRESHOLD_M = 25;
 const ROUTE_ELEVATION_SPIKE_GRADE_LIMIT = 60;
 
 // 天氣對空氣密度的修正（溫度影響）
@@ -98,7 +99,7 @@ function isIsolatedElevationSpike(points: readonly GpxPoint[], index: number): b
 
 /**
  * 取得供路線預覽、時間、功率與補給估算共用的海拔統計。
- * 海拔小幅來回變化在跨越門檻前不會計入，以免長距離 GPX 的雜訊放大總爬升。
+ * 海拔小幅來回變化在跨越門檻前不會計入，以免長距離 GPX 的內插起伏與雜訊放大總爬升。
  */
 export function calculateRouteElevationStatistics(points: readonly GpxPoint[]): RouteElevationStatistics {
   if (!points.length) return { elevations: [], totalAscent: 0, totalDescent: 0 };
@@ -110,11 +111,8 @@ export function calculateRouteElevationStatistics(points: readonly GpxPoint[]): 
     return (previous.ele + next.ele) / 2;
   });
 
-  let totalAscent = 0;
-  let totalDescent = 0;
+  const samples: number[] = [elevations[0] ?? 0];
   let lastSampleIndex = 0;
-  let acceptedElevation = elevations[0] ?? 0;
-
   for (let index = 1; index < points.length; index++) {
     const isLastPoint = index === points.length - 1;
     const horizontalDistance = haversineDistance(
@@ -125,8 +123,13 @@ export function calculateRouteElevationStatistics(points: readonly GpxPoint[]): 
     );
     if (!isLastPoint && horizontalDistance < ROUTE_ELEVATION_MIN_SAMPLE_DISTANCE_M) continue;
     lastSampleIndex = index;
+    samples.push(elevations[index] ?? samples.at(-1) ?? 0);
+  }
 
-    const elevation = elevations[index] ?? acceptedElevation;
+  let totalAscent = 0;
+  let totalDescent = 0;
+  let acceptedElevation = samples[0] ?? 0;
+  for (const elevation of samples.slice(1)) {
     const change = elevation - acceptedElevation;
     if (change >= ROUTE_ELEVATION_CHANGE_THRESHOLD_M) {
       totalAscent += change;
