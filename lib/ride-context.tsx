@@ -10,6 +10,14 @@ import {
   type ActivityCaloriesSource,
   type ActivityPowerSource,
 } from "@/lib/activity-statistics";
+import {
+  canPauseRide,
+  canResetCompletedRide,
+  canResumeRide,
+  canStartRide,
+  canStopRide,
+  shouldAccumulateRideStatistics,
+} from "@/lib/ride-lifecycle-guard";
 import type { SportType } from "./sport-metrics";
 
 export type { SportType } from "./sport-metrics";
@@ -318,9 +326,11 @@ const initialState: RideState = {
   supplyConfirmations: [],
 };
 
-function rideReducer(state: RideState, action: RideAction): RideState {
+export function rideReducer(state: RideState, action: RideAction): RideState {
   switch (action.type) {
     case "START":
+      // 路線、釘選、GPX 與地圖操作絕不可重設進行中的騎乘。
+      if (!canStartRide(state.status)) return state;
       return {
         ...initialState,
         records: state.records,
@@ -330,6 +340,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       };
 
     case "PAUSE":
+      if (!canPauseRide(state.status)) return state;
       return {
         ...state,
         status: "paused",
@@ -340,6 +351,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       };
 
     case "RESUME": {
+      if (!canResumeRide(state.status)) return state;
       return {
         ...state,
         status: "active",
@@ -355,17 +367,25 @@ function rideReducer(state: RideState, action: RideAction): RideState {
     }
 
     case "STOP":
-      return { ...state, status: "finished" };
+      // 僅可由實際進行中的騎乘結束；其他狀態維持原樣。
+      return canStopRide(state.status)
+        ? { ...state, status: "finished" }
+        : state;
 
     case "RESET":
-      return { ...initialState, records: state.records };
+      // 累計只會在 STOP 後進入 finished 的明確完成流程中重置。
+      return canResetCompletedRide(state.status)
+        ? { ...initialState, records: state.records }
+        : state;
 
     case "TICK":
-      return { ...state, elapsed: action.elapsed };
+      return shouldAccumulateRideStatistics(state.status)
+        ? { ...state, elapsed: action.elapsed }
+        : state;
 
     case "PAUSE_TICK": {
       // elapsed 是移動時間；暫停時間以絕對時間戳重算，背景回來後不會漏算或雙算。
-      if (!state.pauseStartTime) return state;
+      if (!canResumeRide(state.status) || !state.pauseStartTime) return state;
       return {
         ...state,
         totalPausedSec: calculatePausedSeconds({
@@ -400,7 +420,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       } = action;
       const newRoute = [...state.route, point];
 
-      // 軌跡點始終記錄
+      // 暫停期間可保留軌跡供地圖呈現，但不得增加任何活動統計。
       if (state.status === "paused") {
         return {
           ...state,
@@ -408,7 +428,10 @@ function rideReducer(state: RideState, action: RideAction): RideState {
         };
       }
 
-      // 其他數據僅在 active 狀態下更新
+      // 只有明確開始且尚未停止的活動可寫入距離、時間、地形、功率與卡路里。
+      // 因此釘選導航、臨時 GPX、地圖定位或任何導航切換都不能在 idle／finished 狀態污染累計。
+      if (!shouldAccumulateRideStatistics(state.status)) return state;
+
       const speedKmh = (point.speed ?? 0) * 3.6;
       const newPowerHistory = [...state.powerHistory, power];
       const effectiveIntervalSec = Math.max(0, Number.isFinite(intervalSec) ? intervalSec : 0);
@@ -487,6 +510,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
     }
 
     case "SWEAT_UPDATE": {
+      if (!shouldAccumulateRideStatistics(state.status)) return state;
       const { sweatLossMl, sweatRatePerHour, intensityLabel } = action;
       const newSweatSince = state.sweatSinceLastRefill + sweatLossMl;
       const newTotalSweat = state.totalSweatMl + sweatLossMl;
@@ -534,6 +558,7 @@ function rideReducer(state: RideState, action: RideAction): RideState {
 
     case "RESTORE":
       // 從快照恢復騎乘狀態（崩潰後重啟）
+      if (!canStartRide(state.status)) return state;
       return {
         ...state,
         ...action.snapshot,
