@@ -1977,3 +1977,8 @@
 - [x] 新增可持久化的「智慧能量補給」與「智慧補水」獨立開關，並安全遷移舊設定
 - [x] 讓使用者可單獨或同時啟用智慧能量與智慧補水；關閉任一項時不影響另一項的倒數、彈窗、通知與確認流程
 - [x] 更新設定頁、前景／背景提醒守門與回歸測試，驗證四種開關組合並完成品質驗證與版本保存（TypeScript 0 errors；lint 0 warnings／0 errors；262 passed／1 skipped）
+
+## Expo Go 最新 Bundle 載入核對（2026-08-18）
+- [x] 檢查 Expo Go 直接載入時的 Metro 服務、bundle 快取與更新行為，確認手機是否取得最新程式
+- [x] 移除 Metro 的離線正式包旗標，恢復 Expo Go 可取得的開發 manifest 與即時 bundle 更新；Android 開發 bundle 已重新編譯成功（14.4 秒）
+- [x] 將 Expo、expo-constants 與 expo-file-system 升至 SDK 54 建議的相容修補版本，重新驗證 Android 開發 bundle HTTP 200 與 TypeScript 0 errors

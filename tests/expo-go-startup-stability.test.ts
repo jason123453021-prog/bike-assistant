@@ -12,12 +12,12 @@ describe("Expo Go startup stability", () => {
     expect(appConfigSource).not.toContain('output: "static"');
   });
 
-  it("keeps the Metro preview memory-bounded and production-like", () => {
-    expect(packageSource).toContain("--offline");
+  it("keeps Metro memory-bounded while serving a current Expo Go development manifest", () => {
     expect(packageSource).toContain("EXPO_NO_INTERACTIVE=1");
-    expect(packageSource).toContain("--no-dev");
-    expect(packageSource).toContain("--minify");
     expect(packageSource).toContain("--max-workers 1");
     expect(packageSource).toContain("--max-old-space-size=1536");
+    expect(packageSource).not.toContain("npx expo start --offline");
+    expect(packageSource).not.toContain("--no-dev");
+    expect(packageSource).not.toContain("--minify");
   });
 });
