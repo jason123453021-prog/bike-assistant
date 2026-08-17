@@ -305,7 +305,12 @@ export default function SettingsScreen() {
       Alert.alert("錯誤", "請輸入有效的數值");
       return;
     }
-    await updateSettings({ [editModal.key]: num });
+    const boundedNum = editModal.key === "touchGuardAutoRelockSec"
+      ? Math.min(60, Math.max(1, Math.round(num)))
+      : editModal.key === "energyServingCarbohydrateG"
+        ? Math.min(100, Math.max(10, Math.round(num)))
+        : num;
+    await updateSettings({ [editModal.key]: boundedNum });
     setEditModal({ ...editModal, visible: false });
   };
 
@@ -429,6 +434,18 @@ export default function SettingsScreen() {
                 : "使用既有固定提醒規則；這些數值只會在手動模式生效。"}
             </Text>
           </View>
+          <Divider colors={colors} />
+          <NumberRow
+            icon="flame.fill"
+            label="單包能量補給碳水"
+            value={settings.energyServingCarbohydrateG}
+            unit="g"
+            colors={colors}
+            iconColor="#D97706"
+            hint="智慧能量倒數與路線攜帶份數會依此份量調整"
+            disabled={supplyControlsDisabled}
+            onPress={() => openEdit("energyServingCarbohydrateG", "單包能量補給碳水克數", settings.energyServingCarbohydrateG, "g")}
+          />
           <Divider colors={colors} />
           {settings.supplyCalculationMode === "smart" ? (
             <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
@@ -788,6 +805,17 @@ export default function SettingsScreen() {
               </View>
             </View>
           </View>
+            <Divider colors={colors} />
+            <NumberRow
+              icon="lock.fill"
+              label="解鎖後自動重新鎖定"
+              value={settings.touchGuardAutoRelockSec}
+              unit="秒"
+              colors={colors}
+              hint="騎乘中解除觸控鎖定後，會在此時間後自動重新鎖定"
+              disabled={!settings.touchGuardEnabled}
+              onPress={() => openEdit("touchGuardAutoRelockSec", "解鎖後自動重新鎖定時間", settings.touchGuardAutoRelockSec, "秒")}
+            />
         </View>}
 
         {/* ── 精簡導航模式 ── */}

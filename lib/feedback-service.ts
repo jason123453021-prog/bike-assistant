@@ -141,8 +141,9 @@ export async function setupNotifications() {
       // 設定本地通知頻道（禁止遠端推播）
       await Notifications.setNotificationChannelAsync("ride", {
         name: "騎乘通知",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
+        importance: Notifications.AndroidImportance.MIN,
+        vibrationPattern: [],
+        sound: null,
         lightColor: "#00C896",
       });
       await Notifications.setNotificationChannelAsync("supply", {
@@ -158,8 +159,10 @@ export async function setupNotifications() {
   try {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
+        // 騎乘中由 App 儀表板呈現狀態；前景本機通知不得中斷騎士專注。
+        // 補給／補水到期則由 App 的雙區塊彈窗呈現，背景與鎖屏仍保留專用系統通知。
+        shouldShowAlert: false,
+        shouldPlaySound: false,
         shouldSetBadge: false,
         shouldShowBanner: true,
         shouldShowList: true,
@@ -309,26 +312,13 @@ export async function showRidingNotification(
   distance: number,
   elapsed: number
 ) {
+  // 背景定位服務本身會保留 Android 所需的常駐狀態，不另以高頻本機通知
+  // 重複推送速度、距離與時間，避免頂端橫幅與提示音干擾騎乘專注。
+  void speed;
+  void distance;
+  void elapsed;
   const Notifications = await getLocalNotifications();
-  if (!Notifications) return;
-
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const timeStr = h > 0 ? `${h}時${m}分` : `${m}分`;
-  try {
-    // 先取消舊通知，再建立同 identifier 的新通知（保持通知欄只有一則）
-    await Notifications.dismissNotificationAsync(RIDING_NOTIFICATION_ID).catch(() => {});
-    await Notifications.scheduleNotificationAsync({
-      identifier: RIDING_NOTIFICATION_ID,
-      content: {
-        title: "🚴 智慧單車騎乘助手",
-        body: `速度 ${Math.round(speed)} km/h · 距離 ${(distance / 1000).toFixed(1)} km · 時間 ${timeStr}`,
-        sticky: true,
-        data: { type: "riding_status" },
-      },
-      trigger: null,
-    });
-  } catch {}
+  await Notifications?.dismissNotificationAsync(RIDING_NOTIFICATION_ID).catch(() => {});
 }
 
 export async function cancelRidingNotification() {
@@ -337,6 +327,5 @@ export async function cancelRidingNotification() {
 
   try {
     await Notifications.dismissNotificationAsync(RIDING_NOTIFICATION_ID).catch(() => {});
-    await Notifications.dismissAllNotificationsAsync();
   } catch {}
 }

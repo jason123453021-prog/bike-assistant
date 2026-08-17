@@ -17,8 +17,8 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).toContain('settings.supplyCalculationMode === "smart"');
     expect(mapSource).toContain('settings.supplyCalculationMode !== "smart" && autoDismissSeconds');
     expect(mapSource).toContain('settings.supplyCalculationMode === "smart" && (kind === "calorie" || kind === "water")');
-    expect(mapSource).toContain("pendingCalorieRef.current ? {");
-    expect(mapSource).toContain("pendingWaterRef.current ? {");
+    expect(mapSource).toContain("currentCountdown ?? createSmartSupplyCountdown(supplyPlan, currentState.elapsed)");
+    expect(mapSource).not.toContain("refreshSmartSupplyCountdown");
   });
 
   it("uses a native modal over the map and omits amount guidance", () => {

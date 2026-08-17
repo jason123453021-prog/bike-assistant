@@ -3,7 +3,6 @@ import { createSupplyPlan } from "../lib/smart-supply-plan";
 import {
   createSmartSupplyCountdown,
   isSmartSupplyCountdownDue,
-  refreshSmartSupplyCountdown,
   restartSmartSupplyCountdown,
   smartSupplyCountdownRemainingSec,
 } from "../lib/smart-supply-countdown";
@@ -27,19 +26,18 @@ describe("smart supply countdown", () => {
     expect(isSmartSupplyCountdownDue(countdown, "water", countdown.waterDueElapsedSec)).toBe(true);
     expect(plan.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
     expect(plan.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
-    expect(plan.energyCountdownSec).toBeGreaterThanOrEqual(30 * 60);
-    expect(plan.energyCountdownSec).toBeLessThanOrEqual(60 * 60);
+    expect(plan.energyCountdownSec).toBeGreaterThanOrEqual(20 * 60);
+    expect(plan.energyCountdownSec).toBeLessThanOrEqual(75 * 60);
   });
 
-  it("未確認前只更新到期時間，確認後才重設對應類別的倒數起點", () => {
+  it("未確認前保持原到期時間，只有確認後才重設對應類別的倒數起點", () => {
     const countdown = createSmartSupplyCountdown(plan, 0);
-    const refreshed = refreshSmartSupplyCountdown(countdown, { ...plan, waterCountdownSec: 10 * 60 });
-    expect(refreshed.waterStartedElapsedSec).toBe(0);
-    expect(refreshed.waterDueElapsedSec).toBe(10 * 60);
+    expect(smartSupplyCountdownRemainingSec(countdown, "water", 120)).toBe(plan.waterCountdownSec - 120);
+    expect(isSmartSupplyCountdownDue(countdown, "water", countdown.waterDueElapsedSec)).toBe(true);
 
-    const restarted = restartSmartSupplyCountdown(refreshed, "water", plan, 900);
+    const restarted = restartSmartSupplyCountdown(countdown, "water", { ...plan, waterCountdownSec: 10 * 60 }, 900);
     expect(restarted.waterStartedElapsedSec).toBe(900);
-    expect(restarted.waterDueElapsedSec).toBe(900 + plan.waterCountdownSec);
+    expect(restarted.waterDueElapsedSec).toBe(900 + 10 * 60);
     expect(restarted.calorieStartedElapsedSec).toBe(0);
   });
 });

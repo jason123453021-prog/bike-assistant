@@ -30,6 +30,7 @@ export function buildRouteEstimateSnapshot(input: {
   weatherCode?: number;
   precipitationProb?: number;
   sweatRateCalibrationMultiplier?: number;
+  energyServingCarbohydrateG?: number;
 }) : RouteEstimateSnapshot {
   const time = estimateRouteCompletionTime(input);
   const duration = time.estimatedDurationSeconds;
@@ -75,6 +76,7 @@ export function buildRouteEstimateSnapshot(input: {
     sweatRatePerHour: hydration.sweatRatePerHour,
     environmentLoad: hydration.environmentLoad,
     weatherAvailable: input.temperatureC !== undefined,
+    energyServingCarbohydrateG: input.energyServingCarbohydrateG,
   });
   const energySupplyCarry = estimateRouteEnergySupplyCarry({
     estimatedDurationSeconds: time.estimatedDurationSeconds,
@@ -86,6 +88,7 @@ export function buildRouteEstimateSnapshot(input: {
     humidityPct: input.humidityPct,
     averageHeadwindMs: time.averageHeadwindMs,
     precipitationProb: input.precipitationProb,
+    energyServingCarbohydrateG: input.energyServingCarbohydrateG,
   });
   return {
     time,

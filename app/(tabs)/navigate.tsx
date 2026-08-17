@@ -92,8 +92,9 @@ export default function NavigateScreen() {
       weatherCode: forecastEnvironment.weatherCode,
       precipitationProb: forecastEnvironment.precipitationProb,
       sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
+      energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
     });
-  }, [autoMetrics.ftpW, bikeKg, forecastEnvironment, riderKg, route, routeTempC, settings.age, settings.birthday, settings.height, settings.sweatRateCalibrationMultiplier]);
+  }, [autoMetrics.ftpW, bikeKg, forecastEnvironment, riderKg, route, routeTempC, settings.age, settings.birthday, settings.energyServingCarbohydrateG, settings.height, settings.sweatRateCalibrationMultiplier]);
   const routeTimeEstimate = routeEstimate?.time ?? null;
   const avgSpeedKmh = routeTimeEstimate?.movingAverageKmh ?? 20;
 

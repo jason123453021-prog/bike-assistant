@@ -1,6 +1,6 @@
 /**
  * GPX 路線的攜帶能量補給規劃。
- * 以一份約 25 g 碳水的常見能量膠／能量棒為換算單位；結果只供保守的騎乘規劃參考。
+ * 以使用者設定的單包碳水克數為換算單位；結果只供保守的騎乘規劃參考。
  */
 export interface RouteEnergySupplyCarryPlan {
   minimumServings: number;
@@ -10,8 +10,6 @@ export interface RouteEnergySupplyCarryPlan {
   maximumCarbohydrateG: number;
   factors: string[];
 }
-
-const STANDARD_SERVING_CARBOHYDRATE_G = 25;
 
 export function estimateRouteEnergySupplyCarry(input: {
   estimatedDurationSeconds: number;
@@ -23,7 +21,9 @@ export function estimateRouteEnergySupplyCarry(input: {
   humidityPct?: number;
   averageHeadwindMs?: number;
   precipitationProb?: number;
+  energyServingCarbohydrateG?: number;
 }): RouteEnergySupplyCarryPlan {
+  const servingCarbohydrateG = Math.min(100, Math.max(10, Number(input.energyServingCarbohydrateG) || 25));
   const durationHours = Math.max(0, input.estimatedDurationSeconds / 3600);
   const upperDurationHours = Math.max(durationHours, input.upperDurationSeconds / 3600);
   const ascentPerKm = input.distanceM > 0 ? input.totalAscentM / (input.distanceM / 1000) : 0;
@@ -33,7 +33,7 @@ export function estimateRouteEnergySupplyCarry(input: {
     return {
       minimumServings: 0,
       maximumServings: 0,
-      standardServingCarbohydrateG: STANDARD_SERVING_CARBOHYDRATE_G,
+      standardServingCarbohydrateG: servingCarbohydrateG,
       minimumCarbohydrateG: 0,
       maximumCarbohydrateG: 0,
       factors: ["預估移動時間不超過 1 小時，途中不強制攜帶能量補給"],
@@ -59,10 +59,10 @@ export function estimateRouteEnergySupplyCarry(input: {
   // 最低份數不計第一小時內的途中攝取；最高份數使用最慢到達時間，並納入一份備援。
   const minimumCarbohydrateG = Math.ceil(minimumRateGPerHour * Math.max(0, durationHours - 1));
   const maximumCarbohydrateG = Math.ceil(
-    maximumRateGPerHour * Math.max(0, upperDurationHours - 0.75) + STANDARD_SERVING_CARBOHYDRATE_G,
+    maximumRateGPerHour * Math.max(0, upperDurationHours - 0.75) + servingCarbohydrateG,
   );
-  const minimumServings = Math.ceil(minimumCarbohydrateG / STANDARD_SERVING_CARBOHYDRATE_G);
-  const maximumServings = Math.max(minimumServings, Math.ceil(maximumCarbohydrateG / STANDARD_SERVING_CARBOHYDRATE_G));
+  const minimumServings = Math.ceil(minimumCarbohydrateG / servingCarbohydrateG);
+  const maximumServings = Math.max(minimumServings, Math.ceil(maximumCarbohydrateG / servingCarbohydrateG));
 
   const factors = ["預估完成時間與 App 自動 FTP 強度"];
   if (demandingClimb) factors.push("爬升與坡度負荷");
@@ -73,7 +73,7 @@ export function estimateRouteEnergySupplyCarry(input: {
   return {
     minimumServings,
     maximumServings,
-    standardServingCarbohydrateG: STANDARD_SERVING_CARBOHYDRATE_G,
+    standardServingCarbohydrateG: servingCarbohydrateG,
     minimumCarbohydrateG,
     maximumCarbohydrateG,
     factors,

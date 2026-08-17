@@ -87,6 +87,9 @@ export interface BackgroundState {
   smartWaterCountdownStartedElapsedSec?: number;
   smartCalorieCountdownDurationSec?: number;
   smartWaterCountdownDurationSec?: number;
+  /** 靜止時凍結補給倒數，恢復移動後從原進度繼續。 */
+  supplyCountdownPausedAtMs?: number;
+  supplyCountdownPausedTotalMs?: number;
   rideStartedAt: number;
   supplyEnergyTimeIntervalEnabled: boolean;
   supplyEnergyTimeIntervalMinutes: number;
@@ -115,6 +118,7 @@ export interface BackgroundState {
     ftpW: number;
     bikeWeightKg: number;
     sweatRateCalibrationMultiplier?: number;
+    energyServingCarbohydrateG?: number;
   };
   environment?: {
     temperatureC: number;
@@ -170,6 +174,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         sweatRatePerHour: 650,
         environmentLoad: 0,
         weatherAvailable: Boolean(state.environment),
+        energyServingCarbohydrateG: state.riderProfile?.energyServingCarbohydrateG,
       });
 
       const acceptedLocations: Array<{ loc: Location.LocationObject; segmentStart: boolean; distanceM: number }> = [];
@@ -218,7 +223,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           state.lastLat = latitude;
           state.lastLon = longitude;
           state.lastTimestamp = timestamp;
+          state.supplyCountdownPausedAtMs ??= timestamp;
           if (speedKmh >= 3 || movementM >= 18) {
+            state.supplyCountdownPausedTotalMs = (state.supplyCountdownPausedTotalMs ?? 0) + Math.max(0, timestamp - (state.supplyCountdownPausedAtMs ?? timestamp));
+            state.supplyCountdownPausedAtMs = undefined;
             state.trackingMode = "full";
             const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
             if (isRegistered) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
@@ -239,6 +247,14 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
             state.totalDistanceM += dist;
             acceptedLocation.distanceM = dist;
           }
+        }
+
+        const isReliablyMovingForSupply = speedKmh >= 3 || acceptedLocation.distanceM >= 18;
+        if (!isReliablyMovingForSupply) {
+          state.supplyCountdownPausedAtMs ??= timestamp;
+        } else if (state.supplyCountdownPausedAtMs) {
+          state.supplyCountdownPausedTotalMs = (state.supplyCountdownPausedTotalMs ?? 0) + Math.max(0, timestamp - state.supplyCountdownPausedAtMs);
+          state.supplyCountdownPausedAtMs = undefined;
         }
 
         // 鎖屏期間沿用前景的個人 FTP、體重與最近環境摘要；沒有天氣資料時安全回退為預設環境。
@@ -311,9 +327,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               ftpW: profile.ftpW,
               intensityFactor: calorieResult.intensityFactor,
               sweatRatePerHour: hydrationResult.sweatRatePerHour,
-              environmentLoad: hydrationResult.environmentLoad,
-              weatherAvailable: Boolean(state.environment),
-            });
+            environmentLoad: hydrationResult.environmentLoad,
+            weatherAvailable: Boolean(state.environment),
+            energyServingCarbohydrateG: profile.energyServingCarbohydrateG,
+          });
             activeCalorieThreshold = latestSupplyPlan.calorieTriggerKcal;
             activeWaterThreshold = latestSupplyPlan.waterTriggerMl;
           }
@@ -347,18 +364,20 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       // 一個背景回呼可能包含多個位置點；只需保存該批次最新完整快照即可。
       await saveRideSessionSnapshot(recoverySession);
 
-      const elapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
+      const activeElapsedMs = Math.max(0, Date.now() - (state.rideStartedAt || Date.now()) - (state.supplyCountdownPausedTotalMs ?? 0) - (state.supplyCountdownPausedAtMs ? Date.now() - state.supplyCountdownPausedAtMs : 0));
+      const elapsedSec = Math.floor(activeElapsedMs / 1000);
       const supplyReminderEnabled = state.supplyReminderEnabled !== false;
-      if (supplyReminderEnabled && state.supplyCalculationMode === "smart") {
+      const canAdvanceSupplyCountdown = !state.supplyCountdownPausedAtMs;
+      if (canAdvanceSupplyCountdown && supplyReminderEnabled && state.supplyCalculationMode === "smart") {
         state.smartCalorieCountdownStartedElapsedSec ??= 0;
         state.smartWaterCountdownStartedElapsedSec ??= 0;
-        state.smartCalorieCountdownDurationSec = latestSupplyPlan.energyCountdownSec;
-        state.smartWaterCountdownDurationSec = latestSupplyPlan.waterCountdownSec;
+        state.smartCalorieCountdownDurationSec ??= latestSupplyPlan.energyCountdownSec;
+        state.smartWaterCountdownDurationSec ??= latestSupplyPlan.waterCountdownSec;
       }
-      const calorieDue = supplyReminderEnabled && (state.supplyCalculationMode === "smart"
+      const calorieDue = canAdvanceSupplyCountdown && supplyReminderEnabled && (state.supplyCalculationMode === "smart"
         ? elapsedSec >= (state.smartCalorieCountdownStartedElapsedSec ?? 0) + (state.smartCalorieCountdownDurationSec ?? latestSupplyPlan.energyCountdownSec)
         : state.calories >= activeCalorieThreshold);
-      const waterDue = supplyReminderEnabled && (state.supplyCalculationMode === "smart"
+      const waterDue = canAdvanceSupplyCountdown && supplyReminderEnabled && (state.supplyCalculationMode === "smart"
         ? elapsedSec >= (state.smartWaterCountdownStartedElapsedSec ?? 0) + (state.smartWaterCountdownDurationSec ?? latestSupplyPlan.waterCountdownSec)
         : state.sweatLossMl >= activeWaterThreshold);
 

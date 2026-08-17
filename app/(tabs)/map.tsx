@@ -79,7 +79,6 @@ import {
   clearAllSupplyNotifications,
   clearSmartSupplyDueNotification,
   showSupplyNotification,
-  showRidingNotification,
   cancelRidingNotification,
   requestNotificationPermission,
   setRideSpeechSuppressed,
@@ -113,7 +112,6 @@ import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import {
   createSmartSupplyCountdown,
   isSmartSupplyCountdownDue,
-  refreshSmartSupplyCountdown,
   restartSmartSupplyCountdown,
   smartSupplyCountdownRemainingSec,
   type SmartSupplyCountdown,
@@ -183,8 +181,12 @@ import {
 import {
   shouldScheduleTouchGuardRelock,
   shouldZeroLiveRideReadings,
-  TOUCH_GUARD_AUTO_RELOCK_MS,
 } from "@/lib/live-ride-readings";
+import {
+  acceptLiveElevationChange,
+  clampVirtualPowerForRider,
+  createLiveElevationFilterState,
+} from "@/lib/live-elevation-filter";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -424,6 +426,7 @@ export default function MapScreen() {
   const [currentGrade, setCurrentGrade] = useState(0);
   const prevAltRef = useRef<number | null>(null);
   const prevPosRef = useRef<{ lat: number; lon: number } | null>(null);
+  const liveElevationFilterRef = useRef(createLiveElevationFilterState());
   // 坡度平滑：7 點滑動平均，消除 GPS 高度抖動
   const gradeWindowRef = useRef<number[]>([]);
 
@@ -454,6 +457,7 @@ export default function MapScreen() {
   // 地圖旋轉動畫（平滑過渡）
   const targetBearingRef = useRef<number>(0);
   const lastMapBearingRef = useRef<number>(0);
+  const lastFollowCameraCenterRef = useRef<{ lat: number; lon: number } | null>(null);
 
   // 騎乘狀態與背景監聽
   const [mapRideActive, setMapRideActive] = useState(false);
@@ -464,9 +468,10 @@ export default function MapScreen() {
     let angleDiff = nextHeading - lastMapBearingRef.current;
     if (angleDiff > 180) angleDiff -= 360;
     if (angleDiff < -180) angleDiff += 360;
-    if (Math.abs(angleDiff) < 2) return;
+    if (Math.abs(angleDiff) < 4) return;
 
-    const followFactor = stateRef.current.currentSpeed >= 12 ? 0.68 : 0.56;
+    // 小幅路徑修正緩慢追隨；可信 GPS 顯示真正轉彎時則快速跟上。
+    const followFactor = Math.abs(angleDiff) >= 25 ? 0.78 : stateRef.current.currentSpeed >= 12 ? 0.52 : 0.4;
     const nextBearing = (lastMapBearingRef.current + angleDiff * followFactor + 360) % 360;
     targetBearingRef.current = nextHeading;
     lastMapBearingRef.current = nextBearing;
@@ -1048,8 +1053,8 @@ export default function MapScreen() {
     touchGuardRelockTimerRef.current = setTimeout(() => {
       setTouchGuardEnabled(true);
       touchGuardRelockTimerRef.current = null;
-    }, TOUCH_GUARD_AUTO_RELOCK_MS);
-  }, [isActive, settings.touchGuardEnabled]);
+    }, settings.touchGuardAutoRelockSec * 1000);
+  }, [isActive, settings.touchGuardAutoRelockSec, settings.touchGuardEnabled]);
 
   const beginTouchGuardHoldProgress = useCallback(() => {
     if (!touchGuardEnabled || !isActive) return;
@@ -1126,7 +1131,8 @@ export default function MapScreen() {
     sweatRatePerHour: state.currentSweatRatePerHour || 550,
     environmentLoad: Math.min(1, Math.max(0, ((state.currentSweatRatePerHour || 550) - 550) / 1_000)),
     weatherAvailable: false,
-  }), [estimateFtpW, hydrationThresholdMl, settings.calorieThreshold, settings.supplyCalculationMode, settings.weight, state.currentPower, state.currentSweatRatePerHour, state.elapsed, state.sportType]);
+    energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+  }), [estimateFtpW, hydrationThresholdMl, settings.calorieThreshold, settings.energyServingCarbohydrateG, settings.supplyCalculationMode, settings.weight, state.currentPower, state.currentSweatRatePerHour, state.elapsed, state.sportType]);
   const dashboardSupplyPlan = activeSupplyPlan ?? fallbackSupplyPlan;
 
   // ─── 底部面板滑桿 ─────────────────────────────────────────────────────────────
@@ -1734,7 +1740,7 @@ export default function MapScreen() {
           // 更新 GPS 位置參考點
           prevGpsForBearingRef.current = { lat: latitude, lon: longitude };
           // 自適應循環平均：縮短窗口以提升轉彎反應；低速仍保留少量平均防止原地抖動。
-          const windowSize = speedKmhRaw >= 15 ? 4 : 5;
+          const windowSize = speedKmhRaw >= 20 ? 3 : speedKmhRaw >= 12 ? 4 : 5;
           headingWindowRef.current.push(rawHdg);
           if (headingWindowRef.current.length > windowSize) headingWindowRef.current.shift();
           // 角度平均：轉換為向量再平均，避免 350°/10° 平均出 180° 的問題
@@ -1743,10 +1749,20 @@ export default function MapScreen() {
           const hdg = ((Math.atan2(sinSum, cosSum) * 180) / Math.PI + 360) % 360;
           headingRef.current = hdg;
           setCurrentPos({ lat: latitude, lon: longitude, heading: hdg });
-          if (followUser && (locationAccuracyM ?? Number.POSITIVE_INFINITY) <= 45) {
-            mapRef.current?.animateCamera(
-              { center: { latitude, longitude }, zoom: 17 }
-            );
+          if (followUser && (locationAccuracyM ?? Number.POSITIVE_INFINITY) <= 35) {
+            const previousCenter = lastFollowCameraCenterRef.current;
+            const movementSinceCamera = previousCenter
+              ? haversineDistance(previousCenter.lat, previousCenter.lon, latitude, longitude)
+              : Number.POSITIVE_INFINITY;
+            // 車頭朝前只在確實前進一段距離後移動鏡頭，避免每次定位與旋轉動畫相互競爭。
+            const recenterThresholdM = headingUp ? 14 : 8;
+            if (movementSinceCamera >= recenterThresholdM) {
+              lastFollowCameraCenterRef.current = { lat: latitude, lon: longitude };
+              mapRef.current?.animateCamera(
+                { center: { latitude, longitude }, zoom: 17 },
+                { duration: headingUp ? 420 : 280 },
+              );
+            }
           }
           // 車頭朝前僅在可信 GPS 行進方向通過死區與旋轉上限後更新，避免畫面抖動。
           const currentState0 = stateRef.current;
@@ -1922,7 +1938,7 @@ export default function MapScreen() {
             );
             const altDiff = (altitude ?? 0) - (lastLocationRef.current.coords.altitude ?? 0);
             grade = calcGrade(altDiff, distanceM);
-            ascent = Math.max(0, altDiff);
+            ascent = acceptLiveElevationChange(liveElevationFilterRef.current, altitude, distanceM);
           }
           lastLocationRef.current = loc;
 
@@ -1951,8 +1967,9 @@ export default function MapScreen() {
             bikeMassKg: settings.bikeWeight ?? 10,
             airDensityKgM3: airDensityRef.current,
           }) : 0;
+          const boundedVirtualPower = clampVirtualPowerForRider(rawPower, estimateFtpW);
           prevSpeedMsRef.current = currentSpeedMs;
-          if (isCyclingSport) powerWindowRef.current.push(rawPower);
+          if (isCyclingSport) powerWindowRef.current.push(boundedVirtualPower);
           if (powerWindowRef.current.length > 5) powerWindowRef.current.shift();
           const power = isCyclingSport
             ? Math.round(powerWindowRef.current.reduce((a, b) => a + b, 0) / Math.max(1, powerWindowRef.current.length))
@@ -2049,30 +2066,15 @@ export default function MapScreen() {
             sweatRatePerHour: sweatResult.sweatRatePerHour,
             environmentLoad: sweatResult.environmentLoad,
             weatherAvailable: Boolean(currentWeather),
+            energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
           });
           setActiveSupplyPlan(supplyPlan);
           const isSmartSupplyMode = settings.supplyReminderEnabled && settings.supplyCalculationMode === "smart";
           const currentCountdown = smartSupplyCountdownRef.current;
-          const refreshedCountdown = isSmartSupplyMode && currentCountdown
-            ? refreshSmartSupplyCountdown(currentCountdown, supplyPlan)
-            : null;
-          // 已到期但尚未確認時，維持原到期狀態；不得因環境資料更新而重算、清空或延後該提醒。
+          // 倒數建立後保持固定，不能隨環境、功率或天氣更新而延後／提前。
+          // 只有使用者按下「已補給／已補水」時才會建立該類別的新一輪倒數。
           const nextCountdown = isSmartSupplyMode
-            ? (currentCountdown && refreshedCountdown
-              ? {
-                  ...refreshedCountdown,
-                  ...(pendingCalorieRef.current ? {
-                    calorieStartedElapsedSec: currentCountdown.calorieStartedElapsedSec,
-                    calorieDurationSec: currentCountdown.calorieDurationSec,
-                    calorieDueElapsedSec: currentCountdown.calorieDueElapsedSec,
-                  } : {}),
-                  ...(pendingWaterRef.current ? {
-                    waterStartedElapsedSec: currentCountdown.waterStartedElapsedSec,
-                    waterDurationSec: currentCountdown.waterDurationSec,
-                    waterDueElapsedSec: currentCountdown.waterDueElapsedSec,
-                  } : {}),
-                }
-              : createSmartSupplyCountdown(supplyPlan, currentState.elapsed))
+            ? (currentCountdown ?? createSmartSupplyCountdown(supplyPlan, currentState.elapsed))
             : null;
           if (isSmartSupplyMode && nextCountdown) {
             syncSmartSupplyCountdown(nextCountdown);
@@ -2151,7 +2153,6 @@ export default function MapScreen() {
           triggerIntervalSupplyReminder();
 
           if (notifPermRef.current && settings.notificationEnabled && currentState.elapsed % 30 === 0) {
-            showRidingNotification(speedKmh, currentState.distance, currentState.elapsed);
           }
         }
       );
@@ -2306,6 +2307,7 @@ export default function MapScreen() {
     setCurrentGrade(0);
     prevAltRef.current = null;
     prevPosRef.current = null;
+    liveElevationFilterRef.current = createLiveElevationFilterState();
     powerWindowRef.current = [];
     gradeWindowRef.current = [];
     environmentSummaryRef.current = {
@@ -2387,6 +2389,7 @@ export default function MapScreen() {
         ftpW: estimateFtpW,
         bikeWeightKg: settings.bikeWeight ?? 10,
         sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
+        energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
       },
       environment: weatherRef.current
         ? {
@@ -2557,6 +2560,7 @@ export default function MapScreen() {
             setCurrentGrade(0);
             prevAltRef.current = null;
             prevPosRef.current = null;
+            liveElevationFilterRef.current = createLiveElevationFilterState();
             prevGpsForBearingRef.current = null;
             lastLocationRef.current = null;
             lastAcceptedTrackPointRef.current = null;

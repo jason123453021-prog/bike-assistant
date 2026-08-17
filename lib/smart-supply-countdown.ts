@@ -42,22 +42,6 @@ export function restartSmartSupplyCountdown(
     : { ...countdown, waterStartedElapsedSec: elapsedSec, waterDurationSec: durationSec, waterDueElapsedSec: elapsedSec + durationSec };
 }
 
-/** 保持原倒數起點，只以最新騎乘與環境模型修正其到期時間。 */
-export function refreshSmartSupplyCountdown(
-  countdown: SmartSupplyCountdown,
-  plan: SupplyPlan,
-): SmartSupplyCountdown {
-  const calorieDurationSec = plan.energyCountdownSec;
-  const waterDurationSec = plan.waterCountdownSec;
-  return {
-    ...countdown,
-    calorieDurationSec,
-    waterDurationSec,
-    calorieDueElapsedSec: countdown.calorieStartedElapsedSec + calorieDurationSec,
-    waterDueElapsedSec: countdown.waterStartedElapsedSec + waterDurationSec,
-  };
-}
-
 export function smartSupplyCountdownRemainingSec(
   countdown: SmartSupplyCountdown | null,
   kind: SmartSupplyKind,

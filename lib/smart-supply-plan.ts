@@ -17,6 +17,8 @@ export interface SupplyPlanInput {
   sweatRatePerHour: number;
   environmentLoad: number;
   weatherAvailable: boolean;
+  /** 使用者單包能量補給可提供的碳水克數，用於推導下一次能量倒數。 */
+  energyServingCarbohydrateG?: number;
 }
 
 export interface SupplyPlan {
@@ -70,7 +72,7 @@ function deriveCountdowns(
   sweatRatePerHour: number,
   environmentLoad: number,
   carbohydrateGPerHour: number,
-  energyTriggerKcal: number,
+  energyServingCarbohydrateG: number,
 ): { energyCountdownSec: number; waterCountdownSec: number } {
   const intensityLoad = clamp((intensity - 0.6) / 0.55, 0, 1);
   const sweatLoad = clamp((sweatRatePerHour - 350) / 1_450, 0, 1);
@@ -83,9 +85,9 @@ function deriveCountdowns(
   const energyCountdownSec = carbohydrateGPerHour <= 0
     ? SMART_ENERGY_COUNTDOWN_RANGE_SEC.max
     : Math.round(clamp(
-        (energyTriggerKcal / Math.max(1, carbohydrateGPerHour * 4)) * 3600,
-        SMART_ENERGY_COUNTDOWN_RANGE_SEC.min,
-        SMART_ENERGY_COUNTDOWN_RANGE_SEC.max,
+        (energyServingCarbohydrateG / Math.max(1, carbohydrateGPerHour)) * 3600,
+        20 * 60,
+        75 * 60,
       ));
   return { energyCountdownSec, waterCountdownSec };
 }
@@ -102,6 +104,11 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
   const sweatRate = clamp(input.sweatRatePerHour, 350, 1_800);
   const carbohydrateG = carbohydrateTargetGPerHour(input.elapsedSec, intensity, environmentLoad)
     * sportProfile.supply.carbohydrateRateMultiplier;
+  const energyServingCarbohydrateG = clamp(
+    Number(input.energyServingCarbohydrateG) || 25,
+    10,
+    100,
+  );
   const energyRecommendationKcal = Math.round(carbohydrateG * 4);
   const durationHydrationLoad = input.elapsedSec >= 3 * 60 * 60 ? 0.08 : input.elapsedSec >= 2 * 60 * 60 ? 0.05 : input.elapsedSec >= 60 * 60 ? 0.02 : 0;
   const waterRecommendationMl = Math.round(clamp(
@@ -146,10 +153,10 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
     sweatRate,
     environmentLoad,
     carbohydrateG,
-    smartEnergyTriggerKcal,
+    energyServingCarbohydrateG,
   );
   const reasonParts = [
-    "全自動智慧計畫（約每 10–15 分鐘小量補水）",
+    `全自動智慧計畫（單包 ${energyServingCarbohydrateG} g 碳水；補水約每 10–15 分鐘）`,
     intensityLoad >= 0.3 ? "騎乘強度較高" : "騎乘強度一般",
     environmentLoad >= 0.4 ? "環境熱負荷提高" : input.weatherAvailable ? "環境負荷穩定" : "離線環境回退",
     input.elapsedSec >= 2 * 60 * 60 ? "長時間騎乘" : "騎乘時間尚短",

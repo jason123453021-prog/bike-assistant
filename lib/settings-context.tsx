@@ -167,6 +167,10 @@ export interface AppSettings {
   touchGuardUnlockHoldMs: number;
   /** 用來區分早期 1200 ms 預設與使用者後續手動選擇的自訂時間。 */
   touchGuardUnlockHoldMsSchemaVersion: number;
+  /** 解鎖後重新自動鎖定的秒數；只在騎乘進行中生效。 */
+  touchGuardAutoRelockSec: number;
+  /** 一包能量補給品可提供的碳水克數，供智慧能量倒數與路線攜帶規劃共用。 */
+  energyServingCarbohydrateG: number;
   // 背景 GPS 精度
   gpsAccuracy: "power_saving" | "standard" | "high_accuracy"; // 背景 GPS 更新頻率
   // 騎乘靜止後的完全自動省電定位：切換為低功耗監測，重新移動時自動恢復。
@@ -248,6 +252,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   touchGuardEnabled: true,
   touchGuardUnlockHoldMs: DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
   touchGuardUnlockHoldMsSchemaVersion: 2,
+  touchGuardAutoRelockSec: 3,
+  energyServingCarbohydrateG: 25,
   gpsAccuracy: "standard",
   idleAutoPauseEnabled: true,
   idleAutoPauseSeconds: 120,
@@ -375,6 +381,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           simplifiedModeFieldOrder: mergedSimplifiedOrder,
           touchGuardUnlockHoldMs: migratedUnlockHoldMs,
           touchGuardUnlockHoldMsSchemaVersion: TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION,
+          touchGuardAutoRelockSec: Math.min(60, Math.max(1, Number(saved.touchGuardAutoRelockSec) || DEFAULT_SETTINGS.touchGuardAutoRelockSec)),
+          energyServingCarbohydrateG: Math.min(100, Math.max(10, Number(saved.energyServingCarbohydrateG) || DEFAULT_SETTINGS.energyServingCarbohydrateG)),
         };
         if (nextSettings.supplyEnergyTimeIntervalEnabled && nextSettings.supplyEnergyDistanceIntervalEnabled) {
           nextSettings.supplyEnergyDistanceIntervalEnabled = false;

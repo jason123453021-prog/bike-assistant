@@ -34,6 +34,7 @@ export class SmartPowerSavingManager {
   private inactivityTimer: ReturnType<typeof setTimeout> | null = null;
   private isInPowerSavingMode: boolean = false;
   private originalBrightness: number = 0.8;
+  private brightnessSession = 0;
   private listeners: Set<(isActive: boolean) => void> = new Set();
 
   private constructor() {
@@ -86,11 +87,13 @@ export class SmartPowerSavingManager {
 
   private async enterPowerSavingMode() {
     if (this.isInPowerSavingMode) return;
-
+    const session = ++this.brightnessSession;
+    this.isInPowerSavingMode = true;
     try {
       this.originalBrightness = await getBrightnessAsync();
+      // 若手勢或補給彈窗在讀取亮度期間已喚醒，不能再把螢幕調暗。
+      if (!this.isInPowerSavingMode || session !== this.brightnessSession) return;
       await setBrightnessAsync(this.settings.minBrightness);
-      this.isInPowerSavingMode = true;
       this.notifyListeners(true);
       console.log('[PowerSaving] Entered power saving mode');
     } catch (error) {
@@ -100,11 +103,11 @@ export class SmartPowerSavingManager {
 
   private async exitPowerSavingMode() {
     if (!this.isInPowerSavingMode) return;
-
+    ++this.brightnessSession;
+    this.isInPowerSavingMode = false;
+    this.notifyListeners(false);
     try {
       await setBrightnessAsync(this.originalBrightness);
-      this.isInPowerSavingMode = false;
-      this.notifyListeners(false);
       console.log('[PowerSaving] Exited power saving mode');
     } catch (error) {
       console.error('[PowerSaving] Failed to exit power saving mode:', error);
