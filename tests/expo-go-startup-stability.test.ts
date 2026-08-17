@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const projectRoot = process.cwd();
 const appConfigSource = readFileSync(resolve(projectRoot, "app.config.ts"), "utf8");
 const packageSource = readFileSync(resolve(projectRoot, "package.json"), "utf8");
+const prewarmSource = readFileSync(resolve(projectRoot, "scripts/prewarm-expo-go-bundle.sh"), "utf8");
 
 describe("Expo Go startup stability", () => {
   it("avoids static web SSR while Metro serves the Android preview", () => {
@@ -19,5 +20,12 @@ describe("Expo Go startup stability", () => {
     expect(packageSource).not.toContain("npx expo start --offline");
     expect(packageSource).not.toContain("--no-dev");
     expect(packageSource).not.toContain("--minify");
+  });
+
+  it("prewarms the Android Hermes bundle before a phone requests the remote update", () => {
+    expect(packageSource).toContain("prewarm-expo-go-bundle.sh");
+    expect(prewarmSource).toContain("platform=android");
+    expect(prewarmSource).toContain("transform.bytecode=1");
+    expect(prewarmSource).toContain("curl --fail");
   });
 });

@@ -1982,3 +1982,8 @@
 - [x] 檢查 Expo Go 直接載入時的 Metro 服務、bundle 快取與更新行為，確認手機是否取得最新程式
 - [x] 移除 Metro 的離線正式包旗標，恢復 Expo Go 可取得的開發 manifest 與即時 bundle 更新；Android 開發 bundle 已重新編譯成功（14.4 秒）
 - [x] 將 Expo、expo-constants 與 expo-file-system 升至 SDK 54 建議的相容修補版本，重新驗證 Android 開發 bundle HTTP 200 與 TypeScript 0 errors
+
+## Expo Go 遠端更新下載失敗（2026-08-18）
+- [x] 診斷 Android Expo Go 顯示「Failed to download remote update」時的外部 manifest、更新 URL、TLS 與 Android bundle 可達性
+- [x] 修正可重現的開發服務或 Expo 更新設定，並提供手機端完整重新載入步驟
+- [x] 在 Metro 啟動後預先編譯 Android Hermes bundle，避免 Expo Go 首次請求等待冷啟動編譯而逾時；外部 launch bundle HTTP 200、暖機回應約 0.38 秒
