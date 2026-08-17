@@ -77,6 +77,23 @@ describe("smart supply plan", () => {
     expect(longHard.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
   });
 
+  it("uses the user-selected carbohydrate per serving to schedule the next energy countdown", () => {
+    const smallServing = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      energyServingCarbohydrateG: 20,
+    });
+    const largeServing = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      energyServingCarbohydrateG: 50,
+    });
+
+    expect(largeServing.energyCountdownSec).toBeGreaterThan(smallServing.energyCountdownSec);
+    expect(smallServing.reason).toContain("單包 20 g 碳水");
+    expect(largeServing.reason).toContain("單包 50 g 碳水");
+  });
+
   it("uses an explainable offline fallback when environment data is unavailable", () => {
     const plan = createSupplyPlan({ ...baseInput, mode: "smart", weatherAvailable: false });
 

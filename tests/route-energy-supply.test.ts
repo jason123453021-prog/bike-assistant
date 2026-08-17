@@ -34,4 +34,21 @@ describe("GPX route energy supply carry planning", () => {
     expect(plan.factors).toContain("相對逆風");
     expect(plan.factors).toContain("降雨延誤備援");
   });
+
+  it("converts the same carbohydrate requirement into fewer or more packages using the user serving size", () => {
+    const input = {
+      estimatedDurationSeconds: 3 * 3600,
+      upperDurationSeconds: 4 * 3600,
+      intensityFactor: 0.9,
+      totalAscentM: 1200,
+      distanceM: 60000,
+    };
+    const smallServing = estimateRouteEnergySupplyCarry({ ...input, energyServingCarbohydrateG: 20 });
+    const largeServing = estimateRouteEnergySupplyCarry({ ...input, energyServingCarbohydrateG: 50 });
+
+    expect(smallServing.standardServingCarbohydrateG).toBe(20);
+    expect(largeServing.standardServingCarbohydrateG).toBe(50);
+    expect(smallServing.minimumServings).toBeGreaterThan(largeServing.minimumServings);
+    expect(smallServing.maximumServings).toBeGreaterThan(largeServing.maximumServings);
+  });
 });

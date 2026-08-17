@@ -430,19 +430,19 @@ export default function SettingsScreen() {
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
             <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
               {settings.supplyCalculationMode === "smart"
-                ? "智慧計畫完全由 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨決定；系統只會顯示下一次補水與補能量的倒數。按下已補給後，才會依最新條件重新安排下一輪。離線時仍以本機個人與騎乘資料安全計算。"
+                ? `智慧計畫完全由 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨決定；目前每份能量補給設定為 ${settings.energyServingCarbohydrateG} g 碳水，可在下方調整。系統只會顯示下一次補水與補能量的倒數。按下已補給後，才會依最新條件重新安排下一輪。離線時仍以本機個人與騎乘資料安全計算。`
                 : "使用既有固定提醒規則；這些數值只會在手動模式生效。"}
             </Text>
           </View>
           <Divider colors={colors} />
           <NumberRow
             icon="flame.fill"
-            label="單包能量補給碳水"
+            label="單次能量補給碳水"
             value={settings.energyServingCarbohydrateG}
             unit="g"
             colors={colors}
             iconColor="#D97706"
-            hint="智慧能量倒數與路線攜帶份數會依此份量調整"
+            hint="可設定 10–100 g；智慧能量倒數與路線攜帶份數會依此份量調整"
             disabled={supplyControlsDisabled}
             onPress={() => openEdit("energyServingCarbohydrateG", "單包能量補給碳水克數", settings.energyServingCarbohydrateG, "g")}
           />
