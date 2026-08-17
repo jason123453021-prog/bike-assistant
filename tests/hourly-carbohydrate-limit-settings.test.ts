@@ -22,6 +22,14 @@ describe("hourly carbohydrate limit setting integration", () => {
     expect(settingsScreenSource).toContain("目前依 ${settings.weight} kg 推導為 ${effectiveCarbohydrateHourlyLimitG} g/h");
   });
 
+  it("lets manual mode apply a smart calculation without switching away from manual control", () => {
+    expect(settingsScreenSource).toContain('settings.energyCarbohydrateHourlyLimitMode === "manual"');
+    expect(settingsScreenSource).toContain("智慧計算");
+    expect(settingsScreenSource).toContain("套用 {smartCarbohydrateHourlySuggestionG} g/h");
+    expect(settingsScreenSource).toContain('energyCarbohydrateHourlyLimitMode: "science"');
+    expect(settingsScreenSource).toContain("updateSettings({ energyCarbohydrateHourlyLimitG: smartCarbohydrateHourlySuggestionG })");
+  });
+
   it("sends the limit through the background rider profile for lock-screen continuity", () => {
     expect(backgroundSource).toContain("energyCarbohydrateHourlyLimitMode?: \"science\" | \"manual\"");
     expect(backgroundSource).toContain("energyCarbohydrateHourlyLimitG?: number");

@@ -2005,3 +2005,8 @@
 - [x] 定義手動每小時碳水上限與科學建議模式的安全範圍、建議邏輯與資料語意；依據保存於 reports/carbohydrate-hourly-limit-evidence-2026-08-18.md
 - [x] 新增設定頁、持久化遷移與統一能量倒數模型，讓單次碳水與每小時上限共同決定下次提醒時間
 - [x] 建立模式、體重、單次份量、上限與倒數時間的回歸測試，完成品質驗證（TypeScript 0 errors；lint 0 warnings／0 errors；272 passed／1 skipped）
+
+## 手動碳水上限智慧計算（2026-08-18）
+- [x] 盤點現有科學上限計算與手動設定頁互動，確認可直接重用同一演算法
+- [x] 在手動模式加入智慧計算並套用按鈕，自動填入建議 g/h 但不切換模式，允許後續微調
+- [x] 補上設定頁互動回歸測試與完整品質驗證（TypeScript 0 errors；lint 0 warnings／0 errors；273 passed／1 skipped）

@@ -56,6 +56,10 @@ export default function SettingsScreen() {
     energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
     energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
   }).gramsPerHour;
+  const smartCarbohydrateHourlySuggestionG = resolveCarbohydrateHourlyLimit({
+    riderWeightKg: settings.weight,
+    energyCarbohydrateHourlyLimitMode: "science",
+  }).gramsPerHour;
   const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
   const [powerSavingSettings, setPowerSavingSettings] = useState<PowerSavingSettings>(
     powerSavingManagerRef.current.getSettings(),
@@ -521,6 +525,29 @@ export default function SettingsScreen() {
             disabled={supplyControlsDisabled || settings.energyCarbohydrateHourlyLimitMode === "science"}
             onPress={() => openEdit("energyCarbohydrateHourlyLimitG", "每小時碳水上限", settings.energyCarbohydrateHourlyLimitG, "g/h")}
           />
+          {settings.energyCarbohydrateHourlyLimitMode === "manual" && (
+            <View style={styles.supplyRepeatPresetRow}>
+              <Text style={[styles.supplyRepeatPresetLabel, { color: colors.muted }]}>智慧計算</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`依體重智慧計算並套用每小時 ${smartCarbohydrateHourlySuggestionG} g 碳水上限`}
+                disabled={supplyControlsDisabled}
+                onPress={() => void updateSettings({ energyCarbohydrateHourlyLimitG: smartCarbohydrateHourlySuggestionG })}
+                style={({ pressed }) => [
+                  styles.supplyRepeatPreset,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    opacity: supplyControlsDisabled ? 0.45 : pressed ? 0.65 : 1,
+                  },
+                ]}
+              >
+                <Text style={{ color: supplyControlsDisabled ? colors.muted : colors.foreground, fontSize: 14, fontWeight: "800" }}>
+                  套用 {smartCarbohydrateHourlySuggestionG} g/h
+                </Text>
+              </Pressable>
+            </View>
+          )}
           <Divider colors={colors} />
           {(settings.smartEnergySupplyEnabled || settings.smartWaterSupplyEnabled) && (
             <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
