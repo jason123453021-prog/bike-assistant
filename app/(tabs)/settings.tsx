@@ -412,26 +412,42 @@ export default function SettingsScreen() {
           </View>
           <Divider colors={colors} />
           <ToggleRow
-            icon="bolt.fill"
-            label="智慧補給計算"
-            value={settings.supplyCalculationMode === "smart"}
+            icon="flame.fill"
+            label="智慧能量補給"
+            value={settings.smartEnergySupplyEnabled}
             colors={colors}
             disabled={supplyControlsDisabled}
-            onToggle={(enabled) => updateSettings(enabled
-              ? {
-                  supplyCalculationMode: "smart",
-                  supplyEnergyTimeIntervalEnabled: false,
-                  supplyEnergyDistanceIntervalEnabled: false,
-                  supplyWaterTimeIntervalEnabled: false,
-                  supplyWaterDistanceIntervalEnabled: false,
-                }
-              : { supplyCalculationMode: "custom" })}
+            onToggle={(enabled) => updateSettings({
+              smartEnergySupplyEnabled: enabled,
+              ...(enabled ? {
+                supplyEnergyTimeIntervalEnabled: false,
+                supplyEnergyDistanceIntervalEnabled: false,
+              } : {}),
+            })}
+          />
+          <ToggleRow
+            icon="drop.fill"
+            label="智慧補水"
+            value={settings.smartWaterSupplyEnabled}
+            colors={colors}
+            disabled={supplyControlsDisabled}
+            onToggle={(enabled) => updateSettings({
+              smartWaterSupplyEnabled: enabled,
+              ...(enabled ? {
+                supplyWaterTimeIntervalEnabled: false,
+                supplyWaterDistanceIntervalEnabled: false,
+              } : {}),
+            })}
           />
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
             <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
-              {settings.supplyCalculationMode === "smart"
-                ? `智慧計畫完全由 FTP、體重、騎乘強度、時間、坡度、溫濕度、風況、日照與降雨決定；目前每份能量補給設定為 ${settings.energyServingCarbohydrateG} g 碳水，可在下方調整。系統只會顯示下一次補水與補能量的倒數。按下已補給後，才會依最新條件重新安排下一輪。離線時仍以本機個人與騎乘資料安全計算。`
-                : "使用既有固定提醒規則；這些數值只會在手動模式生效。"}
+              {settings.smartEnergySupplyEnabled && settings.smartWaterSupplyEnabled
+                ? `能量與補水皆採智慧倒數；系統會依 FTP、體重、騎乘強度、時間、坡度與環境重排下一輪。每份能量補給目前為 ${settings.energyServingCarbohydrateG} g 碳水。`
+                : settings.smartEnergySupplyEnabled
+                  ? `僅能量採智慧倒數；每份能量補給目前為 ${settings.energyServingCarbohydrateG} g 碳水。補水可在下方選擇手動時間或距離規則。`
+                  : settings.smartWaterSupplyEnabled
+                    ? "僅補水採智慧倒數；能量可在下方選擇手動時間或距離規則。"
+                    : "智慧能量與智慧補水均已關閉；可在下方各自選擇手動時間或距離規則。"}
             </Text>
           </View>
           <Divider colors={colors} />
@@ -447,11 +463,12 @@ export default function SettingsScreen() {
             onPress={() => openEdit("energyServingCarbohydrateG", "單包能量補給碳水克數", settings.energyServingCarbohydrateG, "g")}
           />
           <Divider colors={colors} />
-          {settings.supplyCalculationMode === "smart" ? (
+          {(settings.smartEnergySupplyEnabled || settings.smartWaterSupplyEnabled) && (
             <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-              <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>智慧補給會依下一次倒數到期提醒，已停用能量與補水的固定時間／距離規則，避免重複或衝突通知。</Text>
+              <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>已啟用智慧的類別會依下一次倒數到期提醒；未啟用智慧的類別可使用下方固定時間／距離規則，兩者不會重複或衝突通知。</Text>
             </View>
-          ) : <>
+          )}
+          {!settings.smartEnergySupplyEnabled && <>
             <View style={styles.intervalGroupHeader}>
               <IconSymbol name="flame.fill" size={18} color="#D97706" />
               <View style={styles.intervalGroupTitleWrap}>
@@ -503,6 +520,8 @@ export default function SettingsScreen() {
               disabled={supplyControlsDisabled}
               onPress={() => openEdit("supplyEnergyDistanceIntervalKm", "能量距離提醒間隔", settings.supplyEnergyDistanceIntervalKm, "km")}
             />}
+          </>}
+          {!settings.smartWaterSupplyEnabled && <>
             <Divider colors={colors} />
             <View style={styles.intervalGroupHeader}>
               <IconSymbol name="drop.fill" size={18} color="#0284C7" />

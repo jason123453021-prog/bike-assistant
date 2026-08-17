@@ -14,9 +14,9 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).toContain("能量倒數");
     expect(mapSource).toContain("補水倒數");
     expect(mapSource).toContain("restartSmartSupplyCountdown");
-    expect(mapSource).toContain('settings.supplyCalculationMode === "smart"');
-    expect(mapSource).toContain('settings.supplyCalculationMode !== "smart" && autoDismissSeconds');
-    expect(mapSource).toContain('settings.supplyCalculationMode === "smart" && (kind === "calorie" || kind === "water")');
+    expect(mapSource).toContain("const smartEnergySupplyEnabled = smartSupplyChannels.energy");
+    expect(mapSource).toContain("const smartWaterSupplyEnabled = smartSupplyChannels.water");
+    expect(mapSource).toContain('type === "calorie" ? smartEnergySupplyEnabled : smartWaterSupplyEnabled');
     expect(mapSource).toContain("currentCountdown ?? createSmartSupplyCountdown(supplyPlan, currentState.elapsed)");
     expect(mapSource).not.toContain("refreshSmartSupplyCountdown");
   });
@@ -31,7 +31,7 @@ describe("smart supply countdown UI", () => {
     expect(modalSource).not.toContain("recommendedCarbohydrateG");
     expect(modalSource).toContain("allowSnooze = true");
     expect(modalSource).toContain("{allowSnooze && (");
-    expect(mapSource).toContain('allowSnooze={settings.supplyCalculationMode !== "smart" || (!calorieAlert && !waterAlert)}');
+    expect(mapSource).toContain('allowSnooze={(!calorieAlert || !smartEnergySupplyEnabled) && (!waterAlert || !smartWaterSupplyEnabled)}');
   });
 
   it("renders energy and water together when both countdowns expire, then allows either confirmation to keep the other pending", () => {
@@ -121,8 +121,9 @@ describe("smart supply countdown UI", () => {
   });
 
   it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {
-    expect(mapSource).toContain("const smartCalorieDue = bgState.supplyCalculationMode === \"smart\"");
-    expect(mapSource).toContain("const smartWaterDue = bgState.supplyCalculationMode === \"smart\"");
+    expect(mapSource).toContain("const backgroundSmartChannels = resolveSmartSupplyChannels(bgState)");
+    expect(mapSource).toContain("const smartCalorieDue = backgroundSmartChannels.energy");
+    expect(mapSource).toContain("const smartWaterDue = backgroundSmartChannels.water");
     expect(mapSource).toContain("shouldRestoreBackgroundSupplyReminder");
     expect(mapSource).toContain("pendingInForeground: pendingCalorieRef.current");
     expect(mapSource).toContain("pendingInForeground: pendingWaterRef.current");

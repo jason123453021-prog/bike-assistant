@@ -127,6 +127,10 @@ export interface AppSettings {
   waterThreshold: number;
   /** smart：依個人、騎乘與環境資料全自動調整提醒；custom：採用保守本機預設。 */
   supplyCalculationMode: SupplyCalculationMode;
+  /** 智慧能量倒數的獨立開關；可與智慧補水分別使用。 */
+  smartEnergySupplyEnabled: boolean;
+  /** 智慧補水倒數的獨立開關；可與智慧能量分別使用。 */
+  smartWaterSupplyEnabled: boolean;
   /** 補給與補水提醒的總開關；關閉時保留所有偏好設定但不再觸發任何提醒。 */
   supplyReminderEnabled: boolean;
   /** 由本機多次有效騎乘與智慧補水確認自動更新的汗率倍率，限制為保守範圍。 */
@@ -231,6 +235,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   waterThreshold: 500,
   // 新安裝預設使用全自動智慧計畫；舊自訂值只保留供相容性遷移，永不影響智慧模式。
   supplyCalculationMode: "smart",
+  smartEnergySupplyEnabled: true,
+  smartWaterSupplyEnabled: true,
   supplyReminderEnabled: true,
   sweatRateCalibrationMultiplier: 1,
   sweatRateCalibrationCount: 0,
@@ -336,6 +342,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           "supplyWaterDistanceIntervalEnabled",
         ].some((key) => Object.prototype.hasOwnProperty.call(saved, key));
         const legacyIntervalActive = legacyIntervalEnabled === true;
+        const legacySmartEnabled = saved.supplyCalculationMode !== "custom";
+        const smartEnergySupplyEnabled = typeof saved.smartEnergySupplyEnabled === "boolean"
+          ? saved.smartEnergySupplyEnabled
+          : legacySmartEnabled;
+        const smartWaterSupplyEnabled = typeof saved.smartWaterSupplyEnabled === "boolean"
+          ? saved.smartWaterSupplyEnabled
+          : legacySmartEnabled;
         const migratedIntervalSettings = hasIndependentIntervalSettings ? {} : {
           supplyEnergyTimeIntervalEnabled: legacyIntervalActive && legacyTimeIntervalEnabled !== false,
           supplyEnergyTimeIntervalMinutes: legacyTimeIntervalMinutes ?? DEFAULT_SETTINGS.supplyEnergyTimeIntervalMinutes,
@@ -371,6 +384,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           ...DEFAULT_SETTINGS,
           ...savedWithoutRemovedSettings,
           ...migratedIntervalSettings,
+          smartEnergySupplyEnabled,
+          smartWaterSupplyEnabled,
+          supplyCalculationMode: smartEnergySupplyEnabled || smartWaterSupplyEnabled ? "smart" : "custom",
           // 舊版資料沒有此欄位時，維持既有補給提醒可用；只有明確 false 才關閉。
           supplyReminderEnabled: saved.supplyReminderEnabled !== false,
           supplyItems: normalizeSupplyItems(saved.supplyItems),
@@ -402,11 +418,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const updateSettings = async (partial: Partial<AppSettings>) => {
     const birthday = partial.birthday !== undefined ? normalizeBirthday(partial.birthday) : settings.birthday;
+    const legacyModeOverride = partial.supplyCalculationMode;
+    const nextEnergySmartEnabled = partial.smartEnergySupplyEnabled
+      ?? (legacyModeOverride !== undefined ? legacyModeOverride === "smart" : settings.smartEnergySupplyEnabled);
+    const nextWaterSmartEnabled = partial.smartWaterSupplyEnabled
+      ?? (legacyModeOverride !== undefined ? legacyModeOverride === "smart" : settings.smartWaterSupplyEnabled);
     const next = {
       ...settings,
       ...partial,
       birthday,
       age: calculateAgeFromBirthday(birthday) ?? settings.age,
+      smartEnergySupplyEnabled: nextEnergySmartEnabled,
+      smartWaterSupplyEnabled: nextWaterSmartEnabled,
+      supplyCalculationMode: nextEnergySmartEnabled || nextWaterSmartEnabled ? "smart" : "custom" as SupplyCalculationMode,
       autoPersonalMetricsEnabled: true,
       autoRpeEnabled: true,
       touchGuardUnlockHoldMsSchemaVersion: partial.touchGuardUnlockHoldMs !== undefined

@@ -8,8 +8,11 @@ const settingsContextSource = readFileSync(resolve(process.cwd(), "lib/settings-
 const backgroundSource = readFileSync(resolve(process.cwd(), "lib/background-location.ts"), "utf8");
 
 describe("smart supply priority", () => {
-  it("turns off fixed interval reminders and disables their control when smart mode is enabled", () => {
-    expect(settingsSource).toContain('supplyCalculationMode: "smart"');
+  it("turns off only the matching fixed interval reminders when each smart channel is enabled", () => {
+    expect(settingsSource).toContain("label=\"智慧能量補給\"");
+    expect(settingsSource).toContain("label=\"智慧補水\"");
+    expect(settingsSource).toContain("smartEnergySupplyEnabled: enabled");
+    expect(settingsSource).toContain("smartWaterSupplyEnabled: enabled");
     expect(settingsSource).toContain("supplyEnergyTimeIntervalEnabled: false");
     expect(settingsSource).toContain("supplyEnergyDistanceIntervalEnabled: false");
     expect(settingsSource).toContain("supplyWaterTimeIntervalEnabled: false");
@@ -20,8 +23,8 @@ describe("smart supply priority", () => {
     expect(mapSource).toContain("const dashboardSupplyPlan = activeSupplyPlan ?? fallbackSupplyPlan");
     expect(mapSource).toContain("dashboardSupplyPlan.calorieTriggerKcal");
     expect(mapSource).toContain("dashboardSupplyPlan.waterTriggerMl");
-    expect(mapSource).toContain('settings.supplyCalculationMode === "smart" ? false : settings.supplyEnergyTimeIntervalEnabled');
-    expect(mapSource).toContain('settings.supplyCalculationMode === "smart" ? false : settings.supplyWaterTimeIntervalEnabled');
+    expect(mapSource).toContain("timeEnabled: smartEnergySupplyEnabled ? false : settings.supplyEnergyTimeIntervalEnabled");
+    expect(mapSource).toContain("timeEnabled: smartWaterSupplyEnabled ? false : settings.supplyWaterTimeIntervalEnabled");
   });
 
   it("migrates the previous shared interval rule and keeps four distinct rules in foreground and background", () => {
@@ -37,10 +40,10 @@ describe("smart supply priority", () => {
     expect(mapSource).toContain('id: "supply-interval-water-distance"');
   });
 
-  it("explains that smart mode does not read manual thresholds and removes threshold editors", () => {
-    expect(settingsSource).toContain("智慧計畫完全由 FTP");
-    expect(settingsSource).toContain("下一次補水與補能量的倒數");
-    expect(settingsSource).toContain("按下已補給後");
+  it("explains independent smart channels and removes threshold editors", () => {
+    expect(settingsSource).toContain("能量與補水皆採智慧倒數");
+    expect(settingsSource).toContain("僅能量採智慧倒數");
+    expect(settingsSource).toContain("僅補水採智慧倒數");
     expect(settingsSource).not.toContain("能量門檻基準");
     expect(settingsSource).not.toContain("汗液流失提醒閾值");
   });
