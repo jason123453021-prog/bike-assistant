@@ -29,6 +29,8 @@ import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import { evaluateTrackPoint, type TrackQualityPoint } from "@/lib/track-point-quality";
 import type { SupplyIntervalKind } from "@/lib/supply-interval";
 import type { SportType } from "@/lib/sport-metrics";
+import { acceptLiveElevationDelta, clampVirtualPowerForRider } from "@/lib/live-elevation-filter";
+import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
@@ -36,7 +38,22 @@ const BG_STATE_KEY = "@bike_bg_state";
 const BG_TRACK_FLUSH_INTERVAL_MS = 5_000;
 const BG_TRACK_MAX_POINTS = 10_000;
 
-type BackgroundTrackPoint = { lat: number; lon: number; ts: number; accuracy?: number; segmentStart?: boolean; distanceM?: number };
+type BackgroundTrackPoint = {
+  lat: number;
+  lon: number;
+  ts: number;
+  accuracy?: number;
+  altitude?: number;
+  speed?: number;
+  segmentStart?: boolean;
+  distanceM?: number;
+  ascentM?: number;
+  descentM?: number;
+  acceptedElevationM?: number;
+  powerW?: number;
+  caloriesKcal?: number;
+  intervalSec?: number;
+};
 
 let backgroundTrackCache: BackgroundTrackPoint[] | null = null;
 let lastBackgroundTrackFlushAt = 0;
@@ -68,6 +85,14 @@ async function appendBackgroundTrackBatch(points: BackgroundTrackPoint[], force 
 
 export interface BackgroundState {
   totalDistanceM: number;
+  totalAscentM?: number;
+  totalDescentM?: number;
+  minElevationM?: number;
+  maxElevationM?: number;
+  elevationAnchorM?: number | null;
+  powerWorkJ?: number;
+  powerSampleDurationSec?: number;
+  maxPowerW?: number;
   calories: number;
   sweatLossMl: number;
   lastLat: number;
@@ -177,7 +202,17 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         energyServingCarbohydrateG: state.riderProfile?.energyServingCarbohydrateG,
       });
 
-      const acceptedLocations: Array<{ loc: Location.LocationObject; segmentStart: boolean; distanceM: number }> = [];
+      const acceptedLocations: Array<{
+        loc: Location.LocationObject;
+        segmentStart: boolean;
+        distanceM: number;
+        ascentM?: number;
+        descentM?: number;
+        acceptedElevationM?: number;
+        powerW?: number;
+        caloriesKcal?: number;
+        intervalSec?: number;
+      }> = [];
       let qualityAnchor: TrackQualityPoint | null = state.lastLat !== 0 && state.lastLon !== 0
         ? {
           latitude: state.lastLat,
@@ -249,9 +284,31 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           }
         }
 
+        const statisticsIntervalSec = !segmentStart
+          ? resolveStatisticsIntervalSec(state.lastTimestamp || null, timestamp)
+          : 0;
+        const elevationState = { anchorAltitudeM: segmentStart ? null : state.elevationAnchorM ?? null };
+        const elevationDelta = acceptLiveElevationDelta(elevationState, loc.coords.altitude, acceptedLocation.distanceM);
+        state.elevationAnchorM = elevationState.anchorAltitudeM;
+        state.totalAscentM = (state.totalAscentM ?? 0) + elevationDelta.ascentM;
+        state.totalDescentM = (state.totalDescentM ?? 0) + elevationDelta.descentM;
+        acceptedLocation.ascentM = elevationDelta.ascentM;
+        acceptedLocation.descentM = elevationDelta.descentM;
+        acceptedLocation.acceptedElevationM = elevationDelta.acceptedAltitudeM;
+        acceptedLocation.intervalSec = statisticsIntervalSec;
+        if (elevationDelta.acceptedAltitudeM !== undefined) {
+          state.minElevationM = state.minElevationM === undefined
+            ? elevationDelta.acceptedAltitudeM
+            : Math.min(state.minElevationM, elevationDelta.acceptedAltitudeM);
+          state.maxElevationM = state.maxElevationM === undefined
+            ? elevationDelta.acceptedAltitudeM
+            : Math.max(state.maxElevationM, elevationDelta.acceptedAltitudeM);
+        }
+
         const isReliablyMovingForSupply = speedKmh >= 3 || acceptedLocation.distanceM >= 18;
         if (!isReliablyMovingForSupply) {
           state.supplyCountdownPausedAtMs ??= timestamp;
+          acceptedLocation.intervalSec = 0;
         } else if (state.supplyCountdownPausedAtMs) {
           state.supplyCountdownPausedTotalMs = (state.supplyCountdownPausedTotalMs ?? 0) + Math.max(0, timestamp - state.supplyCountdownPausedAtMs);
           state.supplyCountdownPausedAtMs = undefined;
@@ -259,8 +316,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
 
         // 鎖屏期間沿用前景的個人 FTP、體重與最近環境摘要；沒有天氣資料時安全回退為預設環境。
         if (!segmentStart && speedKmh > 3) {
-          const dt = state.lastTimestamp > 0 ? (timestamp - state.lastTimestamp) / 1000 : 0;
-          if (dt > 0 && dt < 30) {
+          if (statisticsIntervalSec > 0) {
             const profile = state.riderProfile ?? { weightKg: 70, heightCm: 175, ageYears: 32, ftpW: 245, bikeWeightKg: 10 };
             const environment = state.environment ?? {
               temperatureC: 25,
@@ -276,16 +332,16 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
             const gradePct = calcGrade((loc.coords.altitude ?? 0) - (state.lastAltitude ?? loc.coords.altitude ?? 0), distanceM);
             const heading = loc.coords.heading ?? 0;
             const headwindMs = getHeadwindMs(heading, environment.windDirection, environment.windSpeedKmh);
-            const power = calculatePower({
+            const power = clampVirtualPowerForRider(calculatePower({
               speedMs,
               prevSpeedMs: state.lastSpeedMs,
-              intervalSec: dt,
+              intervalSec: statisticsIntervalSec,
               gradePct,
               windSpeedMs: headwindMs,
               riderMassKg: profile.weightKg,
               bikeMassKg: profile.bikeWeightKg,
               airDensityKgM3: calcAirDensity(environment.temperatureC, environment.humidityPct),
-            });
+            }), profile.ftpW);
             const calorieResult = calculatePersonalizedCalories({
               powerW: power,
               hasMeasuredPower: power > 0,
@@ -293,7 +349,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               gradePct,
               riderWeightKg: profile.weightKg,
               ftpW: profile.ftpW,
-              intervalSec: dt,
+              intervalSec: statisticsIntervalSec,
               temperatureC: environment.temperatureC,
               humidityPct: environment.humidityPct,
               weatherCode: environment.weatherCode,
@@ -307,8 +363,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               ftpW: profile.ftpW,
               powerW: power,
               speedKmh,
-              ascentPerInterval: Math.max(0, (loc.coords.altitude ?? 0) - (state.lastAltitude ?? loc.coords.altitude ?? 0)),
-              intervalSec: dt,
+              ascentPerInterval: elevationDelta.ascentM,
+              intervalSec: statisticsIntervalSec,
               temperatureC: environment.temperatureC,
               humidityPct: environment.humidityPct,
               weatherCode: environment.weatherCode,
@@ -317,6 +373,11 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               calibrationMultiplier: profile.sweatRateCalibrationMultiplier,
             });
             state.calories += calorieResult.kcal;
+            state.powerWorkJ = (state.powerWorkJ ?? 0) + power * statisticsIntervalSec;
+            state.powerSampleDurationSec = (state.powerSampleDurationSec ?? 0) + statisticsIntervalSec;
+            state.maxPowerW = Math.max(state.maxPowerW ?? 0, power);
+            acceptedLocation.powerW = power;
+            acceptedLocation.caloriesKcal = calorieResult.kcal;
             state.sweatLossMl += hydrationResult.sweatLossMl;
             latestSupplyPlan = createSupplyPlan({
               mode: state.supplyCalculationMode ?? "custom",
@@ -482,14 +543,22 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
 
       // 以記憶體快取合併軌跡批次，避免每次背景回呼讀取和重寫全部歷史軌跡。
-      await appendBackgroundTrackBatch(acceptedLocations.map(({ loc, segmentStart, distanceM }) => (
+      await appendBackgroundTrackBatch(acceptedLocations.map((point) => (
         {
-          lat: loc.coords.latitude,
-          lon: loc.coords.longitude,
-          ts: loc.timestamp,
-          accuracy: loc.coords.accuracy ?? undefined,
-          segmentStart: segmentStart || undefined,
-          distanceM: distanceM || undefined,
+          lat: point.loc.coords.latitude,
+          lon: point.loc.coords.longitude,
+          ts: point.loc.timestamp,
+          accuracy: point.loc.coords.accuracy ?? undefined,
+          altitude: point.loc.coords.altitude ?? undefined,
+          speed: point.loc.coords.speed ?? undefined,
+          segmentStart: point.segmentStart || undefined,
+          distanceM: point.distanceM || undefined,
+          ascentM: point.ascentM || undefined,
+          descentM: point.descentM || undefined,
+          acceptedElevationM: point.acceptedElevationM,
+          powerW: point.powerW,
+          caloriesKcal: point.caloriesKcal,
+          intervalSec: point.intervalSec || undefined,
         }
       )));
     } catch (e) {
@@ -525,6 +594,12 @@ export async function initBackgroundState(params: {
   const startedAt = Date.now();
   const state: BackgroundState = {
     totalDistanceM: 0,
+    totalAscentM: 0,
+    totalDescentM: 0,
+    elevationAnchorM: null,
+    powerWorkJ: 0,
+    powerSampleDurationSec: 0,
+    maxPowerW: 0,
     calories: 0,
     sweatLossMl: 0,
     lastLat: params.currentLat,

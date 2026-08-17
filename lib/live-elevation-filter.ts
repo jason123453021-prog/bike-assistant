@@ -6,6 +6,12 @@ export interface LiveElevationFilterState {
   anchorAltitudeM: number | null;
 }
 
+export interface LiveElevationChange {
+  ascentM: number;
+  descentM: number;
+  acceptedAltitudeM?: number;
+}
+
 export const LIVE_ELEVATION_DEADBAND_M = 10;
 export const LIVE_ELEVATION_MIN_DISTANCE_M = 12;
 
@@ -13,25 +19,38 @@ export function createLiveElevationFilterState(): LiveElevationFilterState {
   return { anchorAltitudeM: null };
 }
 
+export function acceptLiveElevationDelta(
+  state: LiveElevationFilterState,
+  altitudeM: number | null | undefined,
+  distanceM: number,
+): LiveElevationChange {
+  if (!Number.isFinite(altitudeM)) return { ascentM: 0, descentM: 0 };
+  const altitude = Number(altitudeM);
+  if (state.anchorAltitudeM === null) {
+    state.anchorAltitudeM = altitude;
+    return { ascentM: 0, descentM: 0, acceptedAltitudeM: altitude };
+  }
+  if (distanceM < LIVE_ELEVATION_MIN_DISTANCE_M) return { ascentM: 0, descentM: 0 };
+
+  const delta = altitude - state.anchorAltitudeM;
+  if (Math.abs(delta) < LIVE_ELEVATION_DEADBAND_M) return { ascentM: 0, descentM: 0 };
+
+  // 越過死區後才將新高度確認為可信平台；爬升、下降與最高／最低海拔共用此資料流。
+  state.anchorAltitudeM = altitude;
+  return {
+    ascentM: delta > 0 ? delta : 0,
+    descentM: delta < 0 ? Math.abs(delta) : 0,
+    acceptedAltitudeM: altitude,
+  };
+}
+
+/** 舊呼叫端相容介面；新統計程式應使用 acceptLiveElevationDelta 同時處理爬升與下降。 */
 export function acceptLiveElevationChange(
   state: LiveElevationFilterState,
   altitudeM: number | null | undefined,
   distanceM: number,
 ): number {
-  if (!Number.isFinite(altitudeM)) return 0;
-  const altitude = Number(altitudeM);
-  if (state.anchorAltitudeM === null) {
-    state.anchorAltitudeM = altitude;
-    return 0;
-  }
-  if (distanceM < LIVE_ELEVATION_MIN_DISTANCE_M) return 0;
-
-  const delta = altitude - state.anchorAltitudeM;
-  if (Math.abs(delta) < LIVE_ELEVATION_DEADBAND_M) return 0;
-
-  // 越過死區後只計算同一段可確認的正向高度，並將基準移至新平台。
-  state.anchorAltitudeM = altitude;
-  return delta > 0 ? delta : 0;
+  return acceptLiveElevationDelta(state, altitudeM, distanceM).ascentM;
 }
 
 /** 虛擬功率並非量測值；以 FTP 為主的保守上限避免 GPS／坡度尖峰污染最大功率。 */

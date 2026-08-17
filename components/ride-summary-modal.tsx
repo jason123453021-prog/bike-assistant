@@ -19,6 +19,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
 import { persistRideMedia } from "@/lib/local-ride-media";
 import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power-calc";
+import { buildActivityStatistics } from "@/lib/activity-statistics";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
 interface RideSummaryModalProps {
@@ -93,23 +94,43 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
     totalPowerSamples > 0 ? Math.round((v / totalPowerSamples) * 100) : 0
   );
 
-  const distKm = (state.distance / 1000).toFixed(2);
-  const avgSpd = state.elapsed > 0
-    ? ((state.distance / 1000) / (state.elapsed / 3600)).toFixed(1)
-    : "0.0";
+  const activityStats = buildActivityStatistics({
+    distanceM: state.distance,
+    movingTimeSec: state.elapsed,
+    pausedTimeSec: state.totalPausedSec,
+    totalAscentM: state.totalAscent,
+    totalDescentM: state.totalDescent,
+    minElevationM: state.minElevation ?? undefined,
+    maxElevationM: state.maxElevation ?? undefined,
+    maxSpeedKmh: state.maxSpeed,
+    maxPowerW: state.maxPower,
+    powerWorkJ: state.powerWorkJ,
+    powerSampleDurationSec: state.powerSampleDurationSec,
+    caloriesKcal: state.totalCalories,
+    powerSource: state.powerSource,
+    caloriesSource: state.caloriesSource,
+  });
+  const distKm = (activityStats.distanceM / 1000).toFixed(2);
+  const avgSpd = activityStats.averageSpeedKmh.toFixed(1);
+  const powerSourceLabel = activityStats.powerSource === "measured"
+    ? "功率計量測"
+    : activityStats.powerSource === "estimated"
+      ? "本機物理估算"
+      : "功率資料不足";
 
   const handleShare = async () => {
     const msg = [
       `🚴 ${routeName || "智慧單車騎乘記錄"}`,
       `距離：${distKm} km`,
-      `時間：${formatDuration(state.elapsed)}`,
+      `活動時間：${formatDuration(activityStats.elapsedTimeSec)}`,
+      `移動時間：${formatDuration(activityStats.movingTimeSec)}`,
       `均速：${avgSpd} km/h`,
       `最高速：${state.maxSpeed.toFixed(1)} km/h`,
-      `爬升：${Math.round(state.totalAscent)} m`,
-      `卡路里：${Math.round(state.totalCalories)} kcal`,
-      `暫停時間：${formatDuration(state.totalPausedSec)}`,
-      `均功率：${state.avgPower} W`,
-      `最大功率：${state.maxPower} W`,
+      `爬升／下降：${Math.round(activityStats.totalAscentM)}／${Math.round(activityStats.totalDescentM)} m`,
+      `卡路里：${Math.round(activityStats.caloriesKcal)} kcal（估算）`,
+      `暫停時間：${formatDuration(activityStats.pausedTimeSec)}`,
+      `均功率：${Math.round(activityStats.averagePowerW ?? 0)} W（${powerSourceLabel}）`,
+      `最大功率：${Math.round(activityStats.maxPowerW)} W`,
     ].join("\n");
     try { await Share.share({ message: msg }); } catch {}
   };
@@ -233,11 +254,11 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>核心數據</Text>
               <View style={styles.statsGrid}>
                 <StatCell label="距離" value={distKm} unit="km" colors={colors} />
-                <StatCell label="總時間" value={formatDuration(state.elapsed + state.totalPausedSec)} unit="" colors={colors} />
-                <StatCell label="移動時間" value={formatDuration(state.elapsed)} unit="" colors={colors} />
-                <StatCell label="平均速度" value={state.elapsed > 0 ? ((state.distance / 1000) / (state.elapsed / 3600)).toFixed(1) : "0.0"} unit="km/h" colors={colors} />
-                <StatCell label="最高速度" value={state.maxSpeed.toFixed(1)} unit="km/h" colors={colors} />
-                <StatCell label="消耗熱量" value={`${Math.round(state.totalCalories)}`} unit="kcal" colors={colors} />
+                <StatCell label="活動時間" value={formatDuration(activityStats.elapsedTimeSec)} unit="" colors={colors} />
+                <StatCell label="移動時間" value={formatDuration(activityStats.movingTimeSec)} unit="" colors={colors} />
+                <StatCell label="平均速度" value={activityStats.averageSpeedKmh.toFixed(1)} unit="km/h" colors={colors} />
+                <StatCell label="最高速度" value={activityStats.maxSpeedKmh.toFixed(1)} unit="km/h" colors={colors} />
+                <StatCell label="消耗熱量" value={`${Math.round(activityStats.caloriesKcal)}`} unit="kcal（估算）" colors={colors} />
               </View>
             </View>
 
@@ -245,9 +266,10 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
             <View style={[styles.statsPanel, { borderColor: colors.border }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>爬升與地形</Text>
               <View style={styles.statsGrid}>
-                <StatCell label="總爬升高度" value={`${Math.round(state.totalAscent)}`} unit="m" colors={colors} />
-                <StatCell label="總下降高度" value="0" unit="m" colors={colors} />
-                <StatCell label="最大海拔" value="0" unit="m" colors={colors} />
+                <StatCell label="總爬升高度" value={`${Math.round(activityStats.totalAscentM)}`} unit="m" colors={colors} />
+                <StatCell label="總下降高度" value={`${Math.round(activityStats.totalDescentM)}`} unit="m" colors={colors} />
+                <StatCell label="最高海拔" value={activityStats.maxElevationM === undefined ? "--" : `${Math.round(activityStats.maxElevationM)}`} unit="m" colors={colors} />
+                <StatCell label="最低海拔" value={activityStats.minElevationM === undefined ? "--" : `${Math.round(activityStats.minElevationM)}`} unit="m" colors={colors} />
               </View>
             </View>
 
@@ -255,10 +277,12 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
             <View style={[styles.statsPanel, { borderColor: colors.border }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>進階訓練數據</Text>
               <View style={styles.statsGrid}>
-                <StatCell label="平均功率" value={`${state.avgPower}`} unit="W" colors={colors} accent />
-                <StatCell label="最大功率" value={`${state.maxPower}`} unit="W" colors={colors} accent />
-                <StatCell label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" colors={colors} />
+                <StatCell label="平均功率" value={activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)}`} unit="W" colors={colors} accent />
+                <StatCell label="最大功率" value={`${Math.round(activityStats.maxPowerW)}`} unit="W" colors={colors} accent />
+                <StatCell label="機械工作量" value={activityStats.totalWorkKj === undefined ? "--" : `${Math.round(activityStats.totalWorkKj)}`} unit="kJ" colors={colors} />
+                <StatCell label="暫停時間" value={formatDuration(activityStats.pausedTimeSec)} unit="" colors={colors} />
               </View>
+              <Text style={[styles.nameHint, { color: colors.muted }]}>{powerSourceLabel}；卡路里為本機估算，非功率計或代謝量測值。</Text>
             </View>
 
             {/* Power Zone Chart */}

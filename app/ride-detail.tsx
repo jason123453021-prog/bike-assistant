@@ -49,6 +49,7 @@ import { buildElevationBands } from "@/lib/elevation-bands";
 import { buildPhotoRouteMarkers } from "@/lib/photo-route-markers";
 import { compareLocalSplitPersonalBests } from "@/lib/local-split-personal-bests";
 import { buildLocalActivityHighlights, calculateBestPowerEfforts } from "@/lib/local-activity-insights";
+import { buildActivityStatistics } from "@/lib/activity-statistics";
 import { useSettings } from "@/lib/settings-context";
 import { writeLocalFitBackup } from "@/lib/local-fit-backup";
 import { attachRidePhotos, loadRidePhotoTimeline, removeRidePhoto, type RidePhotoTimelineEntry } from "@/lib/local-ride-photos";
@@ -69,6 +70,28 @@ const ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.
 const ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT = SCREEN_H - ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT;
 const ACTIVITY_VIEWER_STAGE_EXPANDED_HEIGHT = SCREEN_H - ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT;
 const ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT + 20;
+
+function buildStoredActivityStatistics(record: RideRecord) {
+  const movingTimeSec = record.movingTime ?? Math.max(0, record.duration - (record.totalPausedSec ?? 0));
+  const powerSampleDurationSec = record.avgPower > 0 ? movingTimeSec : 0;
+  const powerWorkJ = (record.totalWorkKj ?? ((record.avgPower * movingTimeSec) / 1000)) * 1000;
+  return buildActivityStatistics({
+    distanceM: record.distance,
+    movingTimeSec,
+    pausedTimeSec: record.totalPausedSec ?? 0,
+    totalAscentM: record.totalAscent,
+    totalDescentM: record.totalDescent ?? 0,
+    minElevationM: record.minElevation,
+    maxElevationM: record.maxElevation,
+    maxSpeedKmh: record.maxSpeed,
+    maxPowerW: record.maxPower,
+    powerWorkJ,
+    powerSampleDurationSec,
+    caloriesKcal: record.calories,
+    powerSource: record.powerSource ?? "unavailable",
+    caloriesSource: record.caloriesSource ?? "unavailable",
+  });
+}
 
 function clampActivityViewerDrawerHeight(value: number): number {
   return Math.min(ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT, Math.max(ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT, value));
@@ -604,31 +627,32 @@ export default function RideDetailScreen() {
 
   const handleShare = useCallback(async () => {
     if (!record) return;
-    const distKm = (record.distance / 1000).toFixed(2);
+    const activityStats = buildStoredActivityStatistics(record);
+    const distKm = (activityStats.distanceM / 1000).toFixed(2);
     const date = new Date(record.date);
     const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-    const movingTime = Math.max(0, record.duration - (record.totalPausedSec ?? 0));
-    const avgSpeedMoving = ((record.distance / 1000) / (movingTime / 3600)).toFixed(1);
+    const powerSourceLabel = activityStats.powerSource === "measured" ? "功率計量測" : activityStats.powerSource === "estimated" ? "本機估算" : "資料不足";
     const msg = [
       `🚴 ${record.name}`,
       `日期：${dateStr}`,
       ``,
       `📊 核心數據`,
       `距離：${distKm} km`,
-      `總時間：${formatDuration(record.duration)}`,
-      `有效騎乘：${formatDuration(movingTime)}`,
-      `暫停時間：${formatDuration(record.totalPausedSec ?? 0)}`,
+      `活動時間：${formatDuration(activityStats.elapsedTimeSec)}`,
+      `移動時間：${formatDuration(activityStats.movingTimeSec)}`,
+      `暫停時間：${formatDuration(activityStats.pausedTimeSec)}`,
       ``,
       `⚡ 速度與功率`,
-      `均速：${avgSpeedMoving} km/h`,
-      `最高速：${record.maxSpeed.toFixed(1)} km/h`,
-      `均功率：${record.avgPower} W`,
-      `最大功率：${record.maxPower} W`,
+      `均速：${activityStats.averageSpeedKmh.toFixed(1)} km/h`,
+      `最高速：${activityStats.maxSpeedKmh.toFixed(1)} km/h`,
+      `均功率：${Math.round(activityStats.averagePowerW ?? 0)} W（${powerSourceLabel}）`,
+      `最大功率：${Math.round(activityStats.maxPowerW)} W`,
+      `機械工作量：${activityStats.totalWorkKj === undefined ? "--" : Math.round(activityStats.totalWorkKj)} kJ`,
       ``,
       `⛰️ 爬升與地形`,
-      `爬升：${Math.round(record.totalAscent)} m`,
-      `下降：${Math.round(record.totalDescent ?? 0)} m`,
-      `最高海拔：${Math.round(record.maxElevation ?? 0)} m`,
+      `爬升：${Math.round(activityStats.totalAscentM)} m`,
+      `下降：${Math.round(activityStats.totalDescentM)} m`,
+      `最高海拔：${activityStats.maxElevationM === undefined ? "--" : Math.round(activityStats.maxElevationM)} m`,
       ``,
       `❤️ 訓練數據`,
       `平均心率：${record.avgHeartRate ?? 0} bpm`,
@@ -636,7 +660,7 @@ export default function RideDetailScreen() {
       `平均踏頻：${record.avgCadence ?? 0} rpm`,
       ``,
       `🔥 身體數據`,
-      `卡路里：${record.calories} kcal`,
+      `卡路里：${Math.round(activityStats.caloriesKcal)} kcal（本機估算）`,
       `水分流失：${Math.round(record.totalSweatMl)} ml`,
     ].join("\n");
     await Share.share({ message: msg });
@@ -662,10 +686,9 @@ export default function RideDetailScreen() {
     totalZones > 0 ? Math.round((v / totalZones) * 100) : 0
   );
 
-  const movingDuration = Math.max(0, record.duration - (record.totalPausedSec ?? 0));
-  const averageMovingSpeed = movingDuration > 0
-    ? (record.distance / 1000) / (movingDuration / 3600)
-    : 0;
+  const activityStats = buildStoredActivityStatistics(record);
+  const movingDuration = activityStats.movingTimeSec;
+  const averageMovingSpeed = activityStats.averageSpeedKmh;
   const activityHighlights = buildLocalActivityHighlights(record, state.records);
   const bestPowerEfforts = calculateBestPowerEfforts(record);
 
@@ -797,12 +820,12 @@ export default function RideDetailScreen() {
             subtitle={`${dateStr} · ${SPORT_META[record.sportType ?? "cycling"].label}`}
           />
           <CoreActivitySummaryGrid
-            distanceKm={record.distance / 1000}
-            ascentM={record.totalAscent}
+            distanceKm={activityStats.distanceM / 1000}
+            ascentM={activityStats.totalAscentM}
             movingDuration={movingDuration}
-            averagePowerW={record.avgPower}
+            averagePowerW={activityStats.averagePowerW ?? 0}
             averageSpeedKmh={averageMovingSpeed}
-            calories={record.calories}
+            calories={activityStats.caloriesKcal}
             sportType={record.sportType ?? "cycling"}
             averageGrade={record.averageGrade ?? 0}
             altitudeM={record.maxElevation ?? 0}
@@ -1071,14 +1094,13 @@ export default function RideDetailScreen() {
             <View style={[styles.statsPanel, { borderColor: colors.border }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>核心數據</Text>
               <View style={styles.statsGrid}>
-                <DetailCell label="距離" value={`${(record.distance / 1000).toFixed(2)}`} unit="km" />
-                <DetailCell label="總時間" value={formatDuration(record.duration)} unit="" />
-                <DetailCell label="移動時間" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" />
-                <DetailCell label="平均速度" value={record.avgSpeed.toFixed(1)} unit="km/h" />
-                <DetailCell label="最高速度" value={`${record.maxSpeed.toFixed(1)}`} unit="km/h" />
-                <DetailCell label="消耗熱量" value={`${Math.round(record.calories)}`} unit="kcal" />
-                <DetailCell label="有效騎乘" value={formatDuration(Math.max(0, record.duration - (record.totalPausedSec ?? 0)))} unit="" color="#4ADE80" />
-                <DetailCell label="暫停時間" value={formatDuration(record.totalPausedSec ?? 0)} unit="" />
+                <DetailCell label="距離" value={`${(activityStats.distanceM / 1000).toFixed(2)}`} unit="km" />
+                <DetailCell label="活動時間" value={formatDuration(activityStats.elapsedTimeSec)} unit="" />
+                <DetailCell label="移動時間" value={formatDuration(activityStats.movingTimeSec)} unit="" />
+                <DetailCell label="平均速度" value={activityStats.averageSpeedKmh.toFixed(1)} unit="km/h" />
+                <DetailCell label="最高速度" value={`${activityStats.maxSpeedKmh.toFixed(1)}`} unit="km/h" />
+                <DetailCell label="消耗熱量" value={`${Math.round(activityStats.caloriesKcal)}`} unit="kcal（估算）" />
+                <DetailCell label="暫停時間" value={formatDuration(activityStats.pausedTimeSec)} unit="" />
               </View>
             </View>
 
@@ -1086,11 +1108,11 @@ export default function RideDetailScreen() {
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>爬升與地形</Text>
               <View style={styles.statsGrid}>
-                <DetailCell label="總爬升高度" value={`${Math.round(record.totalAscent)}`} unit="m" color="#F59E0B" />
-                <DetailCell label="總下降高度" value={record.totalDescent !== undefined ? `${Math.round(record.totalDescent)}` : "--"} unit="m" color="#4FC3F7" />
-                <DetailCell label="最大海拔" value={record.maxElevation !== undefined ? `${Math.round(record.maxElevation)}` : "--"} unit="m" />
-                <DetailCell label="最小海拔" value={record.minElevation !== undefined ? `${Math.round(record.minElevation)}` : "--"} unit="m" />
-                <DetailCell label="平均坡度" value={record.averageGrade !== undefined ? record.averageGrade.toFixed(1) : "--"} unit="%" />
+                <DetailCell label="總爬升高度" value={`${Math.round(activityStats.totalAscentM)}`} unit="m" color="#F59E0B" />
+                <DetailCell label="總下降高度" value={`${Math.round(activityStats.totalDescentM)}`} unit="m" color="#4FC3F7" />
+                <DetailCell label="最大海拔" value={activityStats.maxElevationM === undefined ? "--" : `${Math.round(activityStats.maxElevationM)}`} unit="m" />
+                <DetailCell label="最小海拔" value={activityStats.minElevationM === undefined ? "--" : `${Math.round(activityStats.minElevationM)}`} unit="m" />
+                <DetailCell label="平均坡度" value={activityStats.averageGradePct === undefined ? "--" : activityStats.averageGradePct.toFixed(1)} unit="%" />
                 <DetailCell label="最大坡度" value={record.maxGrade !== undefined ? record.maxGrade.toFixed(1) : "--"} unit="%" />
               </View>
             </View>
@@ -1101,8 +1123,9 @@ export default function RideDetailScreen() {
               <View style={styles.statsGrid}>
                 <DetailCell label="平均心率" value={record.avgHeartRate ? `${record.avgHeartRate}` : "--"} unit="bpm" color="#EF4444" />
                 <DetailCell label="最大心率" value={record.maxHeartRate ? `${record.maxHeartRate}` : "--"} unit="bpm" color="#EF4444" />
-                <DetailCell label="平均功率" value={`${record.avgPower}`} unit="W" accent />
-                <DetailCell label="最大功率" value={`${record.maxPower}`} unit="W" accent />
+                <DetailCell label="平均功率" value={activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)}`} unit="W（估算）" accent />
+                <DetailCell label="最大功率" value={`${Math.round(activityStats.maxPowerW)}`} unit="W（估算）" accent />
+                <DetailCell label="機械工作量" value={activityStats.totalWorkKj === undefined ? "--" : `${Math.round(activityStats.totalWorkKj)}`} unit="kJ" accent />
                 <DetailCell label="標準化功率" value={record.normalizedPower !== undefined ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" accent />
                 <DetailCell label="平均踏頻" value={record.avgCadence ? `${record.avgCadence}` : "--"} unit="rpm" />
                 <DetailCell label="最大踏頻" value={record.maxCadence ? `${record.maxCadence}` : "--"} unit="rpm" />

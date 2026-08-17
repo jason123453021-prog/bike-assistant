@@ -57,6 +57,29 @@ describe("ride record normalizer", () => {
     expect(record?.normalizedPower).toBe(150);
     expect(record?.calculationProfile?.ftpW).toBe(245);
     expect(record?.calculationProfile?.environment?.averageTemperatureC).toBe(31);
+    expect(record?.totalWorkKj).toBe(450);
+    expect(record?.powerSource).toBe("unavailable");
+    expect(record?.caloriesSource).toBe("unavailable");
+  });
+
+  it("preserves saved statistics provenance instead of claiming legacy or estimated data is measured", () => {
+    const record = normalizeRideRecord({
+      id: "provenance",
+      distance: 10_000,
+      duration: 1_800,
+      totalPausedSec: 300,
+      avgPower: 180,
+      maxPower: 600,
+      totalWorkKj: 270,
+      powerSource: "estimated",
+      caloriesSource: "power-estimate",
+      route: [],
+    });
+
+    expect(record?.movingTime).toBe(1_500);
+    expect(record?.totalWorkKj).toBe(270);
+    expect(record?.powerSource).toBe("estimated");
+    expect(record?.caloriesSource).toBe("power-estimate");
   });
 
   it("keeps valid local records only, fills safe defaults, deduplicates IDs and sorts newest first", () => {

@@ -5,6 +5,11 @@ import { calculatePersonalBests, type PersonalBest } from "./personal-bests";
 import { normalizeRideRecord, normalizeRideRecords } from "./ride-record-normalizer";
 import { estimateAutomaticRpe } from "@/lib/automatic-rpe";
 import { buildRideTimeTotals, calculatePausedSeconds } from "@/lib/ride-time-accounting";
+import {
+  buildActivityStatistics,
+  type ActivityCaloriesSource,
+  type ActivityPowerSource,
+} from "@/lib/activity-statistics";
 import type { SportType } from "./sport-metrics";
 
 export type { SportType } from "./sport-metrics";
@@ -88,7 +93,8 @@ export interface RideRecord {
   id: string;
   date: number;
   name: string;           // 自訂路線名稱（可編輯）
-  duration: number;       // seconds
+  /** 開始至結束的活動總經過時間（seconds = movingTime + totalPausedSec）。 */
+  duration: number;
   distance: number;       // meters
   avgSpeed: number;       // km/h
   maxSpeed: number;       // km/h
@@ -102,6 +108,12 @@ export interface RideRecord {
   calories: number;
   avgPower: number;       // watts
   maxPower: number;       // watts
+  /** 有效移動時間內的機械工作量（kJ）；估算功率時同樣標示為估算。 */
+  totalWorkKj?: number;
+  /** 功率為功率計量測、本機物理模型估算或不可用。 */
+  powerSource?: ActivityPowerSource;
+  /** 卡路里為功率模型、MET 模型、混合估算或不可用。 */
+  caloriesSource?: ActivityCaloriesSource;
   normalizedPower?: number; // 標準化功率 watts
   intensityFactor?: number; // 強度係數 IF
   tss?: number;           // 訓練壓力分數 TSS
@@ -164,8 +176,17 @@ export interface RideState {
   currentPower: number;     // watts
   avgPower: number;
   maxPower: number;
+  /** 有效移動樣本的功率時間積分（J），用於時間加權平均功率與工作量。 */
+  powerWorkJ: number;
+  /** 已被功率樣本覆蓋的有效移動秒數。 */
+  powerSampleDurationSec: number;
+  powerSource: ActivityPowerSource;
+  caloriesSource: ActivityCaloriesSource;
   totalAscent: number;
+  totalDescent: number;
   currentAltitude: number;  // 目前海拔 m
+  minElevation: number | null;
+  maxElevation: number | null;
   calories: number;         // 自上次補給後累計（觸發補給提醒用）
   totalCalories: number;     // 全程總卡路里（不被補給重置）
   calorieProgress: number;  // 0-1
@@ -217,7 +238,21 @@ type RideAction =
   | { type: "PAUSE_TICK" }
   /** 停止或室內定位漂移時只重設畫面上的即時讀數，不寫入軌跡或統計。 */
   | { type: "LIVE_READINGS_STATIONARY" }
-  | { type: "LOCATION_UPDATE"; point: LocationPoint; power: number; calories: number; ascent: number; distanceM?: number }
+  | {
+      type: "LOCATION_UPDATE";
+      point: LocationPoint;
+      power: number;
+      calories: number;
+      ascent: number;
+      descent?: number;
+      acceptedElevationM?: number;
+      distanceM?: number;
+      intervalSec?: number;
+      /** 僅背景回補樣本使用；前景移動時間由每秒計時器維護。 */
+      isBackgroundRecovery?: boolean;
+      powerSource?: ActivityPowerSource;
+      caloriesSource?: ActivityCaloriesSource;
+    }
   | { type: "SWEAT_UPDATE"; sweatLossMl: number; sweatRatePerHour: number; intensityLabel: string }
   | { type: "CONSUME_CALORIES" }
   | { type: "CONSUME_WATER" }
@@ -252,8 +287,15 @@ const initialState: RideState = {
   currentPower: 0,
   avgPower: 0,
   maxPower: 0,
+  powerWorkJ: 0,
+  powerSampleDurationSec: 0,
+  powerSource: "unavailable",
+  caloriesSource: "unavailable",
   totalAscent: 0,
+  totalDescent: 0,
   currentAltitude: 0,
+  minElevation: null,
+  maxElevation: null,
   calories: 0,
   calorieProgress: 0,
   sweatSinceLastRefill: 0,
@@ -343,7 +385,19 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       };
 
     case "LOCATION_UPDATE": {
-      const { point, power, calories, ascent, distanceM } = action;
+      const {
+        point,
+        power,
+        calories,
+        ascent,
+        descent = 0,
+        acceptedElevationM,
+        distanceM,
+        intervalSec = 0,
+        isBackgroundRecovery = false,
+        powerSource = "unavailable",
+        caloriesSource = "unavailable",
+      } = action;
       const newRoute = [...state.route, point];
 
       // 軌跡點始終記錄
@@ -357,12 +411,32 @@ function rideReducer(state: RideState, action: RideAction): RideState {
       // 其他數據僅在 active 狀態下更新
       const speedKmh = (point.speed ?? 0) * 3.6;
       const newPowerHistory = [...state.powerHistory, power];
-      const avgPower = newPowerHistory.reduce((a, b) => a + b, 0) / newPowerHistory.length;
+      const effectiveIntervalSec = Math.max(0, Number.isFinite(intervalSec) ? intervalSec : 0);
+      const nextElapsed = state.elapsed + (isBackgroundRecovery ? effectiveIntervalSec : 0);
+      const newPowerWorkJ = state.powerWorkJ + Math.max(0, power) * effectiveIntervalSec;
+      const newPowerSampleDurationSec = state.powerSampleDurationSec + effectiveIntervalSec;
+      const avgPower = newPowerSampleDurationSec > 0 ? newPowerWorkJ / newPowerSampleDurationSec : 0;
       const zone = getPowerZone(power);
       const newZones = [...state.powerZones];
       newZones[zone]++;
       const newCalories = state.calories + calories;
       const newTotalCalories = state.totalCalories + calories;
+      const mergedPowerSource: ActivityPowerSource = state.powerSource === "measured" || powerSource === "measured"
+        ? "measured"
+        : state.powerSource === "estimated" || powerSource === "estimated"
+          ? "estimated"
+          : "unavailable";
+      const mergedCaloriesSource: ActivityCaloriesSource = state.caloriesSource === "unavailable"
+        ? caloriesSource
+        : caloriesSource === "unavailable" || caloriesSource === state.caloriesSource
+          ? state.caloriesSource
+          : "mixed-estimate";
+      const nextMinElevation = acceptedElevationM === undefined
+        ? state.minElevation
+        : state.minElevation === null ? acceptedElevationM : Math.min(state.minElevation, acceptedElevationM);
+      const nextMaxElevation = acceptedElevationM === undefined
+        ? state.maxElevation
+        : state.maxElevation === null ? acceptedElevationM : Math.max(state.maxElevation, acceptedElevationM);
 
       // 坡度區間統計（使用真實 GPS 距離）
       const newGradeDistribution = [...state.gradeDistribution];
@@ -388,14 +462,20 @@ function rideReducer(state: RideState, action: RideAction): RideState {
         route: newRoute,
         currentSpeed: speedKmh,
         maxSpeed: Math.max(state.maxSpeed, speedKmh),
-        avgSpeed: newRoute.length > 1
-          ? (state.distance + distance) / 1000 / (state.elapsed / 3600) || 0
-          : 0,
+        elapsed: nextElapsed,
+        avgSpeed: nextElapsed > 0 ? (state.distance + distance) / 1000 / (nextElapsed / 3600) : 0,
         currentPower: power,
         avgPower: Math.round(avgPower),
         maxPower: Math.max(state.maxPower, power),
+        powerWorkJ: newPowerWorkJ,
+        powerSampleDurationSec: newPowerSampleDurationSec,
+        powerSource: mergedPowerSource,
+        caloriesSource: mergedCaloriesSource,
         totalAscent: state.totalAscent + ascent,
+        totalDescent: state.totalDescent + descent,
         currentAltitude: point.altitude ?? state.currentAltitude,
+        minElevation: nextMinElevation,
+        maxElevation: nextMaxElevation,
         calories: newCalories,
         totalCalories: newTotalCalories,
         distance: state.distance + distance,
@@ -542,8 +622,6 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   ) => {
     if (state.elapsed < 10) return null;
     const now = Date.now();
-    // 即時 elapsed 是有效移動時間；活動 duration 儲存為移動＋暫停的總經過時間。
-    const finalAvgSpeed = state.elapsed > 0 ? (state.distance / 1000) / (state.elapsed / 3600) : 0;
     
     // 優先使用使用者設定 FTP；只有舊流程缺少設定時才以體重做相容性估算。
     const ftpW = Math.max(
@@ -553,16 +631,32 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     );
     const timeTotals = buildRideTimeTotals(state.elapsed, state.totalPausedSec);
     const movingTime = timeTotals.movingTime;
+    const activityStats = buildActivityStatistics({
+      distanceM: state.distance,
+      movingTimeSec: movingTime,
+      pausedTimeSec: timeTotals.totalPausedSec,
+      totalAscentM: state.totalAscent,
+      totalDescentM: state.totalDescent,
+      minElevationM: state.minElevation ?? undefined,
+      maxElevationM: state.maxElevation ?? undefined,
+      maxSpeedKmh: state.maxSpeed,
+      maxPowerW: state.maxPower,
+      powerWorkJ: state.powerWorkJ,
+      powerSampleDurationSec: state.powerSampleDurationSec,
+      caloriesKcal: state.totalCalories,
+      powerSource: state.powerSource,
+      caloriesSource: state.caloriesSource,
+    });
     const trainingAnalysis = analyzeTraining(
       movingTime,
-      state.avgPower,
-      state.maxPower,
+      activityStats.averagePowerW ?? 0,
+      activityStats.maxPowerW,
       ftpW,
       state.powerHistory,
     );
     const automaticRpe = estimateAutomaticRpe({
       intensityFactor: trainingAnalysis.intensityFactor,
-      averagePowerW: state.avgPower,
+      averagePowerW: activityStats.averagePowerW ?? 0,
       ftpW,
       movingTimeSec: movingTime,
       distanceMeters: state.distance,
@@ -576,14 +670,21 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       id: now.toString(),
       date: now,
       name: (name && name.trim()) ? name.trim() : generateDefaultName(now, state.sportType),
-      duration: timeTotals.elapsedDuration,
-      distance: state.distance,
-      avgSpeed: finalAvgSpeed,
-      maxSpeed: state.maxSpeed,
-      totalAscent: state.totalAscent,
-      calories: Math.round(state.totalCalories),  // 使用全程總卡路里（不被補給重置）
-      avgPower: state.avgPower,
-      maxPower: state.maxPower,
+      duration: activityStats.elapsedTimeSec,
+      distance: activityStats.distanceM,
+      avgSpeed: activityStats.averageSpeedKmh,
+      maxSpeed: activityStats.maxSpeedKmh,
+      totalAscent: activityStats.totalAscentM,
+      totalDescent: activityStats.totalDescentM,
+      maxElevation: activityStats.maxElevationM,
+      minElevation: activityStats.minElevationM,
+      averageGrade: activityStats.averageGradePct,
+      calories: Math.round(activityStats.caloriesKcal),  // 使用全程總卡路里（不被補給重置）
+      avgPower: Math.round(activityStats.averagePowerW ?? 0),
+      maxPower: activityStats.maxPowerW,
+      totalWorkKj: activityStats.totalWorkKj,
+      powerSource: activityStats.powerSource,
+      caloriesSource: activityStats.caloriesSource,
       powerZones: state.powerZones,
       powerHistory: state.powerHistory,  // 功率時間序列（用於回放）
       route: decimateRoute(state.route),  // 抽樣壓縮，最多 500 點
@@ -697,7 +798,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         currentPower: state.currentPower,
         avgPower: state.avgPower,
         maxPower: state.maxPower,
+        powerWorkJ: state.powerWorkJ,
+        powerSampleDurationSec: state.powerSampleDurationSec,
+        powerSource: state.powerSource,
+        caloriesSource: state.caloriesSource,
         totalAscent: state.totalAscent,
+        totalDescent: state.totalDescent,
+        minElevation: state.minElevation,
+        maxElevation: state.maxElevation,
         calories: state.calories,
         calorieProgress: state.calorieProgress,
         sweatSinceLastRefill: state.sweatSinceLastRefill,

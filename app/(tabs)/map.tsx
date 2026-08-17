@@ -178,10 +178,11 @@ import {
   shouldZeroLiveRideReadings,
 } from "@/lib/live-ride-readings";
 import {
-  acceptLiveElevationChange,
+  acceptLiveElevationDelta,
   clampVirtualPowerForRider,
   createLiveElevationFilterState,
 } from "@/lib/live-elevation-filter";
+import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -1888,8 +1889,8 @@ export default function MapScreen() {
 
           // ─── 騎乘計算 ─────────────────────────────────────────────────────
           let grade = 0;
-          let ascent = 0;
           let distanceM = 0;
+          const previousLocation = lastLocationRef.current;
           if (!trackPointDecision.segmentStart && lastLocationRef.current) {
             distanceM = haversineDistance(
               lastLocationRef.current.coords.latitude,
@@ -1898,8 +1899,16 @@ export default function MapScreen() {
             );
             const altDiff = (altitude ?? 0) - (lastLocationRef.current.coords.altitude ?? 0);
             grade = calcGrade(altDiff, distanceM);
-            ascent = acceptLiveElevationChange(liveElevationFilterRef.current, altitude, distanceM);
           }
+          if (trackPointDecision.segmentStart) {
+            // 背景／定位中斷後開啟新資料段，不能用舊段高度跨距離推導爬升或下降。
+            liveElevationFilterRef.current = createLiveElevationFilterState();
+          }
+          const elevationDelta = acceptLiveElevationDelta(liveElevationFilterRef.current, altitude, distanceM);
+          const ascent = elevationDelta.ascentM;
+          const statisticsIntervalSec = !trackPointDecision.segmentStart
+            ? resolveStatisticsIntervalSec(previousLocation?.timestamp ?? null, loc.timestamp)
+            : 0;
           lastLocationRef.current = loc;
 
           const headwindMs = getHeadwindMs(headingRef.current, windDataRef.current.direction, windDataRef.current.speed * 3.6);
@@ -1920,7 +1929,7 @@ export default function MapScreen() {
           const rawPower = isCyclingSport ? calculatePower({
             speedMs: currentSpeedMs,
             prevSpeedMs: prevSpeedMsRef.current,
-            intervalSec: LOCATION_INTERVAL_SEC,
+            intervalSec: statisticsIntervalSec,
             gradePct: grade,
             windSpeedMs: headwindMs,
             riderMassKg: settings.weight,
@@ -1942,7 +1951,7 @@ export default function MapScreen() {
               gradePct: grade,
               riderWeightKg: settings.weight,
               ftpW: estimateFtpW,
-              intervalSec: LOCATION_INTERVAL_SEC,
+              intervalSec: statisticsIntervalSec,
               temperatureC: currentWeather?.temperature,
               humidityPct: currentWeather?.humidity,
               weatherCode: currentWeather?.weatherCode,
@@ -1952,7 +1961,7 @@ export default function MapScreen() {
             : estimateSportCalories({
               sportType: currentState.sportType,
               weightKg: settings.weight,
-              durationSec: LOCATION_INTERVAL_SEC,
+              durationSec: statisticsIntervalSec,
               speedKmh,
               gradePct: grade,
               vamMPerHour: sportVam,
@@ -1968,7 +1977,15 @@ export default function MapScreen() {
               timestamp: loc.timestamp,
               segmentStart: trackPointDecision.segmentStart || undefined,
             },
-            power, calories: calIncrement, ascent, distanceM,
+            power,
+            calories: calIncrement,
+            ascent,
+            descent: elevationDelta.descentM,
+            acceptedElevationM: elevationDelta.acceptedAltitudeM,
+            distanceM,
+            intervalSec: statisticsIntervalSec,
+            powerSource: isCyclingSport ? "estimated" : "unavailable",
+            caloriesSource: isCyclingSport ? "power-estimate" : "met-estimate",
           });
 
           const sweatResult = calculateSweatLoss({
@@ -1978,7 +1995,7 @@ export default function MapScreen() {
             speedKmh,
             ascentPerInterval: ascent,
             gradePct: grade,
-            intervalSec: LOCATION_INTERVAL_SEC,
+            intervalSec: statisticsIntervalSec,
             temperatureC: weatherRef.current?.temperature ?? 25,
             humidityPct: weatherRef.current?.humidity ?? 60,
             weatherCode: weatherRef.current?.weatherCode ?? 1,
@@ -2582,8 +2599,16 @@ export default function MapScreen() {
                   longitude: point.lon,
                   timestamp: point.ts,
                   accuracy: point.accuracy,
+                  altitude: point.altitude,
+                  speed: point.speed,
                   segmentStart: point.segmentStart,
                   distanceM: point.distanceM,
+                  ascentM: point.ascentM,
+                  descentM: point.descentM,
+                  acceptedElevationM: point.acceptedElevationM,
+                  powerW: point.powerW,
+                  caloriesKcal: point.caloriesKcal,
+                  intervalSec: point.intervalSec,
                 })),
               lastAcceptedTrackPointRef.current,
             );
@@ -2602,15 +2627,21 @@ export default function MapScreen() {
                   point: {
                     latitude: point.latitude,
                     longitude: point.longitude,
-                    altitude: 0,
-                    speed: 0,
+                    altitude: point.altitude ?? 0,
+                    speed: point.speed ?? 0,
                     timestamp: point.timestamp,
                     segmentStart: point.segmentStart,
                   },
-                  power: 0,
-                  calories: 0,
-                  ascent: 0,
+                  power: point.powerW ?? 0,
+                  calories: point.caloriesKcal ?? 0,
+                  ascent: point.ascentM ?? 0,
+                  descent: point.descentM ?? 0,
+                  acceptedElevationM: point.acceptedElevationM,
                   distanceM: point.segmentStart ? 0 : point.distanceM ?? 0,
+                  intervalSec: point.intervalSec ?? 0,
+                  isBackgroundRecovery: true,
+                  powerSource: point.powerW !== undefined ? "estimated" : "unavailable",
+                  caloriesSource: point.caloriesKcal !== undefined ? "power-estimate" : "unavailable",
                 });
               }
               lastAcceptedTrackPointRef.current = newPoints.at(-1) ?? lastAcceptedTrackPointRef.current;
@@ -3744,7 +3775,7 @@ function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed }: {
     case "showAvgSpeed":
       return <BigMetric label="均速" value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"} unit="km/h" />;
     case "showCalories":
-      return <BigMetric label="卡路里" value={`${Math.round(state.calories)}`} unit="kcal" />;
+      return <BigMetric label="卡路里" value={`${Math.round(state.totalCalories)}`} unit="kcal" />;
     case "showPausedTime":
       return <BigMetric label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" />;
     case "showTotalAscent":

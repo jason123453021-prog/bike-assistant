@@ -167,6 +167,16 @@ function normalizeSportType(value: unknown): SportType {
     : "cycling";
 }
 
+function normalizePowerSource(value: unknown): RideRecord["powerSource"] {
+  return value === "measured" || value === "estimated" ? value : "unavailable";
+}
+
+function normalizeCaloriesSource(value: unknown): RideRecord["caloriesSource"] {
+  return value === "power-estimate" || value === "met-estimate" || value === "mixed-estimate"
+    ? value
+    : "unavailable";
+}
+
 function normalizeRpe(value: unknown): number | undefined {
   const rpe = normalizedOptional(value);
   return rpe !== undefined && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : undefined;
@@ -205,6 +215,11 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     : 0;
   const averagePower = nonNegative(source.avgPower, derivedAveragePower || 0) || derivedAveragePower;
   const maxPower = Math.max(nonNegative(source.maxPower), ...powerHistory, 0);
+  const powerSource = normalizePowerSource(source.powerSource);
+  const caloriesSource = normalizeCaloriesSource(source.caloriesSource);
+  const totalWorkKj = source.totalWorkKj !== undefined
+    ? nonNegative(source.totalWorkKj)
+    : movingTime > 0 && averagePower > 0 ? (averagePower * movingTime) / 1000 : undefined;
   const derivedNormalizedPower = calculateNormalizedPowerFromHistory(powerHistory, movingTime);
   const recordId = typeof source.id === "string" && source.id.trim() ? source.id.trim() : fallbackId ?? `legacy-${date}`;
   const name = typeof source.name === "string" && source.name.trim() ? source.name.trim() : "匯入騎乘紀錄";
@@ -227,6 +242,9 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     calories: nonNegative(source.calories),
     avgPower: Math.round(averagePower),
     maxPower: Math.round(maxPower),
+    totalWorkKj,
+    powerSource,
+    caloriesSource,
     normalizedPower: derivedNormalizedPower ?? normalizedOptional(source.normalizedPower),
     intensityFactor: normalizedOptional(source.intensityFactor),
     tss: normalizedOptional(source.tss),
