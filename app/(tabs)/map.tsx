@@ -127,6 +127,7 @@ import {
   getBackgroundTrackPoints,
   getBackgroundState,
   updateBackgroundEnvironment,
+  updateBackgroundRiderProfile,
   updateBackgroundSmartSupplyCountdown,
   updateBackgroundSmartSupplyChannels,
   setBackgroundSupplyReminderPending,
@@ -801,6 +802,21 @@ export default function MapScreen() {
   }, [mapRideActive, smartEnergySupplyEnabled, smartWaterSupplyEnabled]);
 
   useEffect(() => {
+    if (!mapRideActive) return;
+    void updateBackgroundRiderProfile({
+      weightKg: settings.weight,
+      heightCm: settings.height,
+      ageYears: estimateAgeYears ?? 32,
+      ftpW: estimateFtpW,
+      bikeWeightKg: settings.bikeWeight ?? 10,
+      sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
+      energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+      energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
+      energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+    });
+  }, [estimateAgeYears, estimateFtpW, mapRideActive, settings.bikeWeight, settings.energyCarbohydrateHourlyLimitG, settings.energyCarbohydrateHourlyLimitMode, settings.energyServingCarbohydrateG, settings.height, settings.sweatRateCalibrationMultiplier, settings.weight]);
+
+  useEffect(() => {
     customSupplyAlertsRef.current = customSupplyAlerts;
   }, [customSupplyAlerts]);
 
@@ -1133,7 +1149,9 @@ export default function MapScreen() {
     environmentLoad: Math.min(1, Math.max(0, ((state.currentSweatRatePerHour || 550) - 550) / 1_000)),
     weatherAvailable: false,
     energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
-  }), [estimateFtpW, hydrationThresholdMl, settings.calorieThreshold, settings.energyServingCarbohydrateG, settings.supplyCalculationMode, settings.weight, state.currentPower, state.currentSweatRatePerHour, state.elapsed, state.sportType]);
+    energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
+    energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+  }), [estimateFtpW, hydrationThresholdMl, settings.calorieThreshold, settings.energyCarbohydrateHourlyLimitG, settings.energyCarbohydrateHourlyLimitMode, settings.energyServingCarbohydrateG, settings.supplyCalculationMode, settings.weight, state.currentPower, state.currentSweatRatePerHour, state.elapsed, state.sportType]);
   const dashboardSupplyPlan = activeSupplyPlan ?? fallbackSupplyPlan;
 
   // ─── 底部面板滑桿 ─────────────────────────────────────────────────────────────
@@ -2019,6 +2037,8 @@ export default function MapScreen() {
             environmentLoad: sweatResult.environmentLoad,
             weatherAvailable: Boolean(currentWeather),
             energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+            energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
+            energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
           });
           setActiveSupplyPlan(supplyPlan);
           const isSmartEnergyMode = settings.supplyReminderEnabled && smartEnergySupplyEnabled;
@@ -2290,6 +2310,8 @@ export default function MapScreen() {
         bikeWeightKg: settings.bikeWeight ?? 10,
         sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
         energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+        energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
+        energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
       },
       environment: weatherRef.current
         ? {

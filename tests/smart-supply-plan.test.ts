@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createSupplyPlan } from "../lib/smart-supply-plan";
+import { createSupplyPlan, resolveCarbohydrateHourlyLimit } from "../lib/smart-supply-plan";
 
 const baseInput = {
   calorieThresholdKcal: 360,
@@ -37,7 +37,7 @@ describe("smart supply plan", () => {
 
     expect(heatStress.calorieTriggerKcal).toBeLessThan(mild.calorieTriggerKcal);
     expect(heatStress.waterTriggerMl).toBeGreaterThan(mild.waterTriggerMl);
-    expect(heatStress.energyRecommendationKcal).toBeGreaterThan(mild.energyRecommendationKcal);
+    expect(heatStress.energyRecommendationKcal).toBeGreaterThanOrEqual(mild.energyRecommendationKcal);
     expect(heatStress.waterRecommendationMl).toBeGreaterThan(mild.waterRecommendationMl);
     expect(heatStress.carbohydrateRecommendationG).toBeLessThanOrEqual(90);
     expect(heatStress.waterRecommendationMl).toBeLessThanOrEqual(250);
@@ -45,7 +45,7 @@ describe("smart supply plan", () => {
     expect(heatStress.waterTriggerMl).toBeLessThanOrEqual(250);
     expect(heatStress.waterTriggerMl).toBeGreaterThanOrEqual(100);
     expect(heatStress.waterCountdownSec).toBeLessThan(mild.waterCountdownSec);
-    expect(heatStress.energyCountdownSec).toBeLessThan(mild.energyCountdownSec);
+    expect(heatStress.energyCountdownSec).toBeLessThanOrEqual(mild.energyCountdownSec);
   });
 
   it("keeps smart triggers independent from any manual custom thresholds", () => {
@@ -68,8 +68,9 @@ describe("smart supply plan", () => {
     const longHard = createSupplyPlan({ ...baseInput, mode: "smart", elapsedSec: 4 * 60 * 60, intensityFactor: 1.05, environmentLoad: 0.8 });
 
     expect(shortEasy.carbohydrateRecommendationG).toBe(0);
-    expect(longHard.carbohydrateRecommendationG).toBeGreaterThanOrEqual(80);
-    expect(longHard.carbohydrateRecommendationG).toBeLessThanOrEqual(90);
+    expect(longHard.carbohydrateRecommendationG).toBe(50);
+    expect(longHard.carbohydrateRecommendationG).toBeLessThanOrEqual(longHard.carbohydrateHourlyLimitG);
+    expect(longHard.carbohydrateHourlyLimitMode).toBe("science");
     expect(longHard.reason).toContain("全自動智慧計畫");
     expect(shortEasy.energyCountdownSec).toBeGreaterThanOrEqual(40 * 60);
     expect(longHard.energyCountdownSec).toBeLessThan(shortEasy.energyCountdownSec);
@@ -92,6 +93,35 @@ describe("smart supply plan", () => {
     expect(largeServing.energyCountdownSec).toBeGreaterThan(smallServing.energyCountdownSec);
     expect(smallServing.reason).toContain("單包 20 g 碳水");
     expect(largeServing.reason).toContain("單包 50 g 碳水");
+  });
+
+  it("uses body mass for a conservative scientific hourly ceiling without forcing extra intake", () => {
+    const lightRider = resolveCarbohydrateHourlyLimit({ riderWeightKg: 50, energyCarbohydrateHourlyLimitMode: "science" });
+    const largerRider = resolveCarbohydrateHourlyLimit({ riderWeightKg: 90, energyCarbohydrateHourlyLimitMode: "science" });
+    const shortEasy = createSupplyPlan({ ...baseInput, mode: "smart", elapsedSec: 30 * 60, intensityFactor: 0.5, riderWeightKg: 90 });
+
+    expect(lightRider.gramsPerHour).toBe(35);
+    expect(largerRider.gramsPerHour).toBe(65);
+    expect(shortEasy.carbohydrateRecommendationG).toBe(0);
+  });
+
+  it("caps the smart target and next countdown with the manual hourly carbohydrate limit", () => {
+    const plan = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 4 * 60 * 60,
+      intensityFactor: 1.05,
+      environmentLoad: 0.8,
+      energyServingCarbohydrateG: 30,
+      energyCarbohydrateHourlyLimitMode: "manual",
+      energyCarbohydrateHourlyLimitG: 30,
+    });
+
+    expect(plan.carbohydrateHourlyLimitMode).toBe("manual");
+    expect(plan.carbohydrateHourlyLimitG).toBe(30);
+    expect(plan.carbohydrateRecommendationG).toBe(30);
+    expect(plan.energyCountdownSec).toBe(60 * 60);
+    expect(plan.reason).toContain("每小時上限 30 g，手動設定");
   });
 
   it("uses an explainable offline fallback when environment data is unavailable", () => {

@@ -1,6 +1,7 @@
 import { getSportModelProfile, type GovernedSportType } from "./model-governance";
 
 export type SupplyCalculationMode = "smart" | "custom";
+export type EnergyCarbohydrateHourlyLimitMode = "science" | "manual";
 
 export interface SupplyPlanInput {
   mode: SupplyCalculationMode;
@@ -19,6 +20,9 @@ export interface SupplyPlanInput {
   weatherAvailable: boolean;
   /** 使用者單包能量補給可提供的碳水克數，用於推導下一次能量倒數。 */
   energyServingCarbohydrateG?: number;
+  /** 每小時碳水上限可採科學建議或由使用者手動指定。 */
+  energyCarbohydrateHourlyLimitMode?: EnergyCarbohydrateHourlyLimitMode;
+  energyCarbohydrateHourlyLimitG?: number;
 }
 
 export interface SupplyPlan {
@@ -30,6 +34,9 @@ export interface SupplyPlan {
   waterCountdownSec: number;
   energyRecommendationKcal: number;
   carbohydrateRecommendationG: number;
+  /** 套用科學建議或手動設定後的每小時碳水上限。 */
+  carbohydrateHourlyLimitG: number;
+  carbohydrateHourlyLimitMode: EnergyCarbohydrateHourlyLimitMode;
   waterRecommendationMl: number;
   source: "smart" | "smart-offline-fallback" | "custom";
   reason: string;
@@ -59,6 +66,21 @@ function carbohydrateTargetGPerHour(elapsedSec: number, intensityFactor: number,
   const durationBonus = elapsedSec >= 4 * 60 * 60 ? 10 : elapsedSec >= 3 * 60 * 60 ? 5 : 0;
   const heatBonus = environmentLoad >= 0.7 && intensityFactor >= 0.75 ? 5 : 0;
   return clamp(base + durationBonus + heatBonus, 20, 90);
+}
+
+/**
+ * 科學建議模式以約 0.7 g/kg/h 作保守上緣，再收斂至 30–90 g/h 的實用範圍。
+ * 實際目標仍由時長、強度與運動類型推導；此值只負責限制上限，不會強制增加攝取量。
+ */
+export function resolveCarbohydrateHourlyLimit(input: Pick<SupplyPlanInput,
+  "riderWeightKg" | "energyCarbohydrateHourlyLimitMode" | "energyCarbohydrateHourlyLimitG"
+>): { mode: EnergyCarbohydrateHourlyLimitMode; gramsPerHour: number } {
+  const mode = input.energyCarbohydrateHourlyLimitMode === "manual" ? "manual" : "science";
+  if (mode === "manual") {
+    return { mode, gramsPerHour: clamp(Math.round(Number(input.energyCarbohydrateHourlyLimitG) || 60), 20, 90) };
+  }
+  const weightKg = clamp(Number(input.riderWeightKg) || 70, 35, 150);
+  return { mode, gramsPerHour: clamp(Math.round((weightKg * 0.7) / 5) * 5, 30, 90) };
 }
 
 /**
@@ -102,8 +124,10 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
   const intensity = clamp(input.intensityFactor, 0, 1.25);
   const environmentLoad = clamp(input.environmentLoad, 0, 1);
   const sweatRate = clamp(input.sweatRatePerHour, 350, 1_800);
-  const carbohydrateG = carbohydrateTargetGPerHour(input.elapsedSec, intensity, environmentLoad)
+  const carbohydrateHourlyLimit = resolveCarbohydrateHourlyLimit(input);
+  const carbohydrateModelTargetG = carbohydrateTargetGPerHour(input.elapsedSec, intensity, environmentLoad)
     * sportProfile.supply.carbohydrateRateMultiplier;
+  const carbohydrateG = Math.min(carbohydrateModelTargetG, carbohydrateHourlyLimit.gramsPerHour);
   const energyServingCarbohydrateG = clamp(
     Number(input.energyServingCarbohydrateG) || 25,
     10,
@@ -127,6 +151,8 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
       waterCountdownSec: SMART_WATER_COUNTDOWN_RANGE_SEC.max,
       energyRecommendationKcal,
       carbohydrateRecommendationG: carbohydrateG,
+      carbohydrateHourlyLimitG: carbohydrateHourlyLimit.gramsPerHour,
+      carbohydrateHourlyLimitMode: carbohydrateHourlyLimit.mode,
       waterRecommendationMl,
       source: "custom",
       reason: "使用自訂固定門檻；建議量只供補給規劃參考。",
@@ -156,7 +182,7 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
     energyServingCarbohydrateG,
   );
   const reasonParts = [
-    `全自動智慧計畫（單包 ${energyServingCarbohydrateG} g 碳水；補水約每 10–15 分鐘）`,
+    `全自動智慧計畫（單包 ${energyServingCarbohydrateG} g 碳水；每小時上限 ${carbohydrateHourlyLimit.gramsPerHour} g${carbohydrateHourlyLimit.mode === "science" ? "，科學建議" : "，手動設定"}；補水約每 10–15 分鐘）`,
     intensityLoad >= 0.3 ? "騎乘強度較高" : "騎乘強度一般",
     environmentLoad >= 0.4 ? "環境熱負荷提高" : input.weatherAvailable ? "環境負荷穩定" : "離線環境回退",
     input.elapsedSec >= 2 * 60 * 60 ? "長時間騎乘" : "騎乘時間尚短",
@@ -170,6 +196,8 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
     waterCountdownSec,
     energyRecommendationKcal,
     carbohydrateRecommendationG: carbohydrateG,
+    carbohydrateHourlyLimitG: carbohydrateHourlyLimit.gramsPerHour,
+    carbohydrateHourlyLimitMode: carbohydrateHourlyLimit.mode,
     waterRecommendationMl,
     source,
     reason: reasonParts.join("；"),

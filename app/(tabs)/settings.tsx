@@ -27,6 +27,7 @@ import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-profile";
 import { RidePermissionReadiness } from "@/components/ride-permission-readiness";
 import { TOUCH_GUARD_UNLOCK_HOLD_PRESETS } from "@/lib/live-ride-readings";
+import { resolveCarbohydrateHourlyLimit } from "@/lib/smart-supply-plan";
 
 
 import Constants from "expo-constants";
@@ -50,6 +51,11 @@ export default function SettingsScreen() {
   });
   const currentAge = calculateAgeFromBirthday(settings.birthday) ?? settings.age;
   const supplyControlsDisabled = !settings.supplyReminderEnabled;
+  const effectiveCarbohydrateHourlyLimitG = resolveCarbohydrateHourlyLimit({
+    riderWeightKg: settings.weight,
+    energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
+    energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+  }).gramsPerHour;
   const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
   const [powerSavingSettings, setPowerSavingSettings] = useState<PowerSavingSettings>(
     powerSavingManagerRef.current.getSettings(),
@@ -338,6 +344,8 @@ export default function SettingsScreen() {
       ? Math.min(60, Math.max(1, Math.round(num)))
       : editModal.key === "energyServingCarbohydrateG"
         ? Math.min(100, Math.max(10, Math.round(num)))
+        : editModal.key === "energyCarbohydrateHourlyLimitG"
+          ? Math.min(90, Math.max(20, Math.round(num)))
         : num;
     await updateSettings({ [editModal.key]: boundedNum });
     setEditModal({ ...editModal, visible: false });
@@ -490,6 +498,28 @@ export default function SettingsScreen() {
             hint="可設定 10–100 g；智慧能量倒數與路線攜帶份數會依此份量調整"
             disabled={supplyControlsDisabled}
             onPress={() => openEdit("energyServingCarbohydrateG", "單包能量補給碳水克數", settings.energyServingCarbohydrateG, "g")}
+          />
+          <Divider colors={colors} />
+          <ToggleRow
+            icon="chart.bar.fill"
+            label="每小時碳水採科學建議"
+            value={settings.energyCarbohydrateHourlyLimitMode === "science"}
+            colors={colors}
+            disabled={supplyControlsDisabled}
+            onToggle={(enabled) => updateSettings({ energyCarbohydrateHourlyLimitMode: enabled ? "science" : "manual" })}
+          />
+          <NumberRow
+            icon="chart.bar.fill"
+            label="每小時碳水上限"
+            value={effectiveCarbohydrateHourlyLimitG}
+            unit="g/h"
+            colors={colors}
+            iconColor="#D97706"
+            hint={settings.energyCarbohydrateHourlyLimitMode === "science"
+              ? `目前依 ${settings.weight} kg 推導為 ${effectiveCarbohydrateHourlyLimitG} g/h（約 0.7 g/kg/h，最高 90 g/h）；可關閉上方開關改為手動設定`
+              : "可設定 20–90 g/h；單次碳水克數與此上限共同計算智慧能量倒數"}
+            disabled={supplyControlsDisabled || settings.energyCarbohydrateHourlyLimitMode === "science"}
+            onPress={() => openEdit("energyCarbohydrateHourlyLimitG", "每小時碳水上限", settings.energyCarbohydrateHourlyLimitG, "g/h")}
           />
           <Divider colors={colors} />
           {(settings.smartEnergySupplyEnabled || settings.smartWaterSupplyEnabled) && (

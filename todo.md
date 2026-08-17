@@ -1999,3 +1999,9 @@
 - [x] 在 SettingsContext 新增可測試的重設方法，原子恢復預設設定並覆寫本機設定儲存
 - [x] 在設定頁加入「重設所有設定」按鈕、二次確認與完成回饋
 - [x] 新增重設資料邊界與設定頁互動回歸測試，完成品質驗證（TypeScript 0 errors；lint 0 warnings／0 errors；266 passed／1 skipped）
+
+## 每小時碳水上限與智慧能量倒數（2026-08-18）
+- [x] 盤點單次碳水克數、體重、運動強度、智慧能量倒數與路線補給份數的現有資料流
+- [x] 定義手動每小時碳水上限與科學建議模式的安全範圍、建議邏輯與資料語意；依據保存於 reports/carbohydrate-hourly-limit-evidence-2026-08-18.md
+- [x] 新增設定頁、持久化遷移與統一能量倒數模型，讓單次碳水與每小時上限共同決定下次提醒時間
+- [x] 建立模式、體重、單次份量、上限與倒數時間的回歸測試，完成品質驗證（TypeScript 0 errors；lint 0 warnings／0 errors；272 passed／1 skipped）

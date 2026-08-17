@@ -147,6 +147,8 @@ export interface BackgroundState {
     bikeWeightKg: number;
     sweatRateCalibrationMultiplier?: number;
     energyServingCarbohydrateG?: number;
+    energyCarbohydrateHourlyLimitMode?: "science" | "manual";
+    energyCarbohydrateHourlyLimitG?: number;
   };
   environment?: {
     temperatureC: number;
@@ -204,6 +206,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         environmentLoad: 0,
         weatherAvailable: Boolean(state.environment),
         energyServingCarbohydrateG: state.riderProfile?.energyServingCarbohydrateG,
+        energyCarbohydrateHourlyLimitMode: state.riderProfile?.energyCarbohydrateHourlyLimitMode,
+        energyCarbohydrateHourlyLimitG: state.riderProfile?.energyCarbohydrateHourlyLimitG,
       });
 
       const acceptedLocations: Array<{
@@ -395,6 +399,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
             environmentLoad: hydrationResult.environmentLoad,
             weatherAvailable: Boolean(state.environment),
             energyServingCarbohydrateG: profile.energyServingCarbohydrateG,
+            energyCarbohydrateHourlyLimitMode: profile.energyCarbohydrateHourlyLimitMode,
+            energyCarbohydrateHourlyLimitG: profile.energyCarbohydrateHourlyLimitG,
           });
             activeCalorieThreshold = latestSupplyPlan.calorieTriggerKcal;
             activeWaterThreshold = latestSupplyPlan.waterTriggerMl;
@@ -704,6 +710,18 @@ export async function updateBackgroundSmartSupplyChannels(params: {
       state.smartWaterCountdownStartedElapsedSec = elapsedSec;
       state.waterReminderSent = false;
     }
+    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+/** 騎乘中調整個人能量設定時，同步背景倒數模型；既有倒數維持至下一次確認才重算。 */
+export async function updateBackgroundRiderProfile(profile: NonNullable<BackgroundState["riderProfile"]>) {
+  try {
+    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+    if (!stateStr) return;
+    const state: BackgroundState = JSON.parse(stateStr);
+    if (!state.isRiding) return;
+    state.riderProfile = { ...state.riderProfile, ...profile };
     await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   } catch {}
 }

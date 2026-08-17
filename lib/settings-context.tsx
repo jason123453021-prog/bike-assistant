@@ -175,6 +175,10 @@ export interface AppSettings {
   touchGuardAutoRelockSec: number;
   /** 一包能量補給品可提供的碳水克數，供智慧能量倒數與路線攜帶規劃共用。 */
   energyServingCarbohydrateG: number;
+  /** 每小時碳水上限可由科學建議推導或由使用者手動設定。 */
+  energyCarbohydrateHourlyLimitMode: "science" | "manual";
+  /** 手動模式的每小時碳水上限；科學模式保留此值以便隨時切回手動。 */
+  energyCarbohydrateHourlyLimitG: number;
   // 背景 GPS 精度
   gpsAccuracy: "power_saving" | "standard" | "high_accuracy"; // 背景 GPS 更新頻率
   // 騎乘靜止後的完全自動省電定位：切換為低功耗監測，重新移動時自動恢復。
@@ -261,6 +265,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   touchGuardUnlockHoldMsSchemaVersion: 2,
   touchGuardAutoRelockSec: 3,
   energyServingCarbohydrateG: 25,
+  energyCarbohydrateHourlyLimitMode: "science",
+  energyCarbohydrateHourlyLimitG: 60,
   gpsAccuracy: "standard",
   idleAutoPauseEnabled: true,
   idleAutoPauseSeconds: 120,
@@ -416,6 +422,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           touchGuardAutoRelockSec: Math.min(60, Math.max(1, Number(saved.touchGuardAutoRelockSec) || DEFAULT_SETTINGS.touchGuardAutoRelockSec)),
           autoRecenterSec: Math.min(60, Math.max(3, Number(saved.autoRecenterSec) || DEFAULT_SETTINGS.autoRecenterSec)),
           energyServingCarbohydrateG: Math.min(100, Math.max(10, Number(saved.energyServingCarbohydrateG) || DEFAULT_SETTINGS.energyServingCarbohydrateG)),
+          energyCarbohydrateHourlyLimitMode: saved.energyCarbohydrateHourlyLimitMode === "manual" ? "manual" : "science",
+          energyCarbohydrateHourlyLimitG: Math.min(90, Math.max(20, Number(saved.energyCarbohydrateHourlyLimitG) || DEFAULT_SETTINGS.energyCarbohydrateHourlyLimitG)),
         };
         if (nextSettings.supplyEnergyTimeIntervalEnabled && nextSettings.supplyEnergyDistanceIntervalEnabled) {
           nextSettings.supplyEnergyDistanceIntervalEnabled = false;

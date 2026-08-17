@@ -51,4 +51,18 @@ describe("GPX route energy supply carry planning", () => {
     expect(smallServing.minimumServings).toBeGreaterThan(largeServing.minimumServings);
     expect(smallServing.maximumServings).toBeGreaterThan(largeServing.maximumServings);
   });
+
+  it("never plans more route carbohydrate per hour than the configured hourly ceiling", () => {
+    const capped = estimateRouteEnergySupplyCarry({
+      estimatedDurationSeconds: 3 * 60 * 60,
+      upperDurationSeconds: 4 * 60 * 60,
+      intensityFactor: 0.9,
+      totalAscentM: 1200,
+      distanceM: 60000,
+      energyCarbohydrateHourlyLimitG: 30,
+    });
+
+    expect(capped.factors).toContain("每小時碳水上限 30 g");
+    expect(capped.maximumCarbohydrateG).toBeLessThanOrEqual(Math.ceil(30 * (4 - 0.75) + 25));
+  });
 });

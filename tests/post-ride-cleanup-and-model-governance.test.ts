@@ -45,6 +45,8 @@ describe("post-ride cleanup and local model governance", () => {
       sweatRatePerHour: 850,
       environmentLoad: 0.4,
       weatherAvailable: true,
+      energyCarbohydrateHourlyLimitMode: "manual" as const,
+      energyCarbohydrateHourlyLimitG: 90,
     };
     const cycling = createSupplyPlan({ ...base, sportType: "cycling" });
     const hiking = createSupplyPlan({ ...base, sportType: "hiking" });
