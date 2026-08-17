@@ -39,7 +39,7 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const { settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
+  const { settings, updateSettings, resetAllSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
   const { state: rideState } = useRide();
   const autoPersonalMetrics = deriveAutoPersonalMetrics(rideState.records, {
     ftpW: settings.ftp,
@@ -139,6 +139,35 @@ export default function SettingsScreen() {
       { text: "取消", style: "cancel" },
       { text: "刪除", style: "destructive", onPress: () => deleteSupplyItem(id) },
     ]);
+  };
+
+  const handleResetAllSettings = () => {
+    Alert.alert(
+      "重設所有設定",
+      "這會恢復個人資料、補給、提醒、儀表板與省電偏好預設值。騎乘活動、軌跡與照片不會被刪除。",
+      [
+        { text: "取消", style: "cancel" },
+        {
+          text: "重設",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                await resetAllSettings();
+                const defaultPowerSavingSettings = await powerSavingManagerRef.current.resetSettings();
+                setPowerSavingSettings(defaultPowerSavingSettings);
+                setCollapsedSections({});
+                setEditModal({ visible: false, key: "", label: "", value: "", unit: "", isNumber: true });
+                closeSupplyModal();
+                Alert.alert("已恢復預設設定", "所有設定偏好已重設；騎乘活動與照片仍保留在本機。");
+              } catch {
+                Alert.alert("無法重設設定", "設定尚未變更，請稍後再試。");
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
 
   // 各區塊折疊狀態（預設全部展開）
@@ -1105,6 +1134,31 @@ export default function SettingsScreen() {
             </>
           );
         })()}
+
+        <View style={[styles.section, { borderColor: colors.border, marginTop: 24 }]}>
+          <Text style={{ fontSize: 15, fontWeight: "800", color: colors.foreground }}>設定管理</Text>
+          <Text style={{ fontSize: 12, lineHeight: 18, color: colors.muted, marginTop: 6 }}>
+            恢復個人資料、補給、提醒、儀表板與省電預設值；不會刪除騎乘活動、軌跡或照片。
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="重設所有設定"
+            onPress={handleResetAllSettings}
+            style={({ pressed }) => ({
+              marginTop: 14,
+              minHeight: 46,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: colors.error,
+              backgroundColor: pressed ? `${colors.error}24` : "transparent",
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: pressed ? 0.78 : 1,
+            })}
+          >
+            <Text style={{ color: colors.error, fontSize: 15, fontWeight: "800" }}>重設所有設定</Text>
+          </Pressable>
+        </View>
 
         {/* 版本號 */}
         <View style={{ alignItems: "center", paddingVertical: 20, paddingBottom: 8 /* internal spacing */ }}>

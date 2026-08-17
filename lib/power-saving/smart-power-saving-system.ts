@@ -26,6 +26,10 @@ const DEFAULT_SETTINGS: PowerSavingSettings = {
   normalBrightness: 0.8,
 };
 
+function createDefaultSettings(): PowerSavingSettings {
+  return { ...DEFAULT_SETTINGS };
+}
+
 const STORAGE_KEY = 'power_saving_settings';
 
 export class SmartPowerSavingManager {
@@ -67,6 +71,20 @@ export class SmartPowerSavingManager {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
     } catch (error) {
       console.error('[PowerSaving] Failed to save settings:', error);
+    }
+  }
+
+  /** 僅恢復省電偏好預設值，不影響任何騎乘活動或補給資料。 */
+  async resetSettings(): Promise<PowerSavingSettings> {
+    const next = createDefaultSettings();
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      this.settings = next;
+      await this.wakeUp();
+      return next;
+    } catch (error) {
+      console.error('[PowerSaving] Failed to reset settings:', error);
+      throw error;
     }
   }
 

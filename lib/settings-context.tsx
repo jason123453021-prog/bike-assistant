@@ -270,6 +270,17 @@ const DEFAULT_SETTINGS: AppSettings = {
   simplifiedModeFieldOrder: DEFAULT_SIMPLIFIED_FIELD_ORDER,
 };
 
+function createDefaultSettings(): AppSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    supplyItems: [],
+    normalModeFields: { ...DEFAULT_SETTINGS.normalModeFields },
+    simplifiedModeFields: { ...DEFAULT_SETTINGS.simplifiedModeFields },
+    normalModeFieldOrder: [...DEFAULT_SETTINGS.normalModeFieldOrder],
+    simplifiedModeFieldOrder: [...DEFAULT_SETTINGS.simplifiedModeFieldOrder],
+  };
+}
+
 const SETTINGS_KEY = "@bike_settings";
 export const TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION = 2;
 
@@ -291,6 +302,8 @@ export function migrateTouchGuardUnlockHoldMs(value: unknown, schemaVersion?: un
 interface SettingsContextValue {
   settings: AppSettings;
   updateSettings: (partial: Partial<AppSettings>) => Promise<void>;
+  /** 僅重設 @bike_settings 的偏好值；不會讀取、修改或刪除騎乘活動、軌跡或相片。 */
+  resetAllSettings: () => Promise<void>;
   updateNormalFields: (partial: Partial<NormalModeFields>) => Promise<void>;
   updateSimplifiedFields: (partial: Partial<SimplifiedModeFields>) => Promise<void>;
   updateFieldOrder: (order: NormalFieldKey[]) => Promise<void>;
@@ -303,7 +316,7 @@ interface SettingsContextValue {
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<AppSettings>(() => createDefaultSettings());
 
   useEffect(() => {
     AsyncStorage.getItem(SETTINGS_KEY).then((data) => {
@@ -441,6 +454,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   };
 
+  const resetAllSettings = async () => {
+    const next = createDefaultSettings();
+    // 只覆寫設定專用 key；騎乘活動、軌跡、相片與活動統計使用其他本機資料，不會被清除。
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+    setSettings(next);
+  };
+
   const updateNormalFields = async (partial: Partial<NormalModeFields>) => {
     const next = {
       ...settings,
@@ -503,7 +523,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem }}>
+    <SettingsContext.Provider value={{ settings, updateSettings, resetAllSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem }}>
       {children}
     </SettingsContext.Provider>
   );
