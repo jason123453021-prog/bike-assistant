@@ -554,9 +554,6 @@ export default function MapScreen() {
   const pendingWaterRef = useRef(false);
   const pendingSupplyPlansRef = useRef<Partial<Record<"calorie" | "water", SupplyPlan>>>({});
   const supplySnoozedUntilRef = useRef<Record<"calorie" | "water", number>>({ calorie: 0, water: 0 });
-  const lastAscentRef = useRef(0); // 用於判斷下坡狀態
-  const isDownhillRef = useRef(false);
-  const deferredSupplySpeechPlansRef = useRef<Partial<Record<"calorie" | "water", SupplyPlan>>>({});
   const rideStartLocationRef = useRef<{ lat: number; lon: number } | null>(null); // 記錄騎乘開始座標
   const lastTurnSpokenRef = useRef<number>(0); // 追蹤上次播報轉彎的時間
   // 轉彎指示增強狀態
@@ -731,7 +728,6 @@ export default function MapScreen() {
     pendingCalorieRef.current = false;
     pendingWaterRef.current = false;
     pendingSupplyPlansRef.current = {};
-    deferredSupplySpeechPlansRef.current = {};
   }, []);
   const clearIntervalSupplyRepeatTimer = useCallback(() => {
     if (intervalSupplyRepeatTimerRef.current) {
@@ -884,7 +880,6 @@ export default function MapScreen() {
     calorieReminderSentRef.current = false;
     pendingCalorieRef.current = false;
     delete pendingSupplyPlansRef.current.calorie;
-    delete deferredSupplySpeechPlansRef.current.calorie;
     const waterStillPending = pendingWaterRef.current || waterAlert;
     if (!waterStillPending) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.calorie = 0;
@@ -925,7 +920,6 @@ export default function MapScreen() {
     waterReminderSentRef.current = false;
     pendingWaterRef.current = false;
     delete pendingSupplyPlansRef.current.water;
-    delete deferredSupplySpeechPlansRef.current.water;
     const calorieStillPending = pendingCalorieRef.current || calorieAlert;
     if (!calorieStillPending) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.water = 0;
@@ -1239,33 +1233,12 @@ export default function MapScreen() {
   }, []);
 
   const speakPlannedSupplyReminder = useCallback(
-    (type: "calorie" | "water", recommendation?: SupplyPlan) => {
+    (type: "calorie" | "water") => {
       if (!settings.ttsEnabled) return;
-      if (isDownhillRef.current) {
-        if (recommendation) deferredSupplySpeechPlansRef.current[type] = recommendation;
-        return;
-      }
       void speakSupplyReminder(type, true);
     },
     [settings.ttsEnabled],
   );
-
-  const resumeDeferredSupplySpeech = useCallback(() => {
-    if (!settings.supplyReminderEnabled || isDownhillRef.current || !settings.ttsEnabled) return;
-    const now = Date.now();
-    const caloriePlan = deferredSupplySpeechPlansRef.current.calorie;
-    const waterPlan = deferredSupplySpeechPlansRef.current.water;
-    const caloriePending = Boolean(caloriePlan) && pendingCalorieRef.current && supplySnoozedUntilRef.current.calorie <= now;
-    const waterPending = Boolean(waterPlan) && pendingWaterRef.current && supplySnoozedUntilRef.current.water <= now;
-
-    if (caloriePending && caloriePlan) {
-      delete deferredSupplySpeechPlansRef.current.calorie;
-      void speakSupplyReminder("calorie", true);
-    } else if (waterPending && waterPlan) {
-      delete deferredSupplySpeechPlansRef.current.water;
-      void speakSupplyReminder("water", true);
-    }
-  }, [settings.supplyReminderEnabled, settings.ttsEnabled]);
 
   // ─── 補給提醒 ────────────────────────────────────────────────────────────────
   const triggerSupplyReminder = useCallback(
@@ -1286,7 +1259,7 @@ export default function MapScreen() {
       if (recommendation) pendingSupplyPlansRef.current[type] = recommendation;
       if ((type === "calorie" ? smartEnergySupplyEnabled : smartWaterSupplyEnabled)) void setBackgroundSupplyReminderPending(type, true);
       if (settings.vibrationEnabled) vibrateWarning();
-      speakPlannedSupplyReminder(type, recommendation);
+      speakPlannedSupplyReminder(type);
       if (settings.soundEnabled) {
         try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
       }
@@ -1332,9 +1305,9 @@ export default function MapScreen() {
           if (waterPending) setWaterAlert(true);
           // 重複音效與語音
           if (caloriePending) {
-            speakPlannedSupplyReminder("calorie", pendingSupplyPlansRef.current.calorie);
+            speakPlannedSupplyReminder("calorie");
           } else if (waterPending) {
-            speakPlannedSupplyReminder("water", pendingSupplyPlansRef.current.water);
+            speakPlannedSupplyReminder("water");
           }
           if (settings.vibrationEnabled) vibrateWarning();
           if (settings.soundEnabled) {
@@ -1352,7 +1325,6 @@ export default function MapScreen() {
       if (!settings.supplyReminderEnabled) return;
       if (!supplyItem.enabled) return;
       const target = supplyItem.target === "water" ? "water" : "calorie";
-      const pauseOnDownhill = target === "water" ? settings.waterPauseOnDownhill : settings.caloriePauseOnDownhill;
 
       // 初始化追蹤器
       if (!supplyItemsTrackerRef.current[supplyItem.id]) {
@@ -1368,16 +1340,6 @@ export default function MapScreen() {
       const tracker = supplyItemsTrackerRef.current[supplyItem.id];
       const currentTime = stateRef.current.elapsed;
       const currentDistance = stateRef.current.distance / 1000;
-
-      // 粗略判斷下坡：速度 > 25 km/h 且海拔不上升
-      const isDownhill = stateRef.current.currentSpeed > 25 && stateRef.current.totalAscent <= lastAscentRef.current;
-      // 更新最後海拔
-      lastAscentRef.current = stateRef.current.totalAscent;
-
-      if (pauseOnDownhill && isDownhill && !customSupplyAlertsRef.current[supplyItem.id]) {
-        // 下坡時暫停提醒但仍計數，不觸發提醒
-        return;
-      }
 
       // 根據觸發方式檢查是否應該觸發
       let shouldTrigger = false;
@@ -2105,33 +2067,19 @@ export default function MapScreen() {
           Animated.timing(calorieAnim, { toValue: calPct, duration: 500, useNativeDriver: false }).start();
           Animated.timing(waterAnim, { toValue: waterPct, duration: 500, useNativeDriver: false }).start();
 
-          // 檢查下坡狀態
-          const isDownhill = currentState.currentSpeed > 25 && currentState.totalAscent <= lastAscentRef.current;
-          lastAscentRef.current = currentState.totalAscent;
-          isDownhillRef.current = isDownhill;
-          if (!isDownhill) resumeDeferredSupplySpeech();
-
-          // 智慧模式改由倒數到期觸發；固定模式維持累積門檻相容行為。
+          // 智慧模式改由倒數到期觸發；提醒不因坡度而被延後或抑制。
           const calorieDue = settings.supplyReminderEnabled && isSmartEnergyMode
             && isSmartSupplyCountdownDue(nextCountdown, "calorie", currentState.elapsed);
           if (calorieDue && !calorieReminderSentRef.current && !pendingCalorieRef.current) {
-            if (settings.caloriePauseOnDownhill && isDownhill && !calorieAlert) {
-              // 下坡時暫停提醒，倒數與待確認狀態均保留。
-            } else {
-              calorieReminderSentRef.current = true;
-              triggerSupplyReminder("calorie", supplyPlan);
-            }
+            calorieReminderSentRef.current = true;
+            triggerSupplyReminder("calorie", supplyPlan);
           }
 
           const waterDue = settings.supplyReminderEnabled && isSmartWaterMode
             && isSmartSupplyCountdownDue(nextCountdown, "water", currentState.elapsed);
           if (waterDue && !waterReminderSentRef.current && !pendingWaterRef.current) {
-            if (settings.waterPauseOnDownhill && isDownhill && !waterAlert) {
-              // 下坡時暫停提醒，倒數與待確認狀態均保留。
-            } else {
-              waterReminderSentRef.current = true;
-              triggerSupplyReminder("water", supplyPlan);
-            }
+            waterReminderSentRef.current = true;
+            triggerSupplyReminder("water", supplyPlan);
           }
 
           // ── 自訂補給品觸發 ──
@@ -2419,7 +2367,6 @@ export default function MapScreen() {
           pendingCalorieRef.current = false;
           pendingWaterRef.current = false;
           pendingSupplyPlansRef.current = {};
-          deferredSupplySpeechPlansRef.current = {};
           supplySnoozedUntilRef.current = { calorie: 0, water: 0 };
           setSupplyRecommendedMl(undefined);
           setSupplyRecommendation(undefined);

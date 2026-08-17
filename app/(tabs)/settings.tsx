@@ -615,19 +615,6 @@ export default function SettingsScreen() {
               );
             })}
           </View>
-          <Divider colors={colors} />
-
-          {/* 補給提醒選項 */}
-          <View style={{ marginVertical: 8, opacity: supplyControlsDisabled ? 0.45 : 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>補給提醒選項</Text>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>長下坡暫停提醒</Text>
-                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>下坡時暫停提醒但仍計數（卡路里和水分）</Text>
-              </View>
-              <Switch disabled={supplyControlsDisabled} value={(settings.caloriePauseOnDownhill ?? false) || (settings.waterPauseOnDownhill ?? false)} onValueChange={(v) => updateSettings({ caloriePauseOnDownhill: v, waterPauseOnDownhill: v })} trackColor={{ false: colors.border, true: colors.primary }} />
-            </View>
-          </View>
         </View>}
 
         {/* ── 自訂補給品清單 ── */}

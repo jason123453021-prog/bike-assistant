@@ -74,8 +74,8 @@ describe("smart supply countdown UI", () => {
     expect(settingsSource).toContain("0 = 停用");
     expect(settingsSource).not.toContain("calorieRepeatUntilDismissed");
     expect(settingsSource).not.toContain("waterRepeatUntilDismissed");
-    expect(settingsSource).toContain("caloriePauseOnDownhill");
-    expect(settingsSource).toContain("waterPauseOnDownhill");
+    expect(settingsSource).not.toContain("PauseOnDownhill");
+    expect(settingsSource).not.toContain("長下坡暫停提醒");
     expect(settingsSource).not.toContain("testPreviewAlertSound");
     expect(settingsSource).not.toContain("testCustomSupplyFeedback");
     expect(settingsSource).not.toContain("testSupplySoundAndSpeech");

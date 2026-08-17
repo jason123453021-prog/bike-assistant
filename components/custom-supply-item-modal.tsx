@@ -176,7 +176,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
           <View style={styles.section}>
             <Text style={[styles.label, { color: colors.foreground }]}>整合提醒類別</Text>
             <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 4 }}>
-              通知、語音、震動、重複提醒與下坡暫停會沿用所選能量或補水的共用設定。
+              通知、語音、震動與重複提醒會沿用所選能量或補水的共用設定。
             </Text>
             <View style={[styles.segmentControl, { marginTop: 12 }]}>
               <Pressable

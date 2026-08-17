@@ -152,10 +152,8 @@ export interface AppSettings {
   supplyWaterDistanceIntervalKm: number;
   // 卡路里高級設定
   calorieAutoDismissSeconds?: number;    // 自動關閉延遲（秒）
-  caloriePauseOnDownhill?: boolean;      // 長下坡暫停提醒
   // 水分高級設定
   waterAutoDismissSeconds?: number;      // 自動關閉延遲（秒）
-  waterPauseOnDownhill?: boolean;        // 長下坡暫停提醒
   supplyItems: SupplyItem[];   // 自訂補給品清單
   // Feedback
   vibrationEnabled: boolean;
@@ -333,6 +331,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           supplyDistanceIntervalKm: legacyDistanceIntervalKm,
           calorieRepeatUntilDismissed: _legacyCalorieRepeatUntilDismissed,
           waterRepeatUntilDismissed: _legacyWaterRepeatUntilDismissed,
+          caloriePauseOnDownhill: _legacyCaloriePauseOnDownhill,
+          waterPauseOnDownhill: _legacyWaterPauseOnDownhill,
           ...savedWithoutRemovedSettings
         } = saved;
         const hasIndependentIntervalSettings = [

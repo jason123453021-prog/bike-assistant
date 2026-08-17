@@ -16,21 +16,19 @@ describe("smart supply speech reminders", () => {
     expect(feedbackSource).not.toContain("補給提醒，請補充水分");
   });
 
-  it("uses generic speech for initial, repeated, and recovered pending reminders while respecting ttsEnabled", () => {
+  it("uses generic speech for initial and repeated pending reminders while respecting ttsEnabled", () => {
     expect(mapSource).toContain("if (!settings.ttsEnabled) return");
-    expect(mapSource).toContain("speakPlannedSupplyReminder(type, recommendation)");
+    expect(mapSource).toContain("speakPlannedSupplyReminder(type)");
     expect(mapSource).toContain("pendingSupplyPlansRef.current[type] = recommendation");
-    expect(mapSource).toContain('speakPlannedSupplyReminder("calorie", pendingSupplyPlansRef.current.calorie)');
-    expect(mapSource).toContain('speakPlannedSupplyReminder("water", pendingSupplyPlansRef.current.water)');
+    expect(mapSource).toContain('speakPlannedSupplyReminder("calorie")');
+    expect(mapSource).toContain('speakPlannedSupplyReminder("water")');
   });
 
-  it("defers only supply speech while downhill and resumes one still-pending reminder after the descent", () => {
-    expect(mapSource).toContain("const isDownhillRef = useRef(false)");
-    expect(mapSource).toContain("const deferredSupplySpeechPlansRef");
-    expect(mapSource).toContain("if (isDownhillRef.current)");
-    expect(mapSource).toContain("deferredSupplySpeechPlansRef.current[type] = recommendation");
-    expect(mapSource).toContain("const resumeDeferredSupplySpeech = useCallback");
-    expect(mapSource).toContain("if (!isDownhill) resumeDeferredSupplySpeech()");
+  it("does not defer supply speech or reminders according to downhill state", () => {
+    expect(mapSource).not.toContain("isDownhillRef");
+    expect(mapSource).not.toContain("deferredSupplySpeechPlansRef");
+    expect(mapSource).not.toContain("resumeDeferredSupplySpeech");
+    expect(mapSource).not.toContain("PauseOnDownhill");
   });
 
   it("passes through the centralized speech guard so a system call interruption suppresses supply speech", () => {
@@ -39,7 +37,7 @@ describe("smart supply speech reminders", () => {
   });
 
   it("does not read custom supply names, confirmation text, smart-plan reasons, quantities, or interval details aloud", () => {
-    expect(mapSource).toContain('void speakSupplyReminder("calorie", true)');
+    expect(mapSource).toContain('speakPlannedSupplyReminder("calorie")');
     expect(mapSource).not.toContain("speak(`請補給 ${supplyItem.name}`)");
     expect(mapSource).not.toContain('speak("已確認補給")');
     expect(feedbackSource).toContain('return type === "calorie" ? "請補給能量" : "請補給水分"');

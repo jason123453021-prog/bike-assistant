@@ -1987,3 +1987,9 @@
 - [x] 診斷 Android Expo Go 顯示「Failed to download remote update」時的外部 manifest、更新 URL、TLS 與 Android bundle 可達性
 - [x] 修正可重現的開發服務或 Expo 更新設定，並提供手機端完整重新載入步驟
 - [x] 在 Metro 啟動後預先編譯 Android Hermes bundle，避免 Expo Go 首次請求等待冷啟動編譯而逾時；外部 launch bundle HTTP 200、暖機回應約 0.38 秒
+
+## 移除長下坡暫停提醒（2026-08-18）
+- [x] 盤點「長下坡暫停提醒」在設定頁、設定模型、前景與背景補給流程及回歸測試中的使用位置
+- [x] 移除設定頁開關與持久化欄位，相容忽略既有本機資料
+- [x] 移除下坡期間延後、禁止或恢復補給提醒的守門邏輯，維持一般提醒不受坡度影響
+- [x] 完成型別、lint、回歸測試與開發服務驗證（TypeScript 0 errors；lint 0 warnings／0 errors；263 passed／1 skipped）
