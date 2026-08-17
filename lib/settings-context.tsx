@@ -161,6 +161,8 @@ export interface AppSettings {
   // 精簡導航模式
   simplifiedNavMode: "off" | "manual" | "auto"; // off=關閉, manual=手動, auto=自動
   simplifiedNavIdleSec: number; // 自動模式開啟前的閒置秒數（預設 30 秒）
+  /** 使用者平移或旋轉地圖後，多久自動回到目前位置；不改變使用者選擇的方向。 */
+  autoRecenterSec: number;
   // 騎乘防誤觸：鎖定時仍可直接閱讀資訊，僅阻擋地圖與控制誤觸
   touchGuardEnabled: boolean;
   /** 長按此毫秒數後解除騎乘防誤觸；設定頁僅提供 400、800、1200 ms。 */
@@ -249,6 +251,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   notificationEnabled: true,
   simplifiedNavMode: "off",
   simplifiedNavIdleSec: 30,
+  autoRecenterSec: 12,
   touchGuardEnabled: true,
   touchGuardUnlockHoldMs: DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
   touchGuardUnlockHoldMsSchemaVersion: 2,
@@ -382,6 +385,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           touchGuardUnlockHoldMs: migratedUnlockHoldMs,
           touchGuardUnlockHoldMsSchemaVersion: TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION,
           touchGuardAutoRelockSec: Math.min(60, Math.max(1, Number(saved.touchGuardAutoRelockSec) || DEFAULT_SETTINGS.touchGuardAutoRelockSec)),
+          autoRecenterSec: Math.min(60, Math.max(3, Number(saved.autoRecenterSec) || DEFAULT_SETTINGS.autoRecenterSec)),
           energyServingCarbohydrateG: Math.min(100, Math.max(10, Number(saved.energyServingCarbohydrateG) || DEFAULT_SETTINGS.energyServingCarbohydrateG)),
         };
         if (nextSettings.supplyEnergyTimeIntervalEnabled && nextSettings.supplyEnergyDistanceIntervalEnabled) {

@@ -28,12 +28,11 @@ describe("app health guardrails", () => {
     expect(mapSource).toContain('if (!savedRecordId) throw new Error("活動記錄未建立")');
   });
 
-  it("releases late GPS and heading subscriptions instead of retaining listeners after unmount", () => {
+  it("releases late GPS subscriptions and does not retain a removed heading listener after unmount", () => {
     expect(mapSource).toContain("let locationSubscription: Location.LocationSubscription | null = null");
-    expect(mapSource).toContain("let headingSubscription: Location.LocationSubscription | null = null");
     expect(mapSource).toContain("if (!active) {\n        sub.remove();\n        return;");
     expect(mapSource).toContain("locationSubscription?.remove();");
-    expect(mapSource).toContain("headingSubscription?.remove();");
+    expect(mapSource).not.toContain("watchHeadingAsync");
   });
 
   it("keeps custom supply tracker data explicit and removes high-frequency supply debug logs", () => {

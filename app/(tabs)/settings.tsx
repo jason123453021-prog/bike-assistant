@@ -879,6 +879,39 @@ export default function SettingsScreen() {
           )}
         </View>}
 
+        {/* ── 地圖互動 ── */}
+        <SectionHeader title="地圖互動" colors={colors} onToggle={() => toggleSection("mapInteraction")} collapsed={collapsedSections["mapInteraction"]} />
+        {!collapsedSections["mapInteraction"] && <View style={[styles.section, { borderColor: colors.border }]}> 
+          <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={{ fontSize: 15, color: colors.foreground }}>回歸目前位置時間</Text>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
+                  拖動或雙指旋轉地圖後，等待此時間才自動置中；會保留你選擇的地圖方向。
+                </Text>
+              </View>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.primary }}>
+                {settings.autoRecenterSec} 秒
+              </Text>
+            </View>
+            <Slider
+              style={{ width: "100%", height: 36 }}
+              minimumValue={3}
+              maximumValue={60}
+              step={1}
+              value={settings.autoRecenterSec}
+              onValueChange={(value) => updateSettings({ autoRecenterSec: Math.round(value) })}
+              minimumTrackTintColor={colors.primary}
+              maximumTrackTintColor={colors.border}
+              thumbTintColor={colors.primary}
+            />
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ fontSize: 11, color: colors.muted }}>3 秒</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>60 秒</Text>
+            </View>
+          </View>
+        </View>}
+
         {/* ── 導航儀表板欄位（拖曳排序 + 開關） ── */}
         {/* 導航儀表板欄位標題 + 恢復預設按鈕 */}
         <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 /* internal spacing */ }}>

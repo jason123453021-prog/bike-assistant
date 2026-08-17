@@ -117,6 +117,7 @@ import {
   type SmartSupplyCountdown,
 } from "@/lib/smart-supply-countdown";
 import { deriveAutomaticSweatCalibration } from "@/lib/supply-calibration";
+import { shouldRestoreBackgroundSupplyReminder } from "@/lib/background-supply-recovery";
 import {
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
@@ -138,12 +139,6 @@ import { SupplyModal } from "@/components/supply-modal";
 import { RideSummaryModal } from "@/components/ride-summary-modal";
 import { SimplifiedNavOverlay } from "@/components/simplified-nav-overlay";
 import { EmotionalUXManager } from "@/lib/emotional-ux";
-import {
-  type CompassData,
-  type GPSVector,
-  getFinalDirection,
-  stabilizeMapHeading,
-} from "@/lib/compass-gps-optimizer";
 import {
   addTrackPoint,
   completeRideSession,
@@ -171,7 +166,7 @@ import {
   hasExistingNavigationLayers,
   type PinnedNavigationLayer,
 } from "@/lib/pinned-navigation-layers";
-import { shouldTrackRideHeading, shouldTrackRideLocation } from "@/lib/ride-tracking-lifecycle";
+import { shouldTrackRideLocation } from "@/lib/ride-tracking-lifecycle";
 import { shouldEnterIdleMonitor, shouldResumeFromIdleMonitor, type RideLocationTrackingMode } from "@/lib/idle-auto-pause";
 import { shouldSuppressRideAudioForSystemInterruption } from "@/lib/ride-audio-interruption";
 import {
@@ -197,7 +192,6 @@ const TURN_ANGLE_DEG = 30;
 const AUTO_PAUSE_RESUME_THRESHOLD = 3; // 自動恢復速度閾值（km/h）- 高於暫停閾值，避免頻繁切換
 const WEATHER_INTERVAL = 10 * 60 * 1000;
 const LOCATION_INTERVAL_SEC = 3;
-const AUTO_RECENTER_AFTER_INTERACTION_MS = 12_000;
 
 type CustomSupplyTracker = {
   lastTriggerTime: number;
@@ -315,8 +309,8 @@ export default function MapScreen() {
       // 不傳入 zoom，也不修改 bearing：保留使用者手動調整的縮放與角度。
       mapRef.current?.animateCamera({ center: { latitude: position.lat, longitude: position.lon } }, { duration: 350 });
       setFollowUser(true);
-    }, AUTO_RECENTER_AFTER_INTERACTION_MS);
-  }, []);
+    }, settings.autoRecenterSec * 1000);
+  }, [settings.autoRecenterSec]);
 
   const flushRecoverySnapshot = useCallback(async () => {
     if (recoverySnapshotTimerRef.current) {
@@ -351,10 +345,7 @@ export default function MapScreen() {
     void flushRecoverySnapshot();
   }, [flushRecoverySnapshot]);
 
-  // 導航固定採車頭朝前：以行進方向優先、低速時以平滑羅盤輔助。
-  const headingUp = true;
-  // 俯視角設定（0-60 度）
-  const [mapPitch, setMapPitch] = useState(0);
+  // 地圖方向完全交由使用者雙指旋轉控制；定位只更新箭頭方向，不再旋轉整張地圖。
 
   // 功率平滑：5 點滑動平均
   const powerWindowRef = useRef<number[]>([]);
@@ -390,7 +381,7 @@ export default function MapScreen() {
   const [navInstruction, setNavInstruction] = useState<string>("");
   const [distToEnd, setDistToEnd] = useState<number | null>(null);
   const arrivedRef = useRef(false);
-  // 釘選 OSRM 路徑一律採自行車道優先；不提供偏離後自動重新規劃。
+  // 路線服務會比較自行車道優先與一般道路候選路徑，避免不合理繞路。
   const preferCycleway = true;
 
   useEffect(() => {
@@ -449,34 +440,15 @@ export default function MapScreen() {
   });
   const prevSpeedMsRef = useRef<number>(0); // 用於計算加速阻力
   const headingRef = useRef<number>(0);
-  // 車頭朝前精度改善：自適應循環平均（消除 GPS heading 抖動）
-  // 低速時用 11 點平均（更平滑），高速時用 7 點平均（更靈敏）
+  // GPS 航向自適應循環平均：只用於位置箭頭與風向計算，不控制地圖角度。
   const headingWindowRef = useRef<number[]>([]);
   // 上一個 GPS 位置（用於低速時計算方位角）
   const prevGpsForBearingRef = useRef<{ lat: number; lon: number } | null>(null);
-  // 地圖旋轉動畫（平滑過渡）
-  const targetBearingRef = useRef<number>(0);
-  const lastMapBearingRef = useRef<number>(0);
   const lastFollowCameraCenterRef = useRef<{ lat: number; lon: number } | null>(null);
 
   // 騎乘狀態與背景監聽
   const [mapRideActive, setMapRideActive] = useState(false);
   const [isAppForeground, setIsAppForeground] = useState(true);
-
-  const applyResponsiveMapBearing = useCallback((nextHeading: number) => {
-    if (!headingUp || !mapRideActive || stateRef.current.status !== "active") return;
-    let angleDiff = nextHeading - lastMapBearingRef.current;
-    if (angleDiff > 180) angleDiff -= 360;
-    if (angleDiff < -180) angleDiff += 360;
-    if (Math.abs(angleDiff) < 4) return;
-
-    // 小幅路徑修正緩慢追隨；可信 GPS 顯示真正轉彎時則快速跟上。
-    const followFactor = Math.abs(angleDiff) >= 25 ? 0.78 : stateRef.current.currentSpeed >= 12 ? 0.52 : 0.4;
-    const nextBearing = (lastMapBearingRef.current + angleDiff * followFactor + 360) % 360;
-    targetBearingRef.current = nextHeading;
-    lastMapBearingRef.current = nextBearing;
-    mapRef.current?.setBearing(nextBearing, true);
-  }, [headingUp, mapRideActive]);
 
   useEffect(() => {
     if (!mapRideActive || !sportTrackingPolicy.autoPause.requiresStillness) {
@@ -581,9 +553,6 @@ export default function MapScreen() {
   const deferredSupplySpeechPlansRef = useRef<Partial<Record<"calorie" | "water", SupplyPlan>>>({});
   const rideStartLocationRef = useRef<{ lat: number; lon: number } | null>(null); // 記錄騎乘開始座標
   const lastTurnSpokenRef = useRef<number>(0); // 追蹤上次播報轉彎的時間
-  // 電子羅盤訂閱 ref
-  const compassHeadingRef = useRef<CompassData | null>(null);
-  const headingSubRef = useRef<Location.LocationSubscription | null>(null);
   // 轉彎指示增強狀態
   const [turnDirection, setTurnDirection] = useState<'left' | 'right' | 'arrive' | null>(null);
   const [turnDistanceM, setTurnDistanceM] = useState<number>(0);
@@ -614,7 +583,10 @@ export default function MapScreen() {
     setActiveNavigationRoute(null);
     setNearestIdx(0);
     setIsNavigating(false);
-    setMapRideActive(false);
+    // 清除導航圖層不等於結束騎乘；騎乘中的 GPS、計時與累計資料必須持續。
+    if (stateRef.current.status === "idle" || stateRef.current.status === "finished") {
+      setMapRideActive(false);
+    }
     setDistToEnd(null);
     setNavInstruction("");
     setPinnedLocation(null);
@@ -635,6 +607,7 @@ export default function MapScreen() {
       setPinnedNavigationLayers((previous) => applyPinnedNavigationDecision(previous, nextLayer, clearExisting));
       setActiveNavigationRoute(route);
       setIsNavigating(true);
+      // 這只啟用地圖追蹤，絕不可 dispatch START／RESET；既有騎乘必須維持原計時與累計。
       setMapRideActive(true);
       setFollowUser(true);
       setNearestIdx(0);
@@ -902,7 +875,7 @@ export default function MapScreen() {
     if (!waterStillPending) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.calorie = 0;
     void acknowledgeBackgroundSupplyReminder("calorie");
-    void clearSmartSupplyDueNotification("calorie");
+    void clearAllSupplyNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!waterStillPending) clearSupplyRepeatTimer();
   }, [calorieAnim, clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, syncSmartSupplyCountdown, waterAlert]);
@@ -943,7 +916,7 @@ export default function MapScreen() {
     if (!calorieStillPending) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.water = 0;
     void acknowledgeBackgroundSupplyReminder("water");
-    void clearSmartSupplyDueNotification("water");
+    void clearAllSupplyNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!calorieStillPending) clearSupplyRepeatTimer();
   }, [calorieAlert, clearSupplyRepeatTimer, dispatch, settings.supplyCalculationMode, settings.vibrationEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
@@ -1729,22 +1702,8 @@ export default function MapScreen() {
           let rawHdg = heading ?? -1;
           const locationAccuracyM = loc.coords.accuracy;
           const gpsHeadingValid = rawHdg >= 0 && speedKmhRaw >= 7 && locationAccuracyM !== null && locationAccuracyM !== undefined && locationAccuracyM <= 35;
-          const compassData = compassHeadingRef.current;
-          const compassValid = compassData && compassData.accuracy < 30 && (Date.now() - compassData.timestamp < 2000);
-
-          if (headingUp && compassValid && gpsHeadingValid) {
-            // 穩定行進時 getFinalDirection 會優先選擇 GPS 行進向量。
-            const gpsVec: GPSVector = { bearing: rawHdg, accuracy: locationAccuracyM, speed: (speed ?? 0), timestamp: Date.now() };
-            const result = getFinalDirection(compassData, gpsVec);
-            rawHdg = result.heading;
-          } else if (headingUp && compassValid && !gpsHeadingValid) {
-            // 低速或低精度時保持最後可信行進方向，不以手持裝置朝向轉動地圖。
-            rawHdg = headingRef.current;
-          } else if (gpsHeadingValid) {
-            // GPS heading 有效，直接使用
-            // rawHdg 已是 GPS heading
-          } else {
-            // 低速且羅盤不可用：用兩點 bearing
+          if (!gpsHeadingValid) {
+            // 低速或低精度時，以可靠的連續 GPS 位置估算箭頭航向。
             const prev = prevGpsForBearingRef.current;
             if (prev) {
               const d = haversine(prev.lat, prev.lon, latitude, longitude);
@@ -1759,7 +1718,7 @@ export default function MapScreen() {
           }
           // 更新 GPS 位置參考點
           prevGpsForBearingRef.current = { lat: latitude, lon: longitude };
-          // 自適應循環平均：縮短窗口以提升轉彎反應；低速仍保留少量平均防止原地抖動。
+          // 自適應循環平均：只平滑箭頭航向，不改變地圖方向。
           const windowSize = speedKmhRaw >= 20 ? 3 : speedKmhRaw >= 12 ? 4 : 5;
           headingWindowRef.current.push(rawHdg);
           if (headingWindowRef.current.length > windowSize) headingWindowRef.current.shift();
@@ -1774,32 +1733,13 @@ export default function MapScreen() {
             const movementSinceCamera = previousCenter
               ? haversineDistance(previousCenter.lat, previousCenter.lon, latitude, longitude)
               : Number.POSITIVE_INFINITY;
-            // 車頭朝前只在確實前進一段距離後移動鏡頭，避免每次定位與旋轉動畫相互競爭。
-            const recenterThresholdM = headingUp ? 14 : 8;
-            if (movementSinceCamera >= recenterThresholdM) {
+            if (movementSinceCamera >= 8) {
               lastFollowCameraCenterRef.current = { lat: latitude, lon: longitude };
               mapRef.current?.animateCamera(
                 { center: { latitude, longitude }, zoom: 17 },
-                { duration: headingUp ? 420 : 280 },
+                { duration: 280 },
               );
             }
-          }
-          // 車頭朝前僅在可信 GPS 行進方向通過死區與旋轉上限後更新，避免畫面抖動。
-          const currentState0 = stateRef.current;
-          if (headingUp && currentState0.status === "active") {
-            const stabilizedBearing = stabilizeMapHeading(hdg, lastMapBearingRef.current, speedKmhRaw, locationAccuracyM);
-            if (stabilizedBearing !== null) applyResponsiveMapBearing(stabilizedBearing);
-            // 根據速度動態設定俯視角（速度越快，俯視角越小）
-            // 低速時保持平視（0°），高速時逐漸增加俯視角
-            const pitch = speedKmhRaw >= 5 ? Math.max(0, Math.min(45, (speedKmhRaw - 5) * 1.2)) : 0;
-            if (Math.abs(pitch - mapPitch) > 1) {
-              setMapPitch(pitch);
-              mapRef.current?.setPitch(pitch);
-            }
-          } else if (headingUp && mapPitch > 0) {
-            // 速度不足或非車頭朝前模式時恢復上下俯視
-            setMapPitch(0);
-            mapRef.current?.setPitch(0);
           }
 
           const wd = windDataRef.current;
@@ -2192,46 +2132,6 @@ export default function MapScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [followUser, mapRideActive, isNavigating, gpxRoute, rideLocationTrackingMode, settings]);
 
-  // ─── 電子羅盤訂閱（只在騎乘中的車頭朝前模式啟用）────────────────────────────────────────
-  useEffect(() => {
-    if (!shouldTrackRideHeading(mapRideActive, headingUp)) {
-      // 待機或非車頭朝前模式時不訂閱羅盤，節省電量
-      headingSubRef.current?.remove();
-      headingSubRef.current = null;
-      return;
-    }
-    let active = true;
-    let headingSubscription: Location.LocationSubscription | null = null;
-    (async () => {
-      try {
-        const sub = await Location.watchHeadingAsync((heading) => {
-          if (!active) return;
-          const nextHeading = heading.trueHeading >= 0 ? heading.trueHeading : heading.magHeading;
-          const compassData: CompassData = {
-            heading: nextHeading,
-            accuracy: heading.accuracy ?? 999,
-            timestamp: Date.now(),
-          };
-          compassHeadingRef.current = compassData;
-          // 不直接由羅盤回呼旋轉地圖：手機微振、磁干擾與 GPS 回呼競爭會導致車頭朝前嚴重晃動。
-        });
-        if (!active) {
-          sub.remove();
-          return;
-        }
-        headingSubscription = sub;
-        headingSubRef.current = sub;
-      } catch {
-        // 羅盤不可用（例如 Web 平台）時保留 GPS 航向，不中斷騎乘流程。
-      }
-    })();
-    return () => {
-      active = false;
-      headingSubscription?.remove();
-      if (headingSubRef.current === headingSubscription) headingSubRef.current = null;
-    };
-  }, [headingUp, mapRideActive]);
-
   // ─── GPX 導航邏輯 ────────────────────────────────────────────────────────────
   const handleNavigation = useCallback(
     (lat: number, lon: number, speedMs: number) => {
@@ -2544,7 +2444,7 @@ export default function MapScreen() {
                     id: savedRecordId,
                     date: Date.now(),
                     duration: stateRef.current.elapsed,
-                    movingTime: Math.max(0, stateRef.current.elapsed - stateRef.current.totalPausedSec),
+                    movingTime: stateRef.current.elapsed,
                     totalSweatMl: stateRef.current.totalSweatMl,
                     avgPower: stateRef.current.avgPower,
                     avgSpeed: stateRef.current.avgSpeed,
@@ -2648,20 +2548,31 @@ export default function MapScreen() {
             const smartWaterDue = bgState.supplyCalculationMode === "smart"
               && typeof bgState.smartWaterCountdownDurationSec === "number"
               && backgroundElapsedSec >= (bgState.smartWaterCountdownStartedElapsedSec ?? 0) + bgState.smartWaterCountdownDurationSec;
-            if (bgState.calorieReminderSent || smartCalorieDue || pendingCalorieRef.current) {
+            // 只有背景有尚未處理的新到期提醒時才重新開啟彈窗；前景已確認後的 ref
+            // 不得成為重複彈窗來源，否則每次背景返回都會重新顯示。
+            if (shouldRestoreBackgroundSupplyReminder({
+              persistedPending: bgState.calorieReminderSent,
+              countdownDue: smartCalorieDue,
+              pendingInForeground: pendingCalorieRef.current,
+            })) {
               calorieReminderSentRef.current = true;
               pendingCalorieRef.current = true;
               setCalorieAlert(true);
               void setBackgroundSupplyReminderPending("calorie", true);
             }
-            if (bgState.waterReminderSent || smartWaterDue || pendingWaterRef.current) {
+            if (shouldRestoreBackgroundSupplyReminder({
+              persistedPending: bgState.waterReminderSent,
+              countdownDue: smartWaterDue,
+              pendingInForeground: pendingWaterRef.current,
+            })) {
               waterReminderSentRef.current = true;
               pendingWaterRef.current = true;
               setWaterAlert(true);
               void setBackgroundSupplyReminderPending("water", true);
             }
           }
-          if (settings.supplyReminderEnabled && bgState && bgState.supplyReminderEnabled !== false && bgTrack.length > 0) {
+          // 軌跡恢復與補給提醒是獨立功能；即使使用者關閉提醒，也必須恢復鎖定期間的軌跡。
+          if (bgState && bgTrack.length > 0) {
             // 只合併尚未同步的背景點，並再次套用品質檢核，防止鎖定期間的延遲批次產生跨區直線。
             const newPoints = filterTrackPointBatch(
               bgTrack
@@ -2706,7 +2617,9 @@ export default function MapScreen() {
               // 更新最大同步時間戳
               lastBgSyncTsRef.current = Math.max(...newPoints.map((point) => point.timestamp));
             }
-            console.log(`[AppState] 已合併 ${newPoints.length}/${bgTrack.length} 個背景軌跡點（去重後）`);
+            
+          }
+          if (settings.supplyReminderEnabled && bgState && bgState.supplyReminderEnabled !== false) {
             const restoredIntervalAlerts: Partial<Record<SupplyIntervalKind, boolean>> = {
               "energy-time": bgState.intervalEnergyTimeReminderSent || false,
               "energy-distance": bgState.intervalEnergyDistanceReminderSent || false,
@@ -3029,7 +2942,7 @@ export default function MapScreen() {
           }
         }}
         kilometersMarkers={kilometersMarkers}
-        onMapMoveEnd={scheduleAutoRecenter}
+        onMapRotateEnd={() => scheduleAutoRecenter()}
       />
 
       {pinSelectMode && (

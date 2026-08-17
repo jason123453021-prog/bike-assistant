@@ -123,8 +123,9 @@ describe("smart supply countdown UI", () => {
   it("restores background or lock-screen overdue reminders on foreground without requiring new GPS points", () => {
     expect(mapSource).toContain("const smartCalorieDue = bgState.supplyCalculationMode === \"smart\"");
     expect(mapSource).toContain("const smartWaterDue = bgState.supplyCalculationMode === \"smart\"");
-    expect(mapSource).toContain("bgState.calorieReminderSent || smartCalorieDue || pendingCalorieRef.current");
-    expect(mapSource).toContain("bgState.waterReminderSent || smartWaterDue || pendingWaterRef.current");
+    expect(mapSource).toContain("shouldRestoreBackgroundSupplyReminder");
+    expect(mapSource).toContain("pendingInForeground: pendingCalorieRef.current");
+    expect(mapSource).toContain("pendingInForeground: pendingWaterRef.current");
     expect(mapSource).toContain("updateBackgroundSmartSupplyCountdown");
     expect(mapSource).toContain("setBackgroundSupplyReminderPending");
   });
@@ -136,7 +137,6 @@ describe("smart supply countdown UI", () => {
     expect(feedbackSource).toContain('channelId: "supply"');
     expect(mapSource).toContain('scheduleSmartSupplyDueNotification(\n        "calorie"');
     expect(mapSource).toContain('scheduleSmartSupplyDueNotification(\n        "water"');
-    expect(mapSource).toContain('clearSmartSupplyDueNotification("calorie")');
-    expect(mapSource).toContain('clearSmartSupplyDueNotification("water")');
+    expect(mapSource).toContain("void clearAllSupplyNotifications();");
   });
 });

@@ -95,6 +95,8 @@ export interface LeafletMapProps {
   centerPinLocation?: { lat: number; lon: number } | null;
   onMapCenterChanged?: (lat: number, lon: number) => void;
   onMapMoveEnd?: (bounds: { northEast: { lat: number; lon: number }; southWest: { lat: number; lon: number } }) => void;
+  /** 使用者完成雙指旋轉後回報目前 bearing；相機置中不得覆寫此方向。 */
+  onMapRotateEnd?: (bearing: number) => void;
   kilometersMarkers?: KilometerMarker[];
   photoMarkers?: PhotoMapMarker[];
   onPhotoMarkerPress?: (id: string) => void;
@@ -416,6 +418,16 @@ map.on('zoomend', function() {
   }
 });
 
+// 定位更新與置中只移動相機，不旋轉地圖；此事件僅回報使用者雙指旋轉的結果。
+map.on('rotateend', function() {
+  if (window.ReactNativeWebView && typeof map.getBearing === 'function') {
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'mapRotateEnd',
+      bearing: map.getBearing()
+    }));
+  }
+});
+
 // Long press detection (700ms hold)
 var longPressTimer = null;
 var longPressStart = null;
@@ -507,12 +519,6 @@ function handleMessage(data) {
             zIndexOffset: 1000,
           }).addTo(map);
         }
-        // 車頭朝前模式：同步地圖方向
-        if (headingUpMode && msg.heading !== undefined && msg.heading !== null) {
-          if (typeof map.setBearing === 'function') {
-            map.setBearing(msg.heading);
-          }
-        }
         if (msg.follow) {
           map.setView([lat, lon], map.getZoom(), { animate: true, duration: 0.5 });
         }
@@ -555,24 +561,9 @@ function handleMessage(data) {
         map.setView([msg.lat, msg.lon], msg.zoom || map.getZoom(), { animate: true, duration: 0.6 });
         break;
       case 'setBearing':
-        // Use leaflet-rotate plugin's native setBearing API
-        var deg = msg.bearing || 0;
-        headingUpMode = msg.headingUp;
-        currentBearing = deg;
-        if (msg.headingUp) {
-          // Rotate the map so vehicle heading points up
-          if (typeof map.setBearing === 'function') {
-            map.setBearing(deg);
-          }
-          // Update position marker with direction arrow
-          updatePosMarkerWithHeading(deg);
-        } else {
-          // Reset to north-up
-          if (typeof map.setBearing === 'function') {
-            map.setBearing(0);
-          }
-          updatePosMarkerWithHeading(null);
-        }
+        // 舊版呼叫端仍可傳送此訊息，但不得覆寫使用者以雙指選擇的地圖方向。
+        headingUpMode = false;
+        currentBearing = typeof map.getBearing === 'function' ? map.getBearing() : 0;
         break;
       case 'fitToCoordinates':
         if (msg.coords && msg.coords.length > 0) {
@@ -738,6 +729,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       onMapCenterChanged,
       kilometersMarkers,
       onMapMoveEnd,
+      onMapRotateEnd,
       photoMarkers,
       onPhotoMarkerPress,
     },
@@ -957,6 +949,9 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             northEast: { lat: msg.northEast.lat, lon: msg.northEast.lon },
             southWest: { lat: msg.southWest.lat, lon: msg.southWest.lon },
           });
+        } else if (msg.type === "mapRotateEnd" && typeof msg.bearing === "number") {
+          followUserRef.current = false;
+          onMapRotateEnd?.(msg.bearing);
         } else if (msg.type === "photoMarkerPress" && typeof msg.id === "string") {
           onPhotoMarkerPress?.(msg.id);
         }

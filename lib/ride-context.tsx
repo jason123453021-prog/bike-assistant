@@ -3,7 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { analyzeTraining, estimateFTP } from "./tss-calc";
 import { calculatePersonalBests, type PersonalBest } from "./personal-bests";
 import { normalizeRideRecord, normalizeRideRecords } from "./ride-record-normalizer";
-import { estimateAutomaticRpe } from "./automatic-rpe";
+import { estimateAutomaticRpe } from "@/lib/automatic-rpe";
+import { buildRideTimeTotals, calculatePausedSeconds } from "@/lib/ride-time-accounting";
 import type { SportType } from "./sport-metrics";
 
 export type { SportType } from "./sport-metrics";
@@ -191,6 +192,8 @@ export interface RideState {
   totalPausedSec: number;
   /** 暫停開始時間戳（ms），用於計算本次暫停時間 */
   pauseStartTime: number | null;
+  /** 本次暫停開始前已累積的暫停秒數，避免前景計時與恢復時計算重複相加。 */
+  pauseStartPausedSec: number | null;
 
   // 坡度區間統計
   /** 坡度區間距離統計 [1-5%, 6-10%, 11-15%, 16-20%, 21-25%, 26%+] */
@@ -265,6 +268,7 @@ const initialState: RideState = {
   records: [],
   totalPausedSec: 0,
   pauseStartTime: null,
+  pauseStartPausedSec: null,
   totalCalories: 0,
   gradeDistribution: [0, 0, 0, 0, 0, 0],
   gradeAscentDistribution: [0, 0, 0, 0, 0, 0],
@@ -290,15 +294,21 @@ function rideReducer(state: RideState, action: RideAction): RideState {
         currentSpeed: 0,   // 暫停時速度歸零
         currentPower: 0,   // 暫停時瓦數歸零
         pauseStartTime: Date.now(),
+        pauseStartPausedSec: state.totalPausedSec,
       };
 
     case "RESUME": {
-      const pausedMs = state.pauseStartTime ? Date.now() - state.pauseStartTime : 0;
       return {
         ...state,
         status: "active",
-        totalPausedSec: state.totalPausedSec + Math.round(pausedMs / 1000),
+        totalPausedSec: calculatePausedSeconds({
+          pauseStartedAtMs: state.pauseStartTime,
+          pauseStartedTotalSec: state.pauseStartPausedSec,
+          currentTotalPausedSec: state.totalPausedSec,
+          nowMs: Date.now(),
+        }),
         pauseStartTime: null,
+        pauseStartPausedSec: null,
       };
     }
 
@@ -311,9 +321,19 @@ function rideReducer(state: RideState, action: RideAction): RideState {
     case "TICK":
       return { ...state, elapsed: action.elapsed };
 
-    case "PAUSE_TICK":
-      // 暫停時只更新 totalPausedSec，不更新 elapsed
-      return { ...state, totalPausedSec: state.totalPausedSec + 1 };
+    case "PAUSE_TICK": {
+      // elapsed 是移動時間；暫停時間以絕對時間戳重算，背景回來後不會漏算或雙算。
+      if (!state.pauseStartTime) return state;
+      return {
+        ...state,
+        totalPausedSec: calculatePausedSeconds({
+          pauseStartedAtMs: state.pauseStartTime,
+          pauseStartedTotalSec: state.pauseStartPausedSec,
+          currentTotalPausedSec: state.totalPausedSec,
+          nowMs: Date.now(),
+        }),
+      };
+    }
 
     case "LIVE_READINGS_STATIONARY":
       return {
@@ -522,7 +542,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   ) => {
     if (state.elapsed < 10) return null;
     const now = Date.now();
-    // 重新計算均速，確保使用最終的 distance 和 elapsed 值
+    // 即時 elapsed 是有效移動時間；活動 duration 儲存為移動＋暫停的總經過時間。
     const finalAvgSpeed = state.elapsed > 0 ? (state.distance / 1000) / (state.elapsed / 3600) : 0;
     
     // 優先使用使用者設定 FTP；只有舊流程缺少設定時才以體重做相容性估算。
@@ -531,7 +551,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       calculationProfile?.ftpW
         ?? estimateFTP(calculationProfile?.riderWeightKg ?? 70, "intermediate"),
     );
-    const movingTime = Math.max(0, state.elapsed - state.totalPausedSec);
+    const timeTotals = buildRideTimeTotals(state.elapsed, state.totalPausedSec);
+    const movingTime = timeTotals.movingTime;
     const trainingAnalysis = analyzeTraining(
       movingTime,
       state.avgPower,
@@ -555,7 +576,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       id: now.toString(),
       date: now,
       name: (name && name.trim()) ? name.trim() : generateDefaultName(now, state.sportType),
-      duration: state.elapsed,
+      duration: timeTotals.elapsedDuration,
       distance: state.distance,
       avgSpeed: finalAvgSpeed,
       maxSpeed: state.maxSpeed,
@@ -568,7 +589,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       route: decimateRoute(state.route),  // 抽樣壓縮，最多 500 點
       totalSweatMl: Math.round(state.totalSweatMl),
       refillCount: state.refillCount,
-      totalPausedSec: state.totalPausedSec,
+      totalPausedSec: timeTotals.totalPausedSec,
       movingTime,
       // 坡度分布數據
       gradeDistribution: state.gradeDistribution,

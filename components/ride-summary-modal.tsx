@@ -233,9 +233,9 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>核心數據</Text>
               <View style={styles.statsGrid}>
                 <StatCell label="距離" value={distKm} unit="km" colors={colors} />
-                <StatCell label="總時間" value={formatDuration(state.elapsed)} unit="" colors={colors} />
-                <StatCell label="移動時間" value={formatDuration(Math.max(0, state.elapsed - state.totalPausedSec))} unit="" colors={colors} />
-                <StatCell label="平均速度" value={((state.distance / 1000) / ((state.elapsed - state.totalPausedSec) / 3600)).toFixed(1)} unit="km/h" colors={colors} />
+                <StatCell label="總時間" value={formatDuration(state.elapsed + state.totalPausedSec)} unit="" colors={colors} />
+                <StatCell label="移動時間" value={formatDuration(state.elapsed)} unit="" colors={colors} />
+                <StatCell label="平均速度" value={state.elapsed > 0 ? ((state.distance / 1000) / (state.elapsed / 3600)).toFixed(1) : "0.0"} unit="km/h" colors={colors} />
                 <StatCell label="最高速度" value={state.maxSpeed.toFixed(1)} unit="km/h" colors={colors} />
                 <StatCell label="消耗熱量" value={`${Math.round(state.totalCalories)}`} unit="kcal" colors={colors} />
               </View>

@@ -55,6 +55,10 @@ const OSM_BIKE_ROUTE_HOST = "https://routing.openstreetmap.de/routed-bike/route/
 const FETCH_TIMEOUT_MS = 10000;
 // 端點被吸附到道路時可接受的最遠距離；超出即視為目標落在不可通行區域。
 const MAX_ENDPOINT_SNAP_DISTANCE_M = 120;
+/** 自行車道路線距離多出此比例以上時，視為不合理繞路。 */
+export const CYCLEWAY_MAX_DETOUR_RATIO = 1.3;
+/** 僅因極小時間差不放棄自行車道；超過此比例才視為明顯較慢。 */
+export const CYCLEWAY_MAX_DURATION_RATIO = 1.2;
 
 // ── OSRM 輔助函數 ─────────────────────────────────────────────
 
@@ -384,17 +388,44 @@ export async function fetchBikeRoute(
     };
   }
 
-  if (preferCycleway) {
-    // 自行車道優先：使用 Brouter trekking profile
-    // 失敗時自動降級至 OSRM
-    const brouterResult = await fetchBrouterRoute(from, to);
-    if (brouterResult) return brouterResult;
-    console.warn("[RouteService] Brouter failed, falling back to OSRM");
-    return fetchOsrmRoute(from, to);
-  } else {
-    // 一般道路：使用 OSRM cycling profile
-    return fetchOsrmRoute(from, to);
+  if (!preferCycleway) return fetchOsrmRoute(from, to);
+
+  // 同時計算兩條可通行候選，避免先等待 Brouter 完成後才發現其路線過度繞行。
+  // 選中 Brouter 時，之後若下一段自行車道仍有利，重新規劃會自然回到自行車道優先。
+  const [cyclewayRoute, roadRoute] = await Promise.all([
+    fetchBrouterRoute(from, to),
+    fetchOsrmRoute(from, to),
+  ]);
+  return selectBikeRouteCandidate(cyclewayRoute, roadRoute);
+}
+
+/**
+ * 自行車道優先的候選選擇規則。
+ * 只有 Brouter 距離超過一般道路 30%，或同時明顯更遠且時間多出 20%，才改走一般道路。
+ * 這可維持自行車道偏好，又不會在繞行／迂迴路網中產生不合常理的導航。
+ */
+export function selectBikeRouteCandidate(
+  cyclewayRoute: RouteResult | null,
+  roadRoute: RouteResult | null,
+): RouteResult | null {
+  if (!cyclewayRoute) return roadRoute;
+  if (!roadRoute) return cyclewayRoute;
+
+  const distanceRatio = cyclewayRoute.distanceM / Math.max(1, roadRoute.distanceM);
+  const durationRatio = cyclewayRoute.durationSec > 0 && roadRoute.durationSec > 0
+    ? cyclewayRoute.durationSec / roadRoute.durationSec
+    : 1;
+  const isMaterialDetour = distanceRatio > CYCLEWAY_MAX_DETOUR_RATIO;
+  const isSlowerAndLonger = distanceRatio > 1.1 && durationRatio > CYCLEWAY_MAX_DURATION_RATIO;
+
+  if (isMaterialDetour || isSlowerAndLonger) {
+    console.info("[RouteService] Using general bicycle route to avoid cycleway detour", {
+      distanceRatio,
+      durationRatio,
+    });
+    return roadRoute;
   }
+  return cyclewayRoute;
 }
 
 /**

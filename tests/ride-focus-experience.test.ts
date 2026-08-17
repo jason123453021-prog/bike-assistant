@@ -41,9 +41,10 @@ describe("rider-focus experience guards", () => {
     expect(routeSnapshotSource).toContain("energyServingCarbohydrateG: input.energyServingCarbohydrateG");
   });
 
-  it("keeps head-up camera updates and screen brightness wake-up guarded", () => {
-    expect(mapSource).toContain("recenterThresholdM = headingUp ? 14 : 8");
-    expect(mapSource).toContain("movementSinceCamera >= recenterThresholdM");
+  it("keeps user-controlled map orientation, delayed recentering, and screen brightness wake-up guarded", () => {
+    expect(mapSource).toContain("settings.autoRecenterSec * 1000");
+    expect(mapSource).toContain("movementSinceCamera >= 8");
+    expect(mapSource).toContain("onMapRotateEnd={() => scheduleAutoRecenter()}");
     expect(powerSavingSource).toContain("brightnessSession");
     expect(powerSavingSource).toContain("session !== this.brightnessSession");
   });
