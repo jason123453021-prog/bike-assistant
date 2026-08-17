@@ -1116,6 +1116,26 @@ export default function MapScreen() {
     return () => manager.stop();
   }, [isActive]);
 
+  const hasPendingSupplyModal = settings.supplyReminderEnabled && (
+    calorieAlert
+    || waterAlert
+    || activeSupplyAlerts.length > 0
+    || Object.values(intervalSupplyAlerts).some(Boolean)
+  );
+
+  useEffect(() => {
+    const manager = powerSavingManagerRef.current;
+    const holdKey = "supply-confirmation-modal";
+    if (hasPendingSupplyModal) {
+      // 補給彈窗等待確認期間，保持正常亮度且不啟動調暗倒數。
+      void manager.holdBrightness(holdKey);
+    } else {
+      // 能量、補水、手動與自訂提醒均已確認／關閉後才恢復調暗計時。
+      manager.releaseBrightnessHold(holdKey);
+    }
+    return () => manager.releaseBrightnessHold(holdKey);
+  }, [hasPendingSupplyModal]);
+
   const hydrationThresholdMl = settings.waterThreshold > 0
     ? settings.waterThreshold
     : DEFAULT_HYDRATION_THRESHOLD_ML;

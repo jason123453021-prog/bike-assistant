@@ -35,6 +35,7 @@ export class SmartPowerSavingManager {
   private isInPowerSavingMode: boolean = false;
   private originalBrightness: number = 0.8;
   private brightnessSession = 0;
+  private brightnessHolds = new Set<string>();
   private listeners: Set<(isActive: boolean) => void> = new Set();
 
   private constructor() {
@@ -78,7 +79,7 @@ export class SmartPowerSavingManager {
       clearTimeout(this.inactivityTimer);
     }
 
-    if (!this.settings.enabled) return;
+    if (!this.settings.enabled || this.brightnessHolds.size > 0) return;
 
     this.inactivityTimer = setTimeout(() => {
       this.enterPowerSavingMode();
@@ -119,6 +120,22 @@ export class SmartPowerSavingManager {
     this.resetInactivityTimer();
   }
 
+  /** 保持亮屏並暫停調暗計時；多個流程可各自持有。 */
+  async holdBrightness(key: string) {
+    this.brightnessHolds.add(key);
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
+    await this.exitPowerSavingMode();
+  }
+
+  /** 只有最後一個亮屏保持解除後，才重新開始調暗倒數。 */
+  releaseBrightnessHold(key: string) {
+    this.brightnessHolds.delete(key);
+    if (this.brightnessHolds.size === 0) this.resetInactivityTimer();
+  }
+
   onUserInteraction() {
     this.wakeUp();
   }
@@ -150,6 +167,7 @@ export class SmartPowerSavingManager {
       clearTimeout(this.inactivityTimer);
       this.inactivityTimer = null;
     }
+    this.brightnessHolds.clear();
     this.exitPowerSavingMode();
   }
 }
