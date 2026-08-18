@@ -101,6 +101,32 @@ function withBikeRidePip(config) {
           "  private fun restoreFullNavigationFromPip() {\n    pipOverlay?.visibility = View.GONE\n    renderRidePipSnapshot()\n    window.decorView.post { window.decorView.requestFocus() }\n  }\n\n  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {\n    super.onPictureInPictureModeChanged(isInPictureInPictureMode)\n    if (isInPictureInPictureMode) {\n      pipOverlay?.visibility = View.VISIBLE\n    } else {\n      // Android expands this same MainActivity when the user taps the PiP surface.\n      restoreFullNavigationFromPip()\n    }\n  }",
         );
       }
+      if (!source.includes("private var pipSpeed: TextView? = null")) {
+        source = source.replace(
+          "  private var pipInstruction: TextView? = null\n  private var pipMetrics: TextView? = null",
+          "  private var pipInstruction: TextView? = null\n  private var pipSpeed: TextView? = null\n  private var pipMetrics: TextView? = null",
+        );
+        source = source.replace(
+          "    pipMetrics = TextView(this).apply {",
+          "    pipSpeed = TextView(this).apply {\n      textSize = 21f\n      setTypeface(typeface, android.graphics.Typeface.BOLD)\n    }\n    pipMetrics = TextView(this).apply {",
+        );
+        source = source.replace(
+          "    content.addView(pipInstruction)\n    content.addView(pipMetrics)",
+          "    content.addView(pipInstruction)\n    content.addView(pipSpeed)\n    content.addView(pipMetrics)",
+        );
+        source = source.replace(
+          "    pipInstruction?.setTextColor(primaryTextColor)\n    pipMetrics?.setTextColor(secondaryTextColor)",
+          "    pipInstruction?.setTextColor(primaryTextColor)\n    pipSpeed?.setTextColor(primaryTextColor)\n    pipMetrics?.setTextColor(secondaryTextColor)",
+        );
+        source = source.replace(
+          "    pipHeader?.text = if (ridePipPaused) \"騎乘已暫停\" else \"騎乘導航\"\n    pipTurnIcon?.text = when {",
+          "    val isFreeRide = ridePipInstruction == \"騎乘中\"\n    pipHeader?.text = if (ridePipPaused) \"騎乘已暫停\" else if (isFreeRide) \"自由騎乘\" else \"下一轉彎\"\n    pipTurnIcon?.text = when {",
+        );
+        source = source.replace(
+          "    pipInstruction?.text = ridePipInstruction\n    val turnDistance = if (ridePipTurnDistanceM > 0.0) \"・\${ridePipTurnDistanceM.toInt()} m\" else \"\"\n    pipMetrics?.text = String.format(\"%.1f km/h ・ %.2f km%s\", ridePipSpeedKmh, ridePipDistanceKm, turnDistance)",
+          "    pipInstruction?.text = ridePipInstruction\n    pipSpeed?.text = String.format(\"時速 %.1f km/h\", ridePipSpeedKmh)\n    val turnDistance = if (ridePipTurnDistanceM > 0.0) \"下一轉彎 ${ridePipTurnDistanceM.toInt()} m\" else \"累計 %.2f km\".format(ridePipDistanceKm)\n    pipMetrics?.text = turnDistance",
+        );
+      }
       nextConfig.modResults.contents = source;
       return nextConfig;
     }
@@ -136,9 +162,10 @@ import android.widget.TextView`,
   private var ridePipDistanceKm = 0.0
   private var pipOverlay: FrameLayout? = null
   private var pipHeader: TextView? = null
-  private var pipTurnIcon: TextView? = null
-  private var pipInstruction: TextView? = null
-  private var pipMetrics: TextView? = null
+	  private var pipTurnIcon: TextView? = null
+	  private var pipInstruction: TextView? = null
+	  private var pipSpeed: TextView? = null
+	  private var pipMetrics: TextView? = null
 
   private val ridePipReceiver = object : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
@@ -201,19 +228,24 @@ import android.widget.TextView`,
       maxLines = 1
       setTypeface(typeface, android.graphics.Typeface.BOLD)
     }
-    pipTurnIcon = TextView(this).apply {
-      setTextColor(Color.WHITE)
+	    pipTurnIcon = TextView(this).apply {
+	      setTextColor(Color.WHITE)
       textSize = 30f
-      setTypeface(typeface, android.graphics.Typeface.BOLD)
-    }
-    pipMetrics = TextView(this).apply {
+	      setTypeface(typeface, android.graphics.Typeface.BOLD)
+	    }
+	    pipSpeed = TextView(this).apply {
+	      textSize = 21f
+	      setTypeface(typeface, android.graphics.Typeface.BOLD)
+	    }
+	    pipMetrics = TextView(this).apply {
       setTextColor(Color.rgb(210, 244, 234))
       textSize = 14f
     }
     content.addView(pipHeader)
-    content.addView(pipTurnIcon)
-    content.addView(pipInstruction)
-    content.addView(pipMetrics)
+	    content.addView(pipTurnIcon)
+	    content.addView(pipInstruction)
+	    content.addView(pipSpeed)
+	    content.addView(pipMetrics)
     overlay.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     addContentView(overlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 	    pipOverlay = overlay
@@ -230,21 +262,24 @@ import android.widget.TextView`,
 	    pipHeader?.setTextColor(primaryTextColor)
 	    pipTurnIcon?.setTextColor(primaryTextColor)
 	    pipInstruction?.setTextColor(primaryTextColor)
+	    pipSpeed?.setTextColor(primaryTextColor)
 	    pipMetrics?.setTextColor(secondaryTextColor)
 	  }
 
 	  private fun renderRidePipSnapshot() {
 	    applyRidePipTheme()
-	    pipHeader?.text = if (ridePipPaused) "騎乘已暫停" else "騎乘導航"
+	    val isFreeRide = ridePipInstruction == "騎乘中"
+	    pipHeader?.text = if (ridePipPaused) "騎乘已暫停" else if (isFreeRide) "自由騎乘" else "下一轉彎"
     pipTurnIcon?.text = when {
       ridePipInstruction.contains("左轉") -> "↰"
       ridePipInstruction.contains("右轉") -> "↱"
       ridePipInstruction.contains("到達") -> "⌖"
       else -> "↑"
-    }
-    pipInstruction?.text = ridePipInstruction
-    val turnDistance = if (ridePipTurnDistanceM > 0.0) "・\${ridePipTurnDistanceM.toInt()} m" else ""
-    pipMetrics?.text = String.format("%.1f km/h ・ %.2f km%s", ridePipSpeedKmh, ridePipDistanceKm, turnDistance)
+	    }
+	    pipInstruction?.text = ridePipInstruction
+	    pipSpeed?.text = String.format("時速 %.1f km/h", ridePipSpeedKmh)
+	    val turnDistance = if (ridePipTurnDistanceM > 0.0) "下一轉彎 \${ridePipTurnDistanceM.toInt()} m" else "累計 %.2f km".format(ridePipDistanceKm)
+	    pipMetrics?.text = turnDistance
   }
 `,
     );

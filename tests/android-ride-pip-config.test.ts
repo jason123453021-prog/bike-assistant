@@ -22,6 +22,9 @@ describe("Android ride PiP integration", () => {
     expect(plugin).toContain("override fun onConfigurationChanged(newConfig: Configuration)");
     expect(plugin).toContain("private fun restoreFullNavigationFromPip()");
     expect(plugin).toContain("window.decorView.requestFocus()");
+    expect(plugin).toContain("private var pipSpeed: TextView? = null");
+    expect(plugin).toContain("時速 %.1f km/h");
+    expect(plugin).toContain("下一轉彎");
     expect(plugin).not.toContain("SYSTEM_ALERT_WINDOW");
     expect(plugin).not.toContain("Nitro");
     expect(plugin).not.toContain("C++");
