@@ -65,6 +65,36 @@ function withBikeRidePip(config) {
           "    pipHeader?.text = if (ridePipPaused) \"騎乘已暫停\" else \"騎乘導航\"\n    pipTurnIcon?.text = when {\n      ridePipInstruction.contains(\"左轉\") -> \"↰\"\n      ridePipInstruction.contains(\"右轉\") -> \"↱\"\n      ridePipInstruction.contains(\"到達\") -> \"⌖\"\n      else -> \"↑\"\n    }\n    pipInstruction?.text = ridePipInstruction",
         );
       }
+      if (!source.includes("private fun applyRidePipTheme()")) {
+        source = source.replace(
+          "import android.content.IntentFilter",
+          "import android.content.IntentFilter\nimport android.content.res.Configuration",
+        );
+        source = source.replace(
+          "    pipOverlay = overlay\n    renderRidePipSnapshot()",
+          "    pipOverlay = overlay\n    applyRidePipTheme()\n    renderRidePipSnapshot()",
+        );
+        source = source.replace(
+          "  private fun renderRidePipSnapshot() {",
+          `  private fun applyRidePipTheme() {
+    val isDarkTheme = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    val backgroundColor = if (isDarkTheme) Color.rgb(0, 83, 66) else Color.rgb(235, 247, 241)
+    val primaryTextColor = if (isDarkTheme) Color.WHITE else Color.rgb(4, 61, 45)
+    val secondaryTextColor = if (isDarkTheme) Color.rgb(210, 244, 234) else Color.rgb(31, 94, 74)
+    pipOverlay?.setBackgroundColor(backgroundColor)
+    pipHeader?.setTextColor(primaryTextColor)
+    pipTurnIcon?.setTextColor(primaryTextColor)
+    pipInstruction?.setTextColor(primaryTextColor)
+    pipMetrics?.setTextColor(secondaryTextColor)
+  }
+
+  private fun renderRidePipSnapshot() {`,
+        );
+        source = source.replace(
+          "  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {",
+          "  override fun onConfigurationChanged(newConfig: Configuration) {\n    super.onConfigurationChanged(newConfig)\n    applyRidePipTheme()\n  }\n\n  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {",
+        );
+      }
       nextConfig.modResults.contents = source;
       return nextConfig;
     }
@@ -74,9 +104,10 @@ function withBikeRidePip(config) {
       `import android.app.PictureInPictureParams
 import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.graphics.Color
+	import android.content.Intent
+	import android.content.IntentFilter
+	import android.content.res.Configuration
+	import android.graphics.Color
 import android.os.Build
 import android.util.Rational
 import android.view.Gravity
@@ -179,12 +210,26 @@ import android.widget.TextView`,
     content.addView(pipMetrics)
     overlay.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     addContentView(overlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-    pipOverlay = overlay
-    renderRidePipSnapshot()
-  }
+	    pipOverlay = overlay
+	    applyRidePipTheme()
+	    renderRidePipSnapshot()
+	  }
 
-  private fun renderRidePipSnapshot() {
-    pipHeader?.text = if (ridePipPaused) "騎乘已暫停" else "騎乘導航"
+	  private fun applyRidePipTheme() {
+	    val isDarkTheme = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+	    val backgroundColor = if (isDarkTheme) Color.rgb(0, 83, 66) else Color.rgb(235, 247, 241)
+	    val primaryTextColor = if (isDarkTheme) Color.WHITE else Color.rgb(4, 61, 45)
+	    val secondaryTextColor = if (isDarkTheme) Color.rgb(210, 244, 234) else Color.rgb(31, 94, 74)
+	    pipOverlay?.setBackgroundColor(backgroundColor)
+	    pipHeader?.setTextColor(primaryTextColor)
+	    pipTurnIcon?.setTextColor(primaryTextColor)
+	    pipInstruction?.setTextColor(primaryTextColor)
+	    pipMetrics?.setTextColor(secondaryTextColor)
+	  }
+
+	  private fun renderRidePipSnapshot() {
+	    applyRidePipTheme()
+	    pipHeader?.text = if (ridePipPaused) "騎乘已暫停" else "騎乘導航"
     pipTurnIcon?.text = when {
       ridePipInstruction.contains("左轉") -> "↰"
       ridePipInstruction.contains("右轉") -> "↱"
@@ -219,10 +264,15 @@ import android.widget.TextView`,
     super.onUserLeaveHint()
   }
 
-  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
-    super.onPictureInPictureModeChanged(isInPictureInPictureMode)
-    pipOverlay?.visibility = if (isInPictureInPictureMode) View.VISIBLE else View.GONE
-  }
+	  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+	    super.onPictureInPictureModeChanged(isInPictureInPictureMode)
+	    pipOverlay?.visibility = if (isInPictureInPictureMode) View.VISIBLE else View.GONE
+	  }
+
+	  override fun onConfigurationChanged(newConfig: Configuration) {
+	    super.onConfigurationChanged(newConfig)
+	    applyRidePipTheme()
+	  }
 
   override fun onDestroy() {
     try {

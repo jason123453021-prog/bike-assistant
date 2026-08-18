@@ -17,6 +17,9 @@ describe("Android ride PiP integration", () => {
     expect(plugin).toContain("EX_DEV_CLIENT_NETWORK_INSPECTOR");
     expect(plugin).toContain("Build.VERSION.SDK_INT < Build.VERSION_CODES.S");
     expect(plugin).toContain("builder.setSeamlessResizeEnabled(false)");
+    expect(plugin).toContain("Configuration.UI_MODE_NIGHT_MASK");
+    expect(plugin).toContain("private fun applyRidePipTheme()");
+    expect(plugin).toContain("override fun onConfigurationChanged(newConfig: Configuration)");
     expect(plugin).not.toContain("SYSTEM_ALERT_WINDOW");
     expect(plugin).not.toContain("Nitro");
     expect(plugin).not.toContain("C++");
