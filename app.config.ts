@@ -115,6 +115,7 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-font",
     "expo-asset",
+    "./plugins/with-bike-ride-pip",
     [
       "expo-location",
       {
