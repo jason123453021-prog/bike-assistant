@@ -1,0 +1,14 @@
+
+> app-template@1.0.2 lint /home/ubuntu/bike_assistant
+> expo lint
+
+
+/home/ubuntu/bike_assistant/app/(tabs)/map.tsx
+    80:3  warning  'clearSmartSupplyDueNotification' is defined but never used                                                                                                    @typescript-eslint/no-unused-vars
+   976:6  warning  React Hook useCallback has missing dependencies: 'smartEnergySupplyEnabled' and 'smartWaterSupplyEnabled'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  1337:5  warning  React Hook useCallback has missing dependencies: 'smartEnergySupplyEnabled' and 'smartWaterSupplyEnabled'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  1495:6  warning  React Hook useCallback has missing dependencies: 'smartEnergySupplyEnabled' and 'smartWaterSupplyEnabled'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  2346:6  warning  React Hook useCallback has missing dependencies: 'smartEnergySupplyEnabled' and 'smartWaterSupplyEnabled'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 5 problems (0 errors, 5 warnings)
+

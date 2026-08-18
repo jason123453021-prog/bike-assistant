@@ -1,0 +1,122 @@
+--- core tests ---
+tests/activity-statistics.test.ts
+tests/background-supply-recovery.test.ts
+tests/compass-gps-optimizer.test.ts
+tests/elevation-chart.test.ts
+tests/gpx-elevation-filter.test.ts
+tests/live-elevation-filter.test.ts
+tests/navigation-ride-lifecycle-isolation.test.ts
+tests/persistence-batching.test.ts
+tests/ride-lifecycle-guard.test.ts
+tests/ride-time-accounting.test.ts
+tests/ride-tracking-lifecycle.test.ts
+tests/track-point-quality.test.ts
+--- runtime subscriptions/timers ---
+app/(tabs)/map.tsx:313:    autoRecenterTimerRef.current = setTimeout(() => {
+app/(tabs)/map.tsx:342:      recoverySnapshotTimerRef.current = setTimeout(() => {
+app/(tabs)/map.tsx:405:      const fitTimer = setTimeout(() => {
+app/(tabs)/map.tsx:492:    const subscription = AppState.addEventListener("change", (nextState) => {
+app/(tabs)/map.tsx:1050:    touchGuardRelockTimerRef.current = setTimeout(() => {
+app/(tabs)/map.tsx:1061:    touchGuardHoldTimerRef.current = setInterval(() => {
+app/(tabs)/map.tsx:1296:        setTimeout(() => {
+app/(tabs)/map.tsx:1312:        supplyRepeatTimerRef.current = setInterval(() => {
+app/(tabs)/map.tsx:1410:        tracker.repeatIntervalId = setInterval(() => {
+app/(tabs)/map.tsx:1477:      intervalSupplyRepeatTimerRef.current = setInterval(() => {
+app/(tabs)/map.tsx:1499:    const checkInterval = setInterval(triggerIntervalSupplyReminder, 10_000);
+app/(tabs)/map.tsx:1513:      timerRef.current = setInterval(() => {
+app/(tabs)/map.tsx:1521:        timerRef.current = setInterval(() => {
+app/(tabs)/map.tsx:1605:    idlePauseTimerRef.current = setTimeout(() => {
+app/(tabs)/map.tsx:1646:      const sub = await Location.watchPositionAsync(
+app/(tabs)/map.tsx:2342:    weatherTimerRef.current = setInterval(async () => {
+app/(tabs)/map.tsx:2529:    const subscription = AppState.addEventListener('change', async (nextState) => {
+app/(tabs)/map.tsx:2707:    const interval = setInterval(() => { if (!cancelled) checkBattery(); }, 60000);
+app/(tabs)/map.tsx:2723:    const timer = setInterval(() => {
+app/(tabs)/map.tsx:2736:      idleTimerRef.current = setTimeout(() => {
+app/_layout.tsx:76:    const subscription = Linking.addEventListener("url", ({ url }) => { void handleUri(url); });
+app/ride-detail.tsx:368:      setTimeout(() => activityViewerRef.current?.scrollTo({ x: (safeIndex - 1) * SCREEN_W, animated: false }), 80);
+app/ride-detail.tsx:380:      setTimeout(() => {
+app/ride-detail.tsx:762:              setTimeout(() => nameInputRef.current?.focus(), 100);
+lib/_core/manus-runtime.ts:112:  window.addEventListener("message", handleMessage);
+lib/auto-pause-fsm.ts:213:    this.bufferTimer = setTimeout(() => {
+lib/map-interaction/map-interaction-manager.ts:98:    this.autoRecenterTimer = setTimeout(() => {
+lib/power-saving/smart-power-saving-system.ts:102:    this.inactivityTimer = setTimeout(() => {
+lib/realtime-navigation-manager.ts:168:      this.locationSubscription = await Location.watchPositionAsync(
+lib/route-service.ts:254:  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+lib/route-service.ts:317:  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+lib/turn-voice-notification-manager.ts:200:          await new Promise((resolve) => setTimeout(resolve, 500));
+lib/turn-voice-notification-manager.ts:224:      const checkInterval = setInterval(async () => {
+lib/turn-voice-notification-manager.ts:233:      setTimeout(() => {
+lib/weather-service.ts:42:  const timer = setTimeout(() => controller.abort(), 5000); // 5 秒 timeout
+lib/weather-service.ts:99:    await new Promise((r) => setTimeout(r, 1000));
+lib/model-update-service.ts:78:    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+components/leaflet-map.tsx:442:  longPressTimer = setTimeout(function() {
+components/leaflet-map.tsx:700:document.addEventListener('message', function(e) { handleMessage(e.data); });
+components/leaflet-map.tsx:701:window.addEventListener('message', function(e) { handleMessage(e.data); });
+components/leaflet-map.tsx:704:setTimeout(function() {
+components/ride-permission-readiness.tsx:36:    const subscription = AppState.addEventListener('change', (state) => {
+--- cleanup ---
+app/(tabs)/map.tsx:312:    if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
+app/(tabs)/map.tsx:324:      clearTimeout(recoverySnapshotTimerRef.current);
+app/(tabs)/map.tsx:350:    if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
+app/(tabs)/map.tsx:351:    if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+app/(tabs)/map.tsx:412:      return () => clearTimeout(fitTimer);
+app/(tabs)/map.tsx:479:      subscription?.remove();
+app/(tabs)/map.tsx:502:      subscription.remove();
+app/(tabs)/map.tsx:726:      clearInterval(supplyRepeatTimerRef.current);
+app/(tabs)/map.tsx:735:      clearInterval(intervalSupplyRepeatTimerRef.current);
+app/(tabs)/map.tsx:745:      if (tracker.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
+app/(tabs)/map.tsx:746:      if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+app/(tabs)/map.tsx:843:    if (tracker?.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
+app/(tabs)/map.tsx:844:    if (tracker?.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+app/(tabs)/map.tsx:956:        clearInterval(supplyRepeatTimerRef.current);
+app/(tabs)/map.tsx:965:        if (tracker?.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+app/(tabs)/map.tsx:1037:      clearInterval(touchGuardHoldTimerRef.current);
+app/(tabs)/map.tsx:1046:      clearTimeout(touchGuardRelockTimerRef.current);
+app/(tabs)/map.tsx:1091:      clearInterval(touchGuardHoldTimerRef.current);
+app/(tabs)/map.tsx:1104:    if (touchGuardRelockTimerRef.current) clearTimeout(touchGuardRelockTimerRef.current);
+app/(tabs)/map.tsx:1409:        if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+app/(tabs)/map.tsx:1419:              clearInterval(tracker.repeatIntervalId);
+app/(tabs)/map.tsx:1500:    return () => clearInterval(checkInterval);
+app/(tabs)/map.tsx:1518:      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+app/(tabs)/map.tsx:1527:      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+app/(tabs)/map.tsx:1595:      if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+app/(tabs)/map.tsx:1613:      locationSubRef.current?.remove();
+app/(tabs)/map.tsx:1624:      if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+app/(tabs)/map.tsx:1634:      locationSubRef.current?.remove();
+app/(tabs)/map.tsx:2118:        sub.remove();
+app/(tabs)/map.tsx:2127:      locationSubscription?.remove();
+app/(tabs)/map.tsx:2209:    if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+app/(tabs)/map.tsx:2368:          if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+app/(tabs)/map.tsx:2373:          locationSubRef.current?.remove();
+app/(tabs)/map.tsx:2379:          if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
+app/(tabs)/map.tsx:2516:    if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
+app/(tabs)/map.tsx:2657:    return () => { subscription.remove(); };
+app/(tabs)/map.tsx:2708:    return () => { cancelled = true; clearInterval(interval); };
+app/(tabs)/map.tsx:2714:      locationSubRef.current?.remove();
+app/(tabs)/map.tsx:2715:      if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
+app/(tabs)/map.tsx:2716:      if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
+app/(tabs)/map.tsx:2726:    return () => clearInterval(timer);
+app/(tabs)/map.tsx:2733:    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+app/(tabs)/map.tsx:2747:      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+app/(tabs)/map.tsx:2751:      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+app/_layout.tsx:77:    return () => subscription.remove();
+lib/auto-pause-fsm.ts:207:      clearTimeout(this.bufferTimer);
+lib/auto-pause-fsm.ts:229:      clearTimeout(this.bufferTimer);
+lib/map-interaction/map-interaction-manager.ts:105:      clearTimeout(this.autoRecenterTimer);
+lib/power-saving/smart-power-saving-system.ts:97:      clearTimeout(this.inactivityTimer);
+lib/power-saving/smart-power-saving-system.ts:145:      clearTimeout(this.inactivityTimer);
+lib/power-saving/smart-power-saving-system.ts:185:      clearTimeout(this.inactivityTimer);
+lib/realtime-navigation-manager.ts:164:        this.locationSubscription.remove();
+lib/realtime-navigation-manager.ts:191:        this.locationSubscription.remove();
+lib/route-service.ts:258:    clearTimeout(timeoutId);
+lib/route-service.ts:294:    clearTimeout(timeoutId);
+lib/route-service.ts:324:    clearTimeout(timeoutId);
+lib/route-service.ts:357:    clearTimeout(timeoutId);
+lib/supply-notification-actions.ts:99:    subscription?.remove();
+lib/turn-voice-notification-manager.ts:227:          clearInterval(checkInterval);
+lib/turn-voice-notification-manager.ts:234:        clearInterval(checkInterval);
+lib/weather-service.ts:45:    clearTimeout(timer);
+lib/weather-service.ts:72:    clearTimeout(timer);
+lib/model-update-service.ts:93:      clearTimeout(timeout);
+components/leaflet-map.tsx:455:    clearTimeout(longPressTimer);
+components/ride-permission-readiness.tsx:39:    return () => subscription.remove();

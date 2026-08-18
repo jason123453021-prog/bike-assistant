@@ -114,7 +114,6 @@ export class SmartPowerSavingManager {
       if (!this.isInPowerSavingMode || session !== this.brightnessSession) return;
       await setBrightnessAsync(this.settings.minBrightness);
       this.notifyListeners(true);
-      console.log('[PowerSaving] Entered power saving mode');
     } catch (error) {
       console.error('[PowerSaving] Failed to enter power saving mode:', error);
     }
@@ -127,7 +126,6 @@ export class SmartPowerSavingManager {
     this.notifyListeners(false);
     try {
       await setBrightnessAsync(this.originalBrightness);
-      console.log('[PowerSaving] Exited power saving mode');
     } catch (error) {
       console.error('[PowerSaving] Failed to exit power saving mode:', error);
     }

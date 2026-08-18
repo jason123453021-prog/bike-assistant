@@ -974,7 +974,6 @@ export async function stopBackgroundLocationTracking() {
 export async function clearBackgroundData() {
   try {
     await AsyncStorage.multiRemove([BG_TRACK_KEY, BG_STATE_KEY]);
-    console.log("[BackgroundLocation] 已清除背景軌跡數據");
   } catch (e) {
     console.warn("[BackgroundLocation] 清除背景數據失敗:", e);
   }

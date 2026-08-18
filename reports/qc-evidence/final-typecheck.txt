@@ -1,0 +1,4 @@
+
+> app-template@1.0.2 check /home/ubuntu/bike_assistant
+> tsc --noEmit
+

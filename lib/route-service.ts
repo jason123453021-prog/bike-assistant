@@ -419,10 +419,6 @@ export function selectBikeRouteCandidate(
   const isSlowerAndLonger = distanceRatio > 1.1 && durationRatio > CYCLEWAY_MAX_DURATION_RATIO;
 
   if (isMaterialDetour || isSlowerAndLonger) {
-    console.info("[RouteService] Using general bicycle route to avoid cycleway detour", {
-      distanceRatio,
-      durationRatio,
-    });
     return roadRoute;
   }
   return cyclewayRoute;

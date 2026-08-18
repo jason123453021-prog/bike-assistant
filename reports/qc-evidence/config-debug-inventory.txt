@@ -1,0 +1,282 @@
+--- package native/dependency indicators ---
+package.json:41:    "expo-audio": "~1.1.1",
+package.json:48:    "expo-file-system": "~19.0.24",
+package.json:56:    "expo-location": "~19.0.8",
+package.json:57:    "expo-notifications": "~0.32.17",
+package.json:67:    "expo-task-manager": "~14.0.9",
+pnpm-lock.yaml:68:      expo-audio:
+pnpm-lock.yaml:89:      expo-file-system:
+pnpm-lock.yaml:113:      expo-location:
+pnpm-lock.yaml:116:      expo-notifications:
+pnpm-lock.yaml:146:      expo-task-manager:
+pnpm-lock.yaml:1215:    resolution: {integrity: sha512-iO1c++VP6xUBUmltHZoMtCUdPlnPGdBom6IrO4gyKPFFVBKioIImVooR5I83nTew5UOYrk3gIJhbZh8X44y06A==}
+pnpm-lock.yaml:3556:  expo-audio@1.1.1:
+pnpm-lock.yaml:3597:  expo-file-system@19.0.24:
+pnpm-lock.yaml:3653:  expo-location@19.0.8:
+pnpm-lock.yaml:3668:  expo-notifications@0.32.17:
+pnpm-lock.yaml:3761:  expo-task-manager@14.0.9:
+pnpm-lock.yaml:9771:  expo-audio@1.1.1(expo-asset@12.0.13(expo@54.0.37)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(expo@54.0.37)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
+pnpm-lock.yaml:9812:  expo-file-system@19.0.24(expo@54.0.37)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)):
+pnpm-lock.yaml:9864:  expo-location@19.0.8(expo@54.0.37):
+pnpm-lock.yaml:9882:  expo-notifications@0.32.17(expo@54.0.37)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
+pnpm-lock.yaml:9990:  expo-task-manager@14.0.9(expo@54.0.37)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)):
+pnpm-lock.yaml:10011:      expo-file-system: 19.0.24(expo@54.0.37)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))
+--- log calls ---
+app/(tabs)/map.tsx:1800:                EmotionalUXManager.onAutoPauseTriggered('speed').catch((error: any) => console.warn("Auto pause emotional UX failed:", error));
+app/(tabs)/map.tsx:1818:            EmotionalUXManager.onRideResumed().catch((error: any) => console.warn("Auto resume emotional UX failed:", error));
+app/(tabs)/map.tsx:2676:          console.warn('[AppState] 恢復背景數據失敗:', e);
+app/(tabs)/map.tsx:2694:        console.log(`[GPS] 即時切換背景 GPS 精度為: ${currentAccuracy}`);
+app/(tabs)/map.tsx:2717:            console.log(`[GPS] 電量 ${pct}%，自動降級為 power_saving`);
+app/(tabs)/map.tsx:2726:          console.log(`[GPS] 電量 ${pct}%，自動回升為 ${userAccuracy}`);
+app/_layout.tsx:107:      console.warn("[App] 無法清除舊版最愛路線快取:", error);
+app/ride-detail.tsx:600:      console.error('[RideDetail] GPX export error:', err);
+app/ride-detail.tsx:623:      console.error("[RideDetail] FIT export error:", error);
+lib/_core/manus-runtime.ts:19:  console.log(`[ManusRuntime ${ts}] ${msg}`);
+lib/auto-pause-fsm.ts:294: *   console.log('State changed to:', newState);
+lib/background-location.ts:178:    console.warn("[BackgroundLocation] Error:", error.message);
+lib/background-location.ts:577:      console.warn("[BackgroundLocation] Processing error:", e);
+lib/background-location.ts:894:      console.warn("[BackgroundLocation] Foreground permission denied");
+lib/background-location.ts:899:      console.warn("[BackgroundLocation] Background permission denied");
+lib/background-location.ts:921:    console.warn("[BackgroundLocation] Start failed:", e);
+lib/background-location.ts:954:    console.warn("[BackgroundLocation] Idle monitor start failed:", e);
+lib/background-location.ts:967:    console.warn("[BackgroundLocation] Stop failed:", e);
+lib/background-location.ts:977:    console.log("[BackgroundLocation] 已清除背景軌跡數據");
+lib/background-location.ts:979:    console.warn("[BackgroundLocation] 清除背景數據失敗:", e);
+lib/emotional-ux.ts:58:        console.warn('TTS initialization failed:', error);
+lib/emotional-ux.ts:93:      console.warn('Haptic feedback failed:', error);
+lib/emotional-ux.ts:124:      console.warn('TTS speech failed:', error);
+lib/emotional-ux.ts:137:      console.warn('Failed to stop speech:', error);
+lib/gpx-parser.ts:326:    console.error("GPX parse error:", e);
+lib/local-notifications.ts:34:        console.warn("[LocalNotifications] 無法載入本機通知模組：", error);
+lib/map-pinning/map-pinning-manager.ts:70:        console.error('[MapPinning] OSRM routing failed:', data);
+lib/map-pinning/map-pinning-manager.ts:95:      console.error('[MapPinning] OSRM request failed:', error);
+lib/onboarding-state-manager.ts:26:      console.error('[OnboardingStateManager] 檢查首次啟動失敗:', error);
+lib/onboarding-state-manager.ts:37:      console.log('[OnboardingStateManager] 已標記首次啟動完成');
+lib/onboarding-state-manager.ts:39:      console.error('[OnboardingStateManager] 標記首次啟動失敗:', error);
+lib/onboarding-state-manager.ts:51:      console.error('[OnboardingStateManager] 檢查權限 Onboarding 失敗:', error);
+lib/onboarding-state-manager.ts:62:      console.log('[OnboardingStateManager] 已標記權限 Onboarding 已顯示');
+lib/onboarding-state-manager.ts:64:      console.error('[OnboardingStateManager] 標記權限 Onboarding 失敗:', error);
+lib/onboarding-state-manager.ts:76:      console.error('[OnboardingStateManager] 獲取最後權限檢查時間失敗:', error);
+lib/onboarding-state-manager.ts:89:      console.error('[OnboardingStateManager] 更新最後權限檢查時間失敗:', error);
+lib/onboarding-state-manager.ts:109:      console.error('[OnboardingStateManager] 獲取 Onboarding 狀態失敗:', error);
+lib/onboarding-state-manager.ts:128:      console.log('[OnboardingStateManager] 已重置 Onboarding 狀態');
+lib/onboarding-state-manager.ts:130:      console.error('[OnboardingStateManager] 重置 Onboarding 狀態失敗:', error);
+lib/onboarding-state-manager.ts:143:      console.error('[OnboardingStateManager] 判斷是否顯示 Onboarding 失敗:', error);
+lib/permissions-manager.ts:39:      console.error('[PermissionsManager] Failed to mark onboarding completed:', error);
+lib/permissions-manager.ts:79:      console.error('[PermissionsManager] Error checking location permission:', error);
+lib/permissions-manager.ts:116:      console.error('[PermissionsManager] Error checking notification permission:', error);
+lib/permissions-manager.ts:159:      console.error('[PermissionsManager] Error requesting location permission:', error);
+lib/permissions-manager.ts:172:      console.error('[PermissionsManager] Error requesting notification permission:', error);
+lib/permissions-manager.ts:207:      console.error('[PermissionsManager] Error opening system settings:', error);
+lib/power-saving/smart-power-saving-system.ts:10:  console.warn('[PowerSaving] expo-brightness not available');
+lib/power-saving/smart-power-saving-system.ts:63:      console.error('[PowerSaving] Failed to load settings:', error);
+lib/power-saving/smart-power-saving-system.ts:73:      console.error('[PowerSaving] Failed to save settings:', error);
+lib/power-saving/smart-power-saving-system.ts:86:      console.error('[PowerSaving] Failed to reset settings:', error);
+lib/power-saving/smart-power-saving-system.ts:117:      console.log('[PowerSaving] Entered power saving mode');
+lib/power-saving/smart-power-saving-system.ts:119:      console.error('[PowerSaving] Failed to enter power saving mode:', error);
+lib/power-saving/smart-power-saving-system.ts:130:      console.log('[PowerSaving] Exited power saving mode');
+lib/power-saving/smart-power-saving-system.ts:132:      console.error('[PowerSaving] Failed to exit power saving mode:', error);
+lib/realtime-navigation-manager.ts:86:      console.log('[RealtimeNavigationManager] Initialized');
+lib/realtime-navigation-manager.ts:88:      console.error('[RealtimeNavigationManager] Initialization error:', error);
+lib/realtime-navigation-manager.ts:126:      console.log('[RealtimeNavigationManager] Navigation started');
+lib/realtime-navigation-manager.ts:133:      console.error('[RealtimeNavigationManager] Error starting navigation:', error);
+lib/realtime-navigation-manager.ts:146:      console.log('[RealtimeNavigationManager] Navigation stopped');
+lib/realtime-navigation-manager.ts:153:      console.error('[RealtimeNavigationManager] Error stopping navigation:', error);
+lib/realtime-navigation-manager.ts:179:      console.log('[RealtimeNavigationManager] Location tracking started');
+lib/realtime-navigation-manager.ts:181:      console.error('[RealtimeNavigationManager] Error starting location tracking:', error);
+lib/realtime-navigation-manager.ts:195:      console.log('[RealtimeNavigationManager] Location tracking stopped');
+lib/realtime-navigation-manager.ts:197:      console.error('[RealtimeNavigationManager] Error stopping location tracking:', error);
+lib/realtime-navigation-manager.ts:283:      console.error('[RealtimeNavigationManager] Error handling location update:', error);
+lib/realtime-navigation-manager.ts:344:      console.error('[RealtimeNavigationManager] Error checking turn notification:', error);
+lib/realtime-navigation-manager.ts:449:        console.error('[RealtimeNavigationManager] Error in listener:', error);
+lib/realtime-navigation-manager.ts:460:    console.log('[RealtimeNavigationManager] Destroyed');
+lib/ride-recovery/app-startup-recovery.ts:53:    console.error('Error during ride session recovery check:', error);
+lib/ride-recovery/ride-session-recovery.ts:69:    console.error('Failed to initialize ride session:', error);
+lib/ride-recovery/ride-session-recovery.ts:115:    console.error('Failed to save ride session snapshot:', error);
+lib/ride-recovery/ride-session-recovery.ts:191:    console.error('Failed to complete ride session:', error);
+lib/ride-recovery/ride-session-recovery.ts:207:    console.error('Failed to recover ride session from backup:', error);
+lib/ride-recovery/ride-session-recovery.ts:256:    console.error('Failed to get ride history:', error);
+lib/ride-recovery/ride-session-recovery.ts:272:    console.error('Failed to clear ride data:', error);
+lib/ride-statistics-manager.ts:74:    console.log('[RideStatisticsManager] Ride started:', this.currentRide.id);
+lib/ride-statistics-manager.ts:86:      console.warn('[RideStatisticsManager] No active ride');
+lib/ride-statistics-manager.ts:137:      console.warn('[RideStatisticsManager] No active ride');
+lib/ride-statistics-manager.ts:169:    console.log('[RideStatisticsManager] Ride ended:', statistics.id);
+lib/ride-statistics-manager.ts:219:      console.error('[RideStatisticsManager] Error saving statistics:', error);
+lib/ride-statistics-manager.ts:233:      console.error('[RideStatisticsManager] Error loading history:', error);
+lib/ride-statistics-manager.ts:253:      console.error('[RideStatisticsManager] Error getting ride stats:', error);
+lib/ride-statistics-manager.ts:283:      console.error('[RideStatisticsManager] Error deleting statistics:', error);
+lib/ride-statistics-manager.ts:317:    console.log('[RideStatisticsManager] Destroyed');
+lib/route-service.ts:261:      console.warn("[RouteService] Brouter HTTP error:", response.status);
+lib/route-service.ts:268:      console.warn("[RouteService] Brouter no route found");
+lib/route-service.ts:288:      console.warn("[RouteService] Brouter endpoint snap is too far from a routable road");
+lib/route-service.ts:296:      console.warn("[RouteService] Brouter request timed out");
+lib/route-service.ts:298:      console.warn("[RouteService] Brouter fetch error:", err);
+lib/route-service.ts:327:      console.warn("[RouteService] OSRM HTTP error:", response.status);
+lib/route-service.ts:334:      console.warn("[RouteService] OSRM no route found:", data.code);
+lib/route-service.ts:341:      console.warn("[RouteService] OSM bike endpoint snap is too far from a routable road");
+lib/route-service.ts:359:      console.warn("[RouteService] OSRM request timed out");
+lib/route-service.ts:361:      console.warn("[RouteService] OSRM fetch error:", err);
+lib/route-service.ts:422:    console.info("[RouteService] Using general bicycle route to avoid cycleway detour", {
+lib/supply/supply-reminder-system.ts:49:      console.error('[SupplyReminder] Failed to load items:', error);
+lib/supply/supply-reminder-system.ts:58:      console.error('[SupplyReminder] Failed to save items:', error);
+lib/supply/supply-reminder-system.ts:121:      console.log('[SupplyReminder] Triggering reminder for:', reminders.map(r => r.itemName).join(', '));
+lib/supply/supply-reminder-system.ts:123:      console.error('[SupplyReminder] Failed to trigger reminder:', error);
+lib/turn-by-turn-navigation.ts:47:    console.log(`[TurnByTurnNavigation] Initialized with ${instructions.length} instructions`);
+lib/turn-voice-notification-manager.ts:69:      console.log('[TurnVoiceNotificationManager] Speech engine available:', !available);
+lib/turn-voice-notification-manager.ts:72:      console.log('[TurnVoiceNotificationManager] Initialized');
+lib/turn-voice-notification-manager.ts:74:      console.error('[TurnVoiceNotificationManager] Initialization error:', error);
+lib/turn-voice-notification-manager.ts:93:    console.log('[TurnVoiceNotificationManager] Config updated:', this.config);
+lib/turn-voice-notification-manager.ts:149:      console.error('[TurnVoiceNotificationManager] Error playing notification:', error);
+lib/turn-voice-notification-manager.ts:164:        console.log('[TurnVoiceNotificationManager] Already speaking, queuing...');
+lib/turn-voice-notification-manager.ts:178:      console.log('[TurnVoiceNotificationManager] Playing voice:', text);
+lib/turn-voice-notification-manager.ts:188:            console.log('[TurnVoiceNotificationManager] Voice playback done');
+lib/turn-voice-notification-manager.ts:191:            console.error('[TurnVoiceNotificationManager] Voice playback error:', error);
+lib/turn-voice-notification-manager.ts:215:      console.error('[TurnVoiceNotificationManager] Error in playVoice:', error);
+lib/turn-voice-notification-manager.ts:248:      console.log('[TurnVoiceNotificationManager] Stopped');
+lib/turn-voice-notification-manager.ts:250:      console.error('[TurnVoiceNotificationManager] Error stopping:', error);
+lib/turn-voice-notification-manager.ts:260:    console.log('[TurnVoiceNotificationManager] Reset');
+lib/turn-voice-notification-manager.ts:293:        console.error('[TurnVoiceNotificationManager] Error in listener:', error);
+lib/turn-voice-notification-manager.ts:304:    console.log('[TurnVoiceNotificationManager] Destroyed');
+server/_core/index.ts:99:    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+server/_core/index.ts:103:    console.log(`[api] server listening on port ${port}`);
+server/_core/index.ts:107:startServer().catch(console.error);
+server/_core/llm.ts:301:      console.warn(
+server/_core/llm.ts:308:      console.warn(
+server/_core/notification.ts:94:      console.warn(
+server/_core/notification.ts:104:    console.warn("[Notification] Error calling notification service:", error);
+server/_core/oauth.ts:94:      console.error("[OAuth] Callback failed", error);
+server/_core/oauth.ts:126:      console.error("[OAuth] Mobile exchange failed", error);
+server/_core/oauth.ts:143:      console.error("[Auth] /api/auth/me failed:", error);
+server/_core/oauth.ts:170:      console.error("[Auth] /api/auth/session failed:", error);
+server/_core/sdk.ts:33:    console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl);
+server/_core/sdk.ts:35:      console.error(
+server/_core/sdk.ts:185:      console.warn("[Auth] Missing session cookie");
+server/_core/sdk.ts:197:        console.warn("[Auth] Session payload missing required fields");
+server/_core/sdk.ts:207:      console.warn("[Auth] Session verification failed", String(error));
+server/_core/sdk.ts:276:        console.error("[Auth] Failed to sync user from OAuth:", error);
+server/_core/storageProxy.ts:30:        console.error(`[StorageProxy] forge error: ${forgeResp.status} ${body}`);
+server/_core/storageProxy.ts:44:      console.error("[StorageProxy] failed:", err);
+server/_core/voiceTranscription.ts:14: *     console.log(data.text); // Full transcription
+server/_core/voiceTranscription.ts:15: *     console.log(data.language); // Detected language
+server/_core/voiceTranscription.ts:16: *     console.log(data.segments); // Timestamped segments
+server/db.ts:14:      console.warn("[Database] Failed to connect:", error);
+server/db.ts:28:    console.warn("[Database] Cannot upsert user: database not available");
+server/db.ts:75:    console.error("[Database] Failed to upsert user:", error);
+server/db.ts:83:    console.warn("[Database] Cannot get user: database not available");
+server/share-router.ts:64:        console.error("[Share] 分享失敗:", error);
+server/share-router.ts:94:      console.error("[Share] 獲取分享記錄失敗:", error);
+server/share-router.ts:124:      console.error("[Share] 獲取我的分享失敗:", error);
+server/share-router.ts:164:        console.error("[Share] 取消分享失敗:", error);
+server/share-router.ts:213:        console.error("[Share] 添加評論失敗:", error);
+server/share-router.ts:242:        console.error("[Share] 獲取評論失敗:", error);
+server/share-router.ts:304:        console.error("[Share] 點讚失敗:", error);
+server/share-router.ts:333:        console.error("[Share] 獲取點讚失敗:", error);
+server/social-router.ts:56:        console.error("[Social] 獲取互動數據失敗:", error);
+server/social-router.ts:103:        console.error("[Social] 切換按讚失敗:", error);
+server/social-router.ts:138:        console.error("[Social] 新增評論失敗:", error);
+server/social-router.ts:175:        console.error("[Social] 刪除評論失敗:", error);
+server/social-router.ts:245:        console.error("[Social] 同步互動失敗:", error);
+--- release config files ---
+-rw-r--r-- 1 ubuntu ubuntu  630 Aug 16 01:13 eas.json
+
+android:
+total 48
+drwxr-xr-x  4 ubuntu ubuntu 4096 Aug 16 01:51 .
+drwxr-xr-x 26 ubuntu ubuntu 4096 Aug 18 00:04 ..
+-rw-r--r--  1 ubuntu ubuntu  129 Aug 16 01:51 .gitignore
+drwxr-xr-x  3 ubuntu ubuntu 4096 Aug 16 01:51 app
+-rw-r--r--  1 ubuntu ubuntu  556 Aug 16 01:51 build.gradle
+drwxr-xr-x  3 ubuntu ubuntu 4096 Aug 16 01:51 gradle
+-rw-r--r--  1 ubuntu ubuntu 3000 Aug 16 01:51 gradle.properties
+-rwxr-xr-x  1 ubuntu ubuntu 8744 Aug 16 01:51 gradlew
+-rw-r--r--  1 ubuntu ubuntu 2937 Aug 16 01:51 gradlew.bat
+-rw-r--r--  1 ubuntu ubuntu 1265 Aug 16 01:51 settings.gradle
+--- config identity ---
+{
+  "name": "單車助手",
+  "version": "1.0.3",
+  "android": {
+    "adaptiveIcon": {
+      "backgroundColor": "#0D0D0D",
+      "foregroundImage": "./assets/images/android-icon-foreground.png",
+      "backgroundImage": "./assets/images/android-icon-background.png",
+      "monochromeImage": "./assets/images/android-icon-monochrome.png"
+    },
+    "versionCode": 10087,
+    "edgeToEdgeEnabled": true,
+    "predictiveBackGestureEnabled": false,
+    "package": "com.jason123453021.bikeassistant",
+    "permissions": [
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.ACCESS_BACKGROUND_LOCATION",
+      "android.permission.FOREGROUND_SERVICE",
+      "android.permission.FOREGROUND_SERVICE_LOCATION",
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.VIBRATE",
+      "android.permission.WAKE_LOCK",
+      "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+      "android.permission.RECORD_AUDIO",
+      "android.permission.MODIFY_AUDIO_SETTINGS"
+    ],
+    "blockedPermissions": [
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.SYSTEM_ALERT_WINDOW"
+    ],
+    "intentFilters": [
+      {
+        "action": "VIEW",
+        "data": [
+          {
+            "scheme": "content",
+            "mimeType": "application/gpx+xml"
+          },
+          {
+            "scheme": "content",
+            "mimeType": "application/xml",
+            "pathPattern": ".*\\.gpx"
+          },
+          {
+            "scheme": "content",
+            "mimeType": "text/xml",
+            "pathPattern": ".*\\.gpx"
+          },
+          {
+            "scheme": "content",
+            "mimeType": "application/octet-stream",
+            "pathPattern": ".*\\.gpx"
+          },
+          {
+            "scheme": "file",
+            "mimeType": "application/gpx+xml"
+          },
+          {
+            "scheme": "file",
+            "mimeType": "application/octet-stream",
+            "pathPattern": ".*\\.gpx"
+          }
+        ],
+        "category": [
+          "BROWSABLE",
+          "DEFAULT"
+        ]
+      },
+      {
+        "action": "VIEW",
+        "autoVerify": true,
+        "data": [
+          {
+            "scheme": "manus20260617",
+            "host": "*"
+          }
+        ],
+        "category": [
+          "BROWSABLE",
+          "DEFAULT"
+        ]
+      }
+    ]
+  },
+  "icon": "./assets/images/icon.png",
+  "runtimeVersion": "1.0.3"
+}

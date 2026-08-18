@@ -77,7 +77,6 @@ import {
   scheduleSmartSupplyDueNotification,
   clearAllSmartSupplyDueNotifications,
   clearAllSupplyNotifications,
-  clearSmartSupplyDueNotification,
   showSupplyNotification,
   cancelRidingNotification,
   requestNotificationPermission,
@@ -973,7 +972,7 @@ export default function MapScreen() {
       clearIntervalSupplyRepeatTimer();
     }
     void scheduleSupplySnooze(kind);
-  }, [clearIntervalSupplyRepeatTimer, settings.supplyCalculationMode]);
+  }, [clearIntervalSupplyRepeatTimer, smartEnergySupplyEnabled, smartWaterSupplyEnabled]);
 
   const processSupplyNotificationAction = useCallback((action: SupplyNotificationAction) => {
     if (!settings.supplyReminderEnabled) return;
@@ -1334,7 +1333,7 @@ export default function MapScreen() {
         }, repeatSec * 1000);
       }
     },
-    [settings, alertPlayer, clearSupplyRepeatTimer, speakPlannedSupplyReminder]
+    [settings, alertPlayer, clearSupplyRepeatTimer, smartEnergySupplyEnabled, smartWaterSupplyEnabled, speakPlannedSupplyReminder]
   );
 
   // ─── 自訂補給品觸發邏輯 ────────────────────────────────────────────────────────
@@ -1492,7 +1491,7 @@ export default function MapScreen() {
         }
       }, repeatSec * 1000);
     }
-  }, [alertPlayer, clearIntervalSupplyRepeatTimer, settings]);
+  }, [alertPlayer, clearIntervalSupplyRepeatTimer, settings, smartEnergySupplyEnabled, smartWaterSupplyEnabled]);
 
   useEffect(() => {
     if (state.status !== "active") return;
@@ -2206,6 +2205,24 @@ export default function MapScreen() {
 
   // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert("定位服務未開啟", "請先在手機系統設定開啟定位服務，再開始騎乘紀錄。");
+        return;
+      }
+      const foregroundPermission = await Location.getForegroundPermissionsAsync();
+      const permission = foregroundPermission.status === "granted"
+        ? foregroundPermission
+        : await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        Alert.alert("需要定位權限", "開始騎乘需要精確定位權限，才能記錄距離、速度與軌跡。您可在系統設定中隨時重新開啟。");
+        return;
+      }
+    } catch {
+      Alert.alert("無法確認定位狀態", "請確認定位服務與權限後再試一次。");
+      return;
+    }
     if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
     idlePauseTimerRef.current = null;
     pausedAtRef.current = null;
@@ -2324,7 +2341,13 @@ export default function MapScreen() {
         }
         : undefined,
     });
-    await startBackgroundLocationTracking(settings.gpsAccuracy || "standard");
+    const backgroundTrackingStarted = await startBackgroundLocationTracking(settings.gpsAccuracy || "standard");
+    if (!backgroundTrackingStarted) {
+      Alert.alert(
+        "背景騎乘未啟用",
+        "目前會在 App 開啟時持續記錄；若鎖定螢幕或切到背景，請在系統設定允許背景定位與電池不受限制，以維持完整軌跡。",
+      );
+    }
 
     // 初始化情感化 UX
     try {
@@ -2343,7 +2366,7 @@ export default function MapScreen() {
       const l = await Location.getLastKnownPositionAsync();
       if (l) updateWeather(l.coords.latitude, l.coords.longitude);
     }, WEATHER_INTERVAL);
-  }, [clearIntervalSupplyRepeatTimer, currentPos, dispatch, estimateAgeYears, estimateFtpW, hydrationThresholdMl, gpxRoute, settings, state.sportType, syncSmartSupplyCountdown, updateWeather, calorieAnim, waterAnim]);
+  }, [clearIntervalSupplyRepeatTimer, currentPos, dispatch, estimateAgeYears, estimateFtpW, hydrationThresholdMl, gpxRoute, settings, smartEnergySupplyEnabled, smartWaterSupplyEnabled, state.sportType, syncSmartSupplyCountdown, updateWeather, calorieAnim, waterAnim]);
 
   const handlePause = useCallback(() => {
     pausedElapsedRef.current = state.elapsed;
@@ -2667,7 +2690,6 @@ export default function MapScreen() {
       (async () => {
         await stopBackgroundLocationTracking();
         await startBackgroundLocationTracking(currentAccuracy);
-        console.log(`[GPS] 即時切換背景 GPS 精度為: ${currentAccuracy}`);
       })();
     } else {
       prevGpsAccuracyRef.current = currentAccuracy;
@@ -2690,7 +2712,6 @@ export default function MapScreen() {
             await stopBackgroundLocationTracking();
             await startBackgroundLocationTracking("power_saving");
             Alert.alert("低電量提示", `電量剩餘 ${pct}%，已自動將背景 GPS 切換為省電模式以延長續航。`);
-            console.log(`[GPS] 電量 ${pct}%，自動降級為 power_saving`);
           }
         } else if (pct > 30 && batteryDegradedRef.current) {
           // 電量恢復超過 30%，自動回升為用戶原本設定的精度
@@ -2699,7 +2720,6 @@ export default function MapScreen() {
           await stopBackgroundLocationTracking();
           await startBackgroundLocationTracking(userAccuracy);
           Alert.alert("電量已恢復", `電量已回升至 ${pct}%，已自動恢復背景 GPS 為「${userAccuracy === "power_saving" ? "省電" : userAccuracy === "standard" ? "標準" : "高精度"}」模式。`);
-          console.log(`[GPS] 電量 ${pct}%，自動回升為 ${userAccuracy}`);
         }
       } catch { /* 忽略電量讀取失敗 */ }
     };
