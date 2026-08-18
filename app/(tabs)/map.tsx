@@ -47,6 +47,7 @@ import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import Svg, { Circle } from "react-native-svg";
 
 import { useRide } from "@/lib/ride-context";
+import { formatPausedSystemClock } from "@/lib/paused-system-clock";
 import {
   buildSportDashboardMetrics,
   calculateGapPaceSecPerKm,
@@ -282,6 +283,7 @@ export default function MapScreen() {
 
   // 當前位置
   const [currentPos, setCurrentPos] = useState<{ lat: number; lon: number; heading: number } | null>(null);
+  const [systemClockNow, setSystemClockNow] = useState(() => new Date());
   const currentPosRef = useRef<{ lat: number; lon: number; heading: number } | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const idlePauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1157,6 +1159,14 @@ export default function MapScreen() {
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [sportPickerVisible, setSportPickerVisible] = useState(false);
   const [sportPickerQuery, setSportPickerQuery] = useState("");
+
+  // 固定儀表板的裝置系統時間；獨立於騎乘 reducer，不會改變活動／移動／暫停時間。
+  useEffect(() => {
+    const updateClock = () => setSystemClockNow(new Date());
+    updateClock();
+    const intervalId = setInterval(updateClock, 30_000);
+    return () => clearInterval(intervalId);
+  }, []);
   // ── 儀表板欄位排序：依 normalModeFieldOrder 排序，只顯示已啟用的欄位 ──
   const orderedEnabledFields = useMemo(() => {
     const f = settings.normalModeFields;
@@ -3210,6 +3220,10 @@ export default function MapScreen() {
               </View>
             </View>
           )}
+          <View style={styles.systemTimeRow} accessibilityLabel={`系統時間 ${formatPausedSystemClock(systemClockNow)}`}>
+            <Text style={styles.systemTimeLabel}>系統時間</Text>
+            <Text style={styles.systemTimeValue}>{formatPausedSystemClock(systemClockNow)}</Text>
+          </View>
         </View>
 
         {/* ── 儀表板（依排序動態顯示，前6格在收縮面板） ── */}
@@ -4205,6 +4219,19 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   pausedText: { color: "#FFD27D", fontSize: 12, fontWeight: "800" },
+  systemTimeRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 28,
+    paddingHorizontal: 12,
+    marginTop: 3,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+  systemTimeLabel: { color: "rgba(255,255,255,0.72)", fontSize: 12, fontWeight: "700" },
+  systemTimeValue: { color: "#FFFFFF", fontSize: 17, fontWeight: "800", fontVariant: ["tabular-nums"] },
 
   // 六格儀表板
   sixGrid: {

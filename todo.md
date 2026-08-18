@@ -2019,3 +2019,12 @@
 - [x] 修正所有可重現問題並補足回歸測試：加入開始騎乘定位服務／權限／背景失敗防呆；清理熱路徑開發日誌；修正智慧通道 Hook 依賴
 - [x] 執行完整型別、lint、測試、Expo Doctor 與 Android Hermes bundle 匯出驗證；正式簽署 APK／AAB 依專案規範交由管理介面的 Publish 執行
 - [x] 產出發布前品管檢驗清單（reports/release-preflight-qc-2026-08-18.md）、保存版本並交付結果
+
+## 暫停儀表板系統時間（2026-08-18）
+- [x] 盤點已暫停儀表板版面與現有秒級時間更新來源
+- [x] 新增只在暫停時顯示的即時系統時間列，不改變活動、移動或暫停時間計算
+- [x] 新增顯示條件與時間統計隔離回歸測試，完成品質驗證（TypeScript 0 errors；lint 0 warnings／0 errors；9 targeted tests passed）
+
+## 儀表板系統時間常駐（2026-08-18）
+- [x] 將系統時間改為儀表板頂部固定位置，於騎乘中與暫停時皆持續顯示
+- [x] 驗證常駐時鐘不會改變活動、移動或暫停時間統計（TypeScript 0 errors；lint 0 warnings／0 errors；9 targeted tests passed）
