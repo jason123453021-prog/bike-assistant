@@ -20,6 +20,8 @@ describe("Android ride PiP integration", () => {
     expect(plugin).toContain("Configuration.UI_MODE_NIGHT_MASK");
     expect(plugin).toContain("private fun applyRidePipTheme()");
     expect(plugin).toContain("override fun onConfigurationChanged(newConfig: Configuration)");
+    expect(plugin).toContain("private fun restoreFullNavigationFromPip()");
+    expect(plugin).toContain("window.decorView.requestFocus()");
     expect(plugin).not.toContain("SYSTEM_ALERT_WINDOW");
     expect(plugin).not.toContain("Nitro");
     expect(plugin).not.toContain("C++");

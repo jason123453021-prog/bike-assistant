@@ -95,6 +95,12 @@ function withBikeRidePip(config) {
           "  override fun onConfigurationChanged(newConfig: Configuration) {\n    super.onConfigurationChanged(newConfig)\n    applyRidePipTheme()\n  }\n\n  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {",
         );
       }
+      if (!source.includes("private fun restoreFullNavigationFromPip()")) {
+        source = source.replace(
+          "  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {\n    super.onPictureInPictureModeChanged(isInPictureInPictureMode)\n    pipOverlay?.visibility = if (isInPictureInPictureMode) View.VISIBLE else View.GONE\n  }",
+          "  private fun restoreFullNavigationFromPip() {\n    pipOverlay?.visibility = View.GONE\n    renderRidePipSnapshot()\n    window.decorView.post { window.decorView.requestFocus() }\n  }\n\n  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {\n    super.onPictureInPictureModeChanged(isInPictureInPictureMode)\n    if (isInPictureInPictureMode) {\n      pipOverlay?.visibility = View.VISIBLE\n    } else {\n      // Android expands this same MainActivity when the user taps the PiP surface.\n      restoreFullNavigationFromPip()\n    }\n  }",
+        );
+      }
       nextConfig.modResults.contents = source;
       return nextConfig;
     }
@@ -264,9 +270,20 @@ import android.widget.TextView`,
     super.onUserLeaveHint()
   }
 
+	  private fun restoreFullNavigationFromPip() {
+	    pipOverlay?.visibility = View.GONE
+	    renderRidePipSnapshot()
+	    window.decorView.post { window.decorView.requestFocus() }
+	  }
+
 	  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
 	    super.onPictureInPictureModeChanged(isInPictureInPictureMode)
-	    pipOverlay?.visibility = if (isInPictureInPictureMode) View.VISIBLE else View.GONE
+	    if (isInPictureInPictureMode) {
+	      pipOverlay?.visibility = View.VISIBLE
+	    } else {
+	      // Android expands this same MainActivity when the user taps the PiP surface.
+	      restoreFullNavigationFromPip()
+	    }
 	  }
 
 	  override fun onConfigurationChanged(newConfig: Configuration) {
