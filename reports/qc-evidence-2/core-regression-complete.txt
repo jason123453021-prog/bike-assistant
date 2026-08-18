@@ -1,0 +1,28 @@
+
+> app-template@1.0.2 test /home/ubuntu/bike_assistant
+> vitest run "tests/activity-statistics.test.ts" "tests/activity-stats.test.ts" "tests/activity-estimation-calibration.test.ts" "tests/personalized-ride-calculations.test.ts" "tests/track-point-quality.test.ts" "tests/gpx-elevation-filter.test.ts" "tests/live-elevation-filter.test.ts" "tests/persistence-batching.test.ts" "tests/ride-tracking-lifecycle.test.ts" "tests/ride-record-normalizer.test.ts" "tests/navigation-ride-lifecycle-isolation.test.ts" "tests/live-ride-navigation-experience.test.ts" "tests/post-ride-cleanup-and-model-governance.test.ts" "tests/background-supply-recovery.test.ts" "tests/ride-audio-interruption.test.ts"
+
+
+ RUN  v2.1.9 /home/ubuntu/bike_assistant
+
+ ✓ tests/navigation-ride-lifecycle-isolation.test.ts (4 tests) 5ms
+ ✓ tests/ride-record-normalizer.test.ts (5 tests) 8ms
+ ✓ tests/personalized-ride-calculations.test.ts (3 tests) 5ms
+ ✓ tests/post-ride-cleanup-and-model-governance.test.ts (4 tests) 9ms
+ ✓ tests/live-ride-navigation-experience.test.ts (5 tests) 6ms
+ ✓ tests/persistence-batching.test.ts (3 tests) 4ms
+ ✓ tests/activity-statistics.test.ts (3 tests) 4ms
+ ✓ tests/track-point-quality.test.ts (3 tests) 6ms
+ ✓ tests/ride-audio-interruption.test.ts (3 tests) 4ms
+ ✓ tests/gpx-elevation-filter.test.ts (3 tests) 7ms
+ ✓ tests/activity-estimation-calibration.test.ts (2 tests) 5ms
+ ✓ tests/live-elevation-filter.test.ts (3 tests) 5ms
+ ✓ tests/background-supply-recovery.test.ts (4 tests) 5ms
+ ✓ tests/activity-stats.test.ts (2 tests) 4ms
+ ✓ tests/ride-tracking-lifecycle.test.ts (3 tests) 4ms
+
+ Test Files  15 passed (15)
+      Tests  50 passed (50)
+   Start at  10:16:55
+   Duration  969ms (transform 415ms, setup 0ms, collect 809ms, tests 81ms, environment 3ms, prepare 1.11s)
+

@@ -3707,7 +3707,6 @@ export default function MapScreen() {
       {touchGuardEnabled && isActive && (
         <Pressable
           style={styles.touchGuard}
-          onPress={() => {}}
           onPressIn={beginTouchGuardHoldProgress}
           onPressOut={resetTouchGuardHoldProgress}
           onLongPress={() => {

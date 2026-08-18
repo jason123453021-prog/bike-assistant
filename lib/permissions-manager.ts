@@ -10,7 +10,6 @@ const PERMISSIONS_ONBOARDING_KEY = 'permissions_onboarding_completed';
 export type PermissionType = 
   | 'location'
   | 'notification'
-  | 'overlay'
   | 'battery_optimization';
 
 export interface PermissionStatus {
@@ -50,9 +49,6 @@ export class PermissionsManager {
     statuses.push(notificationStatus);
 
     if (Platform.OS === 'android') {
-      const overlayStatus = await this.checkOverlayPermission();
-      statuses.push(overlayStatus);
-
       const batteryStatus = await this.checkBatteryOptimizationWhitelist();
       statuses.push(batteryStatus);
     }
@@ -124,17 +120,6 @@ export class PermissionsManager {
     }
   }
 
-  static async checkOverlayPermission(): Promise<PermissionStatus> {
-    return {
-      type: 'overlay',
-      name: '懸浮窗權限',
-      description: '允許 App 在鎖屏時顯示補給提醒彈窗',
-      granted: false,
-      required: true,
-      systemSettingsUrl: 'android.settings.action.MANAGE_OVERLAY_PERMISSION',
-    };
-  }
-
   static async checkBatteryOptimizationWhitelist(): Promise<PermissionStatus> {
     return {
       type: 'battery_optimization',
@@ -191,11 +176,6 @@ export class PermissionsManager {
           case 'notification':
             await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.APP_NOTIFICATION_SETTINGS, {
               extra: packageName ? { 'android.provider.extra.APP_PACKAGE': packageName } : undefined,
-            });
-            break;
-          case 'overlay':
-            await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.MANAGE_APP_OVERLAY_PERMISSION, {
-              data: packageName ? `package:${packageName}` : undefined,
             });
             break;
           case 'battery_optimization':

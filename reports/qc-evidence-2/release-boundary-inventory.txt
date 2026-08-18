@@ -1,0 +1,146 @@
+--- network calls and guards ---
+components/leaflet-map.tsx:123:<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+components/leaflet-map.tsx:124:<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+components/leaflet-map.tsx:125:<script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.7/dist/leaflet-rotate-src.js"></script>
+components/leaflet-map.tsx:198:var baseTileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+components/leaflet-map.tsx:508:          var arrowHtml = '<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;transform:rotate(' + arrowBearing + 'deg);transition:transform 200ms ease-out;"><svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><style>.arrow-fill{fill:#007AFF;}.arrow-stroke{stroke:#fff;stroke-width:1;}</style></defs><path class="arrow-fill arrow-stroke" d="M16 2 L28 28 L16 22 L4 28 Z"/></svg></div>';
+lib/gpx-export.ts:62:<gpx version="1.1" creator="Bike Assistant" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1" xmlns:bikeassistant="https://bike-assistant.local/gpx/extensions/1">
+lib/map-pinning/map-pinning-manager.ts:27:const OSRM_API_BASE = 'https://router.project-osrm.org/route/v1/bike';
+lib/map-pinning/map-pinning-manager.ts:66:      const response = await fetch(url);
+lib/ride-share-card-svg.ts:70:<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="0 0 ${CARD_WIDTH} ${CARD_HEIGHT}">
+lib/route-service.ts:7: *    - 端點：https://brouter.de/brouter
+lib/route-service.ts:12: *    - 端點：https://routing.openstreetmap.de/routed-bike
+lib/route-service.ts:45:const BROUTER_HOST = "https://brouter.de/brouter";
+lib/route-service.ts:52:const OSM_BIKE_ROUTE_HOST = "https://routing.openstreetmap.de/routed-bike/route/v1/driving";
+lib/route-service.ts:257:    const response = await fetch(url, { signal: controller.signal });
+lib/route-service.ts:320:    const response = await fetch(url, {
+lib/weather-service.ts:3: * https://open-meteo.com/
+lib/weather-service.ts:44:    const response = await fetch(url, { signal: controller.signal });
+lib/weather-service.ts:89:    `https://api.open-meteo.com/v1/forecast` +
+lib/model-governance.ts:33:      url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC10818145/",
+lib/model-governance.ts:39:      url: "https://pubmed.ncbi.nlm.nih.gov/12183501/",
+lib/model-governance.ts:45:      url: "https://pubmed.ncbi.nlm.nih.gov/28121252/",
+lib/model-governance.ts:51:      url: "https://pubmed.ncbi.nlm.nih.gov/17277604/",
+lib/model-governance.ts:57:      url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC10054587/",
+lib/model-update-service.ts:26:  return typeof candidate === "string" && candidate.startsWith("https://") ? candidate : null;
+lib/model-update-service.ts:80:      const response = await fetch(manifestUrl, {
+
+--- UI boundary tests ---
+expo-go-startup-stability.test.ts
+readability-contrast-ui.test.ts
+ride-detail-jsx-safety.test.ts
+ride-focus-experience.test.ts
+ride-permission-readiness.test.ts
+
+--- release config ---
+app.config.ts:5:const schemeFromBundleId = "manus20260617";
+app.config.ts:13:  scheme: schemeFromBundleId,
+app.config.ts:15:  androidPackage: bundleId,
+app.config.ts:23:  name: env.appName,
+app.config.ts:26:  version: "1.0.3",
+app.config.ts:28:  orientation: "default",
+app.config.ts:29:  icon: "./assets/images/icon.png",
+app.config.ts:30:  scheme: env.scheme,
+app.config.ts:33:  newArchEnabled: true,
+app.config.ts:49:  android: {
+app.config.ts:52:      foregroundImage: "./assets/images/android-icon-foreground.png",
+app.config.ts:53:      backgroundImage: "./assets/images/android-icon-background.png",
+app.config.ts:54:      monochromeImage: "./assets/images/android-icon-monochrome.png",
+app.config.ts:59:    package: env.androidPackage,
+app.config.ts:64:      "android.permission.ACCESS_FINE_LOCATION",
+app.config.ts:66:      "android.permission.ACCESS_COARSE_LOCATION",
+app.config.ts:68:      "android.permission.ACCESS_BACKGROUND_LOCATION",
+app.config.ts:70:      "android.permission.FOREGROUND_SERVICE",
+app.config.ts:72:      "android.permission.FOREGROUND_SERVICE_LOCATION",
+app.config.ts:74:      "android.permission.POST_NOTIFICATIONS",
+app.config.ts:76:      "android.permission.VIBRATE",
+app.config.ts:78:      "android.permission.WAKE_LOCK",
+app.config.ts:80:      "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+app.config.ts:84:      "android.permission.RECEIVE_BOOT_COMPLETED",
+app.config.ts:85:      "android.permission.SYSTEM_ALERT_WINDOW",
+app.config.ts:91:          { scheme: "content", mimeType: "application/gpx+xml" },
+app.config.ts:92:          { scheme: "content", mimeType: "application/xml", pathPattern: ".*\\.gpx" },
+app.config.ts:93:          { scheme: "content", mimeType: "text/xml", pathPattern: ".*\\.gpx" },
+app.config.ts:94:          { scheme: "content", mimeType: "application/octet-stream", pathPattern: ".*\\.gpx" },
+app.config.ts:95:          { scheme: "file", mimeType: "application/gpx+xml" },
+app.config.ts:96:          { scheme: "file", mimeType: "application/octet-stream", pathPattern: ".*\\.gpx" },
+app.config.ts:103:        data: [{ scheme: env.scheme, host: "*" }],
+app.config.ts:113:    favicon: "./assets/images/favicon.png",
+app.config.ts:157:        android: {
+app.config.ts:161:          compileSdkVersion: 36,
+app.config.ts:163:          targetSdkVersion: 36,
+android/gradle.properties:22:# https://developer.android.com/topic/libraries/support-library/androidx-rn
+android/gradle.properties:23:android.useAndroidX=true
+android/gradle.properties:26:android.enablePngCrunchInReleaseBuilds=true
+android/gradle.properties:38:newArchEnabled=true
+android/gradle.properties:67:android.minSdkVersion=24
+android/gradle.properties:68:android.compileSdkVersion=36
+android/gradle.properties:69:android.targetSdkVersion=36
+android/gradle.properties:70:android.enableMinifyInReleaseBuilds=true
+android/gradle.properties:71:android.enableShrinkResourcesInReleaseBuilds=true
+android/app/build.gradle:1:apply plugin: "com.android.application"
+android/app/build.gradle:2:apply plugin: "org.jetbrains.kotlin.android"
+android/app/build.gradle:12:    entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
+android/app/build.gradle:17:    enableBundleCompression = (findProperty('android.enableBundleCompression') ?: false).toBoolean()
+android/app/build.gradle:46:    // bundleAssetName = "MyApplication.android.bundle"
+android/app/build.gradle:48:    //   The entry file for bundle generation. Default is 'index.android.js' or 'index.js'
+android/app/build.gradle:49:    // entryFile = file("../js/MyApplication.android.js")
+android/app/build.gradle:67: * Set this to true in release builds to optimize the app using [R8](https://developer.android.com/topic/performance/app-optimization/enable-app-optimization).
+android/app/build.gradle:69:def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: false).toBoolean()
+android/app/build.gradle:75: * `def jscFlavor = 'org.webkit:android-jsc-intl:+'`
+android/app/build.gradle:82:def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+android/app/build.gradle:84:android {
+android/app/build.gradle:88:    compileSdk rootProject.ext.compileSdkVersion
+android/app/build.gradle:94:        targetSdkVersion rootProject.ext.targetSdkVersion
+android/app/build.gradle:103:            storePassword 'android'
+android/app/build.gradle:104:            keyAlias 'androiddebugkey'
+android/app/build.gradle:105:            keyPassword 'android'
+android/app/build.gradle:114:            // see https://reactnative.dev/docs/signed-apk-android.
+android/app/build.gradle:116:            def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
+android/app/build.gradle:119:            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+android/app/build.gradle:120:            def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
+android/app/build.gradle:130:    androidResources {
+android/app/build.gradle:135:// Apply static values from `gradle.properties` to the `android.packagingOptions`
+android/app/build.gradle:137:// android.packagingOptions.pickFirsts=/LICENSE,**/picasa.ini
+android/app/build.gradle:140:    def options = (findProperty("android.packagingOptions.$prop") ?: "").split(",");
+android/app/build.gradle:147:        println "android.packagingOptions.$prop += $options ($options.length)"
+android/app/build.gradle:148:        // Ex: android.packagingOptions.pickFirsts += '**/SCCS/**'
+android/app/build.gradle:150:            android.packagingOptions[prop] += it
+android/app/build.gradle:157:    implementation("com.facebook.react:react-android")
+android/app/build.gradle:178:        implementation("com.facebook.react:hermes-android")
+eas.json:4:      "android": {
+eas.json:10:      "android": {
+eas.json:15:      "android": {
+eas.json:20:      "android": {
+eas.json:25:      "android": {
+
+--- high-risk module markers ---
+app.config.ts:32:  // Expo SDK 54 的 Reanimated 4 需要此官方 React Native 架構；未加入任何自訂 NitroModules 或 C++ 原生模組。
+app.config.ts:181:  // 專案仍不使用任何自訂 NitroModules 或 C++ 原生模組。
+android/app/build.gradle:82:def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+--- remaining runtime debug logs ---
+lib/auto-pause-fsm.ts:294: *   console.log('State changed to:', newState);
+lib/onboarding-state-manager.ts:37:      console.log('[OnboardingStateManager] 已標記首次啟動完成');
+lib/onboarding-state-manager.ts:62:      console.log('[OnboardingStateManager] 已標記權限 Onboarding 已顯示');
+lib/onboarding-state-manager.ts:128:      console.log('[OnboardingStateManager] 已重置 Onboarding 狀態');
+lib/realtime-navigation-manager.ts:86:      console.log('[RealtimeNavigationManager] Initialized');
+lib/realtime-navigation-manager.ts:126:      console.log('[RealtimeNavigationManager] Navigation started');
+lib/realtime-navigation-manager.ts:146:      console.log('[RealtimeNavigationManager] Navigation stopped');
+lib/realtime-navigation-manager.ts:179:      console.log('[RealtimeNavigationManager] Location tracking started');
+lib/realtime-navigation-manager.ts:195:      console.log('[RealtimeNavigationManager] Location tracking stopped');
+lib/realtime-navigation-manager.ts:460:    console.log('[RealtimeNavigationManager] Destroyed');
+lib/ride-statistics-manager.ts:74:    console.log('[RideStatisticsManager] Ride started:', this.currentRide.id);
+lib/ride-statistics-manager.ts:169:    console.log('[RideStatisticsManager] Ride ended:', statistics.id);
+lib/ride-statistics-manager.ts:317:    console.log('[RideStatisticsManager] Destroyed');
+lib/supply/supply-reminder-system.ts:121:      console.log('[SupplyReminder] Triggering reminder for:', reminders.map(r => r.itemName).join(', '));
+lib/turn-by-turn-navigation.ts:47:    console.log(`[TurnByTurnNavigation] Initialized with ${instructions.length} instructions`);
+lib/turn-voice-notification-manager.ts:69:      console.log('[TurnVoiceNotificationManager] Speech engine available:', !available);
+lib/turn-voice-notification-manager.ts:72:      console.log('[TurnVoiceNotificationManager] Initialized');
+lib/turn-voice-notification-manager.ts:93:    console.log('[TurnVoiceNotificationManager] Config updated:', this.config);
+lib/turn-voice-notification-manager.ts:164:        console.log('[TurnVoiceNotificationManager] Already speaking, queuing...');
+lib/turn-voice-notification-manager.ts:178:      console.log('[TurnVoiceNotificationManager] Playing voice:', text);
+lib/turn-voice-notification-manager.ts:188:            console.log('[TurnVoiceNotificationManager] Voice playback done');
+lib/turn-voice-notification-manager.ts:248:      console.log('[TurnVoiceNotificationManager] Stopped');
+lib/turn-voice-notification-manager.ts:260:    console.log('[TurnVoiceNotificationManager] Reset');
+lib/turn-voice-notification-manager.ts:304:    console.log('[TurnVoiceNotificationManager] Destroyed');

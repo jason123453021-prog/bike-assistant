@@ -79,10 +79,9 @@ const config: ExpoConfig = {
       // 電池最佳化白名單：確保背景位置追蹤不被系統中斷
       "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
     ],
-    // 套件若宣告開機接收或懸浮窗，均從最終 manifest 明確移除：本 App 僅由使用者開始騎乘後啟動 location 前景服務。
+    // 套件若宣告開機接收器，均從最終 manifest 明確移除：本 App 僅由使用者開始騎乘後啟動 location 前景服務。
     blockedPermissions: [
       "android.permission.RECEIVE_BOOT_COMPLETED",
-      "android.permission.SYSTEM_ALERT_WINDOW",
     ],
     intentFilters: [
       {

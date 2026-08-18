@@ -1,0 +1,89 @@
+app/(tabs)/map.tsx:75:  speakSupplyReminder,
+app/(tabs)/map.tsx:76:  speakAutoPause,
+app/(tabs)/map.tsx:121:import { shouldRestoreBackgroundSupplyReminder } from "@/lib/background-supply-recovery";
+app/(tabs)/map.tsx:133:  setBackgroundSupplyReminderPending,
+app/(tabs)/map.tsx:134:  setBackgroundSupplyReminderEnabled,
+app/(tabs)/map.tsx:137:  acknowledgeBackgroundSupplyReminder,
+app/(tabs)/map.tsx:741:  const previousSupplyReminderEnabledRef = useRef(settings.supplyReminderEnabled);
+app/(tabs)/map.tsx:742:  const clearAllActiveSupplyReminders = useCallback(() => {
+app/(tabs)/map.tsx:766:    void setBackgroundSupplyReminderEnabled(false);
+app/(tabs)/map.tsx:770:    const wasEnabled = previousSupplyReminderEnabledRef.current;
+app/(tabs)/map.tsx:772:      clearAllActiveSupplyReminders();
+app/(tabs)/map.tsx:792:      void setBackgroundSupplyReminderEnabled(true);
+app/(tabs)/map.tsx:794:    previousSupplyReminderEnabledRef.current = settings.supplyReminderEnabled;
+app/(tabs)/map.tsx:795:  }, [clearAllActiveSupplyReminders, settings.supplyItems, settings.supplyReminderEnabled]);
+app/(tabs)/map.tsx:903:    void acknowledgeBackgroundSupplyReminder("calorie");
+app/(tabs)/map.tsx:943:    void acknowledgeBackgroundSupplyReminder("water");
+app/(tabs)/map.tsx:1262:  const speakPlannedSupplyReminder = useCallback(
+app/(tabs)/map.tsx:1265:      void speakSupplyReminder(type, true);
+app/(tabs)/map.tsx:1271:  const triggerSupplyReminder = useCallback(
+app/(tabs)/map.tsx:1275:      powerSavingManagerRef.current.onSupplyReminder();
+app/(tabs)/map.tsx:1287:      if ((type === "calorie" ? smartEnergySupplyEnabled : smartWaterSupplyEnabled)) void setBackgroundSupplyReminderPending(type, true);
+app/(tabs)/map.tsx:1289:      speakPlannedSupplyReminder(type);
+app/(tabs)/map.tsx:1335:            speakPlannedSupplyReminder("calorie");
+app/(tabs)/map.tsx:1337:            speakPlannedSupplyReminder("water");
+app/(tabs)/map.tsx:1346:    [settings, alertPlayer, clearSupplyRepeatTimer, smartEnergySupplyEnabled, smartWaterSupplyEnabled, speakPlannedSupplyReminder]
+app/(tabs)/map.tsx:1350:  const triggerCustomSupplyReminder = useCallback(
+app/(tabs)/map.tsx:1409:      if (settings.ttsEnabled) void speakSupplyReminder(target, true);
+app/(tabs)/map.tsx:1422:            if (settings.ttsEnabled) void speakSupplyReminder(target, true);
+app/(tabs)/map.tsx:1438:  const triggerIntervalSupplyReminder = useCallback(() => {
+app/(tabs)/map.tsx:1472:    powerSavingManagerRef.current.onSupplyReminder();
+app/(tabs)/map.tsx:1476:    if (settings.ttsEnabled) dueTargets.forEach((target) => { void speakSupplyReminder(target, true); });
+app/(tabs)/map.tsx:1497:          targets.forEach((target) => { void speakSupplyReminder(target, true); });
+app/(tabs)/map.tsx:1508:    const checkInterval = setInterval(triggerIntervalSupplyReminder, 10_000);
+app/(tabs)/map.tsx:1510:  }, [state.status, triggerIntervalSupplyReminder]);
+app/(tabs)/map.tsx:1600:      && settings.idleAutoPauseEnabled;
+app/(tabs)/map.tsx:1613:    const delayMs = Math.max(0, settings.idleAutoPauseSeconds * 1000 - (Date.now() - pausedAtMs));
+app/(tabs)/map.tsx:1616:        { enabled: settings.idleAutoPauseEnabled, idleTimeoutSeconds: settings.idleAutoPauseSeconds },
+app/(tabs)/map.tsx:1636:  }, [mapRideActive, rideLocationTrackingMode, settings.gpsAccuracy, settings.idleAutoPauseEnabled, settings.idleAutoPauseSeconds, settings.ttsEnabled, state.status]);
+app/(tabs)/map.tsx:1806:                if (settings.ttsEnabled) speakAutoPause(true);
+app/(tabs)/map.tsx:1809:                EmotionalUXManager.onAutoPauseTriggered('speed').catch((error: any) => console.warn("Auto pause emotional UX failed:", error));
+app/(tabs)/map.tsx:2104:            triggerSupplyReminder("calorie", supplyPlan);
+app/(tabs)/map.tsx:2111:            triggerSupplyReminder("water", supplyPlan);
+app/(tabs)/map.tsx:2117:              triggerCustomSupplyReminder(supplyItem);
+app/(tabs)/map.tsx:2120:          triggerIntervalSupplyReminder();
+app/(tabs)/map.tsx:2588:            if (shouldRestoreBackgroundSupplyReminder({
+app/(tabs)/map.tsx:2596:              void setBackgroundSupplyReminderPending("calorie", true);
+app/(tabs)/map.tsx:2598:            if (shouldRestoreBackgroundSupplyReminder({
+app/(tabs)/map.tsx:2606:              void setBackgroundSupplyReminderPending("water", true);
+app/(tabs)/map.tsx:4157:  rideTrackingStatusAutoPaused: {
+app/(tabs)/settings.tsx:830:            value={settings.idleAutoPauseEnabled}
+app/(tabs)/settings.tsx:832:            onToggle={(enabled) => updateSettings({ idleAutoPauseEnabled: enabled })}
+app/(tabs)/settings.tsx:843:              value={String(settings.idleAutoPauseSeconds)}
+app/(tabs)/settings.tsx:846:                void updateSettings({ idleAutoPauseSeconds: seconds });
+app/(tabs)/settings.tsx:850:              editable={settings.idleAutoPauseEnabled}
+lib/background-location.ts:663:export async function setBackgroundSupplyReminderEnabled(enabled: boolean) {
+lib/background-location.ts:758:export async function setBackgroundSupplyReminderPending(kind: "calorie" | "water", pending: boolean) {
+lib/background-location.ts:809:export async function acknowledgeBackgroundSupplyReminder(kind: "calorie" | "water") {
+lib/emotional-ux.ts:144:  static async onAutoPauseTriggered(reason: 'speed' | 'accelerometer'): Promise<void> {
+lib/emotional-ux.ts:260: * await EmotionalUXManager.onAutoPauseTriggered('speed');
+lib/feedback-service.ts:98:export async function speakSupplyReminder(type: "calorie" | "water", enabled: boolean) {
+lib/feedback-service.ts:110:export function formatSmartSupplyReminder(type: "calorie" | "water", plan: SupplyPlan): string {
+lib/feedback-service.ts:116:export async function speakSmartSupplyReminder(
+lib/feedback-service.ts:122:  await speakSupplyReminder(type, enabled);
+lib/feedback-service.ts:125:export async function speakAutoPause(enabled: boolean) {
+lib/idle-auto-pause.ts:3:export interface IdleAutoPauseConfig {
+lib/idle-auto-pause.ts:10:  config: IdleAutoPauseConfig,
+lib/power-saving/smart-power-saving-system.ts:163:  onSupplyReminder() {
+lib/power-saving/smart-power-saving-system.ts:214:    onSupplyReminder: () => manager.onSupplyReminder(),
+lib/settings-context.tsx:185:  idleAutoPauseEnabled: boolean;
+lib/settings-context.tsx:186:  idleAutoPauseSeconds: number;
+lib/settings-context.tsx:271:  idleAutoPauseEnabled: true,
+lib/settings-context.tsx:272:  idleAutoPauseSeconds: 120,
+lib/background-supply-recovery.ts:5:export function shouldRestoreBackgroundSupplyReminder(input: {
+tests/smart-supply-countdown-ui.test.ts:112:    expect(mapSource).toContain("clearAllActiveSupplyReminders");
+tests/smart-supply-countdown-ui.test.ts:114:    expect(mapSource).toContain("setBackgroundSupplyReminderEnabled(false)");
+tests/smart-supply-countdown-ui.test.ts:118:    expect(backgroundSource).toContain("setBackgroundSupplyReminderEnabled");
+tests/smart-supply-countdown-ui.test.ts:127:    expect(mapSource).toContain("shouldRestoreBackgroundSupplyReminder");
+tests/smart-supply-countdown-ui.test.ts:131:    expect(mapSource).toContain("setBackgroundSupplyReminderPending");
+tests/smart-supply-tts.test.ts:10:    expect(feedbackSource).toContain("speakSupplyReminder");
+tests/smart-supply-tts.test.ts:11:    expect(mapSource).not.toContain("speakSmartSupplyReminder");
+tests/smart-supply-tts.test.ts:12:    expect(mapSource).toContain("void speakSupplyReminder(type, true)");
+tests/smart-supply-tts.test.ts:21:    expect(mapSource).toContain("speakPlannedSupplyReminder(type)");
+tests/smart-supply-tts.test.ts:23:    expect(mapSource).toContain('speakPlannedSupplyReminder("calorie")');
+tests/smart-supply-tts.test.ts:24:    expect(mapSource).toContain('speakPlannedSupplyReminder("water")');
+tests/smart-supply-tts.test.ts:40:    expect(mapSource).toContain('speakPlannedSupplyReminder("calorie")');
+tests/background-supply-recovery.test.ts:4:import { shouldRestoreBackgroundSupplyReminder } from "../lib/background-supply-recovery";
+tests/background-supply-recovery.test.ts:8:    expect(shouldRestoreBackgroundSupplyReminder({
+tests/background-supply-recovery.test.ts:16:    expect(shouldRestoreBackgroundSupplyReminder({
+tests/background-supply-recovery.test.ts:24:    expect(shouldRestoreBackgroundSupplyReminder({

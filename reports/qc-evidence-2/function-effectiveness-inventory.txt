@@ -1,0 +1,83 @@
+--- possible no-op or unfinished handlers ---
+app/(tabs)/map.tsx:3710:          onPress={() => {}}
+components/share-card-modal.tsx:353:                  // TODO: 實現複製功能
+
+--- settings action persistence references ---
+app/(tabs)/settings.tsx:43:  const { settings, updateSettings, resetAllSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
+app/(tabs)/settings.tsx:79:    await powerSavingManagerRef.current.saveSettings(patch);
+app/(tabs)/settings.tsx:166:                await resetAllSettings();
+app/(tabs)/settings.tsx:338:      await updateSettings({ birthday });
+app/(tabs)/settings.tsx:354:    await updateSettings({ [editModal.key]: boundedNum });
+app/(tabs)/settings.tsx:412:                  onPress={() => updateSettings({ gpsAccuracy: level })}
+app/(tabs)/settings.tsx:445:            onToggle={(enabled) => updateSettings({ supplyReminderEnabled: enabled })}
+app/(tabs)/settings.tsx:461:            onToggle={(enabled) => updateSettings({
+app/(tabs)/settings.tsx:475:            onToggle={(enabled) => updateSettings({
+app/(tabs)/settings.tsx:513:            onToggle={(enabled) => updateSettings({ energyCarbohydrateHourlyLimitMode: enabled ? "science" : "manual" })}
+app/(tabs)/settings.tsx:535:                onPress={() => void updateSettings({ energyCarbohydrateHourlyLimitG: smartCarbohydrateHourlySuggestionG })}
+app/(tabs)/settings.tsx:571:              onToggle={(enabled) => updateSettings({
+app/(tabs)/settings.tsx:593:              onToggle={(enabled) => updateSettings({
+app/(tabs)/settings.tsx:625:              onToggle={(enabled) => updateSettings({
+app/(tabs)/settings.tsx:647:              onToggle={(enabled) => updateSettings({
+app/(tabs)/settings.tsx:687:                  onPress={() => void updateSettings({ supplyReminderRepeatSec: seconds })}
+app/(tabs)/settings.tsx:768:            onToggle={(v) => updateSettings({ vibrationEnabled: v })}
+app/(tabs)/settings.tsx:776:            onToggle={(v) => updateSettings({ ttsEnabled: v })}
+app/(tabs)/settings.tsx:784:            onToggle={(v) => updateSettings({ soundEnabled: v })}
+app/(tabs)/settings.tsx:792:            onToggle={(v) => updateSettings({ notificationEnabled: v })}
+app/(tabs)/settings.tsx:832:            onToggle={(enabled) => updateSettings({ idleAutoPauseEnabled: enabled })}
+app/(tabs)/settings.tsx:846:                void updateSettings({ idleAutoPauseSeconds: seconds });
+app/(tabs)/settings.tsx:864:            onToggle={(enabled) => updateSettings({ touchGuardEnabled: enabled })}
+app/(tabs)/settings.tsx:880:                      onPress={() => void updateSettings({ touchGuardUnlockHoldMs: milliseconds })}
+app/(tabs)/settings.tsx:931:                  onPress={() => updateSettings({ simplifiedNavMode: mode })}
+app/(tabs)/settings.tsx:959:                  onValueChange={(v) => updateSettings({ simplifiedNavIdleSec: Math.round(v) })}
+app/(tabs)/settings.tsx:995:              onValueChange={(value) => updateSettings({ autoRecenterSec: Math.round(value) })}
+lib/settings-context.tsx:312:  resetAllSettings: () => Promise<void>;
+lib/settings-context.tsx:435:        void AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(nextSettings));
+lib/settings-context.tsx:462:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:465:  const resetAllSettings = async () => {
+lib/settings-context.tsx:468:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:478:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:487:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:493:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:499:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:510:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:521:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:530:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:534:    <SettingsContext.Provider value={{ settings, updateSettings, resetAllSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem }}>
+
+--- permission/background handoffs ---
+app/(tabs)/map.tsx:83:  requestNotificationPermission,
+app/(tabs)/map.tsx:123:  startBackgroundLocationTracking,
+app/(tabs)/map.tsx:129:  updateBackgroundEnvironment,
+app/(tabs)/map.tsx:130:  updateBackgroundRiderProfile,
+app/(tabs)/map.tsx:131:  updateBackgroundSmartSupplyCountdown,
+app/(tabs)/map.tsx:132:  updateBackgroundSmartSupplyChannels,
+app/(tabs)/map.tsx:531:      void updateBackgroundSmartSupplyCountdown({
+app/(tabs)/map.tsx:675:        const requested = await Location.requestForegroundPermissionsAsync();
+app/(tabs)/map.tsx:799:    void updateBackgroundSmartSupplyChannels({
+app/(tabs)/map.tsx:807:    void updateBackgroundRiderProfile({
+app/(tabs)/map.tsx:1251:      void updateBackgroundEnvironment({
+app/(tabs)/map.tsx:1650:      const { status } = await Location.requestForegroundPermissionsAsync();
+app/(tabs)/map.tsx:1652:      notifPermRef.current = await requestNotificationPermission();
+app/(tabs)/map.tsx:2227:        : await Location.requestForegroundPermissionsAsync();
+app/(tabs)/map.tsx:2354:    const backgroundTrackingStarted = await startBackgroundLocationTracking(settings.gpsAccuracy || "standard");
+app/(tabs)/map.tsx:2702:        await startBackgroundLocationTracking(currentAccuracy);
+app/(tabs)/map.tsx:2723:            await startBackgroundLocationTracking("power_saving");
+app/(tabs)/map.tsx:2731:          await startBackgroundLocationTracking(userAccuracy);
+app/(tabs)/map.tsx:2934:                  startBackgroundLocationTracking(settings.gpsAccuracy || "standard");
+lib/permissions-manager.ts:149:  static async requestLocationPermission(): Promise<boolean> {
+lib/permissions-manager.ts:151:      const foreground = await Location.requestForegroundPermissionsAsync();
+lib/permissions-manager.ts:156:      const background = await Location.requestBackgroundPermissionsAsync();
+lib/permissions-manager.ts:164:  static async requestNotificationPermission(): Promise<boolean> {
+lib/permissions-manager.ts:169:      const settings = await Notifications.requestPermissionsAsync();
+lib/background-location.ts:276:            await Location.startLocationUpdatesAsync(
+lib/background-location.ts:688:export async function updateBackgroundSmartSupplyChannels(params: {
+lib/background-location.ts:718:export async function updateBackgroundRiderProfile(profile: NonNullable<BackgroundState["riderProfile"]>) {
+lib/background-location.ts:730:export async function updateBackgroundEnvironment(environment: NonNullable<BackgroundState["environment"]>) {
+lib/background-location.ts:742:export async function updateBackgroundSmartSupplyCountdown(countdown: Pick<
+lib/background-location.ts:889:export async function startBackgroundLocationTracking(gpsAccuracy: GpsAccuracyLevel = "standard") {
+lib/background-location.ts:892:    const foregroundPermission = await Location.requestForegroundPermissionsAsync();
+lib/background-location.ts:897:    const { status } = await Location.requestBackgroundPermissionsAsync();
+lib/background-location.ts:905:      await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+lib/background-location.ts:932:    const foregroundPermission = await Location.requestForegroundPermissionsAsync();
+lib/background-location.ts:934:    const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
+lib/background-location.ts:948:    await Location.startLocationUpdatesAsync(

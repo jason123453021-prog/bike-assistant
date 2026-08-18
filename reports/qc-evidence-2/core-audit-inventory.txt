@@ -1,0 +1,98 @@
+--- core test inventory ---
+activity-analysis-data.test.ts
+activity-estimation-calibration.test.ts
+activity-map-presentation.test.ts
+activity-media.test.ts
+activity-replay-and-local-markers.test.ts
+activity-sensor-estimates.test.ts
+activity-statistics.test.ts
+activity-stats.test.ts
+background-supply-recovery.test.ts
+compass-gps-optimizer.test.ts
+elevation-chart.test.ts
+gpx-elevation-filter.test.ts
+live-elevation-filter.test.ts
+live-ride-navigation-experience.test.ts
+local-activity-insights.test.ts
+local-ride-photos.test.ts
+navigation-ride-lifecycle-isolation.test.ts
+persistence-batching.test.ts
+personalized-ride-calculations.test.ts
+post-ride-cleanup-and-model-governance.test.ts
+ride-audio-interruption.test.ts
+ride-detail-jsx-safety.test.ts
+ride-focus-experience.test.ts
+ride-lifecycle-guard.test.ts
+ride-permission-readiness.test.ts
+ride-record-normalizer.test.ts
+ride-splits.test.ts
+ride-start-location-readiness.test.ts
+ride-time-accounting.test.ts
+ride-tracking-lifecycle.test.ts
+route-time-estimator.test.ts
+track-point-quality.test.ts
+--- lifecycle cleanup guards ---
+app/(tabs)/map.tsx:313:    if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
+app/(tabs)/map.tsx:325:      clearTimeout(recoverySnapshotTimerRef.current);
+app/(tabs)/map.tsx:351:    if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
+app/(tabs)/map.tsx:352:    if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+app/(tabs)/map.tsx:413:      return () => clearTimeout(fitTimer);
+app/(tabs)/map.tsx:480:      subscription?.remove();
+app/(tabs)/map.tsx:503:      subscription.remove();
+app/(tabs)/map.tsx:727:      clearInterval(supplyRepeatTimerRef.current);
+app/(tabs)/map.tsx:734:  const clearIntervalSupplyRepeatTimer = useCallback(() => {
+app/(tabs)/map.tsx:736:      clearInterval(intervalSupplyRepeatTimerRef.current);
+app/(tabs)/map.tsx:744:    clearIntervalSupplyRepeatTimer();
+app/(tabs)/map.tsx:746:      if (tracker.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
+app/(tabs)/map.tsx:747:      if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+app/(tabs)/map.tsx:767:  }, [alertPlayer, clearIntervalSupplyRepeatTimer, clearSupplyRepeatTimer, syncSmartSupplyCountdown]);
+app/(tabs)/map.tsx:826:    clearIntervalSupplyRepeatTimer();
+app/(tabs)/map.tsx:827:  }, [clearIntervalSupplyRepeatTimer, clearSupplyRepeatTimer]);
+app/(tabs)/map.tsx:844:    if (tracker?.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
+app/(tabs)/map.tsx:845:    if (tracker?.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+app/(tabs)/map.tsx:865:    if (!Object.values(nextAlerts).some(Boolean)) clearIntervalSupplyRepeatTimer();
+app/(tabs)/map.tsx:867:  }, [clearIntervalSupplyRepeatTimer, settings.vibrationEnabled]);
+app/(tabs)/map.tsx:957:        clearInterval(supplyRepeatTimerRef.current);
+app/(tabs)/map.tsx:966:        if (tracker?.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+app/(tabs)/map.tsx:974:      clearIntervalSupplyRepeatTimer();
+app/(tabs)/map.tsx:977:  }, [clearIntervalSupplyRepeatTimer, smartEnergySupplyEnabled, smartWaterSupplyEnabled]);
+app/(tabs)/map.tsx:1038:      clearInterval(touchGuardHoldTimerRef.current);
+app/(tabs)/map.tsx:1047:      clearTimeout(touchGuardRelockTimerRef.current);
+app/(tabs)/map.tsx:1092:      clearInterval(touchGuardHoldTimerRef.current);
+app/(tabs)/map.tsx:1105:    if (touchGuardRelockTimerRef.current) clearTimeout(touchGuardRelockTimerRef.current);
+app/(tabs)/map.tsx:1168:    return () => clearInterval(intervalId);
+app/(tabs)/map.tsx:1418:        if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+app/(tabs)/map.tsx:1428:              clearInterval(tracker.repeatIntervalId);
+app/(tabs)/map.tsx:1491:          clearIntervalSupplyRepeatTimer();
+app/(tabs)/map.tsx:1504:  }, [alertPlayer, clearIntervalSupplyRepeatTimer, settings, smartEnergySupplyEnabled, smartWaterSupplyEnabled]);
+app/(tabs)/map.tsx:1509:    return () => clearInterval(checkInterval);
+app/(tabs)/map.tsx:1512:  useEffect(() => () => clearIntervalSupplyRepeatTimer(), [clearIntervalSupplyRepeatTimer]);
+app/(tabs)/map.tsx:1527:      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+app/(tabs)/map.tsx:1536:      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+app/(tabs)/map.tsx:1604:      if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+app/(tabs)/map.tsx:1622:      locationSubRef.current?.remove();
+app/(tabs)/map.tsx:1633:      if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+app/(tabs)/map.tsx:1643:      locationSubRef.current?.remove();
+app/(tabs)/map.tsx:2127:        sub.remove();
+app/(tabs)/map.tsx:2136:      locationSubscription?.remove();
+app/(tabs)/map.tsx:2236:    if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+app/(tabs)/map.tsx:2302:    clearIntervalSupplyRepeatTimer();
+app/(tabs)/map.tsx:2379:  }, [clearIntervalSupplyRepeatTimer, currentPos, dispatch, estimateAgeYears, estimateFtpW, hydrationThresholdMl, gpxRoute, settings, smartEnergySupplyEnabled, smartWaterSupplyEnabled, state.sportType, syncSmartSupplyCountdown, updateWeather, calorieAnim, waterAnim]);
+app/(tabs)/map.tsx:2401:          if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+app/(tabs)/map.tsx:2406:          locationSubRef.current?.remove();
+app/(tabs)/map.tsx:2412:          if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
+app/(tabs)/map.tsx:2440:          clearIntervalSupplyRepeatTimer();
+app/(tabs)/map.tsx:2545:  }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, state.distance, state.elapsed, syncSmartSupplyCountdown, updateSettings]);
+app/(tabs)/map.tsx:2549:    if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
+app/(tabs)/map.tsx:2690:    return () => { subscription.remove(); };
+app/(tabs)/map.tsx:2738:    return () => { cancelled = true; clearInterval(interval); };
+app/(tabs)/map.tsx:2744:      locationSubRef.current?.remove();
+app/(tabs)/map.tsx:2745:      if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
+app/(tabs)/map.tsx:2746:      if (autoRecenterTimerRef.current) clearTimeout(autoRecenterTimerRef.current);
+app/(tabs)/map.tsx:2756:    return () => clearInterval(timer);
+app/(tabs)/map.tsx:2763:    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+app/(tabs)/map.tsx:2777:      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+app/(tabs)/map.tsx:2781:      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+lib/background-location.ts:275:            if (isRegistered) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+lib/background-location.ts:947:    if (isRegistered) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+lib/background-location.ts:964:      await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);

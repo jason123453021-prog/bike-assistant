@@ -1,0 +1,17 @@
+
+> app-template@1.0.2 test /home/ubuntu/bike_assistant
+> vitest run "tests/ride-permission-readiness.test.ts" "tests/ride-start-location-readiness.test.ts" "tests/ride-focus-experience.test.ts" "tests/expo-go-startup-stability.test.ts" "tests/offline-model-update.test.ts" "tests/theme-contrast.test.ts"
+
+
+ RUN  v2.1.9 /home/ubuntu/bike_assistant
+
+ ✓ tests/ride-permission-readiness.test.ts (3 tests) 4ms
+ ✓ tests/expo-go-startup-stability.test.ts (3 tests) 4ms
+ ✓ tests/ride-focus-experience.test.ts (5 tests) 5ms
+ ✓ tests/ride-start-location-readiness.test.ts (3 tests) 4ms
+
+ Test Files  4 passed (4)
+      Tests  14 passed (14)
+   Start at  10:21:22
+   Duration  337ms (transform 97ms, setup 0ms, collect 134ms, tests 17ms, environment 1ms, prepare 297ms)
+

@@ -18,7 +18,7 @@ describe("Android 15/16 release configuration", () => {
     expect(configSource).not.toContain("with-foreground-service-plugin");
     expect(configSource).toContain("blockedPermissions");
     expect(configSource).toContain('"android.permission.RECEIVE_BOOT_COMPLETED"');
-    expect(configSource).toContain('"android.permission.SYSTEM_ALERT_WINDOW"');
+    expect(configSource).not.toContain('"android.permission.SYSTEM_ALERT_WINDOW"');
   });
 
   it("keeps R8 optimization for production while allowing conservative preview APK builds", () => {
