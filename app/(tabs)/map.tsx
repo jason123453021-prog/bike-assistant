@@ -48,8 +48,6 @@ import Svg, { Circle } from "react-native-svg";
 
 import { useRide } from "@/lib/ride-context";
 import { formatPausedSystemClock } from "@/lib/paused-system-clock";
-import { closeAndroidRidePip, updateAndroidRidePipSnapshot } from "@/lib/android-ride-pip";
-import { buildRidePipSnapshot } from "@/lib/ride-pip-snapshot";
 import {
   buildSportDashboardMetrics,
   calculateGapPaceSecPerKm,
@@ -563,20 +561,6 @@ export default function MapScreen() {
   // 轉彎指示增強狀態
   const [turnDirection, setTurnDirection] = useState<'left' | 'right' | 'arrive' | null>(null);
   const [turnDistanceM, setTurnDistanceM] = useState<number>(0);
-
-  // Android PiP 僅讀取既有騎乘與導航狀態；不派送 reducer action，也不影響距離、時間或補給倒數。
-  const ridePipSnapshot = useMemo(() => buildRidePipSnapshot({
-    status: state.status,
-    instruction: isNavigating ? navInstruction : "騎乘中",
-    turnDistanceM: isNavigating ? turnDistanceM : 0,
-    speedKmh: state.currentSpeed,
-    distanceM: state.distance,
-  }), [isNavigating, navInstruction, state.currentSpeed, state.distance, state.status, turnDistanceM]);
-
-  useEffect(() => {
-    updateAndroidRidePipSnapshot(ridePipSnapshot);
-    if (!ridePipSnapshot.active) closeAndroidRidePip();
-  }, [ridePipSnapshot]);
 
   // ── 地圖釘選功能（按鈕 + 中心圖釘） ──
   const [pinSelectMode, setPinSelectMode] = useState(false); // 釘選模式是否啟動

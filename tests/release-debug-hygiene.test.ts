@@ -20,9 +20,8 @@ describe("release debug hygiene", () => {
 
   it("enables release optimization and disables the development network inspector", () => {
     const gradleProperties = read("android/gradle.properties");
-    const configSource = read("app.config.ts");
     expect(gradleProperties).toContain("EX_DEV_CLIENT_NETWORK_INSPECTOR=false");
-    expect(configSource).toContain("enableMinifyInReleaseBuilds: isProductionEasBuild");
-    expect(configSource).toContain("enableShrinkResourcesInReleaseBuilds: isProductionEasBuild");
+    expect(gradleProperties).toContain("android.enableMinifyInReleaseBuilds=true");
+    expect(gradleProperties).toContain("android.enableShrinkResourcesInReleaseBuilds=true");
   });
 });
