@@ -3569,7 +3569,7 @@ export default function MapScreen() {
         distance={(state.distance ?? 0) / 1000}
         remainingDist={distToEnd !== null ? distToEnd / 1000 : undefined}
         direction={navInstruction || undefined}
-        currentTime={new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false })}
+        currentTime={formatPausedSystemClock(systemClockNow)}
         elapsedTime={formatDuration(state.elapsed ?? 0)}
         grade={currentGrade}
         power={state.currentPower}

@@ -82,7 +82,6 @@ export function SimplifiedNavOverlay({
   const BOTTOM_KEY_MAP: Partial<Record<SimplifiedFieldKey, () => { value: string; label: string } | null>> = {
     showDistance: () => f.showDistance ? { value: distance.toFixed(2), label: "公里" } : null,
     showElapsed: () => f.showElapsed ? { value: elapsedTime, label: "時間" } : null,
-    showCurrentTime: () => f.showCurrentTime ? { value: currentTime, label: "現在" } : null,
     showGrade: () => f.showGrade ? { value: grade !== undefined ? `${grade > 0 ? "+" : ""}${grade.toFixed(1)}%` : "--", label: "坡度" } : null,
     showPower: () => f.showPower ? { value: power !== undefined ? `${power}W` : "--", label: "功率" } : null,
     showAvgSpeed: () => f.showAvgSpeed ? { value: avgSpeed !== undefined && avgSpeed > 0 ? avgSpeed.toFixed(1) : "--", label: "均速" } : null,
@@ -91,7 +90,7 @@ export function SimplifiedNavOverlay({
     showTotalAscent: () => f.showTotalAscent ? { value: totalAscent !== undefined ? `${totalAscent.toFixed(0)}` : "0", label: "m 爬升" } : null,
     showCurrentAltitude: () => f.showCurrentAltitude ? { value: currentAltitude !== undefined ? `${currentAltitude.toFixed(0)}` : "--", label: "m 海拔" } : null,
   };
-  const BOTTOM_KEYS: SimplifiedFieldKey[] = ["showDistance", "showElapsed", "showCurrentTime", "showGrade", "showPower", "showAvgSpeed", "showCalories", "showPausedTime", "showTotalAscent", "showCurrentAltitude"];
+  const BOTTOM_KEYS: SimplifiedFieldKey[] = ["showDistance", "showElapsed", "showGrade", "showPower", "showAvgSpeed", "showCalories", "showPausedTime", "showTotalAscent", "showCurrentAltitude"];
   const orderedKeys = fieldOrder
     ? [...fieldOrder.filter((k) => BOTTOM_KEYS.includes(k)), ...BOTTOM_KEYS.filter((k) => !fieldOrder.includes(k))]
     : BOTTOM_KEYS;
@@ -107,6 +106,13 @@ export function SimplifiedNavOverlay({
   return (
     <Pressable style={styles.overlay} onPress={onDismiss}>
       <StatusBar barStyle="light-content" />
+
+      {f.showCurrentTime && (
+        <View style={styles.systemClock} accessibilityLabel={`系統時間 ${currentTime}`}>
+          <Text style={styles.systemClockLabel}>系統時間</Text>
+          <Text style={styles.systemClockValue}>{currentTime}</Text>
+        </View>
+      )}
 
       {/* 頂部：方向指引 */}
       {f.showDirection ? (
@@ -150,7 +156,7 @@ export function SimplifiedNavOverlay({
         <View style={styles.speedBlock} />
       )}
 
-      {/* 底部：距離 + 時間 + 當前時間（依設定動態顯示，超過3個橫向捲動） */}
+      {/* 底部：騎乘數據（依設定動態顯示，超過3個橫向捲動） */}
       {bottomItems.length > 0 && (
         <ScrollView
           horizontal
@@ -197,6 +203,20 @@ const styles = StyleSheet.create({
     paddingBottom: 48 /* internal spacing */,
     paddingHorizontal: 32,
   },
+  systemClock: {
+    position: "absolute",
+    top: 20,
+    right: 24,
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+  systemClockLabel: { fontSize: 11, color: "#B8B8B8", fontWeight: "700" },
+  systemClockValue: { fontSize: 18, color: "#FFFFFF", fontWeight: "800", fontVariant: ["tabular-nums"] },
   directionRow: {
     flexDirection: "row",
     alignItems: "center",

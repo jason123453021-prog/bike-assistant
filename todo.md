@@ -2028,3 +2028,8 @@
 ## 儀表板系統時間常駐（2026-08-18）
 - [x] 將系統時間改為儀表板頂部固定位置，於騎乘中與暫停時皆持續顯示
 - [x] 驗證常駐時鐘不會改變活動、移動或暫停時間統計（TypeScript 0 errors；lint 0 warnings／0 errors；9 targeted tests passed）
+
+## 簡化導航系統時間同步（2026-08-18）
+- [x] 盤點簡化導航的時間欄位與主儀表板格式來源
+- [x] 以相同 HH:MM 格式將系統時間固定顯示於簡化導航模式
+- [x] 驗證顯示一致性與騎乘統計隔離（TypeScript 0 errors；lint 0 warnings／0 errors；7 targeted tests passed）
