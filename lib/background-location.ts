@@ -175,7 +175,6 @@ function bgHaversine(lat1: number, lon1: number, lat2: number, lon2: number): nu
 // 定義背景任務（必須在模組頂層，不能在函數內）
 TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
   if (error) {
-    console.warn("[BackgroundLocation] Error:", error.message);
     return;
   }
   if (data) {
@@ -573,9 +572,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           intervalSec: point.intervalSec || undefined,
         }
       )));
-    } catch (e) {
-      console.warn("[BackgroundLocation] Processing error:", e);
-    }
+    } catch {}
   }
 });
 
@@ -891,12 +888,10 @@ export async function startBackgroundLocationTracking(gpsAccuracy: GpsAccuracyLe
     const { accuracy: accuracyLevel, timeInterval: timeIntervalMs, distanceInterval: distanceIntervalM } = ACCURACY_CONFIG[gpsAccuracy];
     const foregroundPermission = await Location.requestForegroundPermissionsAsync();
     if (foregroundPermission.status !== "granted") {
-      console.warn("[BackgroundLocation] Foreground permission denied");
       return false;
     }
     const { status } = await Location.requestBackgroundPermissionsAsync();
     if (status !== "granted") {
-      console.warn("[BackgroundLocation] Background permission denied");
       return false;
     }
 
@@ -917,8 +912,7 @@ export async function startBackgroundLocationTracking(gpsAccuracy: GpsAccuracyLe
       });
     }
     return true;
-  } catch (e) {
-    console.warn("[BackgroundLocation] Start failed:", e);
+  } catch {
     return false;
   }
 }
@@ -950,8 +944,7 @@ export async function setBackgroundLocationTrackingMode(
       locationTaskOptions(gpsAccuracy, mode),
     );
     return true;
-  } catch (e) {
-    console.warn("[BackgroundLocation] Idle monitor start failed:", e);
+  } catch {
     return false;
   }
 }
@@ -963,9 +956,7 @@ export async function stopBackgroundLocationTracking() {
     if (isRegistered) {
       await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
     }
-  } catch (e) {
-    console.warn("[BackgroundLocation] Stop failed:", e);
-  }
+  } catch {}
 }
 
 /**
@@ -974,7 +965,5 @@ export async function stopBackgroundLocationTracking() {
 export async function clearBackgroundData() {
   try {
     await AsyncStorage.multiRemove([BG_TRACK_KEY, BG_STATE_KEY]);
-  } catch (e) {
-    console.warn("[BackgroundLocation] 清除背景數據失敗:", e);
-  }
+  } catch {}
 }

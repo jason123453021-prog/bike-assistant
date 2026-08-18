@@ -14,7 +14,7 @@ describe("release debug hygiene", () => {
       "lib/power-saving/smart-power-saving-system.ts",
       "lib/route-service.ts",
     ]) {
-      expect(read(path)).not.toMatch(/console\.(log|info|debug)\(/);
+      expect(read(path)).not.toMatch(/console\.(log|info|debug|warn|error)\(/);
     }
   });
 

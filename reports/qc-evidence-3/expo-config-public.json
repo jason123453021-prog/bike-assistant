@@ -1,0 +1,186 @@
+
+{
+  name: [32m'單車助手'[39m,
+  slug: [32m'bike-assistant'[39m,
+  owner: [32m'jason123453021'[39m,
+  version: [32m'1.0.3'[39m,
+  orientation: [32m'default'[39m,
+  icon: [32m'./assets/images/icon.png'[39m,
+  scheme: [32m'manus20260617'[39m,
+  userInterfaceStyle: [32m'automatic'[39m,
+  newArchEnabled: [33mtrue[39m,
+  jsEngine: [32m'hermes'[39m,
+  plugins: [
+    [32m'expo-router'[39m,
+    [32m'expo-font'[39m,
+    [32m'expo-asset'[39m,
+    [
+      [32m'expo-location'[39m,
+      {
+        locationAlwaysAndWhenInUsePermission: [32m'單車助手需要位置權限以追蹤您的騎乘路線，並在螢幕關閉時持續完成本機紀錄。'[39m,
+        locationWhenInUsePermission: [32m'單車助手需要位置權限以追蹤您的騎乘路線及提供 GPS 導航功能。'[39m,
+        isAndroidBackgroundLocationEnabled: [33mtrue[39m,
+        isAndroidForegroundServiceEnabled: [33mtrue[39m
+      }
+    ],
+    [
+      [32m'expo-audio'[39m,
+      {
+        microphonePermission: [32m'單車助手需要麥克風權限以支援語音功能。'[39m
+      }
+    ],
+    [
+      [32m'expo-image-picker'[39m,
+      {
+        photosPermission: [32m'單車助手僅在您主動選取時讀取相片，以加入本機騎乘時間軸。'[39m
+      }
+    ],
+    [
+      [32m'expo-splash-screen'[39m,
+      {
+        image: [32m'./assets/images/splash-icon.png'[39m,
+        imageWidth: [33m200[39m,
+        resizeMode: [32m'contain'[39m,
+        backgroundColor: [32m'#0D0D0D'[39m,
+        dark: {
+          backgroundColor: [32m'#0D0D0D'[39m
+        }
+      }
+    ],
+    [
+      [32m'expo-build-properties'[39m,
+      {
+        android: {
+          buildArchs: [
+            [32m'armeabi-v7a'[39m,
+            [32m'arm64-v8a'[39m
+          ],
+          compileSdkVersion: [33m36[39m,
+          minSdkVersion: [33m24[39m,
+          targetSdkVersion: [33m36[39m,
+          enableMinifyInReleaseBuilds: [33mfalse[39m,
+          enableShrinkResourcesInReleaseBuilds: [33mfalse[39m
+        }
+      }
+    ]
+  ],
+  runtimeVersion: [32m'1.0.3'[39m,
+  description: [90mundefined[39m,
+  sdkVersion: [32m'54.0.0'[39m,
+  platforms: [
+    [32m'ios'[39m,
+    [32m'android'[39m,
+    [32m'web'[39m
+  ],
+  ios: {
+    supportsTablet: [33mtrue[39m,
+    bundleIdentifier: [32m'com.jason123453021.bikeassistant'[39m,
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: [33mfalse[39m,
+      NSLocationWhenInUseUsageDescription: [32m'單車助手需要存取您的位置，以提供 GPS 導航、速度計算及騎乘路線追蹤功能。'[39m,
+      NSLocationAlwaysAndWhenInUseUsageDescription: [32m'單車助手需要在背景存取您的位置，以便在螢幕關閉時持續追蹤騎乘路線並更新通知欄資訊。'[39m,
+      NSLocationAlwaysUsageDescription: [32m'單車助手需要在背景存取您的位置，以便在螢幕關閉時持續追蹤騎乘路線並更新通知欄資訊。'[39m
+    }
+  },
+  android: {
+    versionCode: [33m10087[39m,
+    edgeToEdgeEnabled: [33mtrue[39m,
+    predictiveBackGestureEnabled: [33mfalse[39m,
+    package: [32m'com.jason123453021.bikeassistant'[39m,
+    permissions: [
+      [32m'android.permission.ACCESS_FINE_LOCATION'[39m,
+      [32m'android.permission.ACCESS_COARSE_LOCATION'[39m,
+      [32m'android.permission.ACCESS_BACKGROUND_LOCATION'[39m,
+      [32m'android.permission.FOREGROUND_SERVICE'[39m,
+      [32m'android.permission.FOREGROUND_SERVICE_LOCATION'[39m,
+      [32m'android.permission.POST_NOTIFICATIONS'[39m,
+      [32m'android.permission.VIBRATE'[39m,
+      [32m'android.permission.WAKE_LOCK'[39m,
+      [32m'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS'[39m,
+      [32m'android.permission.RECORD_AUDIO'[39m,
+      [32m'android.permission.MODIFY_AUDIO_SETTINGS'[39m
+    ],
+    blockedPermissions: [
+      [32m'android.permission.RECEIVE_BOOT_COMPLETED'[39m
+    ],
+    intentFilters: [
+      {
+        action: [32m'VIEW'[39m,
+        data: [
+          {
+            scheme: [32m'content'[39m,
+            mimeType: [32m'application/gpx+xml'[39m
+          },
+          {
+            scheme: [32m'content'[39m,
+            mimeType: [32m'application/xml'[39m,
+            pathPattern: [32m'.*\\.gpx'[39m
+          },
+          {
+            scheme: [32m'content'[39m,
+            mimeType: [32m'text/xml'[39m,
+            pathPattern: [32m'.*\\.gpx'[39m
+          },
+          {
+            scheme: [32m'content'[39m,
+            mimeType: [32m'application/octet-stream'[39m,
+            pathPattern: [32m'.*\\.gpx'[39m
+          },
+          {
+            scheme: [32m'file'[39m,
+            mimeType: [32m'application/gpx+xml'[39m
+          },
+          {
+            scheme: [32m'file'[39m,
+            mimeType: [32m'application/octet-stream'[39m,
+            pathPattern: [32m'.*\\.gpx'[39m
+          }
+        ],
+        category: [
+          [32m'BROWSABLE'[39m,
+          [32m'DEFAULT'[39m
+        ]
+      },
+      {
+        action: [32m'VIEW'[39m,
+        autoVerify: [33mtrue[39m,
+        data: [
+          {
+            scheme: [32m'manus20260617'[39m,
+            host: [32m'*'[39m
+          }
+        ],
+        category: [
+          [32m'BROWSABLE'[39m,
+          [32m'DEFAULT'[39m
+        ]
+      }
+    ],
+    adaptiveIcon: {
+      backgroundColor: [32m'#0D0D0D'[39m,
+      foregroundImage: [32m'./assets/images/android-icon-foreground.png'[39m,
+      backgroundImage: [32m'./assets/images/android-icon-background.png'[39m,
+      monochromeImage: [32m'./assets/images/android-icon-monochrome.png'[39m
+    }
+  },
+  web: {
+    bundler: [32m'metro'[39m,
+    output: [32m'single'[39m,
+    favicon: [32m'./assets/images/favicon.png'[39m
+  },
+  experiments: {
+    typedRoutes: [33mtrue[39m,
+    reactCompiler: [33mfalse[39m
+  },
+  extra: {
+    modelUpdateManifestUrl: [32m'https://bikeassist-bdbkimdc.manus.space/api/model-update/manifest'[39m,
+    eas: {
+      projectId: [32m'af286610-25f1-45e5-afcc-6c30040d4124'[39m
+    },
+    router: {}
+  },
+  androidStatusBar: {
+    backgroundColor: [32m'#0D0D0D'[39m
+  }
+}
+

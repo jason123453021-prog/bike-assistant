@@ -1,0 +1,25 @@
+
+> app-template@1.0.2 test /home/ubuntu/bike_assistant
+> vitest run "tests/activity-statistics.test.ts" "tests/activity-stats.test.ts" "tests/track-point-quality.test.ts" "tests/gpx-elevation-filter.test.ts" "tests/live-elevation-filter.test.ts" "tests/background-supply-recovery.test.ts" "tests/ride-tracking-lifecycle.test.ts" "tests/ride-lifecycle-guard.test.ts" "tests/ride-time-accounting.test.ts" "tests/persistence-batching.test.ts" "tests/navigation-ride-lifecycle-isolation.test.ts" "tests/ride-start-location-readiness.test.ts"
+
+
+ RUN  v2.1.9 /home/ubuntu/bike_assistant
+
+ ✓ tests/navigation-ride-lifecycle-isolation.test.ts (4 tests) 4ms
+ ✓ tests/persistence-batching.test.ts (3 tests) 4ms
+ ✓ tests/activity-statistics.test.ts (3 tests) 4ms
+ ✓ tests/track-point-quality.test.ts (3 tests) 6ms
+ ✓ tests/gpx-elevation-filter.test.ts (3 tests) 5ms
+ ✓ tests/ride-lifecycle-guard.test.ts (4 tests) 4ms
+ ✓ tests/background-supply-recovery.test.ts (4 tests) 4ms
+ ✓ tests/ride-start-location-readiness.test.ts (3 tests) 4ms
+ ✓ tests/live-elevation-filter.test.ts (3 tests) 6ms
+ ✓ tests/activity-stats.test.ts (2 tests) 4ms
+ ✓ tests/ride-time-accounting.test.ts (3 tests) 4ms
+ ✓ tests/ride-tracking-lifecycle.test.ts (3 tests) 3ms
+
+ Test Files  12 passed (12)
+      Tests  38 passed (38)
+   Start at  12:54:30
+   Duration  851ms (transform 313ms, setup 0ms, collect 513ms, tests 53ms, environment 2ms, prepare 930ms)
+

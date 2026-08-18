@@ -1,0 +1,17 @@
+
+> app-template@1.0.2 test /home/ubuntu/bike_assistant
+> vitest run "tests/smart-supply-tts.test.ts" "tests/address-navigation-ui.test.ts" "tests/ride-tracking-lifecycle.test.ts" "tests/release-debug-hygiene.test.ts"
+
+
+ RUN  v2.1.9 /home/ubuntu/bike_assistant
+
+ ✓ tests/smart-supply-tts.test.ts (5 tests) 5ms
+ ✓ tests/release-debug-hygiene.test.ts (2 tests) 5ms
+ ✓ tests/address-navigation-ui.test.ts (3 tests) 7ms
+ ✓ tests/ride-tracking-lifecycle.test.ts (3 tests) 3ms
+
+ Test Files  4 passed (4)
+      Tests  13 passed (13)
+   Start at  13:09:31
+   Duration  324ms (transform 87ms, setup 0ms, collect 131ms, tests 21ms, environment 1ms, prepare 290ms)
+

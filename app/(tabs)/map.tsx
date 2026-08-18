@@ -67,14 +67,11 @@ import { useGpx } from "@/lib/gpx-context";
 import { type GpxPoint, type GpxRoute } from "@/lib/gpx-parser";
 import { calculateKilometerMarkers } from "@/lib/kilometer-markers";
 import {
-  speak,
   vibrateLight,
   vibrateMedium,
   vibrateWarning,
   vibrateSuccess,
   speakSupplyReminder,
-  speakAutoPause,
-  speakAutoResume,
   scheduleSmartSupplyDueNotification,
   clearAllSmartSupplyDueNotifications,
   clearAllSupplyNotifications,
@@ -92,7 +89,7 @@ import {
   formatDuration,
 } from "@/lib/power-calc";
 import { fetchWeather, getHeadwindMs, getRelativeWindInfo, type WeatherData } from "@/lib/weather-service";
-import { fetchBikeRoute, formatRouteDistance, formatRouteDuration } from "@/lib/route-service";
+import { fetchBikeRoute, formatRouteDistance } from "@/lib/route-service";
 import {
   formatNavigationDataFreshness,
   loadRecentAddressSearches,
@@ -570,6 +567,7 @@ export default function MapScreen() {
   const [showPinCard, setShowPinCard] = useState(false);
   const [isFetchingPinRoute, setIsFetchingPinRoute] = useState(false);
   const [pinRouteInfo, setPinRouteInfo] = useState<{ distM: number; durSec: number; polyline: { latitude: number; longitude: number }[] } | null>(null);
+  const [pinRouteStatusMessage, setPinRouteStatusMessage] = useState<string | null>(null);
   const [pinAddress, setPinAddress] = useState("");
   const [isResolvingPinAddress, setIsResolvingPinAddress] = useState(false);
   const [pinAddressCandidates, setPinAddressCandidates] = useState<RecentAddressSearch[]>([]);
@@ -599,10 +597,11 @@ export default function MapScreen() {
     setCenterPinLocation(null);
     setShowPinCard(false);
     setPinRouteInfo(null);
+    setPinRouteStatusMessage(null);
     arrivedRef.current = false;
   }, [clearSharedRoute]);
 
-  const startPinnedNavigationRoute = useCallback((route: GpxRoute, announcement: string) => {
+  const startPinnedNavigationRoute = useCallback((route: GpxRoute) => {
     const nextLayer: PinnedNavigationLayer<GpxRoute> = {
       id: `pinned-${Date.now()}`,
       route,
@@ -617,7 +616,6 @@ export default function MapScreen() {
       setFollowUser(true);
       setNearestIdx(0);
       arrivedRef.current = false;
-      speak(announcement, settings.ttsEnabled);
     };
 
     if (!hasExistingNavigationLayers(Boolean(sharedRoute), pinnedNavigationLayers.length)) {
@@ -634,7 +632,7 @@ export default function MapScreen() {
         { text: "清除並開始", style: "destructive", onPress: () => commitRoute(true) },
       ],
     );
-  }, [clearSharedRoute, pinnedNavigationLayers.length, settings.ttsEnabled, sharedRoute]);
+  }, [clearSharedRoute, pinnedNavigationLayers.length, sharedRoute]);
 
   const selectPinAddressDestination = useCallback((destination: RecentAddressSearch) => {
     const nextLocation = { lat: destination.latitude, lon: destination.longitude };
@@ -642,6 +640,7 @@ export default function MapScreen() {
     setPinnedLocationLabel(destination.label);
     setPinAddress(destination.label);
     setPinRouteInfo(null);
+    setPinRouteStatusMessage(null);
     setShowPinCard(true);
     setPinSelectMode(false);
     setCenterPinLocation(null);
@@ -656,6 +655,7 @@ export default function MapScreen() {
     mapRef.current?.refreshBaseTiles();
     setLastNavigationDataRefreshAt(Date.now());
     setPinRouteInfo(null);
+    setPinRouteStatusMessage(null);
     Alert.alert(
       "已請求更新圖資",
       "地圖已重新向上游請求圖磚。請再按「計算路線」重新取得道路與自行車道資料；臨時施工或短時封路仍可能有延遲，請以現場管制為準。",
@@ -1626,7 +1626,6 @@ export default function MapScreen() {
         : null;
       setRideLocationTrackingMode("idle_monitor");
       void setBackgroundLocationTrackingMode(settings.gpsAccuracy || "standard", "idle_monitor");
-      if (settings.ttsEnabled) speak("偵測到靜止，已切換為省電定位監測", true);
     }, delayMs);
 
     return () => {
@@ -1692,7 +1691,6 @@ export default function MapScreen() {
               setRideLocationTrackingMode("full");
               dispatch({ type: "RESUME" });
               void setBackgroundLocationTrackingMode(settings.gpsAccuracy || "standard", "full");
-              if (settings.ttsEnabled) speak("已偵測到重新移動，恢復騎乘紀錄", true);
             }
             return;
           }
@@ -1803,10 +1801,9 @@ export default function MapScreen() {
                 dispatch({ type: "PAUSE" });
                 // 暫停時強制歸零速度與功率
                 dispatch({ type: "LOCATION_UPDATE", point: { latitude, longitude, altitude: altitude ?? 0, speed: 0, timestamp: Date.now() }, power: 0, calories: 0, ascent: 0 });
-                if (settings.ttsEnabled) speakAutoPause(true);
                 if (settings.vibrationEnabled) vibrateMedium();
                 // 集成情感化 UX - 自動暫停反饋
-                EmotionalUXManager.onAutoPauseTriggered('speed').catch((error: any) => console.warn("Auto pause emotional UX failed:", error));
+                EmotionalUXManager.onAutoPauseTriggered('speed').catch(() => {});
                 return;
               }
             } else if (autoPausePolicy.mode === "suggest" && avgSpeed < autoPausePolicy.speedBelowKmh) {
@@ -1824,8 +1821,7 @@ export default function MapScreen() {
             lowSpeedCountRef.current = 0;
             dispatch({ type: "RESUME" });
             // 集成情感化 UX - 自動恢復反饋
-            EmotionalUXManager.onRideResumed().catch((error: any) => console.warn("Auto resume emotional UX failed:", error));
-            if (settings.ttsEnabled) speakAutoResume(true);
+            EmotionalUXManager.onRideResumed().catch(() => {});
             return;
           }
 
@@ -2154,7 +2150,6 @@ export default function MapScreen() {
       if (!arrivedRef.current && dEnd < ARRIVAL_THRESHOLD_M) {
         arrivedRef.current = true;
         setNavInstruction("已到達終點！");
-        speak("恭喜！您已到達終點！", settings.ttsEnabled);
         vibrateMedium();
         return;
       }
@@ -2180,7 +2175,6 @@ export default function MapScreen() {
             const now = Date.now();
             if (now - lastTurnSpokenRef.current > 10000) {
               turnInstruction = diff > 0 ? "右轉" : "左轉";
-              speak(turnInstruction, settings.ttsEnabled);
               lastTurnSpokenRef.current = now;
             } else {
               turnInstruction = diff > 0 ? "右轉" : "左轉";
@@ -2210,7 +2204,7 @@ export default function MapScreen() {
         setTurnDistanceM(0);
       }
     },
-    [gpxRoute, settings.ttsEnabled]
+    [gpxRoute]
   );
 
   // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
@@ -2304,7 +2298,6 @@ export default function MapScreen() {
     if (gpxRoute) {
       setIsNavigating(true);
       setNavInstruction("導航已啟動");
-      speak("導航已啟動，沿路線前進", settings.ttsEnabled);
     }
 
     // 初始化背景狀態（確保背景中能計算距離和觸發補給提醒）
@@ -2572,7 +2565,6 @@ export default function MapScreen() {
             pausedAtRef.current = null;
             setRideLocationTrackingMode("full");
             dispatch({ type: "RESUME" });
-            if (settings.ttsEnabled) speak("已偵測到重新移動，恢復騎乘紀錄", true);
           }
           if (settings.supplyReminderEnabled && bgState && bgState.supplyReminderEnabled !== false) {
             const backgroundSmartChannels = resolveSmartSupplyChannels(bgState);
@@ -2681,9 +2673,7 @@ export default function MapScreen() {
               setTouchGuardEnabled(false);
             }
           }
-        } catch (e) {
-          console.warn('[AppState] 恢復背景數據失敗:', e);
-        }
+      } catch {}
       }
       appStateRef.current = nextState;
     });
@@ -3594,6 +3584,7 @@ export default function MapScreen() {
                 setPinnedLocation(null);
                 setPinnedLocationLabel(null);
                 setPinRouteInfo(null);
+                setPinRouteStatusMessage(null);
               }}
             >
               <IconSymbol name="xmark.circle.fill" size={20} color="#666" />
@@ -3605,6 +3596,9 @@ export default function MapScreen() {
             </Text>
             {isFetchingPinRoute && (
               <Text style={styles.pinCardStatus}>計算路線中…</Text>
+            )}
+            {pinRouteStatusMessage && (
+              <Text style={styles.pinCardStatus}>{pinRouteStatusMessage}</Text>
             )}
             {pinRouteInfo && (
               <View style={styles.pinCardRoute}>
@@ -3628,6 +3622,7 @@ export default function MapScreen() {
               onPress={() => {
                 if (!currentPos) return;
                 setIsFetchingPinRoute(true);
+                setPinRouteStatusMessage(null);
                 fetchBikeRoute(
                   { latitude: currentPos.lat, longitude: currentPos.lon },
                   { latitude: pinnedLocation.lat, longitude: pinnedLocation.lon },
@@ -3640,19 +3635,13 @@ export default function MapScreen() {
                       durSec: result.durationSec,
                       polyline: result.coordinates
                     });
-                    speak(`計算完成，${formatRouteDistance(result.distanceM)}，${formatRouteDuration(result.durationSec)}`, settings.ttsEnabled);
                   } else {
                     setPinRouteInfo(null);
-                    Alert.alert(
-                      "找不到可通行路線",
-                      "釘選位置可能位於封閉區、匝道、河川或無法通過的路口。請將圖釘移到可騎行道路後重新規劃。",
-                    );
-                    speak("找不到可通行路線，請重新釘選到可騎行道路", settings.ttsEnabled);
+                    setPinRouteStatusMessage("找不到可通行路線。請將圖釘移到可騎行道路後重新規劃。");
                   }
                 }).catch(() => {
                   setPinRouteInfo(null);
-                  Alert.alert("路徑規劃暫時不可用", "請確認網路後重試；系統會以最新道路資料重新規劃。");
-                  speak("路徑規劃暫時不可用，請稍後重試", settings.ttsEnabled);
+                  setPinRouteStatusMessage("目前無法規劃路線；離線時仍可繼續本機騎乘與記錄，恢復連線後可再試一次。");
                 }).finally(() => {
                   setIsFetchingPinRoute(false);
                 });
@@ -3681,7 +3670,7 @@ export default function MapScreen() {
                   avgGradient: 0,
                   maxGradient: 0,
                 };
-                startPinnedNavigationRoute(osmrRoute, `開始導航到${pinnedLocationLabel ?? "釘選位置"}`);
+                startPinnedNavigationRoute(osmrRoute);
                 setShowPinCard(false);
               }}
             >
@@ -3695,6 +3684,7 @@ export default function MapScreen() {
                 setPinnedLocation(null);
                 setPinnedLocationLabel(null);
                 setPinRouteInfo(null);
+                setPinRouteStatusMessage(null);
               }}
             >
               <IconSymbol name="xmark.circle.fill" size={16} color="#fff" />

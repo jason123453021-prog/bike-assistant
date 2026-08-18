@@ -1,0 +1,20 @@
+
+> app-template@1.0.2 test /home/ubuntu/bike_assistant
+> vitest run "tests/address-navigation-ui.test.ts" "tests/route-service.test.ts" "tests/smart-supply-tts.test.ts" "tests/release-debug-hygiene.test.ts"
+
+
+ RUN  v2.1.9 /home/ubuntu/bike_assistant
+
+ ✓ tests/address-navigation-ui.test.ts (3 tests) 7ms
+ ✓ tests/smart-supply-tts.test.ts (5 tests) 5ms
+ ✓ tests/route-service.test.ts (7 tests) 5ms
+ ❯ tests/release-debug-hygiene.test.ts (2 tests | 1 failed) 12ms
+   × release debug hygiene > keeps high-frequency ride and startup paths free of development console logs 10ms
+     → expected '/**\n * 導航頁面（整合版）\n *\n * 功能：\n * - 全…' not to match /console\.(log|info|debug|warn)\(/
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 16 passed (17)
+   Start at  13:01:32
+   Duration  420ms (transform 148ms, setup 0ms, collect 206ms, tests 30ms, environment 1ms, prepare 320ms)
+
+ ELIFECYCLE  Test failed. See above for more details.

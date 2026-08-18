@@ -1,0 +1,22 @@
+
+> app-template@1.0.2 test /home/ubuntu/bike_assistant
+> vitest run "tests/ride-permission-readiness.test.ts" "tests/ride-start-location-readiness.test.ts" "tests/readability-contrast-ui.test.ts" "tests/local-notifications-compat.test.ts" "tests/energy-hydration-persistent-modal.test.ts" "tests/supply-modal-brightness-hold.test.ts" "tests/expo-go-startup-stability.test.ts" "tests/share-card-clipboard.test.ts" "tests/settings-reset-ui.test.ts"
+
+
+ RUN  v2.1.9 /home/ubuntu/bike_assistant
+
+ ✓ tests/settings-reset-ui.test.ts (3 tests) 4ms
+ ✓ tests/supply-modal-brightness-hold.test.ts (3 tests) 4ms
+ ✓ tests/readability-contrast-ui.test.ts (8 tests) 6ms
+ ✓ tests/ride-permission-readiness.test.ts (3 tests) 4ms
+ ✓ tests/expo-go-startup-stability.test.ts (3 tests) 4ms
+ ✓ tests/local-notifications-compat.test.ts (2 tests) 4ms
+ ✓ tests/energy-hydration-persistent-modal.test.ts (2 tests) 4ms
+ ✓ tests/share-card-clipboard.test.ts (2 tests) 4ms
+ ✓ tests/ride-start-location-readiness.test.ts (3 tests) 4ms
+
+ Test Files  9 passed (9)
+      Tests  29 passed (29)
+   Start at  12:54:59
+   Duration  551ms (transform 162ms, setup 0ms, collect 278ms, tests 36ms, environment 2ms, prepare 681ms)
+

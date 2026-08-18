@@ -6,9 +6,7 @@ try {
   const brightness = require('expo-brightness');
   setBrightnessAsync = brightness.setBrightnessAsync;
   getBrightnessAsync = brightness.getBrightnessAsync;
-} catch (e) {
-  console.warn('[PowerSaving] expo-brightness not available');
-}
+} catch {}
 import { useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -59,9 +57,7 @@ export class SmartPowerSavingManager {
       if (stored) {
         this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
       }
-    } catch (error) {
-      console.error('[PowerSaving] Failed to load settings:', error);
-    }
+    } catch {}
     return this.settings;
   }
 
@@ -69,9 +65,7 @@ export class SmartPowerSavingManager {
     try {
       this.settings = { ...this.settings, ...newSettings };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
-    } catch (error) {
-      console.error('[PowerSaving] Failed to save settings:', error);
-    }
+    } catch {}
   }
 
   /** 僅恢復省電偏好預設值，不影響任何騎乘活動或補給資料。 */
@@ -83,7 +77,6 @@ export class SmartPowerSavingManager {
       await this.wakeUp();
       return next;
     } catch (error) {
-      console.error('[PowerSaving] Failed to reset settings:', error);
       throw error;
     }
   }
@@ -114,8 +107,9 @@ export class SmartPowerSavingManager {
       if (!this.isInPowerSavingMode || session !== this.brightnessSession) return;
       await setBrightnessAsync(this.settings.minBrightness);
       this.notifyListeners(true);
-    } catch (error) {
-      console.error('[PowerSaving] Failed to enter power saving mode:', error);
+    } catch {
+      this.isInPowerSavingMode = false;
+      this.notifyListeners(false);
     }
   }
 
@@ -126,9 +120,7 @@ export class SmartPowerSavingManager {
     this.notifyListeners(false);
     try {
       await setBrightnessAsync(this.originalBrightness);
-    } catch (error) {
-      console.error('[PowerSaving] Failed to exit power saving mode:', error);
-    }
+    } catch {}
   }
 
   async wakeUp() {

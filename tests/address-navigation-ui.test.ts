@@ -22,4 +22,14 @@ describe("pinned address navigation", () => {
     expect(source).toContain("地址搜尋暫時不可用");
     expect(source).toContain("離線時仍可直接移動地圖");
   });
+
+  it("keeps pinned-route failures non-blocking and does not add route-planning speech", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "app", "(tabs)", "map.tsx"), "utf8");
+
+    expect(source).toContain("const [pinRouteStatusMessage, setPinRouteStatusMessage] = useState");
+    expect(source).toContain("離線時仍可繼續本機騎乘與記錄");
+    expect(source).toContain("找不到可通行路線。請將圖釘移到可騎行道路後重新規劃。");
+    expect(source).not.toContain('speak(`計算完成，${formatRouteDistance(result.distanceM)}，${formatRouteDuration(result.durationSec)}`');
+    expect(source).not.toContain('speak("路徑規劃暫時不可用');
+  });
 });
