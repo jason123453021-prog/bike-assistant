@@ -37,6 +37,7 @@ export class SmartPowerSavingManager {
   private isInPowerSavingMode: boolean = false;
   private originalBrightness: number = 0.8;
   private brightnessSession = 0;
+  private settingsWriteRevision = 0;
   private brightnessHolds = new Set<string>();
   private listeners: Set<(isActive: boolean) => void> = new Set();
 
@@ -52,8 +53,10 @@ export class SmartPowerSavingManager {
   }
 
   async loadSettings(): Promise<PowerSavingSettings> {
+    const hydrationRevision = this.settingsWriteRevision;
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (hydrationRevision !== this.settingsWriteRevision) return this.settings;
       if (stored) {
         this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
       }
@@ -62,6 +65,7 @@ export class SmartPowerSavingManager {
   }
 
   async saveSettings(newSettings: Partial<PowerSavingSettings>) {
+    this.settingsWriteRevision += 1;
     try {
       this.settings = { ...this.settings, ...newSettings };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
@@ -71,6 +75,7 @@ export class SmartPowerSavingManager {
   /** 僅恢復省電偏好預設值，不影響任何騎乘活動或補給資料。 */
   async resetSettings(): Promise<PowerSavingSettings> {
     const next = createDefaultSettings();
+    this.settingsWriteRevision += 1;
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       this.settings = next;
