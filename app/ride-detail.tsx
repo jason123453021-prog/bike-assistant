@@ -763,7 +763,7 @@ export default function RideDetailScreen() {
               setTimeout(() => nameInputRef.current?.focus(), 100);
             }}
           >
-            <Text style={styles.routeName} numberOfLines={1}>{record.name}</Text>
+            <Text style={styles.routeName}>{record.name}</Text>
             <IconSymbol name="pencil" size={13} color="rgba(255,255,255,0.5)" />
           </Pressable>
         )}
@@ -1697,7 +1697,7 @@ const styles = StyleSheet.create({
   namePressable: {
     flex: 1,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 6,
     justifyContent: "center",
   },
@@ -1707,6 +1707,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     flexShrink: 1,
+    lineHeight: 22,
   },
   nameInput: {
     flex: 1,

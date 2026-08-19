@@ -450,10 +450,11 @@ const styles = StyleSheet.create({
   },
   timeInput: {
     width: '100%',
+    minHeight: 48,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingVertical: 10,
     fontSize: 14,
     textAlign: 'center',
   },

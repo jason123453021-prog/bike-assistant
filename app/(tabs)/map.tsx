@@ -34,6 +34,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   Vibration,
 } from "react-native";
@@ -244,6 +245,10 @@ function findNearestPointIndex(lat: number, lon: number, points: GpxPoint[]): nu
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  const dashboardColumnCount = fontScale >= 1.6 ? 2 : 3;
+  const dashboardCellWidth = dashboardColumnCount === 2 ? "50%" : "33.333%";
+  const dashboardCellMinHeight = fontScale >= 1.6 ? 106 : fontScale >= 1.3 ? 86 : 76;
   const { state, dispatch, saveRecord, updateRideActivity, setSportType, saveSnapshot, clearSnapshot, checkSnapshot } = useRide();
   const { settings, updateSettings } = useSettings();
   const smartSupplyChannels = resolveSmartSupplyChannels(settings);
@@ -1172,15 +1177,17 @@ export default function MapScreen() {
   );
   const dashFieldCount = dashPanelFields.length;
 
-  // 每行3格，每格約60px；最少1行，最多不超過 SCREEN_H/3
-  const CELL_H = 60;
-  const HEADER_H = 80; // 天氣列 + 暫停徽章
-  const CTRL_H = 64;   // 控制按鈕列
-  const dashRows = Math.ceil(dashFieldCount / 3) || 1;
-  const dashGridH = dashRows * CELL_H;
+  // 200% 字體時改為兩欄，並預留多行標籤與數值的高度，避免截斷。
+  const cellHeight = fontScale >= 1.6 ? 106 : fontScale >= 1.3 ? 86 : 60;
+  const headerHeight = fontScale >= 1.6 ? 112 : fontScale >= 1.3 ? 96 : 80;
+  const controlHeight = fontScale >= 1.6 ? 84 : 64;
+  const dashRows = Math.ceil(dashFieldCount / dashboardColumnCount) || 1;
+  const dashGridH = dashRows * cellHeight;
+  const collapsedPanelLimit = Math.round(SCREEN_H * (fontScale >= 1.6 ? 0.54 : fontScale >= 1.3 ? 0.44 : 1 / 3));
+  const expandedPanelHeight = Math.round(SCREEN_H * (fontScale >= 1.6 ? 0.82 : fontScale >= 1.3 ? 0.72 : 0.62));
   const dynamicCollapsedH = Math.min(
-    HEADER_H + dashGridH + CTRL_H,
-    PANEL_COLLAPSED_H
+    headerHeight + dashGridH + controlHeight,
+    collapsedPanelLimit
   );
   routePaddingBottomRef.current = dynamicCollapsedH;
   const sportPickerOptions = useMemo(() => {
@@ -1209,11 +1216,11 @@ export default function MapScreen() {
   const togglePanel = useCallback((expand: boolean) => {
     setPanelExpanded(expand);
     Animated.timing(panelAnim, {
-      toValue: expand ? PANEL_EXPANDED_H : dynamicCollapsedH,
+      toValue: expand ? expandedPanelHeight : dynamicCollapsedH,
       duration: 280,
       useNativeDriver: false,
     }).start();
-  }, [panelAnim, dynamicCollapsedH]);
+  }, [panelAnim, dynamicCollapsedH, expandedPanelHeight]);
 
   // 面板手勢（整個面板區域可上拉/下滑）
   const panResponder = useRef(
@@ -2983,7 +2990,7 @@ export default function MapScreen() {
                   style={styles.pinAddressResultRow}
                   onPress={() => selectPinAddressDestination(candidate)}
                 >
-                  <Text style={styles.pinAddressResultTitle} numberOfLines={1}>{candidate.label}</Text>
+                  <Text style={styles.pinAddressResultTitle}>{candidate.label}</Text>
                   <Text style={styles.pinAddressResultMeta}>候選 {index + 1} · {candidate.latitude.toFixed(5)}, {candidate.longitude.toFixed(5)}</Text>
                 </Pressable>
               ))}
@@ -2998,7 +3005,7 @@ export default function MapScreen() {
                   style={styles.pinAddressResultRow}
                   onPress={() => selectPinAddressDestination(item)}
                 >
-                  <Text style={styles.pinAddressResultTitle} numberOfLines={1}>{item.label}</Text>
+                  <Text style={styles.pinAddressResultTitle}>{item.label}</Text>
                   <Text style={styles.pinAddressResultMeta}>{item.latitude.toFixed(5)}, {item.longitude.toFixed(5)}</Text>
                 </Pressable>
               ))}
@@ -3118,7 +3125,7 @@ export default function MapScreen() {
             )}
           </View>
           <View style={styles.turnBannerContent}>
-            <Text style={styles.turnBannerTitle} numberOfLines={1}>{navInstruction}</Text>
+            <Text style={styles.turnBannerTitle}>{navInstruction}</Text>
             {turnDistanceM > 0 && turnDirection !== 'arrive' && (
               <Text style={styles.turnBannerDist}>
                 {turnDistanceM < 100 ? `${Math.round(turnDistanceM)} m` : `${Math.round(turnDistanceM)} m`}
@@ -3185,10 +3192,10 @@ export default function MapScreen() {
         <View style={styles.sixGrid}>
           {state.sportType === "cycling"
             ? dashPanelFields.map((key) => (
-              <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} />
+              <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} columnCount={dashboardColumnCount} />
             ))
             : sportDashboardMetrics.map((metric) => (
-              <View key={metric.label} style={styles.sportMetric}>
+              <View key={metric.label} style={[styles.sportMetric, { width: dashboardCellWidth, minHeight: dashboardCellMinHeight }]}>
                 <Text style={styles.sportMetricLabel}>{metric.label}</Text>
                 <View style={styles.sportMetricValueRow}>
                   <Text style={styles.sportMetricValue}>{metric.value}</Text>
@@ -3205,7 +3212,7 @@ export default function MapScreen() {
             {dashOverflowFields.length > 0 && (
               <View style={[styles.sixGrid, { marginBottom: 8 /* internal spacing */ }]}>
                 {dashOverflowFields.map((key) => (
-                  <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} />
+                  <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} columnCount={dashboardColumnCount} />
                 ))}
               </View>
             )}
@@ -3541,7 +3548,7 @@ export default function MapScreen() {
       {showPinCard && pinnedLocation && (
         <View style={[styles.pinCard, { bottom: dynamicCollapsedH + 16 }]}> 
           <View style={styles.pinCardHeader}>
-            <Text style={styles.pinCardTitle} numberOfLines={1}>{pinnedLocationLabel ?? "釘選位置"}</Text>
+            <Text style={styles.pinCardTitle}>{pinnedLocationLabel ?? "釘選位置"}</Text>
             <Pressable
               style={styles.pinCardClose}
               onPress={() => {
@@ -3724,34 +3731,35 @@ export default function MapScreen() {
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
 // DashMetric: 依 fieldKey 渲染對應的儀表板欄位
-function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed }: {
+function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed, columnCount }: {
   fieldKey: NormalFieldKey;
   state: any;
   isActive: boolean;
   currentGrade: number;
   avgSpeed: number;
+  columnCount: 2 | 3;
 }) {
   switch (fieldKey) {
     case "showElapsed":
-      return <BigMetric label="騎乘時間" value={formatDuration(state.elapsed)} unit="" />;
+      return <BigMetric label="騎乘時間" value={formatDuration(state.elapsed)} unit="" columnCount={columnCount} />;
     case "showSpeed":
-      return <BigMetric label="速度" value={state.currentSpeed > 0 ? state.currentSpeed.toFixed(1) : "--"} unit="km/h" highlight />;
+      return <BigMetric label="速度" value={state.currentSpeed > 0 ? state.currentSpeed.toFixed(1) : "--"} unit="km/h" highlight columnCount={columnCount} />;
     case "showDistance":
-      return <BigMetric label="距離" value={(state.distance / 1000).toFixed(2)} unit="km" />;
+      return <BigMetric label="距離" value={(state.distance / 1000).toFixed(2)} unit="km" columnCount={columnCount} />;
     case "showGrade":
-      return <BigMetric label="坡度" value={isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"} unit="%" warn={currentGrade > 5} />;
+      return <BigMetric label="坡度" value={isActive ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}` : "--"} unit="%" warn={currentGrade > 5} columnCount={columnCount} />;
     case "showPower":
-      return <BigMetric label="功率" value={`${state.currentPower}`} unit="W" accent />;
+      return <BigMetric label="功率" value={`${state.currentPower}`} unit="W" accent columnCount={columnCount} />;
     case "showAvgSpeed":
-      return <BigMetric label="均速" value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"} unit="km/h" />;
+      return <BigMetric label="均速" value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"} unit="km/h" columnCount={columnCount} />;
     case "showCalories":
-      return <BigMetric label="卡路里" value={`${Math.round(state.totalCalories)}`} unit="kcal" />;
+      return <BigMetric label="卡路里" value={`${Math.round(state.totalCalories)}`} unit="kcal" columnCount={columnCount} />;
     case "showPausedTime":
-      return <BigMetric label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" />;
+      return <BigMetric label="暫停時間" value={formatDuration(state.totalPausedSec)} unit="" columnCount={columnCount} />;
     case "showTotalAscent":
-      return <BigMetric label="總爬升" value={state.totalAscent ? state.totalAscent.toFixed(0) : "0"} unit="m" />;
+      return <BigMetric label="總爬升" value={state.totalAscent ? state.totalAscent.toFixed(0) : "0"} unit="m" columnCount={columnCount} />;
     case "showCurrentAltitude":
-      return <BigMetric label="目前海拔" value={state.currentAltitude ? state.currentAltitude.toFixed(0) : "--"} unit="m" />;
+      return <BigMetric label="目前海拔" value={state.currentAltitude ? state.currentAltitude.toFixed(0) : "--"} unit="m" columnCount={columnCount} />;
     case "showGradeDistribution":
       // 計算坡度分布百分比
       const totalDist = state.gradeDistribution.reduce((a: number, b: number) => a + b, 0);
@@ -3836,7 +3844,7 @@ function DashboardSummaryMetric({ metric, state, isActive, currentGrade, avgSpee
   );
 }
 
-function BigMetric({ label, value, unit, accent, highlight, warn, wide }: {
+function BigMetric({ label, value, unit, accent, highlight, warn, wide, columnCount }: {
   label: string;
   value: string;
   unit: string;
@@ -3844,11 +3852,12 @@ function BigMetric({ label, value, unit, accent, highlight, warn, wide }: {
   highlight?: boolean;
   warn?: boolean;
   wide?: boolean;
+  columnCount: 2 | 3;
 }) {
   const color = accent ? "#00E676" : highlight ? "#fff" : warn ? "#F59E0B" : "rgba(255,255,255,0.9)";
   const fontSize = highlight ? 32 : wide ? 26 : 22;
   return (
-    <View style={[bigMetricStyles.cell, wide && bigMetricStyles.wideCell]}>
+    <View style={[bigMetricStyles.cell, { width: `${100 / columnCount}%` }, wide && bigMetricStyles.wideCell]}>
       <Text style={bigMetricStyles.label}>{label}</Text>
       <View style={bigMetricStyles.valueRow}>
         <Text style={[bigMetricStyles.value, { color, fontSize }]}>{value}</Text>
@@ -3860,7 +3869,6 @@ function BigMetric({ label, value, unit, accent, highlight, warn, wide }: {
 
 const bigMetricStyles = StyleSheet.create({
   cell: {
-    width: "33.33%",
     alignItems: "center",
     paddingVertical: 10,
     borderRightWidth: StyleSheet.hairlineWidth,
@@ -3869,10 +3877,10 @@ const bigMetricStyles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.06)",
   },
   wideCell: {},
-  label: { color: "rgba(255,255,255,0.76)", fontSize: 11, fontWeight: "700", marginBottom: 3 /* internal spacing */, letterSpacing: 0.3 },
-  valueRow: { flexDirection: "row", alignItems: "baseline", gap: 3 },
-  value: { fontWeight: "700", fontVariant: ["tabular-nums"] },
-  unit: { fontSize: 11, color: "rgba(255,255,255,0.72)", fontWeight: "600" },
+  label: { color: "rgba(255,255,255,0.76)", fontSize: 11, fontWeight: "700", lineHeight: 16, marginBottom: 3 /* internal spacing */, letterSpacing: 0.3, textAlign: "center" },
+  valueRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "center", gap: 3 },
+  value: { fontWeight: "700", fontVariant: ["tabular-nums"], textAlign: "center" },
+  unit: { fontSize: 11, color: "rgba(255,255,255,0.72)", fontWeight: "600", textAlign: "center" },
 });
 
 // ─── 樣式 ─────────────────────────────────────────────────────────────────────
@@ -3892,8 +3900,8 @@ const styles = StyleSheet.create({
   paddingVertical: 8,
   gap: 8,
   },
-  navText: { flex: 1, color: "#fff", fontSize: 16, fontWeight: "800" },
-  navDist: { color: "#7FFFC7", fontSize: 14, fontWeight: "800" },
+  navText: { flex: 1, flexShrink: 1, color: "#fff", fontSize: 16, fontWeight: "800", lineHeight: 22 },
+  navDist: { flexShrink: 1, color: "#7FFFC7", fontSize: 14, fontWeight: "800", lineHeight: 20 },
 
   toolBar: { position: "absolute", gap: 10, zIndex: 30 },
   pinAddressOverlay: {
@@ -4156,6 +4164,8 @@ const styles = StyleSheet.create({
   },
   weatherRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     alignItems: "center",
     gap: 6,
     marginBottom: 2 /* internal spacing */,
@@ -4181,12 +4191,14 @@ const styles = StyleSheet.create({
   },
   sportSelector: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
     paddingHorizontal: 12,
     paddingBottom: 8,
   },
   sportChoice: {
     flex: 1,
+    minWidth: "22%",
     minHeight: 54,
     alignItems: "center",
     justifyContent: "center",
@@ -4197,11 +4209,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.1)",
   },
   sportChoiceIcon: { fontSize: 17 },
-  sportChoiceLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "800", textAlign: "center" },
-  preRideControls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
+  sportChoiceLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "800", lineHeight: 17, textAlign: "center" },
+  preRideControls: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 12 },
   sportInlineTrigger: {
     minWidth: 88,
-    height: 52,
+    minHeight: 52,
     paddingHorizontal: 10,
     borderRadius: 16,
     borderWidth: 1.5,
@@ -4211,7 +4223,7 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   sportInlineIcon: { fontSize: 18 },
-  sportInlineLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
+  sportInlineLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "800", lineHeight: 17, textAlign: "center" },
   sportPickerBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.56)" },
   sportPickerSheet: {
     backgroundColor: "#151515",
@@ -4243,10 +4255,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.16)",
     paddingHorizontal: 4,
   },
-  sportMetricLabel: { color: "rgba(255,255,255,0.84)", fontSize: 12, fontWeight: "800", textAlign: "center" },
-  sportMetricValueRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "center", marginTop: 6 },
-  sportMetricValue: { color: "#fff", fontSize: 22, fontWeight: "800", letterSpacing: -0.7 },
-  sportMetricUnit: { color: "rgba(255,255,255,0.8)", fontSize: 11, marginLeft: 3, fontWeight: "600" },
+  sportMetricLabel: { color: "rgba(255,255,255,0.84)", fontSize: 12, fontWeight: "800", lineHeight: 17, textAlign: "center" },
+  sportMetricValueRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "center", marginTop: 6 },
+  sportMetricValue: { color: "#fff", fontSize: 22, fontWeight: "800", letterSpacing: -0.7, textAlign: "center" },
+  sportMetricUnit: { color: "rgba(255,255,255,0.8)", fontSize: 11, marginLeft: 3, fontWeight: "600", textAlign: "center" },
 
   // 展開區域
   expandedSection: {
@@ -4256,10 +4268,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   progressSection: {},
-  progressHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 /* internal spacing */ },
-  progressLabelRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  progressLabel: { color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: "600" },
-  progressValue: { color: "rgba(255,255,255,0.94)", fontSize: 12, fontWeight: "700" },
+  progressHeader: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 6, marginBottom: 4 /* internal spacing */ },
+  progressLabelRow: { flex: 1, flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 5 },
+  progressLabel: { color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: "600", lineHeight: 18 },
+  progressValue: { color: "rgba(255,255,255,0.94)", fontSize: 12, fontWeight: "700", lineHeight: 18, textAlign: "right" },
   progressTrack: { height: 5, backgroundColor: "rgba(255,255,255,0.22)", borderRadius: 3, overflow: "hidden" },
   progressFill: { height: 4, borderRadius: 2 },
   ratePill: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 },
@@ -4267,19 +4279,19 @@ const styles = StyleSheet.create({
 
   // 控制按鈕
   btnRow: { alignItems: "center", marginTop: 12, marginBottom: 8 /* internal spacing */ },
-  activeButtons: { flexDirection: "row", alignItems: "center", gap: 12 },
+  activeButtons: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 12 },
   startBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 32,
-    height: 52,
+    minHeight: 52,
     borderRadius: 26,
     backgroundColor: "#00C853",
     justifyContent: "center",
   },
   stopBtn: { backgroundColor: "#FF3B30" },
-  startBtnText: { color: "#fff", fontSize: 17, fontWeight: "700", letterSpacing: 0.5 },
+  startBtnText: { color: "#fff", fontSize: 17, fontWeight: "700", lineHeight: 23, letterSpacing: 0.5 },
   controlBtn: {
     width: 48, height: 48, borderRadius: 24,
     backgroundColor: "rgba(255,255,255,0.1)",
@@ -4299,6 +4311,7 @@ const styles = StyleSheet.create({
   // 總爬升資訊列
   ascentRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 10,
@@ -4307,6 +4320,7 @@ const styles = StyleSheet.create({
   },
   ascentItem: {
     flex: 1,
+    minWidth: 96,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -4318,9 +4332,9 @@ const styles = StyleSheet.create({
     height: 24,
     backgroundColor: "rgba(255,255,255,0.1)",
   },
-  ascentLabel: { color: "rgba(255,255,255,0.78)", fontSize: 11, fontWeight: "600" },
-  ascentValue: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "700" },
-  ascentUnit: { color: "rgba(255,255,255,0.74)", fontSize: 11, fontWeight: "600" },
+  ascentLabel: { color: "rgba(255,255,255,0.78)", fontSize: 11, fontWeight: "600", lineHeight: 16, textAlign: "center" },
+  ascentValue: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "700", lineHeight: 20, textAlign: "center" },
+  ascentUnit: { color: "rgba(255,255,255,0.74)", fontSize: 11, fontWeight: "600", lineHeight: 16, textAlign: "center" },
   // 崩潰恢復橫幅
   recoveryBanner: {
     position: "absolute",

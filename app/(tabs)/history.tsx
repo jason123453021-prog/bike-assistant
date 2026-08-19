@@ -119,7 +119,7 @@ export default function HistoryScreen() {
         onPress={() => handleViewDetail(item.id)}
       >
         {/* 路線名稱 */}
-        <Text style={[styles.routeName, { color: colors.foreground }]} numberOfLines={1}>
+        <Text style={[styles.routeName, { color: colors.foreground }]}>
           {item.name || dateStr}
         </Text>
         <View style={[styles.sportBadge, { backgroundColor: `${sportMeta.accent}22` }]}>

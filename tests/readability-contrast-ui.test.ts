@@ -37,7 +37,7 @@ describe("small-screen readability guardrails", () => {
     expect(mapSource).toContain('backgroundColor: "rgba(7, 17, 11, 0.97)"');
     expect(mapSource).toContain('sportChoiceLabel: { color: "#FFFFFF", fontSize: 12');
     expect(mapSource).toContain('weatherItem: { color: "rgba(255,255,255,0.94)", fontSize: 13');
-    expect(mapSource).toContain('navText: { flex: 1, color: "#fff", fontSize: 16');
+    expect(mapSource).toContain('navText: { flex: 1, flexShrink: 1, color: "#fff", fontSize: 16');
   });
 
   it("provides elevated, inset and on-accent tokens for both themes", () => {

@@ -14,10 +14,11 @@ describe("sport picker presentation", () => {
     expect(mapSource).not.toContain("<View style={styles.sportSelector}>");
   });
 
-  it("avoids duplicate bottom safe-area height and keeps a full-height start control", () => {
-    expect(mapSource).toContain("HEADER_H + dashGridH + CTRL_H");
+  it("avoids duplicate bottom safe-area height and keeps a font-scale-aware start control", () => {
+    expect(mapSource).toContain("headerHeight + dashGridH + controlHeight");
+    expect(mapSource).toContain("const dashboardColumnCount = fontScale >= 1.6 ? 2 : 3;");
     expect(mapSource).toContain("paddingBottom: 0");
-    expect(mapSource).toContain("height: 52");
+    expect(mapSource).toContain("minHeight: 52");
     expect(mapSource).toContain("marginBottom: 8");
   });
 });

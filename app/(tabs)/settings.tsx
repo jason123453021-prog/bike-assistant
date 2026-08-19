@@ -1490,7 +1490,7 @@ function NumberRow({
       disabled={disabled}
     >
       <IconSymbol name={icon as any} size={18} color={iconColor ?? colors.muted} />
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, flexShrink: 1 }}>
         <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
         {hint && (
           <Text style={[styles.rowHint, { color: colors.muted }]}>{hint}</Text>
@@ -1514,7 +1514,7 @@ function TextRow({
   return (
     <Pressable style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]} onPress={onPress}>
       <IconSymbol name={icon as any} size={18} color={colors.muted} />
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, flexShrink: 1 }}>
         <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
         {hint ? <Text style={[styles.rowHint, { color: colors.muted }]}>{hint}</Text> : null}
       </View>
@@ -1534,7 +1534,7 @@ function ToggleRow({
   return (
     <View style={[styles.row, disabled && { opacity: 0.45 }]}>
       <IconSymbol name={icon as any} size={18} color={colors.muted} />
-      <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
+      <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onToggle}
@@ -1573,8 +1573,8 @@ const styles = StyleSheet.create({
   },
   rowLabel: { fontSize: 16, fontWeight: "600", lineHeight: 21 },
   rowHint: { fontSize: 13, lineHeight: 18, marginTop: 3 },
-  rowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
-  rowValue: { fontSize: 16, fontWeight: "700" },
+  rowRight: { flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 6 },
+  rowValue: { flexShrink: 1, fontSize: 16, fontWeight: "700", lineHeight: 22, textAlign: "right" },
   intervalGroupHeader: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6 },
   intervalGroupTitleWrap: { flex: 1, gap: 2 },
   intervalGroupTitle: { fontSize: 15, fontWeight: "700" },
@@ -1587,13 +1587,14 @@ const styles = StyleSheet.create({
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 46 },
   aboutRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  aboutLabel: { fontSize: 14 },
-  aboutValue: { fontSize: 14, fontWeight: "500" },
+  aboutLabel: { flex: 1, minWidth: "58%", fontSize: 14, lineHeight: 20 },
+  aboutValue: { flexShrink: 1, fontSize: 14, fontWeight: "500", lineHeight: 20, textAlign: "right" },
   // Edit Modal
   editOverlay: {
     flex: 1,

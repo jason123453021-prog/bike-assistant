@@ -370,7 +370,7 @@ export default function NavigateScreen() {
               {/* Route Name */}
               <View style={[styles.routeNameCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
                 <IconSymbol name="location.fill" size={18} color={colors.accent} />
-                <Text style={[styles.routeName, { color: colors.foreground }]} numberOfLines={1}>
+                <Text style={[styles.routeName, { color: colors.foreground }]}>
                   {route.name}
                 </Text>
               </View>
