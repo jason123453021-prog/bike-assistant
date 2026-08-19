@@ -1,5 +1,27 @@
 # 智慧單車騎乘助手 TODO
 
+## Expo Go tunnel 連線修復（2026-08-20）
+- [x] 檢查 Expo tunnel、ngrok 相依與目前公開開發端點條件
+- [x] 建立 Expo Go 專用 tunnel 開發端點並產生新的連線 URL
+- [x] 修復 tunnel manifest 的 launch bundle URL 仍指向管理預覽代理的問題
+- [x] 從外部驗證 tunnel 的 application/expo+json manifest 與 Android Hermes bundle
+- [x] 交付手機端清除舊專案與重新掃描 tunnel URL 的步驟
+
+## Expo Go 清除快取 tunnel 重建（2026-08-20）
+- [x] 依使用者要求停止舊 tunnel、清除 Metro 快取並以 `--clear --tunnel` 重建
+- [x] 擷取新的 Expo tunnel URL，確認其 manifest launch bundle 也使用 tunnel 網域
+- [x] 從外部驗證新的 application/expo+json manifest 與 Android Hermes bundle
+- [x] 交付新的 Expo Go 連線 URL 與手機重新掃描步驟
+
+## Expo Go tunnel 傳輸最佳化（2026-08-20）
+- [x] 分析 12.2 MB Android development bundle 的組成，確認標準開發 bundle 含 Expo Go 開發載入內容
+- [x] 嘗試重建縮減後 tunnel；Expo CLI 在無開發模式下關閉 ngrok session，已回復為可建立且已外部驗證的標準 tunnel
+
+## Expo Go tunnel 服務復原（2026-08-20）
+- [x] 恢復已驗證的 Expo tunnel 設定並確認 ngrok session 可建立
+- [x] 驗證新 tunnel manifest 與 Android Hermes bundle，並建立 Expo Go 專用 QR Code
+- [x] 若 tunnel 無法穩定使用，交付正式 Android AAB 的不依賴 Expo Go 實機驗收路徑
+
 ## Expo Go 遠端更新連線深度修復（2026-08-20）
 - [x] 比對外部公開端點與 localhost 的 Expo Go manifest、回應標頭、bundle URL 與內容一致性
 - [x] 修復導致手機端無法下載遠端更新的 host URI、協定或 tunnel 連線問題
