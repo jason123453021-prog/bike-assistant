@@ -19,6 +19,8 @@ export interface PermissionStatus {
   description: string;
   granted: boolean;
   required: boolean;
+  /** Android 未提供可攜 API 查詢時，以設定頁人工確認取代錯誤的未授權判定。 */
+  verification?: 'manual';
   systemSettingsUrl?: string;
 }
 
@@ -125,9 +127,10 @@ export class PermissionsManager {
     return {
       type: 'battery_optimization',
       name: '電池不受限制',
-      description: '在系統頁將本 App 設為「不受限制」，降低省電機制中斷背景騎乘的機率',
+      description: '請在系統頁確認本 App 為「不受限制」；Android 不提供可由 App 驗證的統一狀態',
       granted: false,
-      required: true,
+      required: false,
+      verification: 'manual',
       systemSettingsUrl: IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS,
     };
   }

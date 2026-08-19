@@ -21,5 +21,8 @@ describe("pinned address navigation", () => {
     expect(source).toContain("找不到地址");
     expect(source).toContain("地址搜尋暫時不可用");
     expect(source).toContain("離線時仍可直接移動地圖");
+    expect(source).toContain("const [pinAddressNotice, setPinAddressNotice]");
+    expect(source).toContain("styles.pinAddressNotice");
+    expect(source).not.toContain('Alert.alert("地址搜尋暫時不可用"');
   });
 });

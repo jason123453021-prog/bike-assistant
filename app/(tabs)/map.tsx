@@ -573,6 +573,7 @@ export default function MapScreen() {
   const [pinAddress, setPinAddress] = useState("");
   const [isResolvingPinAddress, setIsResolvingPinAddress] = useState(false);
   const [pinAddressCandidates, setPinAddressCandidates] = useState<RecentAddressSearch[]>([]);
+  const [pinAddressNotice, setPinAddressNotice] = useState<string | null>(null);
   const [recentAddressSearches, setRecentAddressSearches] = useState<RecentAddressSearch[]>([]);
   const [lastNavigationDataRefreshAt, setLastNavigationDataRefreshAt] = useState<number | null>(null);
 
@@ -681,7 +682,8 @@ export default function MapScreen() {
       }
       const results = await Location.geocodeAsync(address);
       if (!results.length) {
-        Alert.alert("找不到地址", "請補上城市、區域或門牌後再搜尋，也可直接移動地圖中心圖釘選點。");
+        setPinAddressCandidates([]);
+        setPinAddressNotice("找不到地址。請補上城市、區域或門牌；也可直接移動地圖中心圖釘選點。");
         return;
       }
       const candidates = results.slice(0, 5).map((item) => ({
@@ -691,12 +693,15 @@ export default function MapScreen() {
         usedAt: Date.now(),
       }));
       if (candidates.length === 1) {
+        setPinAddressNotice(null);
         selectPinAddressDestination(candidates[0]);
       } else {
+        setPinAddressNotice(null);
         setPinAddressCandidates(candidates);
       }
     } catch {
-      Alert.alert("地址搜尋暫時不可用", "請確認網路與定位服務後再試；離線時仍可直接移動地圖，以中心圖釘選擇目的地。");
+      setPinAddressCandidates([]);
+      setPinAddressNotice("地址搜尋暫時不可用。請確認網路與定位服務；離線時仍可直接移動地圖，以中心圖釘選擇目的地。");
     } finally {
       setIsResolvingPinAddress(false);
     }
@@ -721,6 +726,7 @@ export default function MapScreen() {
   const [intervalSupplyAlerts, setIntervalSupplyAlerts] = useState<Partial<Record<SupplyIntervalKind, boolean>>>({});
   const intervalSupplyRepeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const intervalSnoozedUntilRef = useRef<Partial<Record<SupplyIntervalKind, number>>>({});
+  const supplyAutoDismissTimersRef = useRef<Partial<Record<"calorie" | "water", ReturnType<typeof setTimeout>>>>({});
 
   // 清除重複提醒計時器
   const clearSupplyRepeatTimer = useCallback(() => {
@@ -738,11 +744,20 @@ export default function MapScreen() {
       intervalSupplyRepeatTimerRef.current = null;
     }
   }, []);
+  const clearSupplyAutoDismissTimer = useCallback((type?: "calorie" | "water") => {
+    const types: Array<"calorie" | "water"> = type ? [type] : ["calorie", "water"];
+    types.forEach((kind) => {
+      const timer = supplyAutoDismissTimersRef.current[kind];
+      if (timer) clearTimeout(timer);
+      delete supplyAutoDismissTimersRef.current[kind];
+    });
+  }, []);
 
   const previousSupplyReminderEnabledRef = useRef(settings.supplyReminderEnabled);
   const clearAllActiveSupplyReminders = useCallback(() => {
     clearSupplyRepeatTimer();
     clearIntervalSupplyRepeatTimer();
+    clearSupplyAutoDismissTimer();
     Object.values(supplyItemsTrackerRef.current).forEach((tracker) => {
       if (tracker.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
       if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
@@ -765,7 +780,9 @@ export default function MapScreen() {
     Vibration.cancel();
     void clearAllSupplyNotifications();
     void setBackgroundSupplyReminderEnabled(false);
-  }, [alertPlayer, clearIntervalSupplyRepeatTimer, clearSupplyRepeatTimer, syncSmartSupplyCountdown]);
+  }, [alertPlayer, clearIntervalSupplyRepeatTimer, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, syncSmartSupplyCountdown]);
+
+  useEffect(() => () => clearSupplyAutoDismissTimer(), [clearSupplyAutoDismissTimer]);
 
   useEffect(() => {
     const wasEnabled = previousSupplyReminderEnabledRef.current;
@@ -868,6 +885,7 @@ export default function MapScreen() {
   }, [clearIntervalSupplyRepeatTimer, settings.vibrationEnabled]);
 
   const handleConfirmCalorieSupply = useCallback(() => {
+    clearSupplyAutoDismissTimer("calorie");
     setCalorieAlert(false);
     const confirmedPlan = pendingSupplyPlansRef.current.calorie ?? supplyRecommendation;
     if (smartEnergySupplyEnabled && confirmedPlan && smartSupplyCountdownRef.current) {
@@ -905,9 +923,10 @@ export default function MapScreen() {
     void clearAllSupplyNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!waterStillPending) clearSupplyRepeatTimer();
-  }, [calorieAnim, clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, smartEnergySupplyEnabled, supplyRecommendation, syncSmartSupplyCountdown, waterAlert]);
+  }, [calorieAnim, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, smartEnergySupplyEnabled, supplyRecommendation, syncSmartSupplyCountdown, waterAlert]);
 
   const handleConfirmWaterSupply = useCallback(() => {
+    clearSupplyAutoDismissTimer("water");
     setWaterAlert(false);
     setSupplyRecommendedMl(undefined);
     const confirmedPlan = pendingSupplyPlansRef.current.water ?? supplyRecommendation;
@@ -945,12 +964,13 @@ export default function MapScreen() {
     void clearAllSupplyNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!calorieStillPending) clearSupplyRepeatTimer();
-  }, [calorieAlert, clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, smartWaterSupplyEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
+  }, [calorieAlert, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, smartWaterSupplyEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
 
   const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind, customItemId?: string) => {
     if ((kind === "calorie" && smartEnergySupplyEnabled) || (kind === "water" && smartWaterSupplyEnabled)) return;
     const until = Date.now() + 5 * 60 * 1000;
     if (kind === "calorie" || kind === "water") {
+      clearSupplyAutoDismissTimer(kind);
       supplySnoozedUntilRef.current[kind] = until;
       if (kind === "calorie") setCalorieAlert(false);
       else setWaterAlert(false);
@@ -975,7 +995,7 @@ export default function MapScreen() {
       clearIntervalSupplyRepeatTimer();
     }
     void scheduleSupplySnooze(kind);
-  }, [clearIntervalSupplyRepeatTimer, smartEnergySupplyEnabled, smartWaterSupplyEnabled]);
+  }, [clearIntervalSupplyRepeatTimer, clearSupplyAutoDismissTimer, smartEnergySupplyEnabled, smartWaterSupplyEnabled]);
 
   const processSupplyNotificationAction = useCallback((action: SupplyNotificationAction) => {
     if (!settings.supplyReminderEnabled) return;
@@ -1297,7 +1317,9 @@ export default function MapScreen() {
       // 單次提醒自動關閉功能
       const autoDismissSeconds = type === "calorie" ? settings.calorieAutoDismissSeconds : settings.waterAutoDismissSeconds;
       if (!(type === "calorie" ? smartEnergySupplyEnabled : smartWaterSupplyEnabled) && autoDismissSeconds && autoDismissSeconds > 0) {
-        setTimeout(() => {
+        clearSupplyAutoDismissTimer(type);
+        const autoDismissTimer = setTimeout(() => {
+          delete supplyAutoDismissTimersRef.current[type];
           if (type === "calorie") {
             setCalorieAlert(false);
             pendingCalorieRef.current = false;
@@ -1308,6 +1330,7 @@ export default function MapScreen() {
             delete pendingSupplyPlansRef.current.water;
           }
         }, autoDismissSeconds * 1000);
+        supplyAutoDismissTimersRef.current[type] = autoDismissTimer;
       }
 
       // 唯一的重複提醒間隔：0 代表關閉，正值同時套用能量與補水。
@@ -1338,7 +1361,7 @@ export default function MapScreen() {
         }, repeatSec * 1000);
       }
     },
-    [settings, alertPlayer, clearSupplyRepeatTimer, smartEnergySupplyEnabled, smartWaterSupplyEnabled, speakPlannedSupplyReminder]
+    [settings, alertPlayer, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, smartEnergySupplyEnabled, smartWaterSupplyEnabled, speakPlannedSupplyReminder]
   );
 
   // ─── 自訂補給品觸發邏輯 ────────────────────────────────────────────────────────
@@ -2965,6 +2988,7 @@ export default function MapScreen() {
               onChangeText={(value) => {
                 setPinAddress(value);
                 setPinAddressCandidates([]);
+                setPinAddressNotice(null);
               }}
               placeholder="輸入地址、地標或店家名稱"
               placeholderTextColor="rgba(255,255,255,0.52)"
@@ -2981,6 +3005,11 @@ export default function MapScreen() {
               <Text style={styles.pinAddressSearchText}>{isResolvingPinAddress ? "搜尋中" : "搜尋"}</Text>
             </Pressable>
           </View>
+          {pinAddressNotice && (
+            <View style={styles.pinAddressNotice} accessibilityLiveRegion="polite">
+              <Text style={styles.pinAddressNoticeText}>{pinAddressNotice}</Text>
+            </View>
+          )}
           {pinAddressCandidates.length > 1 && (
             <View style={styles.pinAddressResults}>
               <Text style={styles.pinAddressResultsTitle}>選擇目的地</Text>
@@ -3934,6 +3963,16 @@ const styles = StyleSheet.create({
   },
   pinAddressSearchButtonDisabled: { opacity: 0.58 },
   pinAddressSearchText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  pinAddressNotice: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,190,92,0.58)",
+    backgroundColor: "rgba(61,42,13,0.94)",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  pinAddressNoticeText: { color: "#FFE3AA", fontSize: 13, fontWeight: "700", lineHeight: 19 },
   pinAddressResults: {
   marginTop: 8,
   overflow: "hidden",

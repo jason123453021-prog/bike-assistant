@@ -78,17 +78,20 @@ export function RidePermissionReadiness() {
 
       {READINESS_ITEMS.map((item, index) => {
         const status = statusByType.get(item.type);
-        const granted = item.type === 'battery_optimization' ? false : Boolean(status?.granted);
+        const isManualVerification = status?.verification === 'manual';
+        const granted = Boolean(status?.granted);
         const isOpening = opening === item.type;
+        const stateColor = isManualVerification ? colors.accent : granted ? colors.success : colors.warning;
+        const stateBackground = isManualVerification ? `${colors.accent}18` : granted ? `${colors.success}18` : `${colors.warning}18`;
         return (
           <View key={item.type} style={[styles.row, index > 0 && { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth }]}>
-            <View style={[styles.itemIcon, { backgroundColor: granted ? `${colors.success}18` : `${colors.warning}18` }]}>
-              <MaterialIcons name={item.icon} size={18} color={granted ? colors.success : colors.warning} />
+            <View style={[styles.itemIcon, { backgroundColor: stateBackground }]}> 
+              <MaterialIcons name={item.icon} size={18} color={stateColor} />
             </View>
             <View style={styles.copy}>
               <Text style={[styles.itemTitle, { color: colors.foreground }]}>{item.title}</Text>
-              <Text style={[styles.itemHint, { color: colors.muted }]}>
-                {granted ? '已允許' : status?.description ?? '請在系統設定完成此項目'}
+              <Text style={[styles.itemHint, { color: colors.muted }]}> 
+                {isManualVerification ? status?.description : granted ? '已允許' : status?.description ?? '請在系統設定完成此項目'}
               </Text>
             </View>
             <Pressable
@@ -98,10 +101,10 @@ export function RidePermissionReadiness() {
               onPress={() => { void openSetup(item.type); }}
               style={({ pressed }) => [
                 styles.action,
-                { borderColor: granted ? colors.success : colors.accent, opacity: pressed || isOpening ? 0.66 : 1 },
+                { borderColor: stateColor, opacity: pressed || isOpening ? 0.66 : 1 },
               ]}
             >
-              <Text style={[styles.actionText, { color: granted ? colors.success : colors.accent }]}>{isOpening ? '開啟中' : granted ? '檢查' : item.setupLabel}</Text>
+              <Text style={[styles.actionText, { color: stateColor }]}>{isOpening ? '開啟中' : isManualVerification ? item.setupLabel : granted ? '檢查' : item.setupLabel}</Text>
             </Pressable>
           </View>
         );

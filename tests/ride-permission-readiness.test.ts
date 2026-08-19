@@ -25,6 +25,13 @@ describe('正式 APK 背景騎乘權限健檢', () => {
     expect(managerSource).not.toContain('com.jason123453021.bikeassistant');
   });
 
+  it('treats battery optimization as a manual system confirmation instead of permanently reporting a false denial', () => {
+    expect(managerSource).toContain("verification: 'manual'");
+    expect(managerSource).toContain('required: false');
+    expect(readinessSource).toContain("const isManualVerification = status?.verification === 'manual';");
+    expect(readinessSource).not.toContain("item.type === 'battery_optimization' ? false");
+  });
+
   it('removes the readiness hint from the pre-ride controls', () => {
     expect(mapSource).not.toContain('開始前請確認通知、背景位置與電池不受限制');
     expect(mapSource).not.toContain('router.push("/settings")');
