@@ -1,6 +1,7 @@
 import "@/global.css";
 import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
@@ -31,6 +32,12 @@ import { startSupplyNotificationActionListener } from "@/lib/supply-notification
 import { checkModelUpdateOnAppLaunch } from "@/lib/model-update-service";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
+
+if (Platform.OS !== "web") {
+  // 原生 Splash 必須在 Root component 掛載前保留，避免出現短暫白屏。
+  void SplashScreen.preventAutoHideAsync();
+  SplashScreen.setOptions({ duration: 220, fade: true });
+}
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -88,6 +95,13 @@ export default function RootLayout() {
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
+  const splashWasHidden = useRef(false);
+
+  const hideNativeSplashAfterFirstLayout = useCallback(() => {
+    if (Platform.OS === "web" || splashWasHidden.current) return;
+    splashWasHidden.current = true;
+    void SplashScreen.hideAsync();
+  }, []);
 
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
@@ -98,16 +112,21 @@ export default function RootLayout() {
     setupNotifications().catch(() => {});
   }, []);
 
-  // 靜默模型檢查最多每七天執行一次；騎乘開始後不再發起網路請求。
+  // 首屏完成後才處理非必要工作，避免與第一個導航畫面的渲染競爭主執行緒。
   useEffect(() => {
-    void checkModelUpdateOnAppLaunch();
+    const timer = setTimeout(() => {
+      void checkModelUpdateOnAppLaunch();
+    }, 600);
+    return () => clearTimeout(timer);
   }, []);
 
-  // 升級後立即釋放已移除「最愛路線」功能留下的單一舊版快取鍵。
   useEffect(() => {
-    clearLegacyFavoritesCache(AsyncStorage).catch((error) => {
-      reportRecoverableIssue("[App] 無法清除舊版最愛路線快取", error);
-    });
+    const timer = setTimeout(() => {
+      clearLegacyFavoritesCache(AsyncStorage).catch((error) => {
+        reportRecoverableIssue("[App] 無法清除舊版最愛路線快取", error);
+      });
+    }, 900);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => startSupplyNotificationActionListener(), []);
@@ -136,7 +155,7 @@ export default function RootLayout() {
   }, [initialInsets, initialFrame]);
 
   const content = (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }} onLayout={hideNativeSplashAfterFirstLayout}>
       <AppErrorBoundary>
         <SettingsProvider>
           <GpxProvider>

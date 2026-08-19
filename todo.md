@@ -1,5 +1,11 @@
 # 智慧單車騎乘助手 TODO
 
+## 啟動體驗與部署建置修復（2026-08-19）
+- [x] 診斷並修復模板清理後缺少 `build` script 的部署阻擋問題
+- [x] 量測 App 根路由與首屏初始化工作，找出可延後或安全降級的阻塞操作
+- [x] 優化 Splash Screen、首屏載入與初始化回饋，避免白屏或長時間無回應
+- [x] 完成靜態建置、TypeScript、Lint、完整測試、Expo Doctor 與 Android production 匯出驗證
+
 ## Production 相依安全與模板模組整理（2026-08-19）
 - [x] 建立 production 相依、Console 診斷與模板伺服器的實際使用基準
 - [x] 執行 production dependency audit，分析並處理可修復的安全風險
