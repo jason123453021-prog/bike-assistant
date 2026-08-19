@@ -1,0 +1,136 @@
+=== 開發腳本 ===
+{
+  dev: 'concurrently -k "pnpm dev:server" "pnpm dev:metro"',
+  'dev:server': 'cross-env NODE_ENV=development tsx watch server/_core/index.ts',
+  'dev:metro': "sh -c './scripts/prewarm-expo-go-bundle.sh & exec cross-env NODE_OPTIONS=--max-old-space-size=1536 EXPO_NO_INTERACTIVE=1 EXPO_NO_METRO_WORKSPACE_ROOT=1 npx expo start --max-workers 1 --port ${EXPO_PORT:-8081}'",
+  build: 'esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist',
+  start: 'NODE_ENV=production node dist/index.js',
+  check: 'tsc --noEmit',
+  lint: 'expo lint',
+  format: 'prettier --write .',
+  test: 'vitest run',
+  'db:push': 'drizzle-kit generate && drizzle-kit migrate',
+  android: 'expo run:android',
+  ios: 'expo run:ios',
+  qr: 'node scripts/generate_qr.mjs'
+}
+=== 預熱／Metro 相關檔案 ===
+check-and-migrate.ts
+fix-all-margin-bottom.js
+fix-margin-bottom.js
+generate_qr.mjs
+load-env.js
+migrate-ui-safety.js
+prewarm-expo-go-bundle.sh
+reset-project.js
+package.json:9:    "dev:metro": "sh -c './scripts/prewarm-expo-go-bundle.sh & exec cross-env NODE_OPTIONS=--max-old-space-size=1536 EXPO_NO_INTERACTIVE=1 EXPO_NO_METRO_WORKSPACE_ROOT=1 npx expo start --max-workers 1 --port ${EXPO_PORT:-8081}'",
+package.json:10:    "build": "esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+scripts/load-env.js:38:  VITE_APP_ID: "EXPO_PUBLIC_APP_ID",
+scripts/load-env.js:39:  VITE_OAUTH_PORTAL_URL: "EXPO_PUBLIC_OAUTH_PORTAL_URL",
+scripts/load-env.js:40:  OAUTH_SERVER_URL: "EXPO_PUBLIC_OAUTH_SERVER_URL",
+scripts/load-env.js:41:  OWNER_OPEN_ID: "EXPO_PUBLIC_OWNER_OPEN_ID",
+scripts/load-env.js:42:  OWNER_NAME: "EXPO_PUBLIC_OWNER_NAME",
+scripts/reset-project.js:90:      `1. Run \`npx expo start\` to start a development server.\n2. Edit app/index.tsx to edit the main screen.${
+scripts/prewarm-expo-go-bundle.sh:2:# 在背景等待 Metro 就緒後，主動建立 Expo Go 所需的 Android Hermes bundle。
+scripts/prewarm-expo-go-bundle.sh:6:port="${EXPO_PORT:-8081}"
+scripts/prewarm-expo-go-bundle.sh:7:bundle_url="http://127.0.0.1:${port}/node_modules/expo-router/entry.bundle?platform=android&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=app&unstable_transformProfile=hermes-stable"
+scripts/prewarm-expo-go-bundle.sh:12:  if curl --fail --silent --show-error --connect-timeout 2 --max-time 90 "$bundle_url" -o /dev/null; then
+app.config.ts:4:const bundleId = "com.jason123453021.bikeassistant";
+app.config.ts:14:  iosBundleId: bundleId,
+app.config.ts:15:  androidPackage: bundleId,
+app.config.ts:19:  modelUpdateManifestUrl: "https://bikeassist-bdbkimdc.manus.space/api/model-update/manifest",
+app.config.ts:37:    bundleIdentifier: env.iosBundleId,
+app.config.ts:82:    // 套件若宣告開機接收或懸浮窗，均從最終 manifest 明確移除：本 App 僅由使用者開始騎乘後啟動 location 前景服務。
+app.config.ts:108:    bundler: "metro",
+app.config.ts:110:    // 避免靜態 SSR 與 Expo Go Android bundle 同時建立大型 Metro 圖譜。
+=== 最新服務日誌 ===
+[2026-08-19T00:15:20.186Z] [1] Web Bundled 10205ms node_modules/expo-router/entry.js (1 module)
+[2026-08-19T00:15:21.115Z] [1]  LOG  [web] Logs will appear in the browser console
+[2026-08-19T00:17:24.116Z] [1] Web node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[2026-08-19T00:17:24.196Z] [1] Web Bundled 80ms node_modules/expo-router/entry.js (1 module)
+[2026-08-19T00:17:25.141Z] [1]  LOG  [web] Logs will appear in the browser console
+[2026-08-19T00:17:27.853Z] ELIFECYCLE  Command failed.
+[2026-08-19T00:17:27.873Z] [0]  ELIFECYCLE  Command failed.
+[2026-08-19T00:17:27.874Z] [1]  ELIFECYCLE  Command failed.
+[2026-08-19T00:17:27.874Z] [0] pnpm dev:server exited with code SIGTERM
+[2026-08-19T00:17:27.874Z] --> Sending SIGTERM to other processes..
+[2026-08-19T00:17:28.692Z] [1] pnpm dev:metro exited with code SIGTERM
+[2026-08-19T00:17:29.277Z] Lockfile is up to date, resolution step is skipped
+[2026-08-19T00:17:29.869Z] Dev server exited with code -1
+[2026-08-19T00:17:30.867Z] Starting dev server with command: pnpm run dev
+[2026-08-19T00:17:32.114Z] > app-template@1.0.2 dev /home/ubuntu/bike_assistant
+[2026-08-19T00:17:32.114Z] > concurrently -k "pnpm dev:server" "pnpm dev:metro"
+[2026-08-19T00:17:32.858Z] [1]
+[2026-08-19T00:17:32.858Z] [1] > app-template@1.0.2 dev:metro /home/ubuntu/bike_assistant
+[2026-08-19T00:17:32.858Z] [1] > sh -c './scripts/prewarm-expo-go-bundle.sh & exec cross-env NODE_OPTIONS=--max-old-space-size=1536 EXPO_NO_INTERACTIVE=1 EXPO_NO_METRO_WORKSPACE_ROOT=1 npx expo start --max-workers 1 --port ${EXPO_PORT:-8081}'
+[2026-08-19T00:17:32.858Z] [1]
+[2026-08-19T00:17:32.859Z] [0]
+[2026-08-19T00:17:32.859Z] [0] > app-template@1.0.2 dev:server /home/ubuntu/bike_assistant
+[2026-08-19T00:17:32.859Z] [0] > cross-env NODE_ENV=development tsx watch server/_core/index.ts
+[2026-08-19T00:17:32.859Z] [0]
+[2026-08-19T00:17:32.871Z] [1] curl: (7) Failed to con ELIFECYCLE  Command failed.
+[2026-08-19T00:17:32.877Z] [0]  ELIFECYCLE  Command failed.
+[2026-08-19T00:17:32.878Z] [1]  ELIFECYCLE  Command failed.
+[2026-08-19T00:17:32.879Z] [1] pnpm dev:metro exited with code SIGTERM
+[2026-08-19T00:17:32.879Z] --> Sending SIGTERM to other processes..
+[2026-08-19T00:17:32.885Z] [0] pnpm dev:server exited with code SIGTERM
+[2026-08-19T00:17:32.900Z] Dev server exited with code -1
+[2026-08-19T00:17:33.984Z] Starting dev server with command: pnpm run dev
+[2026-08-19T00:17:35.295Z] > app-template@1.0.2 dev /home/ubuntu/bike_assistant
+[2026-08-19T00:17:35.295Z] > concurrently -k "pnpm dev:server" "pnpm dev:metro"
+[2026-08-19T00:17:36.037Z] [1]
+[2026-08-19T00:17:36.037Z] [1] > app-template@1.0.2 dev:metro /home/ubuntu/bike_assistant
+[2026-08-19T00:17:36.037Z] [1] > sh -c './scripts/prewarm-expo-go-bundle.sh & exec cross-env NODE_OPTIONS=--max-old-space-size=1536 EXPO_NO_INTERACTIVE=1 EXPO_NO_METRO_WORKSPACE_ROOT=1 npx expo start --max-workers 1 --port ${EXPO_PORT:-8081}'
+[2026-08-19T00:17:36.037Z] [1]
+[2026-08-19T00:17:36.042Z] [0]
+[2026-08-19T00:17:36.042Z] [0] > app-template@1.0.2 dev:server /home/ubuntu/bike_assistant
+[2026-08-19T00:17:36.042Z] [0] > cross-env NODE_ENV=development tsx watch server/_core/index.ts
+[2026-08-19T00:17:36.042Z] [0]
+[2026-08-19T00:17:36.048Z] [1] curl: (7) Failed to connect to 127.0.0.1 port 8081 after 0 ms: Couldn't connect to server
+[2026-08-19T00:17:36.754Z] [1] Starting project at /home/ubuntu/bike_assistant
+[2026-08-19T00:17:38.058Z] [1] curl: (7) Failed to connect to 127.0.0.1 port 8081 after 0 ms: Couldn't connect to server
+[2026-08-19T00:17:38.113Z] [1] Starting Metro Bundler
+[2026-08-19T00:17:39.742Z] [0] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-08-19T00:17:39.892Z] [0] [api] server listening on port 3000
+[2026-08-19T00:17:45.137Z] [1] Web node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[2026-08-19T00:17:45.137Z] [1] Android node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[2026-08-19T00:17:45.159Z] [1] Waiting on http://localhost:8081
+[2026-08-19T00:17:45.159Z] [1] Logs for your project will appear below.
+[2026-08-19T00:17:45.159Z] [1] Web node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[2026-08-19T00:17:45.159Z] [1] Android node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[2026-08-19T00:17:48.745Z] [1] Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 95.7% (1444/1476)
+[2026-08-19T00:17:48.745Z] [1] Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 70.2% (1303/1555)
+[2026-08-19T00:17:49.299Z] [1] Web Bundled 4216ms node_modules/expo-router/entry.js (1476 modules)
+[2026-08-19T00:17:49.524Z] [1] Android Bundled 4439ms node_modules/expo-router/entry.js (1837 modules)
+[2026-08-19T00:17:50.586Z] [1]  LOG  [web] Logs will appear in the browser console
+[2026-08-19T00:18:07.172Z] [1] Web node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[2026-08-19T00:18:07.254Z] [1] Web Bundled 82ms node_modules/expo-router/entry.js (1 module)
+[2026-08-19T00:18:07.945Z] [1]  LOG  [web] Logs will appear in the browser console
+[2026-08-19T00:19:09.872Z] [1] Web node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[2026-08-19T00:19:09.952Z] [1] Web Bundled 80ms node_modules/expo-router/entry.js (1 module)
+[2026-08-19T00:19:11.335Z] [1]  LOG  [web] Logs will appear in the browser console
+[2026-08-19T00:19:13.090Z] [1] Web Bundled 69ms node_modules/expo-router/entry.js (1 module)
+[2026-08-19T00:19:13.965Z] [1]  LOG  [web] Logs will appear in the browser console
+[2026-08-19T00:19:33.056Z] [1] CommandError: Input is required, but 'npx expo' is in non-interactive mode.
+[2026-08-19T00:19:33.056Z] [1] Use the EXPO_TOKEN environment variable to authenticate in CI (Learn more: https://docs.expo.dev/accounts/programmatic-access/)
+[2026-08-19T00:19:57.244Z] [1] Web node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[2026-08-19T00:19:57.310Z] [1] Web Bundled 66ms node_modules/expo-router/entry.js (1 module)
+[2026-08-19T00:19:58.858Z] [1]  LOG  [web] Logs will appear in the browser console
+[2026-08-19T00:20:00.574Z] [1] Web Bundled 73ms node_modules/expo-router/entry.js (1 module)
+[2026-08-19T00:20:01.639Z] [1]  LOG  [web] Logs will appear in the browser console
+[2026-08-19T00:21:31.301Z] [1] Web node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[2026-08-19T00:21:31.373Z] [1] Web Bundled 72ms node_modules/expo-router/entry.js (1 module)
+[2026-08-19T00:21:32.294Z] [1]  LOG  [web] Logs will appear in the browser console
+[2026-08-19T00:21:35.007Z] ELIFECYCLE  Command failed.
+[2026-08-19T00:21:35.018Z] [0]  ELIFECYCLE  Command failed.
+[2026-08-19T00:21:35.018Z] [1]  ELIFECYCLE  Command failed.
+[2026-08-19T00:21:35.027Z] [0] 12:21:35 AM [tsx] Previous process hasn't exited yet. Force killing...
+[2026-08-19T00:21:35.046Z] [0] pnpm dev:server exited with code SIGTERM
+[2026-08-19T00:21:35.046Z] --> Sending SIGTERM to other processes..
+[2026-08-19T00:21:35.868Z] [1] pnpm dev:metro exited with code SIGTERM
+[2026-08-19T00:21:36.486Z] Lockfile is up to date, resolution step is skipped
+[2026-08-19T00:21:36.855Z] Progress: resolved 0, reused 1, downloaded 0, added 0
+[2026-08-19T00:21:37.033Z] Dev server exited with code -1
+[2026-08-19T00:21:38.043Z] Starting dev server with command: pnpm run dev
+[2026-08-19T00:21:39.295Z] > app-template@1.0.2 dev /home/ubuntu/bike_assistant
+[2026-08-19T00:21:39.295Z] > concurrently -k "pnpm dev:server" "pnpm dev:metro"

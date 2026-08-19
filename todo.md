@@ -2028,3 +2028,8 @@
 - [x] 移除無實際功能且永遠無法驗證的 Android 懸浮窗權限與引導項目
 - [x] 移除地圖觸控鎖定覆蓋層的空白按鈕處理器
 - [x] 將分享卡的複製文字按鈕接入系統剪貼簿並移除 TODO 殘留
+
+## 修復 Expo Go 遠端更新下載失敗（2026-08-19）
+- [x] 檢查 Android Expo manifest、遠端 Hermes bundle、Metro 啟動設定與預熱流程
+- [x] 修復可重現的遠端更新下載或逾時風險，避免手機在 JavaScript 載入前顯示錯誤
+- [x] 驗證 manifest 與 Android bundle 可由公開開發網址快速下載，並提供手機端重新載入步驟

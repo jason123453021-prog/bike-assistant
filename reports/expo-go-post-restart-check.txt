@@ -1,0 +1,3 @@
+manifest 200 application/expo+json 0.142238s
+launch asset https://8081-iv3gmjf25eviy2j4wd3ph-8f06572a.sg1.manus.computer/node_modules/expo-router/entry.bundle?platform=android&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=app&unstable_transformProfile=hermes-stable
+bundle 200 12204227 bytes 0.433533s

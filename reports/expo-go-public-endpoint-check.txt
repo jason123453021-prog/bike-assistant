@@ -1,0 +1,28 @@
+=== manifest headers ===
+HTTP/2 200 
+date: Wed, 19 Aug 2026 00:22:09 GMT
+content-type: text/plain
+cache-control: private, max-age=0
+expo-protocol-version: 0
+expo-sfv-version: 0
+x-trace-id: 7903c590d77d92fada69c48a4eb2e613
+
+=== manifest media type ===
+200 application/expo+json 5940
+=== android bundle headers ===
+HTTP/2 200 
+date: Wed, 19 Aug 2026 00:22:09 GMT
+content-type: application/javascript; charset=UTF-8
+content-length: 12204227
+cache-control: no-store, no-cache, must-revalidate, proxy-revalidate
+content-location: https://8081-iv3gmjf25eviy2j4wd3ph-8f06572a.sg1.manus.computer/node_modules/expo-router/entry.bundle//&platform=android&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=app&unstable_transformProfile=hermes-stable
+expires: 0
+last-modified: Wed, 19 Aug 2026 00:21:52 GMT
+pragma: no-cache
+surrogate-control: no-store
+vary: Accept-Encoding
+x-content-type-options: nosniff
+x-metro-delta-id: 0da2be2224079411
+x-metro-files-changed-count: 0
+x-trace-id: b181f8846096fed81685fab52bf2f969
+
