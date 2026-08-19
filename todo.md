@@ -2033,3 +2033,8 @@
 - [x] 檢查 Android Expo manifest、遠端 Hermes bundle、Metro 啟動設定與預熱流程
 - [x] 修復可重現的遠端更新下載或逾時風險，避免手機在 JavaScript 載入前顯示錯誤
 - [x] 驗證 manifest 與 Android bundle 可由公開開發網址快速下載，並提供手機端重新載入步驟
+
+## Expo 專案移轉至 jason123453021eve（2026-08-19）
+- [x] 核對目前 Expo 專案擁有者、projectId、目標帳號成員權限與可移轉條件
+- [x] 說明移轉對既有 EAS projectId、憑證、Android 套件與雲端建置的影響，取得執行確認
+- [x] 執行所有權移轉、更新專案設定並驗證目標帳號可發起雲端建置
