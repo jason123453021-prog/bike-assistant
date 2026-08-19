@@ -1,5 +1,22 @@
 # 智慧單車騎乘助手 TODO
 
+## Expo 專案移轉至 jason1234530（2026-08-19）
+- [x] 核對來源 Expo 專案與目標帳號 jason1234530 的可存取狀態
+- [x] 確認移轉後保留 EAS projectId、Android package 與既有簽章的影響
+- [x] 建立臨時 Expo 組織，並將 jason1234530 納入為管理員
+- [x] 將 bike-assistant 移轉至臨時組織並更新 app.config.ts owner
+- [x] 將 jason1234530 從 Admin 升格為臨時組織 Owner，以取得最終移轉權限
+- [x] 由 jason1234530 完成最終移轉並驗證新帳號建置頁面
+
+## 本機 Android EAS Local Build 指引（2026-08-19）
+- [ ] 核對目前 Android 發布設定與本機建置所需的前置條件
+- [ ] 整理使用者電腦可執行的 Local Build 流程、產物位置與故障排除步驟
+
+## 免費雲端 Android 建置替代方案（2026-08-19）
+- [x] 研究可支援 Expo SDK 54／Android APK 的免費雲端建置服務與目前額度限制
+- [ ] 比較服務的 GitHub、簽章、APK 產物與隱私條件，確認適用方案
+- [ ] 依使用者選擇設定雲端服務並啟動 Android 建置
+
 ## 基礎設定與 UI
 - [x] 品牌色彩配置（極簡黑白+綠色 #00C896 強調）
 - [x] 四標籤導覽（騎乘、導航、記錄、設定）

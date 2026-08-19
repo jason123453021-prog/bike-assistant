@@ -22,7 +22,7 @@ const env = {
 const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
-  owner: "jason123453021eve",
+  owner: "jason1234530",
   version: "1.0.3",
   // Android 16 會忽略大螢幕的強制方向；改採自適應視窗與 Safe Area 佈局。
   orientation: "default",
