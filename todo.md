@@ -1,5 +1,11 @@
 # 智慧單車騎乘助手 TODO
 
+## Expo Go 遠端更新連線深度修復（2026-08-20）
+- [x] 比對外部公開端點與 localhost 的 Expo Go manifest、回應標頭、bundle URL 與內容一致性
+- [x] 修復導致手機端無法下載遠端更新的 host URI、協定或 tunnel 連線問題
+- [x] 建立實際 Android development manifest/bundle 連線守門並完成回歸
+- [x] 交付手機端清除舊連線、重新掃描及正式 AAB 替代驗收步驟
+
 ## Expo Go 與管理預覽可用性修復（2026-08-19）
 - [x] 診斷 Android Expo manifest、遠端 Hermes bundle 與管理預覽字型載入的失敗原因
 - [x] 修復開發伺服器或預覽頁造成的遠端更新下載/字型逾時問題

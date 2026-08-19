@@ -176,8 +176,9 @@ const config: ExpoConfig = {
       projectId: "af286610-25f1-45e5-afcc-6c30040d4124",
     },
   },
-  // 專案仍不使用任何自訂 NitroModules 或 C++ 原生模組。
-  runtimeVersion: "1.0.3",
+  // 正式 AAB 與 EAS Update 使用固定 runtime；Expo Go 開發 manifest 則採 SDK 相容 runtime，
+  // 避免 Expo Go 將 1.0.3 當成不相容的已安裝原生 runtime 而拒絕下載遠端 bundle。
+  runtimeVersion: isProductionEasBuild ? "1.0.3" : undefined,
 };
 
 export default config;
