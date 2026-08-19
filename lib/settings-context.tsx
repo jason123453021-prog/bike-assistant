@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { calculateAgeFromBirthday, normalizeBirthday } from "./personal-profile";
 import {
@@ -323,13 +323,9 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(() => createDefaultSettings());
-  // 防止初始化的非同步讀取在使用者已重設或更新設定後，重新套用舊的持久化資料。
-  const settingsWriteRevisionRef = useRef(0);
 
   useEffect(() => {
-    const hydrationRevision = settingsWriteRevisionRef.current;
     AsyncStorage.getItem(SETTINGS_KEY).then((data) => {
-      if (settingsWriteRevisionRef.current !== hydrationRevision) return;
       if (data) {
         const saved = JSON.parse(data);
         const {
@@ -442,7 +438,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateSettings = async (partial: Partial<AppSettings>) => {
-    settingsWriteRevisionRef.current += 1;
     const birthday = partial.birthday !== undefined ? normalizeBirthday(partial.birthday) : settings.birthday;
     const legacyModeOverride = partial.supplyCalculationMode;
     const nextEnergySmartEnabled = partial.smartEnergySupplyEnabled
@@ -470,13 +465,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const resetAllSettings = async () => {
     const next = createDefaultSettings();
     // 只覆寫設定專用 key；騎乘活動、軌跡、相片與活動統計使用其他本機資料，不會被清除。
-    settingsWriteRevisionRef.current += 1;
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
     setSettings(next);
   };
 
   const updateNormalFields = async (partial: Partial<NormalModeFields>) => {
-    settingsWriteRevisionRef.current += 1;
     const next = {
       ...settings,
       normalModeFields: { ...settings.normalModeFields, ...partial },
@@ -486,7 +479,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateSimplifiedFields = async (partial: Partial<SimplifiedModeFields>) => {
-    settingsWriteRevisionRef.current += 1;
     const next = {
       ...settings,
       simplifiedModeFields: { ...settings.simplifiedModeFields, ...partial },
@@ -496,14 +488,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateFieldOrder = async (order: NormalFieldKey[]) => {
-    settingsWriteRevisionRef.current += 1;
     const next = { ...settings, normalModeFieldOrder: order };
     setSettings(next);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   };
 
   const updateSimplifiedFieldOrder = async (order: SimplifiedFieldKey[]) => {
-    settingsWriteRevisionRef.current += 1;
     const next = { ...settings, simplifiedModeFieldOrder: order };
     setSettings(next);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
@@ -512,7 +502,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const addSupplyItem = async (item: SupplyItem) => {
     const normalized = normalizeSupplyItems([item])[0];
     if (!normalized) return;
-    settingsWriteRevisionRef.current += 1;
     const next = {
       ...settings,
       supplyItems: [...settings.supplyItems, normalized],
@@ -522,7 +511,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateSupplyItem = async (id: string, partial: Partial<SupplyItem>) => {
-    settingsWriteRevisionRef.current += 1;
     const next = {
       ...settings,
       supplyItems: settings.supplyItems.flatMap((item) =>
@@ -534,7 +522,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteSupplyItem = async (id: string) => {
-    settingsWriteRevisionRef.current += 1;
     const next = {
       ...settings,
       supplyItems: settings.supplyItems.filter((item) => item.id !== id),

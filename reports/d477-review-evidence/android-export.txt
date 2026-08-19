@@ -1,0 +1,29 @@
+Starting Metro Bundler
+Android node_modules/expo-router/entry.js ▓▓░░░░░░░░░░░░░░ 15.2% (131/336)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1879/1879)
+Android Bundled 13088ms node_modules/expo-router/entry.js (1879 modules)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1879/1879)
+
+› Assets (26):
+assets/sounds/alert.mp3 (3.38 kB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf (357 kB)
+node_modules/@react-navigation/elements/lib/module/assets/back-icon-mask.png (653 B)
+node_modules/@react-navigation/elements/lib/module/assets/back-icon.png (4 variations | 152 B)
+node_modules/@react-navigation/elements/lib/module/assets/clear-icon.png (4 variations | 425 B)
+node_modules/@react-navigation/elements/lib/module/assets/close-icon.png (4 variations | 235 B)
+node_modules/@react-navigation/elements/lib/module/assets/search-icon.png (4 variations | 599 B)
+node_modules/expo-router/assets/arrow_down.png (9.46 kB)
+node_modules/expo-router/assets/error.png (469 B)
+node_modules/expo-router/assets/file.png (138 B)
+node_modules/expo-router/assets/forward.png (188 B)
+node_modules/expo-router/assets/pkg.png (364 B)
+node_modules/expo-router/assets/sitemap.png (465 B)
+node_modules/expo-router/assets/unmatched.png (4.75 kB)
+
+› android bundles (1):
+_expo/static/js/android/entry-08280138ac93ada08f54f7dab6f28376.hbc (5.79 MB)
+
+› Files (1):
+metadata.json (1.91 kB)
+
+Exported: reports/d477-review-evidence/android-export

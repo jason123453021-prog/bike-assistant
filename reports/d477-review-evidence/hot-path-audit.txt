@@ -1,0 +1,184 @@
+=== 位置、計時器與訂閱 ===
+app/(tabs)/map.tsx:203:  dismissTimeoutId: ReturnType<typeof setTimeout> | null;
+app/(tabs)/map.tsx:204:  repeatIntervalId: ReturnType<typeof setInterval> | null;
+app/(tabs)/map.tsx:287:  const idlePauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+app/(tabs)/map.tsx:293:  const recoverySnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+app/(tabs)/map.tsx:298:  const autoRecenterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+app/(tabs)/map.tsx:312:    autoRecenterTimerRef.current = setTimeout(() => {
+app/(tabs)/map.tsx:341:      recoverySnapshotTimerRef.current = setTimeout(() => {
+app/(tabs)/map.tsx:404:      const fitTimer = setTimeout(() => {
+app/(tabs)/map.tsx:434:  const weatherTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+app/(tabs)/map.tsx:478:      subscription?.remove();
+app/(tabs)/map.tsx:484:  const touchGuardHoldTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+app/(tabs)/map.tsx:485:  const touchGuardRelockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+app/(tabs)/map.tsx:491:    const subscription = AppState.addEventListener("change", (nextState) => {
+app/(tabs)/map.tsx:501:      subscription.remove();
+app/(tabs)/map.tsx:551:  const supplyRepeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+app/(tabs)/map.tsx:718:  const [intervalSupplyAlerts, setIntervalSupplyAlerts] = useState<Partial<Record<SupplyIntervalKind, boolean>>>({});
+app/(tabs)/map.tsx:719:  const intervalSupplyRepeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+app/(tabs)/map.tsx:751:    setIntervalSupplyAlerts({});
+app/(tabs)/map.tsx:862:    setIntervalSupplyAlerts(nextAlerts);
+app/(tabs)/map.tsx:971:      setIntervalSupplyAlerts(nextAlerts);
+app/(tabs)/map.tsx:1010:  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+app/(tabs)/map.tsx:1049:    touchGuardRelockTimerRef.current = setTimeout(() => {
+app/(tabs)/map.tsx:1060:    touchGuardHoldTimerRef.current = setInterval(() => {
+app/(tabs)/map.tsx:1295:        setTimeout(() => {
+app/(tabs)/map.tsx:1311:        supplyRepeatTimerRef.current = setInterval(() => {
+app/(tabs)/map.tsx:1409:        tracker.repeatIntervalId = setInterval(() => {
+app/(tabs)/map.tsx:1461:    setIntervalSupplyAlerts(nextAlerts);
+app/(tabs)/map.tsx:1476:      intervalSupplyRepeatTimerRef.current = setInterval(() => {
+app/(tabs)/map.tsx:1498:    const checkInterval = setInterval(triggerIntervalSupplyReminder, 10_000);
+app/(tabs)/map.tsx:1507:  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+app/(tabs)/map.tsx:1512:      timerRef.current = setInterval(() => {
+app/(tabs)/map.tsx:1520:        timerRef.current = setInterval(() => {
+app/(tabs)/map.tsx:1604:    idlePauseTimerRef.current = setTimeout(() => {
+app/(tabs)/map.tsx:1612:      locationSubRef.current?.remove();
+app/(tabs)/map.tsx:1633:      locationSubRef.current?.remove();
+app/(tabs)/map.tsx:1645:      const sub = await Location.watchPositionAsync(
+app/(tabs)/map.tsx:2117:        sub.remove();
+app/(tabs)/map.tsx:2126:      locationSubscription?.remove();
+app/(tabs)/map.tsx:2291:    setIntervalSupplyAlerts({});
+app/(tabs)/map.tsx:2365:    weatherTimerRef.current = setInterval(async () => {
+app/(tabs)/map.tsx:2396:          locationSubRef.current?.remove();
+app/(tabs)/map.tsx:2429:          setIntervalSupplyAlerts({});
+app/(tabs)/map.tsx:2552:    const subscription = AppState.addEventListener('change', async (nextState) => {
+app/(tabs)/map.tsx:2670:              setIntervalSupplyAlerts(restoredIntervalAlerts);
+app/(tabs)/map.tsx:2680:    return () => { subscription.remove(); };
+app/(tabs)/map.tsx:2727:    const interval = setInterval(() => { if (!cancelled) checkBattery(); }, 60000);
+app/(tabs)/map.tsx:2734:      locationSubRef.current?.remove();
+app/(tabs)/map.tsx:2743:    const timer = setInterval(() => {
+app/(tabs)/map.tsx:2756:      idleTimerRef.current = setTimeout(() => {
+app/_layout.tsx:76:    const subscription = Linking.addEventListener("url", ({ url }) => { void handleUri(url); });
+app/_layout.tsx:77:    return () => subscription.remove();
+app/ride-detail.tsx:368:      setTimeout(() => activityViewerRef.current?.scrollTo({ x: (safeIndex - 1) * SCREEN_W, animated: false }), 80);
+app/ride-detail.tsx:380:      setTimeout(() => {
+app/ride-detail.tsx:762:              setTimeout(() => nameInputRef.current?.focus(), 100);
+lib/_core/manus-runtime.ts:99:  window.addEventListener("message", handleMessage);
+lib/auto-pause-fsm.ts:41:  private bufferTimer: ReturnType<typeof setTimeout> | null = null;
+lib/auto-pause-fsm.ts:213:    this.bufferTimer = setTimeout(() => {
+lib/background-location.ts:275:            if (isRegistered) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+lib/background-location.ts:276:            await Location.startLocationUpdatesAsync(
+lib/background-location.ts:905:      await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+lib/background-location.ts:947:    if (isRegistered) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+lib/background-location.ts:948:    await Location.startLocationUpdatesAsync(
+lib/background-location.ts:964:      await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+lib/map-interaction/map-interaction-manager.ts:25:  private autoRecenterTimer: ReturnType<typeof setTimeout> | null = null;
+lib/map-interaction/map-interaction-manager.ts:98:    this.autoRecenterTimer = setTimeout(() => {
+lib/power-saving/smart-power-saving-system.ts:38:  private inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+lib/power-saving/smart-power-saving-system.ts:102:    this.inactivityTimer = setTimeout(() => {
+lib/realtime-navigation-manager.ts:164:        this.locationSubscription.remove();
+lib/realtime-navigation-manager.ts:168:      this.locationSubscription = await Location.watchPositionAsync(
+lib/realtime-navigation-manager.ts:191:        this.locationSubscription.remove();
+lib/route-service.ts:254:  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+lib/route-service.ts:317:  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+lib/supply-notification-actions.ts:99:    subscription?.remove();
+lib/turn-voice-notification-manager.ts:200:          await new Promise((resolve) => setTimeout(resolve, 500));
+lib/turn-voice-notification-manager.ts:224:      const checkInterval = setInterval(async () => {
+lib/turn-voice-notification-manager.ts:233:      setTimeout(() => {
+lib/weather-service.ts:42:  const timer = setTimeout(() => controller.abort(), 5000); // 5 秒 timeout
+lib/weather-service.ts:99:    await new Promise((r) => setTimeout(r, 1000));
+lib/model-update-service.ts:78:    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+components/leaflet-map.tsx:442:  longPressTimer = setTimeout(function() {
+components/leaflet-map.tsx:700:document.addEventListener('message', function(e) { handleMessage(e.data); });
+components/leaflet-map.tsx:701:window.addEventListener('message', function(e) { handleMessage(e.data); });
+components/leaflet-map.tsx:704:setTimeout(function() {
+components/ride-permission-readiness.tsx:36:    const subscription = AppState.addEventListener('change', (state) => {
+components/ride-permission-readiness.tsx:39:    return () => subscription.remove();
+=== 本機儲存與批次寫入 ===
+app/(tabs)/history.tsx:90:          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+app/(tabs)/map.tsx:321:  const flushRecoverySnapshot = useCallback(async () => {
+app/(tabs)/map.tsx:337:      void flushRecoverySnapshot();
+app/(tabs)/map.tsx:343:        void flushRecoverySnapshot();
+app/(tabs)/map.tsx:346:  }, [flushRecoverySnapshot]);
+app/(tabs)/map.tsx:351:    void flushRecoverySnapshot();
+app/(tabs)/map.tsx:352:  }, [flushRecoverySnapshot]);
+app/(tabs)/map.tsx:2433:          await flushRecoverySnapshot();
+app/(tabs)/map.tsx:2535:  }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, state.distance, state.elapsed, syncSmartSupplyCountdown, updateSettings]);
+lib/address-search-history.ts:26:    const raw = await AsyncStorage.getItem(RECENT_ADDRESS_SEARCHES_KEY);
+lib/address-search-history.ts:43:    await AsyncStorage.setItem(
+lib/background-location.ts:70:      const stored = await AsyncStorage.getItem(BG_TRACK_KEY);
+lib/background-location.ts:83:  await AsyncStorage.setItem(BG_TRACK_KEY, JSON.stringify(backgroundTrackCache));
+lib/background-location.ts:187:      const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:281:          await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:555:      await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:657:  await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:659:  await AsyncStorage.setItem(BG_TRACK_KEY, JSON.stringify([]));
+lib/background-location.ts:665:    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:683:    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:693:    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:713:    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:720:    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:725:    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:732:    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:737:    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:747:    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:753:    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:760:    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:766:    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:775:    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:779:      await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:787:    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:804:    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:811:    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:829:    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/background-location.ts:838:    const str = await AsyncStorage.getItem(BG_TRACK_KEY);
+lib/background-location.ts:850:    const str = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:937:    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+lib/background-location.ts:943:      await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+lib/local-ride-photos.ts:13:  const raw = await AsyncStorage.getItem(PHOTO_TIMELINE_KEY);
+lib/local-ride-photos.ts:24:  await AsyncStorage.setItem(PHOTO_TIMELINE_KEY, JSON.stringify(store));
+lib/onboarding-state-manager.ts:23:      const flag = await AsyncStorage.getItem(FIRST_LAUNCH_FLAG);
+lib/onboarding-state-manager.ts:36:      await AsyncStorage.setItem(FIRST_LAUNCH_FLAG, 'true');
+lib/onboarding-state-manager.ts:48:      const flag = await AsyncStorage.getItem(PERMISSION_ONBOARDING_SHOWN);
+lib/onboarding-state-manager.ts:61:      await AsyncStorage.setItem(PERMISSION_ONBOARDING_SHOWN, 'true');
+lib/onboarding-state-manager.ts:73:      const timestamp = await AsyncStorage.getItem(LAST_PERMISSION_CHECK);
+lib/onboarding-state-manager.ts:87:      await AsyncStorage.setItem(LAST_PERMISSION_CHECK, now.toString());
+lib/permissions-manager.ts:28:      const completed = await AsyncStorage.getItem(PERMISSIONS_ONBOARDING_KEY);
+lib/permissions-manager.ts:37:      await AsyncStorage.setItem(PERMISSIONS_ONBOARDING_KEY, 'true');
+lib/power-saving/smart-power-saving-system.ts:58:      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+lib/power-saving/smart-power-saving-system.ts:71:      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
+lib/power-saving/smart-power-saving-system.ts:81:      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+lib/ride-context.tsx:637:    void AsyncStorage.getItem(SPORT_TYPE_STORAGE_KEY).then((stored) => {
+lib/ride-context.tsx:744:    const existing = await AsyncStorage.getItem(STORAGE_KEY);
+lib/ride-context.tsx:747:    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(records.slice(0, 100)));
+lib/ride-context.tsx:753:      const data = await AsyncStorage.getItem(STORAGE_KEY);
+lib/ride-context.tsx:760:          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(migrated.slice(0, 100)));
+lib/ride-context.tsx:770:      const data = await AsyncStorage.getItem(STORAGE_KEY);
+lib/ride-context.tsx:774:        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+lib/ride-context.tsx:784:      const data = await AsyncStorage.getItem(STORAGE_KEY);
+lib/ride-context.tsx:804:        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+lib/ride-context.tsx:848:      await AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+lib/ride-context.tsx:860:      const data = await AsyncStorage.getItem(SNAPSHOT_KEY);
+lib/ride-context.tsx:899:    void AsyncStorage.setItem(SPORT_TYPE_STORAGE_KEY, sportType).catch(() => {});
+lib/ride-recovery/ride-session-recovery.ts:59:    const sessionJson = await AsyncStorage.getItem(RIDE_SESSION_KEY);
+lib/ride-recovery/ride-session-recovery.ts:107:    await AsyncStorage.setItem(RIDE_SESSION_KEY, JSON.stringify(session));
+lib/ride-recovery/ride-session-recovery.ts:110:    await AsyncStorage.setItem(RIDE_BACKUP_KEY, JSON.stringify({
+lib/ride-recovery/ride-session-recovery.ts:182:    const historyJson = await AsyncStorage.getItem(RIDE_HISTORY_KEY);
+lib/ride-recovery/ride-session-recovery.ts:185:    await AsyncStorage.setItem(RIDE_HISTORY_KEY, JSON.stringify(history));
+lib/ride-recovery/ride-session-recovery.ts:200:    const backupJson = await AsyncStorage.getItem(RIDE_BACKUP_KEY);
+lib/ride-recovery/ride-session-recovery.ts:253:    const historyJson = await AsyncStorage.getItem(RIDE_HISTORY_KEY);
+lib/ride-statistics-manager.ts:217:      await AsyncStorage.setItem(RIDE_HISTORY_KEY, JSON.stringify(history));
+lib/ride-statistics-manager.ts:228:      const data = await AsyncStorage.getItem(RIDE_HISTORY_KEY);
+lib/ride-statistics-manager.ts:281:      await AsyncStorage.setItem(RIDE_HISTORY_KEY, JSON.stringify(history));
+lib/settings-context.tsx:328:    AsyncStorage.getItem(SETTINGS_KEY).then((data) => {
+lib/settings-context.tsx:435:        void AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(nextSettings));
+lib/settings-context.tsx:462:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:468:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:478:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:487:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:493:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:499:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:510:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:521:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/settings-context.tsx:530:    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+lib/supply-notification-actions.ts:53:  const stored = await AsyncStorage.getItem(PENDING_ACTIONS_KEY);
+lib/supply-notification-actions.ts:56:  await AsyncStorage.setItem(PENDING_ACTIONS_KEY, JSON.stringify(actions));
+lib/supply-notification-actions.ts:62:    const stored = await AsyncStorage.getItem(PENDING_ACTIONS_KEY);
+lib/supply/supply-reminder-system.ts:43:      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+lib/supply/supply-reminder-system.ts:56:      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+lib/model-update-service.ts:22:export type ModelUpdateCheckResult = "throttled" | "offline-fallback" | "unchanged" | "updated" | "rejected";
+lib/model-update-service.ts:55:    const stored = await AsyncStorage.getItem(MODEL_UPDATE_CACHE_KEY);
+lib/model-update-service.ts:73:    const lastCheckAt = Number(await AsyncStorage.getItem(MODEL_UPDATE_LAST_CHECK_KEY) ?? 0);
+lib/model-update-service.ts:74:    if (Number.isFinite(lastCheckAt) && now - lastCheckAt < MODEL_UPDATE_INTERVAL_MS) return "throttled";
+lib/model-update-service.ts:75:    await AsyncStorage.setItem(MODEL_UPDATE_LAST_CHECK_KEY, String(now));
+lib/model-update-service.ts:89:      await AsyncStorage.setItem(MODEL_UPDATE_CACHE_KEY, JSON.stringify(manifest));

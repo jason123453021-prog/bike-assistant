@@ -1,0 +1,86 @@
+=== 開發服務錯誤 ===
+[2026-08-16T00:48:40.597Z] [1] Error: Premature close
+[2026-08-16T00:48:40.963Z] [1] Error: Premature close
+[2026-08-16T00:48:41.363Z] [1] Error: Premature close
+[2026-08-16T00:48:41.671Z] [1] Error: Premature close
+[2026-08-16T00:48:42.068Z] [1] Error: Premature close
+[2026-08-16T00:48:42.574Z] [1] Error: Premature close
+[2026-08-16T00:48:42.882Z] [1] Error: Premature close
+[2026-08-16T00:48:43.389Z] [1] Error: Premature close
+[2026-08-16T00:48:43.808Z] [1] Error: Premature close
+[2026-08-16T00:48:44.066Z] [1] Error: Premature close
+[2026-08-16T00:48:44.251Z] [1] Error: Premature close
+[2026-08-16T00:48:44.269Z] [1] Error: Premature close
+[2026-08-16T00:48:44.285Z] [1] Error: Premature close
+[2026-08-16T00:48:44.303Z] [1] Error: Premature close
+[2026-08-16T00:48:44.316Z] [1] Error: Premature close
+[2026-08-16T00:48:44.331Z] [1] Error: Premature close
+[2026-08-16T00:48:44.343Z] [1] Error: Premature close
+[2026-08-16T00:48:44.356Z] [1] Error: Premature close
+[2026-08-16T00:48:44.367Z] [1] Error: Premature close
+[2026-08-16T00:48:44.379Z] [1] Error: Premature close
+[2026-08-16T00:48:44.390Z] [1] Error: Premature close
+[2026-08-16T00:48:44.403Z] [1] Error: Premature close
+[2026-08-16T00:49:14.663Z] [1] Error while reading cache, falling back to a full crawl:
+[2026-08-16T00:49:14.664Z] [1]  Error: Unable to deserialize cloned data due to invalid or unsupported version.
+[2026-08-16T05:34:13.703Z] [1] Error while reading cache, falling back to a full crawl:
+[2026-08-16T05:34:13.703Z] [1]  Error: Unable to deserialize cloned data due to invalid or unsupported version.
+[2026-08-16T06:06:02.180Z] [1] /home/ubuntu/bike_assistant/node_modules/@expo/cli/build/src/utils/errors.js:130
+[2026-08-16T06:06:02.181Z] [1]     throw error;
+[2026-08-16T06:06:02.181Z] [1] Error: ENOENT: no such file or directory, watch '/home/ubuntu/bike_assistant/node_modules/glob-parent_tmp_40465'
+[2026-08-16T06:15:49.175Z] [1] CommandError: Input is required, but 'npx expo' is in non-interactive mode.
+[2026-08-16T06:16:38.372Z] [1] CommandError: Input is required, but 'npx expo' is in non-interactive mode.
+[2026-08-17T16:51:29.129Z] [1] /home/ubuntu/bike_assistant/node_modules/@expo/cli/build/src/utils/errors.js:130
+[2026-08-17T16:51:29.129Z] [1]     throw error;
+[2026-08-17T16:51:29.129Z] [1] Error: ENOENT: no such file or directory, watch '/home/ubuntu/bike_assistant/node_modules/expo-audio_tmp_208704/android/src'
+[2026-08-17T16:55:14.244Z] [1] CommandError: Input is required, but 'npx expo' is in non-interactive mode.
+[2026-08-17T16:55:24.802Z] [1] CommandError: Input is required, but 'npx expo' is in non-interactive mode.
+[2026-08-17T17:02:32.657Z] [1] CommandError: Input is required, but 'npx expo' is in non-interactive mode.
+[2026-08-19T00:14:29.153Z] [1] /home/ubuntu/bike_assistant/node_modules/@expo/cli/build/src/utils/errors.js:130
+[2026-08-19T00:14:29.153Z] [1]     throw error;
+[2026-08-19T00:14:29.153Z] [1] Error: ENOENT: no such file or directory, watch '/home/ubuntu/bike_assistant/node_modules/hermes-estree_tmp_257676/dist/generated'
+=== 原生高風險與已移除項目 ===
+lib/fit-export.ts:19: * 僅使用 Garmin 官方 JavaScript SDK；不包含原生橋接、雲端轉檔或 C++ 模組。
+app.config.ts:32:  // Expo SDK 54 的 Reanimated 4 需要此官方 React Native 架構；未加入任何自訂 NitroModules 或 C++ 原生模組。
+app.config.ts:180:  // 專案仍不使用任何自訂 NitroModules 或 C++ 原生模組。
+=== Expo 與原生依賴 ===
+@react-native-async-storage/async-storage 2.2.0
+@react-native-community/slider 5.0.1
+expo-asset 12.0.13
+expo-audio 1.1.1
+expo-battery 10.0.8
+expo-brightness 14.0.8
+expo-build-properties 1.0.10
+expo-clipboard 8.0.8
+expo-constants 18.0.14
+expo-crypto 15.0.9
+expo-document-picker 14.0.8
+expo-file-system 19.0.24
+expo-font 14.0.12
+expo-haptics 15.0.8
+expo-image 3.0.11
+expo-image-picker 17.0.11
+expo-intent-launcher 13.0.8
+expo-keep-awake 15.0.8
+expo-linking 8.0.12
+expo-location 19.0.8
+expo-notifications 0.32.17
+expo-router 6.0.24
+expo-secure-store 15.0.8
+expo-sensors 15.0.8
+expo-sharing 14.0.8
+expo-speech 14.0.8
+expo-splash-screen 31.0.13
+expo-status-bar 3.0.9
+expo-symbols 1.0.8
+expo-system-ui 6.0.9
+expo-task-manager 14.0.9
+react-native 0.81.5
+react-native-gesture-handler 2.28.0
+react-native-reanimated 4.1.6
+react-native-safe-area-context 5.6.2
+react-native-screens 4.16.0
+react-native-svg 15.12.1
+react-native-web 0.21.2
+react-native-webview 13.15.0
+react-native-worklets 0.5.1

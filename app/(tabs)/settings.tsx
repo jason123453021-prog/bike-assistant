@@ -64,15 +64,11 @@ export default function SettingsScreen() {
   const [powerSavingSettings, setPowerSavingSettings] = useState<PowerSavingSettings>(
     powerSavingManagerRef.current.getSettings(),
   );
-  const powerSavingHydrationRevisionRef = useRef(0);
 
   useEffect(() => {
     let mounted = true;
-    const hydrationRevision = powerSavingHydrationRevisionRef.current;
     powerSavingManagerRef.current.loadSettings().then((loaded) => {
-      if (mounted && powerSavingHydrationRevisionRef.current === hydrationRevision) {
-        setPowerSavingSettings(loaded);
-      }
+      if (mounted) setPowerSavingSettings(loaded);
     });
     return () => { mounted = false; };
   }, []);
@@ -168,7 +164,6 @@ export default function SettingsScreen() {
             void (async () => {
               try {
                 await resetAllSettings();
-                powerSavingHydrationRevisionRef.current += 1;
                 const defaultPowerSavingSettings = await powerSavingManagerRef.current.resetSettings();
                 setPowerSavingSettings(defaultPowerSavingSettings);
                 setCollapsedSections({});

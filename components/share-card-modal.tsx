@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, Modal, Pressable, ScrollView, Share, Alert, Platform } from "react-native";
-import * as Clipboard from "expo-clipboard";
 import * as Sharing from "expo-sharing";
+import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import { WebView } from "react-native-webview";
 import { useColors } from "@/hooks/use-colors";
@@ -69,17 +69,13 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
   };
 
   const handleCopyShareText = async () => {
-    if (!shareText) {
-      Alert.alert("無可複製內容", "目前沒有可分享的騎乘文字。");
-      return;
-    }
+    if (!shareText) return;
 
     try {
-      const copied = await Clipboard.setStringAsync(shareText);
-      if (!copied) throw new Error("Clipboard copy was rejected");
-      Alert.alert("已複製", "分享文字已複製到剪貼板。");
+      await Clipboard.setStringAsync(shareText);
+      Alert.alert("已複製", "分享文字已複製到剪貼板");
     } catch {
-      Alert.alert("複製失敗", "無法存取剪貼板，請確認系統權限後再試一次。");
+      Alert.alert("複製失敗", "無法寫入系統剪貼板，請稍後再試。");
     }
   };
 
@@ -365,7 +361,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                     opacity: pressed ? 0.8 : 1,
                   },
                 ]}
-                onPress={handleCopyShareText}
+                onPress={() => { void handleCopyShareText(); }}
               >
                 <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>
                   📋 複製分享文字

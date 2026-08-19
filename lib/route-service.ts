@@ -258,12 +258,14 @@ async function fetchBrouterRoute(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      console.warn("[RouteService] Brouter HTTP error:", response.status);
       return null;
     }
 
     const data = await response.json();
 
     if (!data.features || data.features.length === 0) {
+      console.warn("[RouteService] Brouter no route found");
       return null;
     }
 
@@ -283,12 +285,18 @@ async function fetchBrouterRoute(
     const steps = parseBrouterMessages(messages);
 
     if (!hasUsableRouteEndpoints(coordinates, from, to)) {
+      console.warn("[RouteService] Brouter endpoint snap is too far from a routable road");
       return null;
     }
 
     return { coordinates, distanceM, durationSec, steps };
-  } catch {
+  } catch (err) {
     clearTimeout(timeoutId);
+    if ((err as Error).name === "AbortError") {
+      console.warn("[RouteService] Brouter request timed out");
+    } else {
+      console.warn("[RouteService] Brouter fetch error:", err);
+    }
     return null;
   }
 }
@@ -316,18 +324,21 @@ async function fetchOsrmRoute(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      console.warn("[RouteService] OSRM HTTP error:", response.status);
       return null;
     }
 
     const data = await response.json();
 
     if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
+      console.warn("[RouteService] OSRM no route found:", data.code);
       return null;
     }
 
     const route = data.routes[0];
     const coordinates = decodePolyline6(route.geometry);
     if (!hasUsableRouteEndpoints(coordinates, from, to)) {
+      console.warn("[RouteService] OSM bike endpoint snap is too far from a routable road");
       return null;
     }
     const allSteps: any[] = [];
@@ -342,8 +353,13 @@ async function fetchOsrmRoute(
       durationSec: Math.round(route.duration),
       steps,
     };
-  } catch {
+  } catch (err) {
     clearTimeout(timeoutId);
+    if ((err as Error).name === "AbortError") {
+      console.warn("[RouteService] OSRM request timed out");
+    } else {
+      console.warn("[RouteService] OSRM fetch error:", err);
+    }
     return null;
   }
 }

@@ -1,4 +1,0 @@
-
-> app-template@1.0.2 lint /home/ubuntu/bike_assistant
-> expo lint
-

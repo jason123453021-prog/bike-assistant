@@ -6,7 +6,9 @@ try {
   const brightness = require('expo-brightness');
   setBrightnessAsync = brightness.setBrightnessAsync;
   getBrightnessAsync = brightness.getBrightnessAsync;
-} catch {}
+} catch (e) {
+  console.warn('[PowerSaving] expo-brightness not available');
+}
 import { useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -37,7 +39,6 @@ export class SmartPowerSavingManager {
   private isInPowerSavingMode: boolean = false;
   private originalBrightness: number = 0.8;
   private brightnessSession = 0;
-  private settingsWriteRevision = 0;
   private brightnessHolds = new Set<string>();
   private listeners: Set<(isActive: boolean) => void> = new Set();
 
@@ -53,35 +54,36 @@ export class SmartPowerSavingManager {
   }
 
   async loadSettings(): Promise<PowerSavingSettings> {
-    const hydrationRevision = this.settingsWriteRevision;
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (hydrationRevision !== this.settingsWriteRevision) return this.settings;
       if (stored) {
         this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
       }
-    } catch {}
+    } catch (error) {
+      console.error('[PowerSaving] Failed to load settings:', error);
+    }
     return this.settings;
   }
 
   async saveSettings(newSettings: Partial<PowerSavingSettings>) {
-    this.settingsWriteRevision += 1;
     try {
       this.settings = { ...this.settings, ...newSettings };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
-    } catch {}
+    } catch (error) {
+      console.error('[PowerSaving] Failed to save settings:', error);
+    }
   }
 
   /** 僅恢復省電偏好預設值，不影響任何騎乘活動或補給資料。 */
   async resetSettings(): Promise<PowerSavingSettings> {
     const next = createDefaultSettings();
-    this.settingsWriteRevision += 1;
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       this.settings = next;
       await this.wakeUp();
       return next;
     } catch (error) {
+      console.error('[PowerSaving] Failed to reset settings:', error);
       throw error;
     }
   }
@@ -112,9 +114,8 @@ export class SmartPowerSavingManager {
       if (!this.isInPowerSavingMode || session !== this.brightnessSession) return;
       await setBrightnessAsync(this.settings.minBrightness);
       this.notifyListeners(true);
-    } catch {
-      this.isInPowerSavingMode = false;
-      this.notifyListeners(false);
+    } catch (error) {
+      console.error('[PowerSaving] Failed to enter power saving mode:', error);
     }
   }
 
@@ -125,7 +126,9 @@ export class SmartPowerSavingManager {
     this.notifyListeners(false);
     try {
       await setBrightnessAsync(this.originalBrightness);
-    } catch {}
+    } catch (error) {
+      console.error('[PowerSaving] Failed to exit power saving mode:', error);
+    }
   }
 
   async wakeUp() {

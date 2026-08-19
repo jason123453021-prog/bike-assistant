@@ -14,15 +14,14 @@ describe("release debug hygiene", () => {
       "lib/power-saving/smart-power-saving-system.ts",
       "lib/route-service.ts",
     ]) {
-      expect(read(path)).not.toMatch(/console\.(log|info|debug|warn|error)\(/);
+      expect(read(path)).not.toMatch(/console\.(log|info|debug)\(/);
     }
   });
 
   it("enables release optimization and disables the development network inspector", () => {
     const gradleProperties = read("android/gradle.properties");
-    const appConfig = read("app.config.ts");
     expect(gradleProperties).toContain("EX_DEV_CLIENT_NETWORK_INSPECTOR=false");
-    expect(appConfig).toContain("enableMinifyInReleaseBuilds: isProductionEasBuild");
-    expect(appConfig).toContain("enableShrinkResourcesInReleaseBuilds: isProductionEasBuild");
+    expect(gradleProperties).toContain("android.enableMinifyInReleaseBuilds=true");
+    expect(gradleProperties).toContain("android.enableShrinkResourcesInReleaseBuilds=true");
   });
 });

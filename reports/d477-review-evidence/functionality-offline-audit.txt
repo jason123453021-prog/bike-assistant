@@ -1,0 +1,225 @@
+=== 離線、權限與失敗回退 ===
+app/(tabs)/map.tsx:82:  requestNotificationPermission,
+app/(tabs)/map.tsx:381:  const gpxRoute = activeNavigationRoute ?? sharedRoute ?? pinnedNavigationLayers[pinnedNavigationLayers.length - 1]?.route ?? null;
+app/(tabs)/map.tsx:497:        try { alertPlayer.pause(); } catch {}
+app/(tabs)/map.tsx:671:      const permission = await Location.getForegroundPermissionsAsync();
+app/(tabs)/map.tsx:672:      if (permission.status !== "granted") {
+app/(tabs)/map.tsx:673:        const requested = await Location.requestForegroundPermissionsAsync();
+app/(tabs)/map.tsx:674:        if (requested.status !== "granted") {
+app/(tabs)/map.tsx:695:    } catch {
+app/(tabs)/map.tsx:761:    try { alertPlayer.pause(); } catch {}
+app/(tabs)/map.tsx:1281:        try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1331:            try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1401:        try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1414:              try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1468:      try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1490:          try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1640:      const { status } = await Location.requestForegroundPermissionsAsync();
+app/(tabs)/map.tsx:1641:      if (status !== "granted") return;
+app/(tabs)/map.tsx:1642:      notifPermRef.current = await requestNotificationPermission();
+app/(tabs)/map.tsx:2214:      const foregroundPermission = await Location.getForegroundPermissionsAsync();
+app/(tabs)/map.tsx:2215:      const permission = foregroundPermission.status === "granted"
+app/(tabs)/map.tsx:2216:        ? foregroundPermission
+app/(tabs)/map.tsx:2217:        : await Location.requestForegroundPermissionsAsync();
+app/(tabs)/map.tsx:2218:      if (permission.status !== "granted") {
+app/(tabs)/map.tsx:2222:    } catch {
+app/(tabs)/map.tsx:2359:    } catch {
+app/(tabs)/map.tsx:2451:                source: environmentSummary.hadLiveWeather ? "live-weather" : "offline-fallback",
+app/(tabs)/map.tsx:2519:          } catch {
+app/(tabs)/map.tsx:2529:          } catch {
+app/(tabs)/map.tsx:2724:      } catch { /* 忽略電量讀取失敗 */ }
+app/(tabs)/navigate.tsx:42:  const [route, setRoute] = useState<GpxRoute | null>(null);
+app/(tabs)/navigate.tsx:46:  const [routeWeather, setRouteWeather] = useState<WeatherData | null>(null);
+app/(tabs)/navigate.tsx:80:    if (!route) return null;
+app/(tabs)/navigate.tsx:100:  const routeTimeEstimate = routeEstimate?.time ?? null;
+app/(tabs)/navigate.tsx:136:        const { status } = await Location.requestForegroundPermissionsAsync();
+app/(tabs)/navigate.tsx:137:        if (status !== "granted") return;
+app/(tabs)/navigate.tsx:152:      } catch {
+app/(tabs)/navigate.tsx:174:    } catch {
+app/(tabs)/navigate.tsx:193:    if (!route || route.elevationProfile.length < 2) return null;
+app/(tabs)/settings.tsx:28:import { RidePermissionReadiness } from "@/components/ride-permission-readiness";
+app/(tabs)/settings.tsx:173:              } catch {
+app/(tabs)/settings.tsx:391:        <RidePermissionReadiness />
+app/ride-detail.tsx:148:    } catch {
+app/ride-detail.tsx:173:  const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
+app/ride-detail.tsx:427:    if (!record?.route?.length) return null;
+lib/_core/manus-runtime.ts:32:  } catch {
+lib/address-search-history.ts:36:  } catch {
+lib/address-search-history.ts:47:  } catch {
+lib/background-location.ts:72:    } catch {
+lib/background-location.ts:684:  } catch {}
+lib/background-location.ts:714:  } catch {}
+lib/background-location.ts:726:  } catch {}
+lib/background-location.ts:738:  } catch {}
+lib/background-location.ts:754:  } catch {}
+lib/background-location.ts:767:  } catch {}
+lib/background-location.ts:781:  } catch {}
+lib/background-location.ts:805:  } catch {}
+lib/background-location.ts:830:  } catch {}
+lib/background-location.ts:840:  } catch {
+lib/background-location.ts:852:  } catch {
+lib/background-location.ts:892:    const foregroundPermission = await Location.requestForegroundPermissionsAsync();
+lib/background-location.ts:893:    if (foregroundPermission.status !== "granted") {
+lib/background-location.ts:894:      console.warn("[BackgroundLocation] Foreground permission denied");
+lib/background-location.ts:897:    const { status } = await Location.requestBackgroundPermissionsAsync();
+lib/background-location.ts:898:    if (status !== "granted") {
+lib/background-location.ts:899:      console.warn("[BackgroundLocation] Background permission denied");
+lib/background-location.ts:932:    const foregroundPermission = await Location.requestForegroundPermissionsAsync();
+lib/background-location.ts:933:    if (foregroundPermission.status !== "granted") return false;
+lib/background-location.ts:934:    const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
+lib/background-location.ts:935:    if (backgroundPermission.status !== "granted") return false;
+lib/feedback-service.ts:33:  } catch {}
+lib/feedback-service.ts:40:  } catch {}
+lib/feedback-service.ts:47:  } catch {}
+lib/feedback-service.ts:54:  } catch {}
+lib/feedback-service.ts:61:  } catch {}
+lib/feedback-service.ts:76:  } catch {}
+lib/feedback-service.ts:84:  } catch {}
+lib/feedback-service.ts:155:    } catch {}
+lib/feedback-service.ts:171:  } catch {}
+lib/feedback-service.ts:175:export async function requestNotificationPermission(): Promise<boolean> {
+lib/feedback-service.ts:180:    const { status: existing } = await Notifications.getPermissionsAsync();
+lib/feedback-service.ts:181:    if (existing === "granted") return true;
+lib/feedback-service.ts:182:    const { status } = await Notifications.requestPermissionsAsync();
+lib/feedback-service.ts:183:    return status === "granted";
+lib/feedback-service.ts:184:  } catch {
+lib/feedback-service.ts:227:  } catch {}
+lib/feedback-service.ts:238:  } catch {}
+lib/feedback-service.ts:261:  } catch {}
+lib/feedback-service.ts:305:  } catch {}
+lib/feedback-service.ts:330:  } catch {}
+lib/fit-export.ts:23:  if (route.length < 2) return null;
+lib/gpx-context.tsx:16:  setSharedRoute: (route: GpxRoute | null) => void;
+lib/gpx-context.tsx:28:  const setSharedRoute = useCallback((route: GpxRoute | null) => {
+lib/history-route.ts:9:  if (!record.route || record.route.length < 2) return null;
+lib/local-ride-media.ts:33:    } catch {
+lib/local-ride-photos.ts:18:  } catch {
+lib/local-ride-photos.ts:49:    } catch {
+lib/onboarding-state-manager.ts:4:const PERMISSION_ONBOARDING_SHOWN = 'permission_onboarding_shown';
+lib/onboarding-state-manager.ts:5:const LAST_PERMISSION_CHECK = 'last_permission_check';
+lib/onboarding-state-manager.ts:9:  hasShownPermissionOnboarding: boolean;
+lib/onboarding-state-manager.ts:10:  lastPermissionCheckTime: number;
+lib/onboarding-state-manager.ts:46:  static async hasShownPermissionOnboarding(): Promise<boolean> {
+lib/onboarding-state-manager.ts:59:  static async markPermissionOnboardingShown(): Promise<void> {
+lib/onboarding-state-manager.ts:71:  static async getLastPermissionCheckTime(): Promise<number> {
+lib/onboarding-state-manager.ts:84:  static async updateLastPermissionCheckTime(): Promise<void> {
+lib/onboarding-state-manager.ts:99:      const hasShownPermissionOnboarding =
+lib/onboarding-state-manager.ts:100:        await this.hasShownPermissionOnboarding();
+lib/onboarding-state-manager.ts:101:      const lastPermissionCheckTime = await this.getLastPermissionCheckTime();
+lib/onboarding-state-manager.ts:105:        hasShownPermissionOnboarding,
+lib/onboarding-state-manager.ts:106:        lastPermissionCheckTime,
+lib/onboarding-state-manager.ts:112:        hasShownPermissionOnboarding: false,
+lib/onboarding-state-manager.ts:113:        lastPermissionCheckTime: 0,
+lib/onboarding-state-manager.ts:138:  static async shouldShowPermissionOnboarding(): Promise<boolean> {
+lib/onboarding-state-manager.ts:141:      return state.isFirstLaunch && !state.hasShownPermissionOnboarding;
+lib/permissions-manager.ts:8:const PERMISSIONS_ONBOARDING_KEY = 'permissions_onboarding_completed';
+lib/permissions-manager.ts:10:export type PermissionType = 
+lib/permissions-manager.ts:16:export interface PermissionStatus {
+lib/permissions-manager.ts:17:  type: PermissionType;
+lib/permissions-manager.ts:20:  granted: boolean;
+lib/permissions-manager.ts:25:export class PermissionsManager {
+lib/permissions-manager.ts:30:    } catch {
+lib/permissions-manager.ts:39:      console.error('[PermissionsManager] Failed to mark onboarding completed:', error);
+lib/permissions-manager.ts:43:  static async getAllPermissionStatuses(): Promise<PermissionStatus[]> {
+lib/permissions-manager.ts:44:    const statuses: PermissionStatus[] = [];
+lib/permissions-manager.ts:46:    const locationStatus = await this.checkLocationPermission();
+lib/permissions-manager.ts:49:    const notificationStatus = await this.checkNotificationPermission();
+lib/permissions-manager.ts:53:      const overlayStatus = await this.checkOverlayPermission();
+lib/permissions-manager.ts:63:  static async checkLocationPermission(): Promise<PermissionStatus> {
+lib/permissions-manager.ts:65:      const { status } = await Location.getForegroundPermissionsAsync();
+lib/permissions-manager.ts:66:      const backgroundStatus = await Location.getBackgroundPermissionsAsync();
+lib/permissions-manager.ts:68:      const granted = status === 'granted' && backgroundStatus.status === 'granted';
+lib/permissions-manager.ts:74:        granted,
+lib/permissions-manager.ts:79:      console.error('[PermissionsManager] Error checking location permission:', error);
+lib/permissions-manager.ts:84:        granted: false,
+lib/permissions-manager.ts:90:  static async checkNotificationPermission(): Promise<PermissionStatus> {
+lib/permissions-manager.ts:99:        granted: false,
+lib/permissions-manager.ts:105:      const settings = await Notifications.getPermissionsAsync();
+lib/permissions-manager.ts:111:        granted: settings.granted,
+lib/permissions-manager.ts:116:      console.error('[PermissionsManager] Error checking notification permission:', error);
+lib/permissions-manager.ts:121:        granted: false,
+lib/permissions-manager.ts:127:  static async checkOverlayPermission(): Promise<PermissionStatus> {
+lib/permissions-manager.ts:132:      granted: false,
+lib/permissions-manager.ts:138:  static async checkBatteryOptimizationWhitelist(): Promise<PermissionStatus> {
+lib/permissions-manager.ts:143:      granted: false,
+lib/permissions-manager.ts:149:  static async requestLocationPermission(): Promise<boolean> {
+lib/permissions-manager.ts:151:      const foreground = await Location.requestForegroundPermissionsAsync();
+lib/permissions-manager.ts:152:      if (foreground.status !== 'granted') {
+lib/permissions-manager.ts:156:      const background = await Location.requestBackgroundPermissionsAsync();
+lib/permissions-manager.ts:157:      return background.status === 'granted';
+lib/permissions-manager.ts:159:      console.error('[PermissionsManager] Error requesting location permission:', error);
+lib/permissions-manager.ts:164:  static async requestNotificationPermission(): Promise<boolean> {
+lib/permissions-manager.ts:169:      const settings = await Notifications.requestPermissionsAsync();
+lib/permissions-manager.ts:170:      return settings.granted;
+lib/permissions-manager.ts:172:      console.error('[PermissionsManager] Error requesting notification permission:', error);
+lib/permissions-manager.ts:177:  static async openSystemSettings(permissionType: PermissionType): Promise<void> {
+lib/permissions-manager.ts:185:        switch (permissionType) {
+lib/permissions-manager.ts:207:      console.error('[PermissionsManager] Error opening system settings:', error);
+lib/realtime-navigation-manager.ts:49:  private route: NavigationRoute | null = null;
+lib/realtime-navigation-manager.ts:81:      const { status } = await Location.requestForegroundPermissionsAsync();
+lib/realtime-navigation-manager.ts:82:      if (status !== 'granted') {
+lib/realtime-navigation-manager.ts:83:        throw new Error('Location permission denied');
+lib/ride-context.tsx:84:    source: "live-weather" | "offline-fallback";
+lib/ride-context.tsx:96:  source?: "smart" | "smart-offline-fallback" | "custom";
+lib/ride-context.tsx:594:  getRouteStats: (routeName: string) => RouteStats | null;
+lib/ride-context.tsx:873:  const getRouteStats = useCallback((routeName: string): RouteStats | null => {
+lib/ride-context.tsx:875:    if (routeRecords.length === 0) return null;
+lib/ride-record-normalizer.ts:115:      const source = environmentValue.source === "live-weather" ? "live-weather" : "offline-fallback";
+lib/ride-record-normalizer.ts:141:    const source = item.source === "smart" || item.source === "smart-offline-fallback" || item.source === "custom"
+lib/ride-record-normalizer.ts:192:  if (!Array.isArray(source.route) || typeof source.distance !== "number" || !Number.isFinite(source.distance) || source.distance < 0) return null;
+lib/smart-supply-plan.ts:41:  source: "smart" | "smart-offline-fallback" | "custom";
+lib/smart-supply-plan.ts:175:  const source = input.weatherAvailable ? "smart" : "smart-offline-fallback";
+lib/supply-calibration.ts:40:    source?: "smart" | "smart-offline-fallback" | "custom";
+lib/supply-calibration.ts:72:    && (confirmation.source === "smart" || confirmation.source === "smart-offline-fallback")
+lib/supply-notification-actions.ts:65:  } catch {
+lib/weather-service.ts:71:  } catch {
+lib/model-update-service.ts:22:export type ModelUpdateCheckResult = "throttled" | "offline-fallback" | "unchanged" | "updated" | "rejected";
+lib/model-update-service.ts:58:  } catch {
+lib/model-update-service.ts:70:  if (!manifestUrl) return "offline-fallback";
+lib/model-update-service.ts:85:      if (!response.ok) return "offline-fallback";
+lib/model-update-service.ts:95:  } catch {
+lib/model-update-service.ts:96:    return "offline-fallback";
+components/leaflet-map.tsx:958:      } catch {}
+components/ride-permission-readiness.tsx:6:import { PermissionsManager, type PermissionStatus, type PermissionType } from '@/lib/permissions-manager';
+components/ride-permission-readiness.tsx:9:  type: Extract<PermissionType, 'location' | 'notification' | 'battery_optimization'>;
+components/ride-permission-readiness.tsx:24:export function RidePermissionReadiness() {
+components/ride-permission-readiness.tsx:26:  const [statuses, setStatuses] = useState<PermissionStatus[]>([]);
+components/ride-permission-readiness.tsx:27:  const [opening, setOpening] = useState<PermissionType | null>(null);
+components/ride-permission-readiness.tsx:30:    const next = await PermissionsManager.getAllPermissionStatuses();
+components/ride-permission-readiness.tsx:47:  const openSetup = useCallback(async (type: PermissionType) => {
+components/ride-permission-readiness.tsx:51:        const granted = await PermissionsManager.requestNotificationPermission();
+components/ride-permission-readiness.tsx:52:        if (!granted) await PermissionsManager.openSystemSettings(type);
+components/ride-permission-readiness.tsx:54:        const granted = await PermissionsManager.requestLocationPermission();
+components/ride-permission-readiness.tsx:55:        if (!granted) await PermissionsManager.openSystemSettings(type);
+components/ride-permission-readiness.tsx:57:        await PermissionsManager.openSystemSettings(type);
+components/ride-permission-readiness.tsx:81:        const granted = item.type === 'battery_optimization' ? false : Boolean(status?.granted);
+components/ride-permission-readiness.tsx:85:            <View style={[styles.itemIcon, { backgroundColor: granted ? `${colors.success}18` : `${colors.warning}18` }]}>
+components/ride-permission-readiness.tsx:86:              <MaterialIcons name={item.icon} size={18} color={granted ? colors.success : colors.warning} />
+components/ride-permission-readiness.tsx:91:                {granted ? '已允許' : status?.description ?? '請在系統設定完成此項目'}
+components/ride-permission-readiness.tsx:101:                { borderColor: granted ? colors.success : colors.accent, opacity: pressed || isOpening ? 0.66 : 1 },
+components/ride-permission-readiness.tsx:104:              <Text style={[styles.actionText, { color: granted ? colors.success : colors.accent }]}>{isOpening ? '開啟中' : granted ? '檢查' : item.setupLabel}</Text>
+components/ride-summary-modal.tsx:135:    try { await Share.share({ message: msg }); } catch {}
+components/ride-summary-modal.tsx:155:    } catch {
+components/share-card-modal.tsx:65:    } catch {
+components/share-card-modal.tsx:98:    } catch {
+=== 空白互動處理器與 PiP／懸浮窗殘留 ===
+app/(tabs)/map.tsx:142:import { SimplifiedNavOverlay } from "@/components/simplified-nav-overlay";
+app/(tabs)/map.tsx:2786:    const overlays: NavigationRouteOverlay[] = [];
+app/(tabs)/map.tsx:2788:      overlays.push({
+app/(tabs)/map.tsx:2797:      overlays.push({
+app/(tabs)/map.tsx:2805:    return overlays;
+app/(tabs)/map.tsx:3696:          onPress={() => {}}
+lib/permissions-manager.ts:13:  | 'overlay'
+lib/permissions-manager.ts:53:      const overlayStatus = await this.checkOverlayPermission();
+lib/permissions-manager.ts:54:      statuses.push(overlayStatus);
+lib/permissions-manager.ts:129:      type: 'overlay',
+lib/permissions-manager.ts:196:          case 'overlay':
+lib/theme-provider.tsx:57:        "color-overlay": SchemeColors[colorScheme].overlay,
+components/leaflet-map.tsx:835:    // Send route overlays. When supplied, this replaces the legacy single GPX layer.
+components/simplified-nav-overlay.tsx:108:    <Pressable style={styles.overlay} onPress={onDismiss}>
+components/simplified-nav-overlay.tsx:186:  overlay: {
+components/supply-modal.tsx:68:      <View style={styles.overlay}>
+components/supply-modal.tsx:195:  overlay: {
+app.config.ts:85:      "android.permission.SYSTEM_ALERT_WINDOW",
+=== 正式流程 TODO／FIXME ===
+components/share-card-modal.tsx:353:                  // TODO: 實現複製功能
