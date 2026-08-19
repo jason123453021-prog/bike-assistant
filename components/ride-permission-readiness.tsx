@@ -1,21 +1,21 @@
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react';
 
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColors } from '@/hooks/use-colors';
 import { PermissionsManager, type PermissionStatus, type PermissionType } from '@/lib/permissions-manager';
 
 type ReadinessItem = {
   type: Extract<PermissionType, 'location' | 'notification' | 'battery_optimization'>;
-  icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  icon: ComponentProps<typeof IconSymbol>['name'];
   title: string;
   setupLabel: string;
 };
 
 const READINESS_ITEMS: ReadinessItem[] = [
-  { type: 'notification', icon: 'notifications-active', title: '補給與導航通知', setupLabel: '允許通知' },
-  { type: 'location', icon: 'my-location', title: '精確與背景位置', setupLabel: '允許位置' },
-  { type: 'battery_optimization', icon: 'battery-charging-full', title: '電池不受限制', setupLabel: '前往設定' },
+  { type: 'notification', icon: 'bell.fill', title: '補給與導航通知', setupLabel: '允許通知' },
+  { type: 'location', icon: 'location.fill', title: '精確與背景位置', setupLabel: '允許位置' },
+  { type: 'battery_optimization', icon: 'battery.100', title: '電池不受限制', setupLabel: '前往設定' },
 ];
 
 /**
@@ -67,8 +67,8 @@ export function RidePermissionReadiness() {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
       <View style={styles.header}>
-        <View style={[styles.headerIcon, { backgroundColor: `${colors.accent}18` }]}>
-          <MaterialIcons name="directions-bike" size={20} color={colors.accent} />
+        <View style={[styles.headerIcon, { backgroundColor: `${colors.accent}18` }]}> 
+          <IconSymbol name="bicycle" size={20} color={colors.accent} />
         </View>
         <View style={styles.headerCopy}>
           <Text style={[styles.title, { color: colors.foreground }]}>背景騎乘準備</Text>
@@ -86,7 +86,7 @@ export function RidePermissionReadiness() {
         return (
           <View key={item.type} style={[styles.row, index > 0 && { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth }]}>
             <View style={[styles.itemIcon, { backgroundColor: stateBackground }]}> 
-              <MaterialIcons name={item.icon} size={18} color={stateColor} />
+              <IconSymbol name={item.icon} size={18} color={stateColor} />
             </View>
             <View style={styles.copy}>
               <Text style={[styles.itemTitle, { color: colors.foreground }]}>{item.title}</Text>

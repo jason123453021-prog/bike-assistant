@@ -202,9 +202,8 @@ type CustomSupplyTracker = {
   repeatIntervalId: ReturnType<typeof setInterval> | null;
 };
 
-// 底部面板高度：螢幕下方三分之一（收縮）/ 五分之三（展開）
+// 底部面板收縮高度；展開高度由字體縮放與內容自適應計算。
 const PANEL_COLLAPSED_H = Math.round(SCREEN_H / 3);
-const PANEL_EXPANDED_H = Math.round(SCREEN_H * 0.62);
 
 // ─── 工具函數 ─────────────────────────────────────────────────────────────────
 
@@ -745,7 +744,7 @@ export default function MapScreen() {
     }
   }, []);
   const clearSupplyAutoDismissTimer = useCallback((type?: "calorie" | "water") => {
-    const types: Array<"calorie" | "water"> = type ? [type] : ["calorie", "water"];
+    const types: ("calorie" | "water")[] = type ? [type] : ["calorie", "water"];
     types.forEach((kind) => {
       const timer = supplyAutoDismissTimersRef.current[kind];
       if (timer) clearTimeout(timer);

@@ -1,5 +1,11 @@
 # 智慧單車騎乘助手 TODO
 
+## Expo Go 與管理預覽可用性修復（2026-08-19）
+- [x] 診斷 Android Expo manifest、遠端 Hermes bundle 與管理預覽字型載入的失敗原因
+- [x] 修復開發伺服器或預覽頁造成的遠端更新下載/字型逾時問題
+- [x] 建立 Expo Go manifest、bundle 與預覽逾時回歸守門
+- [x] 完成 Android Expo Go 連線、靜態 Web、TypeScript、Lint 與正式 Android 匯出驗證
+
 ## 發布前全機 QA/QC 與穩定性檢測（2026-08-19）
 - [x] 建立核心計算、定位軌跡、背景復原、權限、離線與發布設定的稽核基準
 - [x] 稽核距離、時間、速度、配速、坡度、爬升、卡路里與功率計算的邊界防護

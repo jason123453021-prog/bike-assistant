@@ -12,6 +12,7 @@ const MAPPING = {
   "map.fill":                            "map",
   "clock.fill":                          "history",
   "gearshape.fill":                      "settings",
+  "battery.100":                         "battery-charging-full",
   // Ride screen
   "play.fill":                           "play-arrow",
   "pause.fill":                          "pause",
