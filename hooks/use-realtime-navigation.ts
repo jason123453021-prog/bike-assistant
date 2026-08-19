@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { getRealtimeNavigationManager, type NavigationRoute, type NavigationState, type NavigationEvent } from '@/lib/realtime-navigation-manager';
+import { reportRecoverableIssue } from '@/lib/release-safe-log';
 
 export interface UseRealtimeNavigationOptions {
   onEvent?: (event: NavigationEvent) => void;
@@ -26,7 +27,7 @@ export function useRealtimeNavigation(options: UseRealtimeNavigationOptions = {}
       try {
         await managerRef.current.initialize();
       } catch (error) {
-        console.error('[useRealtimeNavigation] Initialization error:', error);
+        reportRecoverableIssue('[useRealtimeNavigation] Initialization error', error);
       }
     };
 

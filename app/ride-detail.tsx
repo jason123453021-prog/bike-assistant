@@ -44,6 +44,7 @@ import { ActivityElevationChart } from "@/components/activity-elevation-chart";
 import { buildActivitySensorAnalysis } from "@/lib/activity-sensor-estimates";
 import { deriveLocalEstimationCalibration } from "@/lib/activity-estimation-calibration";
 import { writeLocalGpxBackup } from "@/lib/local-gpx-backup";
+import { reportRecoverableIssue } from "@/lib/release-safe-log";
 import { buildRideSplits } from "@/lib/ride-splits";
 import { buildElevationBands } from "@/lib/elevation-bands";
 import { buildPhotoRouteMarkers } from "@/lib/photo-route-markers";
@@ -597,7 +598,7 @@ export default function RideDetailScreen() {
         Alert.alert("已建立本機備份", `${backup.filename}\n已保存至 App 的本機備份資料夾。`);
       }
     } catch (err) {
-      console.error('[RideDetail] GPX export error:', err);
+      reportRecoverableIssue("[RideDetail] GPX export error", err);
       Alert.alert("匯出失敗", "無法建立 GPX 本機備份，請確認此記錄包含至少兩個有效 GPS 軌跡點。");
     }
   }, [record]);
@@ -620,7 +621,7 @@ export default function RideDetailScreen() {
         Alert.alert("已建立本機 FIT", `${backup.filename}\n已保存至 App 本機快取資料夾。`);
       }
     } catch (error) {
-      console.error("[RideDetail] FIT export error:", error);
+      reportRecoverableIssue("[RideDetail] FIT export error", error);
       Alert.alert("FIT 匯出失敗", "無法建立本機 FIT 檔，請確認記錄中的 GPS 軌跡完整。");
     }
   }, [record]);

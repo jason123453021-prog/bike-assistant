@@ -8,6 +8,7 @@
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
 import { Platform } from 'react-native';
+import { reportRecoverableIssue } from '@/lib/release-safe-log';
 
 export enum HapticType {
   LIGHT = 'light',
@@ -55,7 +56,7 @@ export class EmotionalUXManager {
       try {
         await Speech.speak('', { rate: 0 }); // 預熱 TTS
       } catch (error) {
-        console.warn('TTS initialization failed:', error);
+        reportRecoverableIssue('TTS initialization failed', error);
       }
     }
   }
@@ -90,7 +91,7 @@ export class EmotionalUXManager {
           break;
       }
     } catch (error) {
-      console.warn('Haptic feedback failed:', error);
+      reportRecoverableIssue('Haptic feedback failed', error);
     }
   }
 
@@ -121,7 +122,7 @@ export class EmotionalUXManager {
         },
       });
     } catch (error) {
-      console.warn('TTS speech failed:', error);
+      reportRecoverableIssue('TTS speech failed', error);
       this.isSpeaking = false;
     }
   }
@@ -134,7 +135,7 @@ export class EmotionalUXManager {
       await Speech.stop();
       this.isSpeaking = false;
     } catch (error) {
-      console.warn('Failed to stop speech:', error);
+      reportRecoverableIssue('Failed to stop speech', error);
     }
   }
 

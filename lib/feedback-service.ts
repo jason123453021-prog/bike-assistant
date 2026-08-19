@@ -63,7 +63,7 @@ export async function vibrateWarning() {
 
 // ─── TTS 語音播報 ─────────────────────────────────────────────────────────────
 
-export async function speak(text: string, enabled: boolean = true) {
+async function speak(text: string, enabled: boolean = true) {
   if (!enabled || rideSpeechSuppressed || Platform.OS === "web") return;
   try {
     const isSpeaking = await Speech.isSpeakingAsync();
@@ -82,17 +82,6 @@ export async function stopSpeech() {
     const isSpeaking = await Speech.isSpeakingAsync();
     if (isSpeaking) await Speech.stop();
   } catch {}
-}
-
-export async function speakRideUpdate(
-  speed: number,
-  power: number,
-  distance: number,
-  enabled: boolean
-) {
-  if (!enabled) return;
-  const distKm = (distance / 1000).toFixed(1);
-  await speak(`速度 ${Math.round(speed)} 公里，功率 ${power} 瓦，距離 ${distKm} 公里`, enabled);
 }
 
 export async function speakSupplyReminder(type: "calorie" | "water", enabled: boolean) {
@@ -120,14 +109,6 @@ export async function speakSmartSupplyReminder(
 ) {
   void plan;
   await speakSupplyReminder(type, enabled);
-}
-
-export async function speakAutoPause(enabled: boolean) {
-  await speak("自動暫停", enabled);
-}
-
-export async function speakAutoResume(enabled: boolean) {
-  await speak("繼續騎乘", enabled);
 }
 
 // ─── 通知設定 ─────────────────────────────────────────────────────────────────

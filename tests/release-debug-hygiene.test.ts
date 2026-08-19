@@ -19,9 +19,13 @@ describe("release debug hygiene", () => {
   });
 
   it("enables release optimization and disables the development network inspector", () => {
-    const gradleProperties = read("android/gradle.properties");
-    expect(gradleProperties).toContain("EX_DEV_CLIENT_NETWORK_INSPECTOR=false");
-    expect(gradleProperties).toContain("android.enableMinifyInReleaseBuilds=true");
-    expect(gradleProperties).toContain("android.enableShrinkResourcesInReleaseBuilds=true");
+    const appConfig = read("app.config.ts");
+    const easConfig = read("eas.json");
+    expect(appConfig).toContain('const isProductionEasBuild = process.env.EAS_BUILD_PROFILE === "production"');
+    expect(appConfig).toContain("enableMinifyInReleaseBuilds: isProductionEasBuild");
+    expect(appConfig).toContain("enableShrinkResourcesInReleaseBuilds: isProductionEasBuild");
+    expect(appConfig).not.toContain("EX_DEV_CLIENT_NETWORK_INSPECTOR=true");
+    expect(easConfig).toContain('"production"');
+    expect(easConfig).toContain('"buildType": "app-bundle"');
   });
 });

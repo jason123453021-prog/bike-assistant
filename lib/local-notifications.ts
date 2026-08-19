@@ -1,5 +1,6 @@
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { Platform } from "react-native";
+import { reportRecoverableIssue } from "@/lib/release-safe-log";
 
 type NotificationsModule = typeof import("expo-notifications");
 
@@ -31,7 +32,7 @@ export async function getLocalNotifications(): Promise<NotificationsModule | nul
         return notifications;
       })
       .catch((error) => {
-        console.warn("[LocalNotifications] 無法載入本機通知模組：", error);
+        reportRecoverableIssue("[LocalNotifications] 無法載入本機通知模組", error);
         return null;
       });
   }

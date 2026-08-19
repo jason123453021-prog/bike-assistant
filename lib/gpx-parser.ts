@@ -12,6 +12,7 @@
  */
 
 import { haversineDistance } from "./power-calc";
+import { reportRecoverableIssue } from "./release-safe-log";
 
 // ─── 物理常數 ─────────────────────────────────────────────────────────────────
 const G = 9.81;           // 重力加速度 m/s²
@@ -323,7 +324,7 @@ export function parseGpx(xmlString: string): GpxRoute | null {
       estimatedCalories: totalKcal,
     };
   } catch (e) {
-    console.error("GPX parse error:", e);
+    reportRecoverableIssue("[GPX] Parse error", e);
     return null;
   }
 }

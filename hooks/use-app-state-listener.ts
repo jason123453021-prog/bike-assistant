@@ -36,22 +36,16 @@ export function useAppStateListener(options: AppStateListenerOptions = {}) {
       const previousState = appState.current;
       appState.current = nextAppState;
 
-      console.log(
-        `[AppStateListener] 應用狀態變化: ${previousState} -> ${nextAppState}`
-      );
-
       // 觸發通用回調
       onStateChange?.(nextAppState);
 
       // 從背景返回前景
       if (previousState.match(/inactive|background/) && nextAppState === 'active') {
-        console.log('[AppStateListener] 應用返回前景');
         onForeground?.();
       }
 
       // 進入背景
       if (nextAppState.match(/inactive|background/)) {
-        console.log('[AppStateListener] 應用進入背景');
         onBackground?.();
       }
     },

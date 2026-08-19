@@ -66,14 +66,11 @@ import { useGpx } from "@/lib/gpx-context";
 import { type GpxPoint, type GpxRoute } from "@/lib/gpx-parser";
 import { calculateKilometerMarkers } from "@/lib/kilometer-markers";
 import {
-  speak,
   vibrateLight,
   vibrateMedium,
   vibrateWarning,
   vibrateSuccess,
   speakSupplyReminder,
-  speakAutoPause,
-  speakAutoResume,
   scheduleSmartSupplyDueNotification,
   clearAllSmartSupplyDueNotifications,
   clearAllSupplyNotifications,
@@ -91,7 +88,7 @@ import {
   formatDuration,
 } from "@/lib/power-calc";
 import { fetchWeather, getHeadwindMs, getRelativeWindInfo, type WeatherData } from "@/lib/weather-service";
-import { fetchBikeRoute, formatRouteDistance, formatRouteDuration } from "@/lib/route-service";
+import { fetchBikeRoute, formatRouteDistance } from "@/lib/route-service";
 import {
   formatNavigationDataFreshness,
   loadRecentAddressSearches,
@@ -140,7 +137,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SupplyModal } from "@/components/supply-modal";
 import { RideSummaryModal } from "@/components/ride-summary-modal";
 import { SimplifiedNavOverlay } from "@/components/simplified-nav-overlay";
-import { EmotionalUXManager } from "@/lib/emotional-ux";
 import {
   addTrackPoint,
   completeRideSession,
@@ -601,6 +597,8 @@ export default function MapScreen() {
   }, [clearSharedRoute]);
 
   const startPinnedNavigationRoute = useCallback((route: GpxRoute, announcement: string) => {
+    // 釘選導航以畫面提示呈現；騎乘語音僅保留補給／補水兩種固定短句。
+    void announcement;
     const nextLayer: PinnedNavigationLayer<GpxRoute> = {
       id: `pinned-${Date.now()}`,
       route,
@@ -615,7 +613,6 @@ export default function MapScreen() {
       setFollowUser(true);
       setNearestIdx(0);
       arrivedRef.current = false;
-      speak(announcement, settings.ttsEnabled);
     };
 
     if (!hasExistingNavigationLayers(Boolean(sharedRoute), pinnedNavigationLayers.length)) {
@@ -632,7 +629,7 @@ export default function MapScreen() {
         { text: "清除並開始", style: "destructive", onPress: () => commitRoute(true) },
       ],
     );
-  }, [clearSharedRoute, pinnedNavigationLayers.length, settings.ttsEnabled, sharedRoute]);
+  }, [clearSharedRoute, pinnedNavigationLayers.length, sharedRoute]);
 
   const selectPinAddressDestination = useCallback((destination: RecentAddressSearch) => {
     const nextLocation = { lat: destination.latitude, lon: destination.longitude };
@@ -1616,7 +1613,6 @@ export default function MapScreen() {
         : null;
       setRideLocationTrackingMode("idle_monitor");
       void setBackgroundLocationTrackingMode(settings.gpsAccuracy || "standard", "idle_monitor");
-      if (settings.ttsEnabled) speak("偵測到靜止，已切換為省電定位監測", true);
     }, delayMs);
 
     return () => {
@@ -1682,7 +1678,6 @@ export default function MapScreen() {
               setRideLocationTrackingMode("full");
               dispatch({ type: "RESUME" });
               void setBackgroundLocationTrackingMode(settings.gpsAccuracy || "standard", "full");
-              if (settings.ttsEnabled) speak("已偵測到重新移動，恢復騎乘紀錄", true);
             }
             return;
           }
@@ -1793,10 +1788,7 @@ export default function MapScreen() {
                 dispatch({ type: "PAUSE" });
                 // 暫停時強制歸零速度與功率
                 dispatch({ type: "LOCATION_UPDATE", point: { latitude, longitude, altitude: altitude ?? 0, speed: 0, timestamp: Date.now() }, power: 0, calories: 0, ascent: 0 });
-                if (settings.ttsEnabled) speakAutoPause(true);
                 if (settings.vibrationEnabled) vibrateMedium();
-                // 集成情感化 UX - 自動暫停反饋
-                EmotionalUXManager.onAutoPauseTriggered('speed').catch((error: any) => console.warn("Auto pause emotional UX failed:", error));
                 return;
               }
             } else if (autoPausePolicy.mode === "suggest" && avgSpeed < autoPausePolicy.speedBelowKmh) {
@@ -1813,9 +1805,6 @@ export default function MapScreen() {
           } else if (currentState.status === "paused" && autoPausePolicy.mode === "automatic" && avgSpeed >= Math.max(AUTO_PAUSE_RESUME_THRESHOLD, autoPausePolicy.speedBelowKmh + 0.5)) {
             lowSpeedCountRef.current = 0;
             dispatch({ type: "RESUME" });
-            // 集成情感化 UX - 自動恢復反饋
-            EmotionalUXManager.onRideResumed().catch((error: any) => console.warn("Auto resume emotional UX failed:", error));
-            if (settings.ttsEnabled) speakAutoResume(true);
             return;
           }
 
@@ -2144,7 +2133,6 @@ export default function MapScreen() {
       if (!arrivedRef.current && dEnd < ARRIVAL_THRESHOLD_M) {
         arrivedRef.current = true;
         setNavInstruction("已到達終點！");
-        speak("恭喜！您已到達終點！", settings.ttsEnabled);
         vibrateMedium();
         return;
       }
@@ -2170,7 +2158,6 @@ export default function MapScreen() {
             const now = Date.now();
             if (now - lastTurnSpokenRef.current > 10000) {
               turnInstruction = diff > 0 ? "右轉" : "左轉";
-              speak(turnInstruction, settings.ttsEnabled);
               lastTurnSpokenRef.current = now;
             } else {
               turnInstruction = diff > 0 ? "右轉" : "左轉";
@@ -2200,7 +2187,7 @@ export default function MapScreen() {
         setTurnDistanceM(0);
       }
     },
-    [gpxRoute, settings.ttsEnabled]
+    [gpxRoute]
   );
 
   // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
@@ -2294,7 +2281,6 @@ export default function MapScreen() {
     if (gpxRoute) {
       setIsNavigating(true);
       setNavInstruction("導航已啟動");
-      speak("導航已啟動，沿路線前進", settings.ttsEnabled);
     }
 
     // 初始化背景狀態（確保背景中能計算距離和觸發補給提醒）
@@ -2347,17 +2333,6 @@ export default function MapScreen() {
         "背景騎乘未啟用",
         "目前會在 App 開啟時持續記錄；若鎖定螢幕或切到背景，請在系統設定允許背景定位與電池不受限制，以維持完整軌跡。",
       );
-    }
-
-    // 初始化情感化 UX
-    try {
-      await EmotionalUXManager.initialize({
-        hapticEnabled: true,
-        ttsEnabled: settings.ttsEnabled,
-        language: 'zh-TW',
-      });
-    } catch {
-      // 情感化回饋為非核心增強；初始化失敗不應影響定位與騎乘紀錄。
     }
 
     const loc = await Location.getLastKnownPositionAsync();
@@ -2523,16 +2498,10 @@ export default function MapScreen() {
             );
           }
           
-          // 集成情感化 UX - 騎乘完成反饋
-          try {
-            await EmotionalUXManager.onRideCompleted(state.elapsed, state.distance);
-          } catch {
-            // 完成回饋為非核心增強；失敗不影響已保存的活動。
-          }
         },
       },
     ]);
-  }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, state.distance, state.elapsed, syncSmartSupplyCountdown, updateSettings]);
+  }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, syncSmartSupplyCountdown, updateSettings]);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {
@@ -2562,7 +2531,6 @@ export default function MapScreen() {
             pausedAtRef.current = null;
             setRideLocationTrackingMode("full");
             dispatch({ type: "RESUME" });
-            if (settings.ttsEnabled) speak("已偵測到重新移動，恢復騎乘紀錄", true);
           }
           if (settings.supplyReminderEnabled && bgState && bgState.supplyReminderEnabled !== false) {
             const backgroundSmartChannels = resolveSmartSupplyChannels(bgState);
@@ -3626,19 +3594,16 @@ export default function MapScreen() {
                       durSec: result.durationSec,
                       polyline: result.coordinates
                     });
-                    speak(`計算完成，${formatRouteDistance(result.distanceM)}，${formatRouteDuration(result.durationSec)}`, settings.ttsEnabled);
                   } else {
                     setPinRouteInfo(null);
                     Alert.alert(
                       "找不到可通行路線",
                       "釘選位置可能位於封閉區、匝道、河川或無法通過的路口。請將圖釘移到可騎行道路後重新規劃。",
                     );
-                    speak("找不到可通行路線，請重新釘選到可騎行道路", settings.ttsEnabled);
                   }
                 }).catch(() => {
                   setPinRouteInfo(null);
                   Alert.alert("路徑規劃暫時不可用", "請確認網路後重試；系統會以最新道路資料重新規劃。");
-                  speak("路徑規劃暫時不可用，請稍後重試", settings.ttsEnabled);
                 }).finally(() => {
                   setIsFetchingPinRoute(false);
                 });

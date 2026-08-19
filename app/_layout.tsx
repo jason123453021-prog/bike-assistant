@@ -29,6 +29,8 @@ import { setupNotifications } from "@/lib/feedback-service";
 import "@/lib/background-location";
 import { startSupplyNotificationActionListener } from "@/lib/supply-notification-actions";
 import { checkModelUpdateOnAppLaunch } from "@/lib/model-update-service";
+import { AppErrorBoundary } from "@/components/app-error-boundary";
+import { reportRecoverableIssue } from "@/lib/release-safe-log";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -104,7 +106,7 @@ export default function RootLayout() {
   // 升級後立即釋放已移除「最愛路線」功能留下的單一舊版快取鍵。
   useEffect(() => {
     clearLegacyFavoritesCache(AsyncStorage).catch((error) => {
-      console.warn("[App] 無法清除舊版最愛路線快取:", error);
+      reportRecoverableIssue("[App] 無法清除舊版最愛路線快取", error);
     });
   }, []);
 
@@ -135,16 +137,18 @@ export default function RootLayout() {
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SettingsProvider>
-        <GpxProvider>
-          <ExternalGpxReceiver />
-          <RideProvider>
-            <ThemeProvider>
-              <InnerLayout />
-            </ThemeProvider>
-          </RideProvider>
-        </GpxProvider>
-      </SettingsProvider>
+      <AppErrorBoundary>
+        <SettingsProvider>
+          <GpxProvider>
+            <ExternalGpxReceiver />
+            <RideProvider>
+              <ThemeProvider>
+                <InnerLayout />
+              </ThemeProvider>
+            </RideProvider>
+          </GpxProvider>
+        </SettingsProvider>
+      </AppErrorBoundary>
     </GestureHandlerRootView>
   );
 
