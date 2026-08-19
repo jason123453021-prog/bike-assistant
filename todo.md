@@ -1,5 +1,13 @@
 # 智慧單車騎乘助手 TODO
 
+## 上架前 QA/QC 與部署建置修復（2026-08-19）
+- [x] 建立本次靜態程式、設定、相依與 Android production 匯出的稽核基準
+- [x] 稽核正式版依賴、已棄用套件、機密與 release-safe 診斷邊界
+- [x] 修復雲端部署 Web export 的 Metro `react-native-css-interop` 快取檔案阻擋問題
+- [x] 稽核 SafeArea、深淺主題、字體縮放、例外處理、離線回退與資源釋放
+- [x] 完成 TypeScript、Lint、完整 Vitest、Expo Doctor、靜態 Web 與 Android production 匯出驗證
+- [x] 建立並交付本次上架前 QA/QC 品管結果總結報告
+
 ## 啟動體驗與部署建置修復（2026-08-19）
 - [x] 診斷並修復模板清理後缺少 `build` script 的部署阻擋問題
 - [x] 量測 App 根路由與首屏初始化工作，找出可延後或安全降級的阻塞操作

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "pnpm dev:metro",
     "dev:metro": "sh -c './scripts/prewarm-expo-go-bundle.sh & exec cross-env NODE_OPTIONS=--max-old-space-size=1536 EXPO_NO_INTERACTIVE=1 EXPO_NO_METRO_WORKSPACE_ROOT=1 npx expo start --max-workers 1 --port ${EXPO_PORT:-8081}'",
-    "build": "expo export --platform web --output-dir dist",
+    "build": "cross-env NODE_ENV=production expo export --platform web --output-dir dist",
     "check": "tsc --noEmit",
     "lint": "expo lint",
     "format": "prettier --write .",

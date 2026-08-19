@@ -24,6 +24,6 @@ describe("啟動體驗與部署建置守門", () => {
   });
 
   it("保留部署容器所需的靜態 Web build 指令", () => {
-    expect(packageJson.scripts.build).toBe("expo export --platform web --output-dir dist");
+    expect(packageJson.scripts.build).toBe("cross-env NODE_ENV=production expo export --platform web --output-dir dist");
   });
 });
