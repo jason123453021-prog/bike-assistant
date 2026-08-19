@@ -181,6 +181,7 @@ import {
   createLiveElevationFilterState,
 } from "@/lib/live-elevation-filter";
 import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
+import { reportRecoverableIssue } from "@/lib/release-safe-log";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -2639,8 +2640,8 @@ export default function MapScreen() {
               setTouchGuardEnabled(false);
             }
           }
-        } catch (e) {
-          console.warn('[AppState] 恢復背景數據失敗:', e);
+        } catch (error) {
+          reportRecoverableIssue('[AppState] 恢復背景數據失敗', error);
         }
       }
       appStateRef.current = nextState;

@@ -16,6 +16,8 @@
  * 注意：兩個公開端點均有流量限制，僅供開發/示範用途。
  */
 
+import { reportRecoverableIssue } from './release-safe-log';
+
 export interface RouteCoordinate {
   latitude: number;
   longitude: number;
@@ -258,14 +260,14 @@ async function fetchBrouterRoute(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.warn("[RouteService] Brouter HTTP error:", response.status);
+      reportRecoverableIssue("[RouteService] Brouter HTTP error", response.status);
       return null;
     }
 
     const data = await response.json();
 
     if (!data.features || data.features.length === 0) {
-      console.warn("[RouteService] Brouter no route found");
+      reportRecoverableIssue("[RouteService] Brouter no route found");
       return null;
     }
 
@@ -285,7 +287,7 @@ async function fetchBrouterRoute(
     const steps = parseBrouterMessages(messages);
 
     if (!hasUsableRouteEndpoints(coordinates, from, to)) {
-      console.warn("[RouteService] Brouter endpoint snap is too far from a routable road");
+      reportRecoverableIssue("[RouteService] Brouter endpoint snap is too far from a routable road");
       return null;
     }
 
@@ -293,9 +295,9 @@ async function fetchBrouterRoute(
   } catch (err) {
     clearTimeout(timeoutId);
     if ((err as Error).name === "AbortError") {
-      console.warn("[RouteService] Brouter request timed out");
+      reportRecoverableIssue("[RouteService] Brouter request timed out");
     } else {
-      console.warn("[RouteService] Brouter fetch error:", err);
+      reportRecoverableIssue("[RouteService] Brouter fetch error", err);
     }
     return null;
   }
@@ -324,21 +326,21 @@ async function fetchOsrmRoute(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.warn("[RouteService] OSRM HTTP error:", response.status);
+      reportRecoverableIssue("[RouteService] OSRM HTTP error", response.status);
       return null;
     }
 
     const data = await response.json();
 
     if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
-      console.warn("[RouteService] OSRM no route found:", data.code);
+      reportRecoverableIssue("[RouteService] OSRM no route found", data.code);
       return null;
     }
 
     const route = data.routes[0];
     const coordinates = decodePolyline6(route.geometry);
     if (!hasUsableRouteEndpoints(coordinates, from, to)) {
-      console.warn("[RouteService] OSM bike endpoint snap is too far from a routable road");
+      reportRecoverableIssue("[RouteService] OSM bike endpoint snap is too far from a routable road");
       return null;
     }
     const allSteps: any[] = [];
@@ -356,9 +358,9 @@ async function fetchOsrmRoute(
   } catch (err) {
     clearTimeout(timeoutId);
     if ((err as Error).name === "AbortError") {
-      console.warn("[RouteService] OSRM request timed out");
+      reportRecoverableIssue("[RouteService] OSRM request timed out");
     } else {
-      console.warn("[RouteService] OSRM fetch error:", err);
+      reportRecoverableIssue("[RouteService] OSRM fetch error", err);
     }
     return null;
   }

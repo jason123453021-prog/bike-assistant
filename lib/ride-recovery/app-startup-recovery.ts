@@ -1,4 +1,5 @@
 import { RideSession, initializeRideSession, recoverRideSessionFromBackup } from './ride-session-recovery';
+import { reportRecoverableIssue } from '../release-safe-log';
 
 /**
  * App 啟動時的自動恢復機制
@@ -50,7 +51,7 @@ export async function checkAndRecoverRideSession(): Promise<RecoveryResult> {
       message: '無未完成的騎乘記錄。',
     };
   } catch (error) {
-    console.error('Error during ride session recovery check:', error);
+    reportRecoverableIssue('Error during ride session recovery check', error);
     return {
       hasUnfinishedRide: false,
       session: null,

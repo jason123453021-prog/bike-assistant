@@ -1,5 +1,12 @@
 # 智慧單車騎乘助手 TODO
 
+## Production 相依安全與模板模組整理（2026-08-19）
+- [x] 建立 production 相依、Console 診斷與模板伺服器的實際使用基準
+- [x] 執行 production dependency audit，分析並處理可修復的安全風險
+- [x] 移除未被 Expo Android App 引用的模板伺服器、資料庫、OAuth 與社群模組
+- [x] 清理未使用的舊版 Console 診斷，保留可控的開發期診斷工具
+- [x] 完成 TypeScript、Lint、完整回歸、Expo Doctor 與 Android production 匯出驗證
+
 ## 上架前 QA/QC 與穩定性檢測（2026-08-19）
 - [x] 建立目前版本基準，執行 TypeScript、Lint、Vitest、Expo Doctor 與設定解析檢查
 - [x] 掃描相依套件、已棄用 API、原生外掛與正式 Android 預編譯／資產設定

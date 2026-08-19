@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { type RideStatistics } from '@/lib/ride-statistics-manager';
+
+type RideStatistics = {
+  id: string;
+  startTime: number;
+  endTime: number;
+  totalDistance: number;
+  totalTime: number;
+  averageSpeed: number;
+  maxSpeed: number;
+  totalElevationGain: number;
+  totalElevationLoss: number;
+  routeName: string;
+  trackPoints: Array<{ lat: number; lon: number; altitude?: number; timestamp: number }>;
+  timestamp: number;
+};
 
 describe('ElevationChart', () => {
   const mockStatistics: RideStatistics = {

@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { getLocalNotifications, isExpoGoRuntime } from '@/lib/local-notifications';
+import { reportRecoverableIssue } from './release-safe-log';
 
 const PERMISSIONS_ONBOARDING_KEY = 'permissions_onboarding_completed';
 
@@ -35,7 +36,7 @@ export class PermissionsManager {
     try {
       await AsyncStorage.setItem(PERMISSIONS_ONBOARDING_KEY, 'true');
     } catch (error) {
-      console.error('[PermissionsManager] Failed to mark onboarding completed:', error);
+      reportRecoverableIssue('[PermissionsManager] Failed to mark onboarding completed', error);
     }
   }
 
@@ -72,7 +73,7 @@ export class PermissionsManager {
         systemSettingsUrl: this.getLocationSettingsUrl(),
       };
     } catch (error) {
-      console.error('[PermissionsManager] Error checking location permission:', error);
+      reportRecoverableIssue('[PermissionsManager] Error checking location permission', error);
       return {
         type: 'location',
         name: '位置權限',
@@ -109,7 +110,7 @@ export class PermissionsManager {
         systemSettingsUrl: this.getNotificationSettingsUrl(),
       };
     } catch (error) {
-      console.error('[PermissionsManager] Error checking notification permission:', error);
+      reportRecoverableIssue('[PermissionsManager] Error checking notification permission', error);
       return {
         type: 'notification',
         name: '通知權限',
@@ -141,7 +142,7 @@ export class PermissionsManager {
       const background = await Location.requestBackgroundPermissionsAsync();
       return background.status === 'granted';
     } catch (error) {
-      console.error('[PermissionsManager] Error requesting location permission:', error);
+      reportRecoverableIssue('[PermissionsManager] Error requesting location permission', error);
       return false;
     }
   }
@@ -154,7 +155,7 @@ export class PermissionsManager {
       const settings = await Notifications.requestPermissionsAsync();
       return settings.granted;
     } catch (error) {
-      console.error('[PermissionsManager] Error requesting notification permission:', error);
+      reportRecoverableIssue('[PermissionsManager] Error requesting notification permission', error);
       return false;
     }
   }
@@ -184,7 +185,7 @@ export class PermissionsManager {
         }
       }
     } catch (error) {
-      console.error('[PermissionsManager] Error opening system settings:', error);
+      reportRecoverableIssue('[PermissionsManager] Error opening system settings', error);
       Alert.alert('錯誤', '無法打開系統設定，請手動進入設定頁面');
     }
   }

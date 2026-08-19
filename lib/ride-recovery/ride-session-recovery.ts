@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { reportRecoverableIssue } from '../release-safe-log';
 
 /**
  * 騎乘會話恢復系統
@@ -66,7 +67,7 @@ export async function initializeRideSession(): Promise<RideSession | null> {
     }
     return null;
   } catch (error) {
-    console.error('Failed to initialize ride session:', error);
+    reportRecoverableIssue('Failed to initialize ride session', error);
     return null;
   }
 }
@@ -112,7 +113,7 @@ export async function saveRideSessionSnapshot(session: RideSession): Promise<voi
       session,
     }));
   } catch (error) {
-    console.error('Failed to save ride session snapshot:', error);
+    reportRecoverableIssue('Failed to save ride session snapshot', error);
   }
 }
 
@@ -188,7 +189,7 @@ export async function completeRideSession(session: RideSession): Promise<void> {
     await AsyncStorage.removeItem(RIDE_SESSION_KEY);
     await AsyncStorage.removeItem(RIDE_BACKUP_KEY);
   } catch (error) {
-    console.error('Failed to complete ride session:', error);
+    reportRecoverableIssue('Failed to complete ride session', error);
   }
 }
 
@@ -204,7 +205,7 @@ export async function recoverRideSessionFromBackup(): Promise<RideSession | null
     }
     return null;
   } catch (error) {
-    console.error('Failed to recover ride session from backup:', error);
+    reportRecoverableIssue('Failed to recover ride session from backup', error);
     return null;
   }
 }
@@ -253,7 +254,7 @@ export async function getRideHistory(): Promise<RideSession[]> {
     const historyJson = await AsyncStorage.getItem(RIDE_HISTORY_KEY);
     return historyJson ? JSON.parse(historyJson) : [];
   } catch (error) {
-    console.error('Failed to get ride history:', error);
+    reportRecoverableIssue('Failed to get ride history', error);
     return [];
   }
 }
@@ -269,6 +270,6 @@ export async function clearAllRideData(): Promise<void> {
       RIDE_BACKUP_KEY,
     ]);
   } catch (error) {
-    console.error('Failed to clear ride data:', error);
+    reportRecoverableIssue('Failed to clear ride data', error);
   }
 }

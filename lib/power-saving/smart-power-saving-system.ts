@@ -1,3 +1,5 @@
+import { reportRecoverableIssue } from '../release-safe-log';
+
 // 動態導入 expo-brightness 以避免編譯錯誤
 let setBrightnessAsync: (brightness: number) => Promise<void> = async () => {};
 let getBrightnessAsync: () => Promise<number> = async () => 0.8;
@@ -7,7 +9,7 @@ try {
   setBrightnessAsync = brightness.setBrightnessAsync;
   getBrightnessAsync = brightness.getBrightnessAsync;
 } catch (e) {
-  console.warn('[PowerSaving] expo-brightness not available');
+  reportRecoverableIssue('[PowerSaving] expo-brightness not available');
 }
 import { useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -60,7 +62,7 @@ export class SmartPowerSavingManager {
         this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
       }
     } catch (error) {
-      console.error('[PowerSaving] Failed to load settings:', error);
+      reportRecoverableIssue('[PowerSaving] Failed to load settings', error);
     }
     return this.settings;
   }
@@ -70,7 +72,7 @@ export class SmartPowerSavingManager {
       this.settings = { ...this.settings, ...newSettings };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
     } catch (error) {
-      console.error('[PowerSaving] Failed to save settings:', error);
+      reportRecoverableIssue('[PowerSaving] Failed to save settings', error);
     }
   }
 
@@ -83,7 +85,7 @@ export class SmartPowerSavingManager {
       await this.wakeUp();
       return next;
     } catch (error) {
-      console.error('[PowerSaving] Failed to reset settings:', error);
+      reportRecoverableIssue('[PowerSaving] Failed to reset settings', error);
       throw error;
     }
   }
@@ -115,7 +117,7 @@ export class SmartPowerSavingManager {
       await setBrightnessAsync(this.settings.minBrightness);
       this.notifyListeners(true);
     } catch (error) {
-      console.error('[PowerSaving] Failed to enter power saving mode:', error);
+      reportRecoverableIssue('[PowerSaving] Failed to enter power saving mode', error);
     }
   }
 
@@ -127,7 +129,7 @@ export class SmartPowerSavingManager {
     try {
       await setBrightnessAsync(this.originalBrightness);
     } catch (error) {
-      console.error('[PowerSaving] Failed to exit power saving mode:', error);
+      reportRecoverableIssue('[PowerSaving] Failed to exit power saving mode', error);
     }
   }
 
