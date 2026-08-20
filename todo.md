@@ -1,5 +1,11 @@
 # 智慧單車騎乘助手 TODO
 
+## 管理預覽服務與 Expo tunnel 分離（2026-08-20）
+- [x] 確認 ngrok tunnel 失敗會使唯一 Metro 程序退出，導致管理預覽顯示沙盒未啟動
+- [x] 建立不依賴 Expo tunnel 的管理預覽 fallback，避免手機預覽因 tunnel 波動而中斷
+- [x] 驗證 localhost、管理預覽與正式靜態 Web 均可持續回應
+- [x] 交付預覽恢復與 Expo Go 正式 AAB 測試建議
+
 ## Expo Go tunnel 連線修復（2026-08-20）
 - [x] 檢查 Expo tunnel、ngrok 相依與目前公開開發端點條件
 - [x] 建立 Expo Go 專用 tunnel 開發端點並產生新的連線 URL

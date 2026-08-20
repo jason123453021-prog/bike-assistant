@@ -13,9 +13,15 @@ describe("Expo Go startup stability", () => {
     expect(appConfigSource).not.toContain('output: "static"');
   });
 
-  it("keeps Metro memory-bounded while serving a current Expo Go development manifest", () => {
+  it("keeps preview and Expo Go Metro processes memory-bounded", () => {
     expect(packageSource).toContain("--max-workers 1");
     expect(packageSource).toContain("--max-old-space-size=1536");
+    expect(packageSource).toContain('"dev": "pnpm dev:preview"');
+    expect(packageSource).toContain('"dev:preview"');
+    expect(packageSource).toContain('"expo:go"');
+    expect(packageSource).toContain("expo start --web");
+    expect(packageSource).toContain("expo start --tunnel");
+    expect(packageSource).toContain("-u EXPO_PACKAGER_PROXY_URL");
     expect(packageSource).not.toContain("EXPO_NO_INTERACTIVE=1");
     expect(packageSource).not.toContain("expo start --clear");
     expect(packageSource).not.toContain("npx expo start --offline");
@@ -23,7 +29,7 @@ describe("Expo Go startup stability", () => {
     expect(packageSource).not.toContain("--minify");
   });
 
-  it("prewarms the Android Hermes bundle before a phone requests the remote update", () => {
+  it("prewarms the Android Hermes bundle only for the independent Expo Go tunnel", () => {
     expect(packageSource).toContain("prewarm-expo-go-bundle.sh");
     expect(prewarmSource).toContain("platform=android");
     expect(prewarmSource).toContain("transform.bytecode=1");

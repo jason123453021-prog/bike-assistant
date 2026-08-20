@@ -15,8 +15,12 @@ describe("Expo Go 與管理預覽可用性守門", () => {
     expect(prewarmScript).toContain("--max-time 90");
   });
 
-  it("日常 Metro 啟動保留暖快取，避免每次重啟都觸發超過 Expo Go 等待時間的完整重編譯", () => {
-    expect(devScript).toContain('"dev:metro"');
+  it("日常管理預覽不依賴 tunnel，Expo Go 預熱保留在獨立指令", () => {
+    expect(devScript).toContain('"dev": "pnpm dev:preview"');
+    expect(devScript).toContain('"dev:preview"');
+    expect(devScript).toContain("expo start --web");
+    expect(devScript).toContain('"expo:go"');
+    expect(devScript).toContain("expo start --tunnel");
     expect(devScript).toContain("prewarm-expo-go-bundle.sh");
     expect(devScript).not.toContain("expo start --clear");
     expect(devScript).not.toContain("EXPO_NO_INTERACTIVE=1");
