@@ -28,4 +28,17 @@ describe("GitHub Actions Android 驗收 APK 建置守門", () => {
     expect(workflow).toContain("actions/upload-artifact@v4");
     expect(workflow).toContain("bike-assistant-preview-apk");
   });
+
+  it("在 main 推送後自動執行，且品質檢查一定先於原生建置與 APK 上傳", () => {
+    const qualityGateIndex = workflow.indexOf("- name: 執行程式品質守門");
+    const prebuildIndex = workflow.indexOf("- name: 產生 Android 原生專案");
+    const gradleIndex = workflow.indexOf("- name: 建置可安裝的驗收 APK");
+    const artifactIndex = workflow.indexOf("- name: 上傳 Android APK artifact");
+
+    expect(workflow).toContain("branches: [main]");
+    expect(qualityGateIndex).toBeGreaterThan(-1);
+    expect(prebuildIndex).toBeGreaterThan(qualityGateIndex);
+    expect(gradleIndex).toBeGreaterThan(prebuildIndex);
+    expect(artifactIndex).toBeGreaterThan(gradleIndex);
+  });
 });

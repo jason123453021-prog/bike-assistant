@@ -1,5 +1,10 @@
 # 智慧單車騎乘助手 TODO
 
+## 未來功能 QC 後 GitHub 建置標準（2026-08-20）
+- [x] 記錄「功能完成 → QC 通過 → 保存版本 → 同步 main → GitHub 建置」的交付規範
+- [x] 驗證 GitHub workflow 僅在品質檢查通過後才進入 APK 建置與 artifact 上傳
+- [x] 保存規範並同步至 GitHub，供後續每次功能交付沿用
+
 ## GitHub Actions Android 建置（2026-08-20）
 - [x] 確認 GitHub 整合、儲存庫與簽署需求（目前未啟用 GitHub 整合，需由管理介面安全匯出）
 - [x] 建立不依賴 EAS 的 Android APK GitHub Actions 工作流程
