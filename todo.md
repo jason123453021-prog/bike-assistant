@@ -4,8 +4,8 @@
 - [x] 確認 GitHub 整合、儲存庫與簽署需求（目前未啟用 GitHub 整合，需由管理介面安全匯出）
 - [x] 建立不依賴 EAS 的 Android APK GitHub Actions 工作流程
 - [x] 驗證工作流程語法、Expo prebuild 與 Gradle 建置前置設定
-- [ ] 同步專案至 GitHub 並觸發 Android APK 建置
-- [ ] 交付 GitHub Actions APK artifact 下載方式與正式簽署建議
+- [x] 同步專案至 GitHub 並觸發 Android APK 建置（run 32342508438 成功）
+- [x] 交付 GitHub Actions APK artifact 下載方式與正式簽署建議
 
 ## 發布前 QC（2026-08-20）
 - [x] 建立目前版本、設定、服務與已知限制的 QC 基準
