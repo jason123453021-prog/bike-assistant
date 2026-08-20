@@ -20,6 +20,8 @@ describe("GitHub Actions Android 驗收 APK 建置守門", () => {
   });
 
   it("先完成品質檢查，並上傳可下載的 APK artifact", () => {
+    expect(workflow).toContain("actions/setup-java@v5");
+    expect(workflow).not.toContain("cache: gradle");
     expect(workflow).toContain("pnpm check");
     expect(workflow).toContain("pnpm lint");
     expect(workflow).toContain("pnpm test");

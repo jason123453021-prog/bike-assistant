@@ -48,12 +48,11 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: 設定 Java 與 Gradle 快取
-        uses: actions/setup-java@v4
+      - name: 設定 Java
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
 
       - name: 安裝鎖定版本的依賴
         run: pnpm install --frozen-lockfile
