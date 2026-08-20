@@ -1,0 +1,80 @@
+name: Android 驗收 APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "assets/**"
+      - "scripts/**"
+      - "tests/**"
+      - "app.config.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/android-apk.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: 建置 Android 驗收 APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: true
+      EXPO_NO_DOCTOR: "1"
+      # 使用 preview 設定產生可安裝的驗收 APK；不呼叫 EAS Build，也不消耗 Expo 雲端建置額度。
+      EAS_BUILD_PROFILE: preview
+    steps:
+      - name: 取得原始碼
+        uses: actions/checkout@v4
+
+      - name: 設定 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: 設定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 設定 Java 與 Gradle 快取
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: 安裝鎖定版本的依賴
+        run: pnpm install --frozen-lockfile
+
+      - name: 執行程式品質守門
+        run: |
+          pnpm check
+          pnpm lint
+          pnpm test
+
+      - name: 產生 Android 原生專案
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: 建置可安裝的驗收 APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: 上傳 Android APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bike-assistant-preview-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
