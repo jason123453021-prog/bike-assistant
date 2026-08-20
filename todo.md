@@ -1,5 +1,18 @@
 # 智慧單車騎乘助手 TODO
 
+## 發布前 QC（2026-08-20）
+- [x] 建立目前版本、設定、服務與已知限制的 QC 基準
+- [x] 執行 TypeScript、Lint、Vitest、Expo Doctor 與依賴安全檢驗
+- [x] 驗證公開 Expo Go manifest／Hermes bundle、Web 靜態匯出與 Android production 匯出
+- [x] 排查並修復本輪可重現的阻擋問題，完成回歸
+- [x] 整理品管結果、更新待辦、保存驗證版本並交付
+
+## Expo Go QR Code 交付（2026-08-20）
+- [x] 檢查管理預覽與 Expo Go tunnel 程序，避免連接埠衝突
+- [x] 建立新的 Expo Go tunnel 並產生新的 QR Code
+- [x] 驗證 QR Code 對應 tunnel manifest 與 Android Hermes bundle
+- [x] 直接交付 QR Code 與掃描步驟
+
 ## 正式版 Expo OTA 停用（2026-08-20）
 - [x] 檢閱 app.config.ts 的 updates、runtimeVersion 與正式 EAS profile 行為
 - [x] 在正式 App 設定停用 Expo OTA 遠端更新與自動檢查
