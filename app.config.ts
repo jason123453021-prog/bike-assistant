@@ -110,6 +110,12 @@ const config: ExpoConfig = {
     output: "single",
     favicon: "./assets/images/favicon.png",
   },
+  // 此 Local-First App 的正式 AAB 僅隨安裝包更新；不向 Expo Updates 請求或套用 OTA bundle。
+  // Expo Go 的 Metro development bundle 下載是獨立流程，並不受這個正式版設定控制。
+  updates: {
+    enabled: false,
+    checkAutomatically: "NEVER",
+  },
   plugins: [
     "expo-router",
     "expo-font",

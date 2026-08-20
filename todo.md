@@ -1,5 +1,11 @@
 # 智慧單車騎乘助手 TODO
 
+## 正式版 Expo OTA 停用（2026-08-20）
+- [x] 檢閱 app.config.ts 的 updates、runtimeVersion 與正式 EAS profile 行為
+- [x] 在正式 App 設定停用 Expo OTA 遠端更新與自動檢查
+- [x] 新增設定守門，驗證 production config 停用 updates 且 Android Hermes 匯出維持可用
+- [x] 交付 Expo Go 開發連線與正式 AAB 安裝版的測試邊界說明
+
 ## 管理預覽服務與 Expo tunnel 分離（2026-08-20）
 - [x] 確認 ngrok tunnel 失敗會使唯一 Metro 程序退出，導致管理預覽顯示沙盒未啟動
 - [x] 建立不依賴 Expo tunnel 的管理預覽 fallback，避免手機預覽因 tunnel 波動而中斷
