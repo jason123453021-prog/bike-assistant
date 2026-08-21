@@ -6,7 +6,7 @@
 - [x] 讓日照事件排程與前景彈窗依提醒範圍過濾，僅日落模式不建立日出提醒
 - [x] 讓日照、補給與補水彈窗在確認、取消或關閉時同步清除各自的系統通知
 - [x] 新增模式過濾與通知同步清理回歸測試，完成完整 QC（TypeScript、Lint、Vitest、Expo Doctor 與 Android Hermes 匯出）
-- [ ] 保存版本、同步 GitHub 並確認 Android APK artifact
+- [x] 保存版本、同步 GitHub 並確認 Android APK artifact（GitHub run 32481761366）
 
 ## 日照警示提前時間與開關（2026-08-21）
 - [x] 盤點日出／日落事件計算、前景彈窗、背景通知與設定資料流
