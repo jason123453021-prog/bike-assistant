@@ -95,7 +95,7 @@ export function buildRideSplits(record: RideRecord, splitDistanceM = 1_000): Rid
     };
   };
 
-  rawSegments.forEach((segment) => {
+  rawSegments.forEach((segment, segmentIndex) => {
     let remainingDistance = segment.distanceM * distanceScale;
     const altitudeDelta = finitePositive(segment.current.altitude !== null && segment.previous.altitude !== null
       ? segment.current.altitude - segment.previous.altitude
@@ -109,7 +109,15 @@ export function buildRideSplits(record: RideRecord, splitDistanceM = 1_000): Rid
       : (remainingDistance / record.distance) * movingTime;
     const power = [segment.previous.power, segment.current.power]
       .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
-    const segmentPower = power.length ? power.reduce((sum, value) => sum + value, 0) / power.length : undefined;
+    // GPS 軌跡經抽樣後未必保留 power 欄位；以同一次騎乘已保存的功率序列按時間位置對齊，
+    // 不以整體平均功率複製到每一段，避免掩蓋實際分段差異。
+    const historyIndex = record.powerHistory.length > 1
+      ? Math.round((segmentIndex / Math.max(1, rawSegments.length - 1)) * (record.powerHistory.length - 1))
+      : 0;
+    const historyPower = record.powerHistory[historyIndex];
+    const segmentPower = power.length
+      ? power.reduce((sum, value) => sum + value, 0) / power.length
+      : finitePositive(historyPower);
 
     while (remainingDistance > 0.001) {
       const capacity = splitDistanceM - current.distanceM;

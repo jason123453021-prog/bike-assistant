@@ -791,6 +791,22 @@ export default function SettingsScreen() {
             colors={colors}
             onToggle={(v) => updateSettings({ notificationEnabled: v })}
           />
+          <Divider colors={colors} />
+          <ToggleRow
+            icon="sun.max.fill"
+            label="日出／日落警示燈提醒"
+            value={settings.daylightAlertEnabled}
+            colors={colors}
+            disabled={!settings.notificationEnabled}
+            onToggle={(enabled) => updateSettings({ daylightAlertEnabled: enabled })}
+          />
+          <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+            <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
+              {settings.daylightAlertEnabled && settings.notificationEnabled
+                ? "騎乘跨越日出或日落時，會依 GPS 座標與裝置時間提醒您開啟或關閉自行車警示燈；需按下確認才結束提醒。"
+                : "已關閉日出／日落警示燈提醒。"}
+            </Text>
+          </View>
         </View>}
 
         {/* ── 智慧省電模式 ── */}

@@ -46,6 +46,21 @@ describe("createFitBytes", () => {
     expect(createFitBytes({ ...ride, route: [ride.route[0]] })).toBeNull();
   });
 
+  it("將使用者手動標記的多個 Lap 匯出為標準 FIT lap 訊息", () => {
+    const bytes = createFitBytes({
+      ...ride,
+      laps: [
+        { index: 1, startedAtElapsedSec: 0, endedAtElapsedSec: 50, movingTimeSec: 50, distanceM: 900, ascentM: 12, descentM: 3, averageSpeedKmh: 18, averagePowerW: 158 },
+        { index: 2, startedAtElapsedSec: 50, endedAtElapsedSec: 110, movingTimeSec: 60, distanceM: 1_100, ascentM: 22, descentM: 16, averageSpeedKmh: 19, averagePowerW: 166 },
+      ],
+    });
+    const decoder = new Decoder(Stream.fromByteArray(Array.from(bytes!)));
+    const { messages, errors } = decoder.read();
+    expect(errors).toEqual([]);
+    expect(messages.lapMesgs?.length).toBe(2);
+    expect(messages.lapMesgs?.map((lap) => lap.totalDistance)).toEqual([900, 1100]);
+  });
+
   it("以安全檔名輸出 .fit 副檔名", () => {
     expect(fitFilename(ride)).toMatch(/\.fit$/);
   });

@@ -75,9 +75,12 @@ import {
   scheduleSmartSupplyDueNotification,
   clearAllSmartSupplyDueNotifications,
   clearAllSupplyNotifications,
+  clearAllDaylightAlertNotifications,
+  clearDaylightAlertNotification,
   showSupplyNotification,
   cancelRidingNotification,
   requestNotificationPermission,
+  scheduleDaylightAlertNotification,
   setRideSpeechSuppressed,
   stopSpeech,
 } from "@/lib/feedback-service";
@@ -184,6 +187,11 @@ import {
 } from "@/lib/live-elevation-filter";
 import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
+import { daylightAlertCopy, getDueDaylightAlert, getNextDaylightAlert, type DaylightAlertEvent } from "@/lib/daylight-alert";
+import {
+  consumeDaylightNotificationActions,
+  subscribeToDaylightNotificationActions,
+} from "@/lib/daylight-notification-actions";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -285,6 +293,10 @@ export default function MapScreen() {
   // 當前位置
   const [currentPos, setCurrentPos] = useState<{ lat: number; lon: number; heading: number } | null>(null);
   const currentPosRef = useRef<{ lat: number; lon: number; heading: number } | null>(null);
+  const [currentClock, setCurrentClock] = useState(() => new Date());
+  const [daylightAlert, setDaylightAlert] = useState<DaylightAlertEvent | null>(null);
+  const daylightAcknowledgedRef = useRef(new Set<string>());
+  const daylightRideStartedAtRef = useRef<number | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const idlePauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pausedAtRef = useRef<number | null>(null);
@@ -307,6 +319,11 @@ export default function MapScreen() {
   useEffect(() => {
     currentPosRef.current = currentPos;
   }, [currentPos]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentClock(new Date()), 1_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const scheduleAutoRecenter = useCallback(() => {
     setFollowUser(false);
@@ -2258,6 +2275,9 @@ export default function MapScreen() {
     setRideLocationTrackingMode("full");
     pausedElapsedRef.current = 0;
     dispatch({ type: "START", hydrationThresholdMl });
+    daylightRideStartedAtRef.current = Date.now();
+    daylightAcknowledgedRef.current = new Set();
+    setDaylightAlert(null);
     calorieReminderSentRef.current = false;
     waterReminderSentRef.current = false;
     syncSmartSupplyCountdown(null);
@@ -2393,6 +2413,55 @@ export default function MapScreen() {
     dispatch({ type: "RESUME" });
   }, [dispatch]);
 
+  const handleMarkLap = useCallback(() => {
+    if (state.status !== "active") return;
+    dispatch({ type: "MARK_LAP" });
+    if (settings.vibrationEnabled) vibrateLight();
+  }, [dispatch, settings.vibrationEnabled, state.status]);
+
+  const acknowledgeDaylightAlert = useCallback((event: DaylightAlertEvent) => {
+    daylightAcknowledgedRef.current.add(event.key);
+    setDaylightAlert((current) => current?.key === event.key ? null : current);
+    void clearDaylightAlertNotification(event.key);
+    if (settings.vibrationEnabled) vibrateSuccess();
+  }, [settings.vibrationEnabled]);
+
+  useEffect(() => {
+    const processQueuedActions = async () => {
+      const actions = await consumeDaylightNotificationActions();
+      actions.forEach((action) => acknowledgeDaylightAlert({
+        key: action.eventKey,
+        kind: action.kind,
+        triggerAtMs: Date.now(),
+      }));
+    };
+    void processQueuedActions();
+    return subscribeToDaylightNotificationActions(() => { void processQueuedActions(); });
+  }, [acknowledgeDaylightAlert]);
+
+  useEffect(() => {
+    if (!mapRideActive || !settings.daylightAlertEnabled || !settings.notificationEnabled || !currentPos) return;
+    const rideStartedAtMs = daylightRideStartedAtRef.current ?? (Date.now() - state.elapsed * 1_000);
+    daylightRideStartedAtRef.current = rideStartedAtMs;
+    const evaluateDaylight = () => {
+      const nowMs = Date.now();
+      const input = {
+        nowMs,
+        rideStartedAtMs,
+        latitude: currentPos.lat,
+        longitude: currentPos.lon,
+        acknowledgedKeys: daylightAcknowledgedRef.current,
+      };
+      const due = getDueDaylightAlert(input);
+      if (due) setDaylightAlert((active) => active?.key === due.key ? active : due);
+      const next = getNextDaylightAlert(input);
+      if (next) void scheduleDaylightAlertNotification(next.kind, next.key, next.triggerAtMs);
+    };
+    evaluateDaylight();
+    const timer = setInterval(evaluateDaylight, 30_000);
+    return () => clearInterval(timer);
+  }, [currentPos, mapRideActive, settings.daylightAlertEnabled, settings.notificationEnabled, state.elapsed]);
+
   const handleStop = useCallback(() => {
     Alert.alert("結束騎乘", "確定要結束本次騎乘並儲存記錄？", [
       { text: "取消", style: "cancel" },
@@ -2418,6 +2487,10 @@ export default function MapScreen() {
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           await cancelRidingNotification();
           await clearAllSmartSupplyDueNotifications();
+          await clearAllDaylightAlertNotifications();
+          daylightRideStartedAtRef.current = null;
+          daylightAcknowledgedRef.current = new Set();
+          setDaylightAlert(null);
           // 結束騎乘清除補給重複提醒計時器
           clearSupplyRepeatTimer();
           setCalorieAlert(false);
@@ -3194,12 +3267,16 @@ export default function MapScreen() {
         <View style={styles.handleArea}>
           <View style={styles.panelHandle} />
           {/* 天氣列 */}
-          {weather && (
+          {(weather || isActive) && (
             <View style={styles.weatherRow}>
-              <Text style={styles.weatherItem}>{weather.temperature}°C</Text>
-              <Text style={styles.weatherSep}>·</Text>
-              <Text style={styles.weatherItem}>{weather.humidity}%</Text>
-              {relativeWindInfo && (
+              <Text style={styles.weatherItem}>{currentClock.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false })}</Text>
+              {weather && <>
+                <Text style={styles.weatherSep}>·</Text>
+                <Text style={styles.weatherItem}>{weather.temperature}°C</Text>
+                <Text style={styles.weatherSep}>·</Text>
+                <Text style={styles.weatherItem}>{weather.humidity}%</Text>
+              </>}
+              {weather && relativeWindInfo && (
                 <>
                   <Text style={styles.weatherSep}>·</Text>
                   <Text style={[styles.weatherItem, {
@@ -3216,13 +3293,6 @@ export default function MapScreen() {
                   <Text style={styles.pausedText}>已暫停</Text>
                 </View>
               )}
-            </View>
-          )}
-          {!weather && isPaused && (
-            <View style={[styles.weatherRow, { justifyContent: "center" }]}>
-              <View style={styles.pausedBadge}>
-                <Text style={styles.pausedText}>已暫停</Text>
-              </View>
             </View>
           )}
         </View>
@@ -3413,6 +3483,15 @@ export default function MapScreen() {
                 </Pressable>
               )}
               <Pressable
+                accessibilityLabel="標記手動 Lap"
+                style={({ pressed }) => [styles.lapControlBtn, { opacity: !isRiding ? 0.45 : pressed ? 0.7 : 1 }]}
+                onPress={handleMarkLap}
+                disabled={!isRiding}
+              >
+                <Text style={styles.lapControlText}>Lap</Text>
+                <Text style={styles.lapControlCount}>{state.laps.length + 1}</Text>
+              </Pressable>
+              <Pressable
                 style={({ pressed }) => [styles.startBtn, styles.stopBtn, { opacity: pressed ? 0.85 : 1 }]}
                 onPress={handleStop}
               >
@@ -3541,6 +3620,24 @@ export default function MapScreen() {
           if (waterAlert) handleSnoozeSupply("water");
         }}
       />
+
+      <Modal visible={daylightAlert !== null} transparent animationType="fade" onRequestClose={() => {}}>
+        <View style={styles.daylightModalBackdrop}>
+          <View style={styles.daylightModalCard}>
+            <IconSymbol name={daylightAlert?.kind === "sunset" ? "moon.stars.fill" : "sun.max.fill"} size={30} color={daylightAlert?.kind === "sunset" ? "#FCD34D" : "#FDBA74"} />
+            <Text style={styles.daylightModalTitle}>{daylightAlert ? daylightAlertCopy(daylightAlert.kind).title : "安全提醒"}</Text>
+            <Text style={styles.daylightModalBody}>{daylightAlert ? daylightAlertCopy(daylightAlert.kind).body : ""}</Text>
+            {daylightAlert && (
+              <Pressable
+                style={({ pressed }) => [styles.daylightModalConfirm, { opacity: pressed ? 0.82 : 1 }]}
+                onPress={() => acknowledgeDaylightAlert(daylightAlert)}
+              >
+                <Text style={styles.daylightModalConfirmText}>{daylightAlertCopy(daylightAlert.kind).confirmation}</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* ── 騎乘摘要 Modal ── */}
       <RideSummaryModal
@@ -3715,7 +3812,7 @@ export default function MapScreen() {
           <Animated.View
             style={[
               styles.touchGuardCornerHint,
-              { top: insets.top + 144, opacity: touchGuardHintOpacity, pointerEvents: "none" },
+              { top: insets.top + 226, opacity: touchGuardHintOpacity, pointerEvents: "none" },
             ]}
           >
             <IconSymbol name="lock.fill" size={14} color="#9CFFB5" />
@@ -3724,7 +3821,7 @@ export default function MapScreen() {
             </Text>
           </Animated.View>
           {touchGuardHoldProgress > 0 && (
-            <View style={[styles.touchGuardProgressRing, { top: insets.top + 56, pointerEvents: "none" }]}> 
+            <View style={[styles.touchGuardProgressRing, { top: insets.top + 224, pointerEvents: "none" }]}>
               <Svg width={56} height={56} viewBox="0 0 56 56">
                 <Circle cx="28" cy="28" r="23" stroke="rgba(255,255,255,0.18)" strokeWidth="4" fill="rgba(5, 21, 14, 0.62)" />
                 <Circle
@@ -4347,6 +4444,39 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
   },
+  lapControlBtn: {
+    minWidth: 54,
+    minHeight: 48,
+    borderRadius: 16,
+    backgroundColor: "rgba(96, 80, 214, 0.32)",
+    borderWidth: 1,
+    borderColor: "rgba(190, 183, 255, 0.78)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lapControlText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900", lineHeight: 16 },
+  lapControlCount: { color: "#D9D6FF", fontSize: 10, fontWeight: "700", lineHeight: 13 },
+  daylightModalBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    backgroundColor: "rgba(0,0,0,0.62)",
+  },
+  daylightModalCard: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 24,
+    alignItems: "center",
+    backgroundColor: "#17251E",
+    borderWidth: 1,
+    borderColor: "rgba(253, 186, 116, 0.72)",
+    padding: 24,
+  },
+  daylightModalTitle: { color: "#FFFFFF", fontSize: 22, fontWeight: "900", lineHeight: 29, textAlign: "center", marginTop: 12 },
+  daylightModalBody: { color: "rgba(255,255,255,0.9)", fontSize: 16, fontWeight: "600", lineHeight: 24, textAlign: "center", marginTop: 8 },
+  daylightModalConfirm: { width: "100%", minHeight: 52, borderRadius: 16, marginTop: 22, backgroundColor: "#D97706", alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
+  daylightModalConfirmText: { color: "#FFFFFF", fontSize: 16, fontWeight: "900", lineHeight: 22, textAlign: "center" },
 
   expandHint: {
     flexDirection: "row",

@@ -85,7 +85,25 @@ export function createFitBytes(record: RideRecord): Uint8Array | null {
     totalCalories: Math.round(record.calories),
     sport: "cycling",
   };
-  encoder.onMesg(Profile.MesgNum.LAP, { ...totals, event: "lap", eventType: "stop" } as any);
+  const manualLaps = record.laps ?? [];
+  const lapPayloads = manualLaps.length > 0
+    ? manualLaps.map((lap, index) => ({
+        timestamp: new Date(startTime.getTime() + lap.endedAtElapsedSec * 1_000),
+        startTime: new Date(startTime.getTime() + lap.startedAtElapsedSec * 1_000),
+        totalElapsedTime: lap.movingTimeSec,
+        totalTimerTime: lap.movingTimeSec,
+        totalDistance: lap.distanceM,
+        totalAscent: Math.round(lap.ascentM),
+        totalDescent: Math.round(lap.descentM),
+        avgSpeed: lap.averageSpeedKmh === undefined ? undefined : lap.averageSpeedKmh / 3.6,
+        maxSpeed: lap.maxSpeedKmh === undefined ? undefined : lap.maxSpeedKmh / 3.6,
+        avgPower: lap.averagePowerW,
+        messageIndex: index,
+      }))
+    : [{ ...totals, messageIndex: 0 }];
+  lapPayloads.forEach((lap) => {
+    encoder.onMesg(Profile.MesgNum.LAP, { ...lap, event: "lap", eventType: "stop" } as any);
+  });
   encoder.onMesg(Profile.MesgNum.SESSION, { ...totals, event: "session", eventType: "stop", subSport: "generic" } as any);
   encoder.onMesg(Profile.MesgNum.EVENT, { timestamp: endTime, event: "timer", eventType: "stopAll" } as any);
   encoder.onMesg(Profile.MesgNum.ACTIVITY, {

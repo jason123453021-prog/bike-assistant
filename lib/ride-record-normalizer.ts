@@ -1,8 +1,9 @@
 import { calculateNormalizedPowerFromHistory } from "./tss-calc";
-import type { LocationPoint, RideActivityType, RideCalculationProfile, RideRecord, SportType, SupplyConfirmation } from "./ride-context";
+import type { LocationPoint, RideActivityType, RideCalculationProfile, RideLap, RideRecord, SportType, SupplyConfirmation } from "./ride-context";
 import { calculateCalories, calculateCaloriesMET, calculatePower } from "./power-calc";
 import { acceptLiveElevationDelta, clampVirtualPowerForRider, createLiveElevationFilterState } from "./live-elevation-filter";
 import { hasReliableRideMovement } from "./live-ride-readings";
+import { analyzeTraining } from "./tss-calc";
 
 const EARTH_RADIUS_M = 6_371_000;
 const MIN_SUSTAINED_GRADE_DISTANCE_M = 40;
@@ -102,6 +103,27 @@ export function calculateRouteMovingTime(route: LocationPoint[]): number {
     }
   }
   return Math.round(movingSeconds);
+}
+
+/** 依已保存的速度或相鄰 GPS 位移重建最高可靠速度，跳過漂移與不合理尖峰。 */
+export function calculateRouteMaxSpeed(route: LocationPoint[]): number | undefined {
+  let maxSpeedKmh = 0;
+  for (let index = 1; index < route.length; index += 1) {
+    const previous = route[index - 1];
+    const current = route[index];
+    if (current.segmentStart) continue;
+    const elapsedSec = (current.timestamp - previous.timestamp) / 1_000;
+    const distanceM = distanceBetween(previous, current);
+    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 30 || !Number.isFinite(distanceM) || distanceM > 200) continue;
+    const derivedSpeedKmh = (distanceM / elapsedSec) * 3.6;
+    const speedKmh = current.speed !== null && Number.isFinite(current.speed) && current.speed > 0
+      ? current.speed * 3.6
+      : derivedSpeedKmh;
+    if (speedKmh > 0 && speedKmh <= 120 && hasReliableRideMovement({ speedKmh, distanceM, accuracyM: 0 })) {
+      maxSpeedKmh = Math.max(maxSpeedKmh, speedKmh);
+    }
+  }
+  return maxSpeedKmh > 0 ? maxSpeedKmh : undefined;
 }
 
 /** 從已儲存的軌跡安全重建地形資料；沒有可靠高度樣本時不偽造數值。 */
@@ -299,6 +321,31 @@ function normalizeRpe(value: unknown): number | undefined {
   return rpe !== undefined && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : undefined;
 }
 
+function normalizeLaps(value: unknown): RideLap[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((candidate, index): RideLap[] => {
+    if (!candidate || typeof candidate !== "object") return [];
+    const lap = candidate as Partial<RideLap>;
+    const movingTimeSec = nonNegative(lap.movingTimeSec);
+    const distanceM = nonNegative(lap.distanceM);
+    if (movingTimeSec < 1 || distanceM < 1) return [];
+    const startedAtElapsedSec = nonNegative(lap.startedAtElapsedSec);
+    const endedAtElapsedSec = Math.max(startedAtElapsedSec + movingTimeSec, nonNegative(lap.endedAtElapsedSec));
+    return [{
+      index: Math.max(1, Math.round(nonNegative(lap.index, index + 1))),
+      startedAtElapsedSec,
+      endedAtElapsedSec,
+      movingTimeSec,
+      distanceM,
+      ascentM: nonNegative(lap.ascentM),
+      descentM: nonNegative(lap.descentM),
+      averageSpeedKmh: normalizedOptional(lap.averageSpeedKmh),
+      maxSpeedKmh: normalizedOptional(lap.maxSpeedKmh),
+      averagePowerW: normalizedOptional(lap.averagePowerW),
+    }];
+  }).sort((a, b) => a.index - b.index).slice(0, 100);
+}
+
 /**
  * 將歷史、匯入與新建騎乘資料轉為同一個安全模型。
  * 僅接受具有數值距離與軌跡陣列的記錄；缺失的衍生數據會由本機軌跡補齊。
@@ -319,6 +366,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const terrain = calculateTerrainMetrics(route);
   const reconstructedDistanceM = calculateRouteDistance(route);
   const routeMovingTime = calculateRouteMovingTime(route);
+  const routeMaxSpeedKmh = calculateRouteMaxSpeed(route);
   const routeTimingIsComparable = routeMovingTime >= 60
     && declaredMovingTime > 0
     && routeMovingTime >= declaredMovingTime * 0.3
@@ -373,6 +421,9 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     ? nonNegative(source.totalWorkKj)
     : hasUsablePower && movingTime > 0 && averagePower > 0 ? (averagePower * movingTime) / 1000 : undefined;
   const derivedNormalizedPower = hasUsablePower ? calculateNormalizedPowerFromHistory(normalizedPowerHistory, movingTime) : undefined;
+  const derivedTraining = hasUsablePower && calculationProfile
+    ? analyzeTraining(movingTime, averagePower, maxPower, calculationProfile.ftpW, normalizedPowerHistory)
+    : undefined;
   const recordId = typeof source.id === "string" && source.id.trim() ? source.id.trim() : fallbackId ?? `legacy-${date}`;
   const name = typeof source.name === "string" && source.name.trim() ? source.name.trim() : "匯入騎乘紀錄";
   const terrainDisagreesWithStoredAscent = terrain.totalAscent > 0
@@ -402,6 +453,8 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     ? estimatedPowerCalories > 0 ? "power-estimate" : "met-estimate"
     : declaredCaloriesSource;
 
+  const supplyConfirmations = normalizeSupplyConfirmations(source.supplyConfirmations);
+  const storedMaxSpeed = Math.min(120, nonNegative(source.maxSpeed));
   return {
     id: recordId,
     date,
@@ -409,7 +462,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     duration,
     distance: distanceM,
     avgSpeed: averageSpeedKmh,
-    maxSpeed: nonNegative(source.maxSpeed),
+    maxSpeed: storedMaxSpeed > 0 ? storedMaxSpeed : routeMaxSpeedKmh ?? 0,
     totalAscent,
     totalDescent,
     maxElevation: hasTerrainAltitude && (storedMaxElevation === undefined || (storedMaxElevation === 0 && terrain.maxElevation !== 0)) ? terrain.maxElevation : storedMaxElevation,
@@ -426,13 +479,16 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     powerSource,
     caloriesSource,
     normalizedPower: derivedNormalizedPower ?? normalizedOptional(source.normalizedPower),
-    intensityFactor: normalizedOptional(source.intensityFactor),
-    tss: normalizedOptional(source.tss),
+    intensityFactor: normalizedOptional(source.intensityFactor) ?? derivedTraining?.intensityFactor,
+    tss: normalizedOptional(source.tss) ?? derivedTraining?.tss,
     powerZones: normalizePowerZones(source.powerZones),
     powerHistory: normalizedPowerHistory,
     route,
     totalSweatMl: nonNegative(source.totalSweatMl),
-    refillCount: Math.round(nonNegative(source.refillCount)),
+    refillCount: Math.max(
+      Math.round(nonNegative(source.refillCount)),
+      supplyConfirmations?.filter((confirmation) => confirmation.type === "water").length ?? 0,
+    ),
     totalPausedSec,
     avgHeartRate: normalizedOptional(source.avgHeartRate),
     maxHeartRate: normalizedOptional(source.maxHeartRate),
@@ -442,7 +498,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     gradeAscentDistribution: Array.isArray(source.gradeAscentDistribution) ? source.gradeAscentDistribution.map((v) => nonNegative(v)) : [0, 0, 0, 0, 0, 0],
     personalBests: Array.isArray(source.personalBests) ? source.personalBests : undefined,
     calculationProfile,
-    supplyConfirmations: normalizeSupplyConfirmations(source.supplyConfirmations),
+    supplyConfirmations,
     description: typeof source.description === "string" ? source.description : undefined,
     activityType: normalizeActivityType(source.activityType),
     sportType: normalizeSportType(source.sportType),
@@ -452,6 +508,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     mediaItems: Array.isArray(source.mediaItems) ? source.mediaItems.filter((uri): uri is string => typeof uri === "string") : undefined,
     coverPhotoUri: typeof source.coverPhotoUri === "string" && source.coverPhotoUri.trim() ? source.coverPhotoUri.trim() : undefined,
     segmentAchievements: Array.isArray(source.segmentAchievements) ? source.segmentAchievements : undefined,
+    laps: normalizeLaps(source.laps),
   };
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateRouteDistance, calculateRouteMovingTime, normalizeRideRecord, normalizeRideRecords } from "../lib/ride-record-normalizer";
+import { calculateRouteDistance, calculateRouteMaxSpeed, calculateRouteMovingTime, normalizeRideRecord, normalizeRideRecords } from "../lib/ride-record-normalizer";
 import { calculateNormalizedPowerFromHistory } from "../lib/tss-calc";
 
 describe("ride record normalizer", () => {
@@ -206,6 +206,29 @@ describe("ride record normalizer", () => {
     expect(estimated?.maxPower).toBe(600);
     expect(estimated?.avgPower).toBeLessThanOrEqual(600);
     expect(measured?.maxPower).toBe(1_200);
+  });
+
+  it("重建可靠最高速度、補水確認次數與手動 Lap，並跳過無法驗證的 GPS 尖峰", () => {
+    const route = [
+      { latitude: 25, longitude: 121, altitude: 100, speed: 0, timestamp: 1_000 },
+      { latitude: 25.0005, longitude: 121, altitude: 101, speed: 4, timestamp: 11_000 },
+      { latitude: 25.001, longitude: 121, altitude: 102, speed: 5, timestamp: 21_000 },
+      { latitude: 25.9, longitude: 121, altitude: 102, speed: 80, timestamp: 22_000 },
+    ];
+    expect(calculateRouteMaxSpeed(route)).toBeCloseTo(18, 3);
+    const record = normalizeRideRecord({
+      id: "detail-repair",
+      duration: 20,
+      distance: 100,
+      maxSpeed: 0,
+      route,
+      supplyConfirmations: [{ type: "water", timestamp: 10_000, elapsedSec: 10 }],
+      laps: [{ index: 1, startedAtElapsedSec: 0, endedAtElapsedSec: 20, movingTimeSec: 20, distanceM: 100, ascentM: 2, descentM: 0 }],
+    });
+    expect(record?.maxSpeed).toBeCloseTo(18, 3);
+    expect(record?.refillCount).toBe(1);
+    expect(record?.laps).toHaveLength(1);
+    expect(record?.laps?.[0].distanceM).toBe(100);
   });
 
   it("keeps valid local records only, fills safe defaults, deduplicates IDs and sorts newest first", () => {

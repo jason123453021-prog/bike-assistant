@@ -52,4 +52,12 @@ describe("buildRideSplits", () => {
     expect(bands.length).toBeGreaterThan(1);
     expect(bands.reduce((sum, band) => sum + band.distanceM, 0)).toBeGreaterThan(0);
   });
+
+  it("GPS 軌跡未附每點功率時，依保存功率序列對齊重建分段功率", () => {
+    const routeWithoutPointPower = route.map(({ power: _power, ...point }) => point);
+    const splits = buildRideSplits({ ...record, route: routeWithoutPointPower, powerHistory: [140, 220, 260] });
+    expect(splits).toHaveLength(2);
+    expect(splits.every((split) => split.averagePowerW !== undefined && split.averagePowerW > 0)).toBe(true);
+    expect(splits[0].averagePowerW).not.toBe(splits[1].averagePowerW);
+  });
 });

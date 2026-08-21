@@ -97,6 +97,30 @@ export interface SupplyConfirmation {
   reason?: string;
 }
 
+/** 使用者在活動中明確按下標記所封存的本機手動 Lap。 */
+export interface RideLap {
+  index: number;
+  startedAtElapsedSec: number;
+  endedAtElapsedSec: number;
+  movingTimeSec: number;
+  distanceM: number;
+  ascentM: number;
+  descentM: number;
+  averageSpeedKmh?: number;
+  maxSpeedKmh?: number;
+  averagePowerW?: number;
+}
+
+interface RideLapAnchor {
+  elapsedSec: number;
+  distanceM: number;
+  ascentM: number;
+  descentM: number;
+  powerWorkJ: number;
+  powerSampleDurationSec: number;
+  routePointIndex: number;
+}
+
 export interface RideRecord {
   id: string;
   date: number;
@@ -170,6 +194,8 @@ export interface RideRecord {
     isPR: boolean;          // 是否為個人紀錄 PR
     date: string;
   }[];
+  /** 騎乘中手動標記的 Lap；不含未經使用者標記的推測分段。 */
+  laps?: RideLap[];
 }
 
 export interface RideState {
@@ -234,6 +260,8 @@ export interface RideState {
   /** 自訂補給品計數 Map: supplyItemId -> { count: 次數, lastTriggeredTime: 上次觸發時間戳 } */
   customSupplyItemCounts: Record<string, { count: number; lastTriggeredTime: number }>;
   supplyConfirmations: SupplyConfirmation[];
+  laps: RideLap[];
+  lapAnchor: RideLapAnchor;
 }
 
 type RideAction =
@@ -265,6 +293,7 @@ type RideAction =
   | { type: "CONSUME_CALORIES" }
   | { type: "CONSUME_WATER" }
   | { type: "SUPPLY_CONFIRMED"; confirmation: SupplyConfirmation }
+  | { type: "MARK_LAP" }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
   | { type: "ADD_RECORD"; record: RideRecord }
   | { type: "SET_SPORT_TYPE"; sportType: SportType }
@@ -324,6 +353,16 @@ const initialState: RideState = {
   gradeAscentDistribution: [0, 0, 0, 0, 0, 0],
   customSupplyItemCounts: {},
   supplyConfirmations: [],
+  laps: [],
+  lapAnchor: {
+    elapsedSec: 0,
+    distanceM: 0,
+    ascentM: 0,
+    descentM: 0,
+    powerWorkJ: 0,
+    powerSampleDurationSec: 0,
+    routePointIndex: 0,
+  },
 };
 
 export function rideReducer(state: RideState, action: RideAction): RideState {
@@ -540,6 +579,50 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
         supplyConfirmations: [...state.supplyConfirmations, action.confirmation].slice(-100),
       };
 
+    case "MARK_LAP": {
+      // 手動 Lap 僅能在真正騎乘中建立，避免暫停或地圖操作產生空白分段。
+      if (state.status !== "active") return state;
+      const anchor = state.lapAnchor;
+      const movingTimeSec = Math.max(0, state.elapsed - anchor.elapsedSec);
+      const distanceM = Math.max(0, state.distance - anchor.distanceM);
+      if (movingTimeSec < 1 || distanceM < 1) return state;
+
+      const lapRoute = state.route.slice(anchor.routePointIndex);
+      const speeds = lapRoute.flatMap((point) => {
+        const speedKmh = (point.speed ?? 0) * 3.6;
+        return Number.isFinite(speedKmh) && speedKmh > 0 && speedKmh <= 120 ? [speedKmh] : [];
+      });
+      const powerDurationSec = Math.max(0, state.powerSampleDurationSec - anchor.powerSampleDurationSec);
+      const averagePowerW = powerDurationSec > 0
+        ? (state.powerWorkJ - anchor.powerWorkJ) / powerDurationSec
+        : undefined;
+      const lap: RideLap = {
+        index: state.laps.length + 1,
+        startedAtElapsedSec: anchor.elapsedSec,
+        endedAtElapsedSec: state.elapsed,
+        movingTimeSec,
+        distanceM,
+        ascentM: Math.max(0, state.totalAscent - anchor.ascentM),
+        descentM: Math.max(0, state.totalDescent - anchor.descentM),
+        averageSpeedKmh: (distanceM / 1_000) / (movingTimeSec / 3_600),
+        maxSpeedKmh: speeds.length > 0 ? Math.max(...speeds) : undefined,
+        averagePowerW: averagePowerW !== undefined && averagePowerW > 0 ? Math.round(averagePowerW) : undefined,
+      };
+      return {
+        ...state,
+        laps: [...state.laps, lap].slice(-100),
+        lapAnchor: {
+          elapsedSec: state.elapsed,
+          distanceM: state.distance,
+          ascentM: state.totalAscent,
+          descentM: state.totalDescent,
+          powerWorkJ: state.powerWorkJ,
+          powerSampleDurationSec: state.powerSampleDurationSec,
+          routePointIndex: state.route.length,
+        },
+      };
+    }
+
     case "LOAD_RECORDS":
       return { ...state, records: action.records };
 
@@ -734,6 +817,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         ? { ...calculationProfile, ftpW }
         : undefined,
       supplyConfirmations: state.supplyConfirmations,
+      laps: state.laps,
     };
     const normalizedRecord = normalizeRideRecord(recordBase) ?? recordBase;
     const record: RideRecord = {
@@ -843,6 +927,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         powerZones: state.powerZones,
         sportType: state.sportType,
         supplyConfirmations: state.supplyConfirmations,
+        laps: state.laps,
+        lapAnchor: state.lapAnchor,
         savedAt: Date.now(),
       };
       await AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
@@ -876,7 +962,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
 
     const rideCount = routeRecords.length;
     const avgSpeed = routeRecords.reduce((sum, r) => sum + r.avgSpeed, 0) / rideCount;
-    const bestSpeed = Math.max(...routeRecords.map((r) => r.maxSpeed));
+    // 路線「最佳速度」採完整活動的平均移動速度，而不是容易受 GPS 尖峰影響的瞬時最高速。
+    const bestSpeed = Math.max(...routeRecords.map((r) => r.avgSpeed));
     const bestTime = Math.min(...routeRecords.map((r) => r.duration));
     const totalDistance = routeRecords.reduce((sum, r) => sum + r.distance / 1000, 0);
     const totalAscent = routeRecords.reduce((sum, r) => sum + r.totalAscent, 0);

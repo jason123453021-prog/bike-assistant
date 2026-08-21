@@ -160,6 +160,8 @@ export interface AppSettings {
   ttsEnabled: boolean;
   soundEnabled: boolean;
   notificationEnabled: boolean;
+  /** 騎乘跨越日出／日落時，以本機通知與待確認彈窗提醒開啟或關閉警示燈。 */
+  daylightAlertEnabled: boolean;
   // 精簡導航模式
   simplifiedNavMode: "off" | "manual" | "auto"; // off=關閉, manual=手動, auto=自動
   simplifiedNavIdleSec: number; // 自動模式開啟前的閒置秒數（預設 30 秒）
@@ -257,6 +259,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   ttsEnabled: true,
   soundEnabled: true,
   notificationEnabled: true,
+  daylightAlertEnabled: true,
   simplifiedNavMode: "off",
   simplifiedNavIdleSec: 30,
   autoRecenterSec: 12,

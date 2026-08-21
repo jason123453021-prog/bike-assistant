@@ -51,6 +51,7 @@ import { buildPhotoRouteMarkers } from "@/lib/photo-route-markers";
 import { compareLocalSplitPersonalBests } from "@/lib/local-split-personal-bests";
 import { buildLocalActivityHighlights, calculateBestPowerEfforts } from "@/lib/local-activity-insights";
 import { buildActivityStatistics } from "@/lib/activity-statistics";
+import { analyzeTraining } from "@/lib/tss-calc";
 import { useSettings } from "@/lib/settings-context";
 import { writeLocalFitBackup } from "@/lib/local-fit-backup";
 import { attachRidePhotos, loadRidePhotoTimeline, removeRidePhoto, type RidePhotoTimelineEntry } from "@/lib/local-ride-photos";
@@ -691,9 +692,36 @@ export default function RideDetailScreen() {
   const activityStats = buildStoredActivityStatistics(record);
   const movingDuration = activityStats.movingTimeSec;
   const averageMovingSpeed = activityStats.averageSpeedKmh;
-  const powerUnit = activityStats.powerSource === "measured"
+  const activityEstimatePowerHistory = activitySensorAnalysis?.points
+    .map((point) => point.powerW)
+    .filter((power) => Number.isFinite(power) && power > 0) ?? [];
+  const displayedPower = activityStats.averagePowerW !== undefined && activityStats.maxPowerW !== undefined
+    ? {
+        averagePowerW: activityStats.averagePowerW,
+        maxPowerW: activityStats.maxPowerW,
+        powerHistory: record.powerHistory,
+        source: activityStats.powerSource,
+      }
+    : activityEstimatePowerHistory.length > 0
+      ? {
+          averagePowerW: activityEstimatePowerHistory.reduce((sum, power) => sum + power, 0) / activityEstimatePowerHistory.length,
+          maxPowerW: Math.max(...activityEstimatePowerHistory),
+          powerHistory: activityEstimatePowerHistory,
+          source: "estimated" as const,
+        }
+      : undefined;
+  const displayedTraining = displayedPower
+    ? analyzeTraining(
+        movingDuration,
+        displayedPower.averagePowerW,
+        displayedPower.maxPowerW,
+        record.calculationProfile?.ftpW ?? settings.ftp,
+        displayedPower.powerHistory,
+      )
+    : undefined;
+  const powerUnit = displayedPower?.source === "measured"
     ? "W（量測）"
-    : activityStats.powerSource === "estimated"
+    : displayedPower?.source === "estimated"
       ? "W（本機估算）"
       : "資料不足";
   const caloriesUnit = activityStats.caloriesSource === "power-estimate"
@@ -837,7 +865,7 @@ export default function RideDetailScreen() {
             distanceKm={activityStats.distanceM / 1000}
             ascentM={activityStats.totalAscentM}
             movingDuration={movingDuration}
-            averagePowerW={activityStats.averagePowerW ?? 0}
+            averagePowerW={displayedPower?.averagePowerW ?? 0}
             averageSpeedKmh={averageMovingSpeed}
             calories={activityStats.caloriesKcal}
             sportType={record.sportType ?? "cycling"}
@@ -1137,10 +1165,10 @@ export default function RideDetailScreen() {
               <View style={styles.statsGrid}>
                 <DetailCell label="平均心率" value={record.avgHeartRate ? `${record.avgHeartRate}` : "--"} unit="bpm" color="#EF4444" />
                 <DetailCell label="最大心率" value={record.maxHeartRate ? `${record.maxHeartRate}` : "--"} unit="bpm" color="#EF4444" />
-                <DetailCell label="平均功率" value={activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)}`} unit={powerUnit} accent />
-                <DetailCell label="最大功率" value={activityStats.maxPowerW === undefined ? "--" : `${Math.round(activityStats.maxPowerW)}`} unit={powerUnit} accent />
-                <DetailCell label="機械工作量" value={activityStats.totalWorkKj === undefined ? "--" : `${Math.round(activityStats.totalWorkKj)}`} unit="kJ" accent />
-                <DetailCell label="標準化功率" value={record.normalizedPower !== undefined ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" accent />
+                <DetailCell label="平均功率" value={displayedPower === undefined ? "--" : `${Math.round(displayedPower.averagePowerW)}`} unit={powerUnit} accent />
+                <DetailCell label="最大功率" value={displayedPower === undefined ? "--" : `${Math.round(displayedPower.maxPowerW)}`} unit={powerUnit} accent />
+                <DetailCell label="機械工作量" value={displayedPower === undefined ? "--" : `${Math.round(activityStats.totalWorkKj ?? ((displayedPower.averagePowerW * movingDuration) / 1_000))}`} unit={displayedPower?.source === "estimated" ? "kJ（本機估算）" : "kJ"} accent />
+                <DetailCell label="標準化功率" value={displayedTraining === undefined ? "--" : `${Math.round(record.normalizedPower ?? displayedTraining.normalizedPower)}`} unit={displayedTraining === undefined ? "資料不足" : powerUnit} accent />
                 <DetailCell label="平均踏頻" value={record.avgCadence ? `${record.avgCadence}` : "--"} unit="rpm" />
                 <DetailCell label="最大踏頻" value={record.maxCadence ? `${record.maxCadence}` : "--"} unit="rpm" />
               </View>
@@ -1150,9 +1178,10 @@ export default function RideDetailScreen() {
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}> 
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>表現指標</Text>
               <View style={styles.statsGrid}>
-                <DetailCell label="訓練壓力分數" value={record.tss !== undefined ? `${record.tss.toFixed(1)}` : "--"} unit="" color="#9C27B0" />
-                <DetailCell label="強度係數" value={record.intensityFactor !== undefined ? `${record.intensityFactor.toFixed(2)}` : "--"} unit="" />
-                <DetailCell label="標準化功率" value={record.normalizedPower !== undefined ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" />
+                <DetailCell label="訓練壓力分數" value={displayedTraining === undefined ? "--" : `${(record.tss ?? displayedTraining.tss).toFixed(1)}`} unit={displayedTraining === undefined ? "資料不足" : "TSS"} color="#9C27B0" />
+                <DetailCell label="強度係數" value={displayedTraining === undefined ? "--" : `${(record.intensityFactor ?? displayedTraining.intensityFactor).toFixed(2)}`} unit={displayedTraining === undefined ? "資料不足" : "IF"} />
+                <DetailCell label="標準化功率" value={displayedTraining === undefined ? "--" : `${Math.round(record.normalizedPower ?? displayedTraining.normalizedPower)}`} unit={displayedTraining === undefined ? "資料不足" : powerUnit} />
+                <DetailCell label="訓練效果" value={displayedTraining === undefined ? "--" : displayedTraining.trainingEffect.toFixed(1)} unit={displayedTraining === undefined ? "資料不足" : displayedTraining.trainingEffectLabel} color="#A855F7" />
               </View>
             </View>
 
@@ -1175,6 +1204,24 @@ export default function RideDetailScreen() {
                         <Text style={{ fontSize: 13, fontWeight: "600", color: "#FF9500" }}>{split.averagePowerW === undefined ? "--" : `${split.averagePowerW} 瓦`}</Text>
                       </View>
                     </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {(record.laps?.length ?? 0) > 0 && (
+              <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>手動 Lap 紀錄</Text>
+                <Text style={[styles.panelHint, { color: colors.muted }]}>僅顯示騎乘中由您主動標記的分段。</Text>
+                {record.laps?.map((lap) => (
+                  <View key={lap.index} style={[styles.segmentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={[styles.segmentTitle, { color: colors.foreground }]}>Lap {lap.index}</Text>
+                      <Text style={{ color: colors.muted, fontSize: 12 }}>{formatDuration(lap.movingTimeSec)}</Text>
+                    </View>
+                    <Text style={{ color: colors.muted, fontSize: 12, marginTop: 6, lineHeight: 18 }}>
+                      {(lap.distanceM / 1_000).toFixed(2)} km · 均速 {lap.averageSpeedKmh?.toFixed(1) ?? "--"} km/h · 爬升 {Math.round(lap.ascentM)} m · 功率 {lap.averagePowerW === undefined ? "資料不足" : `${lap.averagePowerW} W`}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -1230,27 +1277,25 @@ export default function RideDetailScreen() {
               </View>
             )}
 
-            {/* 补給品記錄面板 */}
-            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}> 
-              <Text style={[styles.panelTitle, { color: colors.foreground }]}>补給品記錄</Text>
+            {/* 補給品記錄面板 */}
+            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>補給品記錄</Text>
               <View style={styles.statsGrid}>
                 <DetailCell label="水分流失" value={`${Math.round(record.totalSweatMl)}`} unit="ml" color="#4FC3F7" />
                 <DetailCell label="補水次數" value={`${record.refillCount}`} unit="次" />
-                <DetailCell label="GPS 點數" value={`${record.route.length}`} unit="點" />
               </View>
             </View>
 
-            {record.calculationProfile?.environment && (
-              <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-                <Text style={[styles.panelTitle, { color: colors.foreground }]}>本次環境與智慧補給</Text>
-                <View style={styles.statsGrid}>
-                  <DetailCell label="環境樣本" value={`${record.calculationProfile.environment.sampleCount}`} unit="筆" />
-                  <DetailCell label="平均溫度" value={record.calculationProfile.environment.averageTemperatureC === undefined ? "--" : record.calculationProfile.environment.averageTemperatureC.toFixed(1)} unit="°C" color="#F97316" />
-                  <DetailCell label="平均濕度" value={record.calculationProfile.environment.averageHumidityPct === undefined ? "--" : record.calculationProfile.environment.averageHumidityPct.toFixed(0)} unit="%" color="#60A5FA" />
-                  <DetailCell label="平均風速" value={record.calculationProfile.environment.averageWindSpeedKmh === undefined ? "--" : record.calculationProfile.environment.averageWindSpeedKmh.toFixed(1)} unit="km/h" />
-                  <DetailCell label="計算來源" value={record.calculationProfile.environment.source === "live-weather" ? "當日天氣" : "本機環境基準"} unit="" />
-                </View>
-                {(record.supplyConfirmations?.length ?? 0) > 0 && (
+            <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>本次環境與智慧補給</Text>
+              <View style={styles.statsGrid}>
+                <DetailCell label="環境樣本" value={`${record.calculationProfile?.environment?.sampleCount ?? 0}`} unit="筆" />
+                <DetailCell label="平均溫度" value={record.calculationProfile?.environment?.averageTemperatureC === undefined ? "--" : record.calculationProfile.environment.averageTemperatureC.toFixed(1)} unit="°C" color="#F97316" />
+                <DetailCell label="平均濕度" value={record.calculationProfile?.environment?.averageHumidityPct === undefined ? "--" : record.calculationProfile.environment.averageHumidityPct.toFixed(0)} unit="%" color="#60A5FA" />
+                <DetailCell label="平均風速" value={record.calculationProfile?.environment?.averageWindSpeedKmh === undefined ? "--" : record.calculationProfile.environment.averageWindSpeedKmh.toFixed(1)} unit="km/h" />
+                <DetailCell label="計算來源" value={record.calculationProfile?.environment?.source === "live-weather" ? "當日天氣" : "本機環境基準"} unit="" />
+              </View>
+              {(record.supplyConfirmations?.length ?? 0) > 0 ? (
                   <View style={styles.confirmationList}>
                     <Text style={[styles.confirmationHeading, { color: colors.muted }]}>已確認補給</Text>
                     {record.supplyConfirmations?.slice(-4).map((entry, index) => (
@@ -1262,9 +1307,8 @@ export default function RideDetailScreen() {
                       </Text>
                     ))}
                   </View>
-                )}
-              </View>
-            )}
+                ) : <Text style={[styles.panelHint, { color: colors.muted }]}>本次沒有已確認的補給或補水紀錄。</Text>}
+            </View>
 
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
               <View style={styles.photoTimelineHeader}>
