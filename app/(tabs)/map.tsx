@@ -76,7 +76,6 @@ import {
   clearAllSmartSupplyDueNotifications,
   clearAllSupplyNotifications,
   clearAllDaylightAlertNotifications,
-  clearDaylightAlertNotification,
   showSupplyNotification,
   cancelRidingNotification,
   requestNotificationPermission,
