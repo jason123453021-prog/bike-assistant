@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { daylightAlertCopy, getDaylightEvents, getDueDaylightAlert, getNextDaylightAlert } from "../lib/daylight-alert";
+import {
+  daylightAlertCopy,
+  getDaylightEvents,
+  getDueDaylightAlert,
+  getNextDaylightAlert,
+  normalizeDaylightAlertLeadMinutes,
+} from "../lib/daylight-alert";
 import { DAYLIGHT_CONFIRM_ACTION, parseDaylightNotificationAction } from "../lib/daylight-notification-action-model";
 
 describe("daylight alert", () => {
@@ -26,6 +32,25 @@ describe("daylight alert", () => {
     expect(getDueDaylightAlert(input)?.key).toBe(sunset.key);
     expect(getDueDaylightAlert({ ...input, acknowledgedKeys: new Set([sunrise.key, sunset.key]) })).toBeUndefined();
     expect(getNextDaylightAlert({ ...input, nowMs: sunrise.triggerAtMs - 60_000 })?.key).toBe(sunrise.key);
+  });
+
+  it("將提前提醒時間套用到日照觸發時刻、待確認判定與使用者文案", () => {
+    const date = new Date("2026-08-21T12:00:00.000Z");
+    const actual = getDaylightEvents(date, 25.033, 121.5654);
+    const early = getDaylightEvents(date, 25.033, 121.5654, 15);
+    expect(early[0].eventAtMs).toBe(actual[0].eventAtMs);
+    expect(early[0].triggerAtMs).toBe(actual[0].triggerAtMs - 15 * 60_000);
+    expect(getDueDaylightAlert({
+      nowMs: early[0].triggerAtMs,
+      rideStartedAtMs: early[0].triggerAtMs - 60_000,
+      latitude: 25.033,
+      longitude: 121.5654,
+      leadMinutes: 15,
+      acknowledgedKeys: new Set(),
+    })?.key).toBe(early[0].key);
+    expect(daylightAlertCopy("sunset", 15).body).toContain("15 分鐘後");
+    expect(normalizeDaylightAlertLeadMinutes(-10)).toBe(0);
+    expect(normalizeDaylightAlertLeadMinutes(99)).toBe(60);
   });
 
   it("只接受明確的日照確認通知動作", () => {

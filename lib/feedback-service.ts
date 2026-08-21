@@ -250,10 +250,10 @@ function daylightNotificationId(eventKey: string) {
 }
 
 /** 日出／日落提醒只在本機建立，確認後與補給提醒相同會移除系統通知。 */
-export async function scheduleDaylightAlertNotification(kind: DaylightAlertKind, eventKey: string, dueAtMs: number) {
+export async function scheduleDaylightAlertNotification(kind: DaylightAlertKind, eventKey: string, dueAtMs: number, leadMinutes = 0) {
   const Notifications = await getLocalNotifications();
   if (!Notifications || dueAtMs <= Date.now()) return;
-  const copy = daylightAlertCopy(kind);
+  const copy = daylightAlertCopy(kind, leadMinutes);
   try {
     await configureDaylightNotificationActions();
     const identifier = daylightNotificationId(eventKey);

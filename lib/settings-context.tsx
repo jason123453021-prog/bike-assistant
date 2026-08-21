@@ -10,6 +10,10 @@ import {
   DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
   TOUCH_GUARD_UNLOCK_HOLD_PRESETS,
 } from "./live-ride-readings";
+import {
+  DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES,
+  normalizeDaylightAlertLeadMinutes,
+} from "./daylight-alert";
 
 // 正常導航模式可顯示的欄位
 export interface NormalModeFields {
@@ -162,6 +166,8 @@ export interface AppSettings {
   notificationEnabled: boolean;
   /** 騎乘跨越日出／日落時，以本機通知與待確認彈窗提醒開啟或關閉警示燈。 */
   daylightAlertEnabled: boolean;
+  /** 日出或日落前幾分鐘提醒；0 代表在實際日照事件時提醒。 */
+  daylightAlertLeadMinutes: number;
   // 精簡導航模式
   simplifiedNavMode: "off" | "manual" | "auto"; // off=關閉, manual=手動, auto=自動
   simplifiedNavIdleSec: number; // 自動模式開啟前的閒置秒數（預設 30 秒）
@@ -260,6 +266,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   soundEnabled: true,
   notificationEnabled: true,
   daylightAlertEnabled: true,
+  daylightAlertLeadMinutes: DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES,
   simplifiedNavMode: "off",
   simplifiedNavIdleSec: 30,
   autoRecenterSec: 12,
@@ -424,6 +431,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           touchGuardUnlockHoldMsSchemaVersion: TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION,
           touchGuardAutoRelockSec: Math.min(60, Math.max(1, Number(saved.touchGuardAutoRelockSec) || DEFAULT_SETTINGS.touchGuardAutoRelockSec)),
           autoRecenterSec: Math.min(60, Math.max(3, Number(saved.autoRecenterSec) || DEFAULT_SETTINGS.autoRecenterSec)),
+          daylightAlertLeadMinutes: normalizeDaylightAlertLeadMinutes(saved.daylightAlertLeadMinutes),
           energyServingCarbohydrateG: Math.min(100, Math.max(10, Number(saved.energyServingCarbohydrateG) || DEFAULT_SETTINGS.energyServingCarbohydrateG)),
           energyCarbohydrateHourlyLimitMode: saved.energyCarbohydrateHourlyLimitMode === "manual" ? "manual" : "science",
           energyCarbohydrateHourlyLimitG: Math.min(90, Math.max(20, Number(saved.energyCarbohydrateHourlyLimitG) || DEFAULT_SETTINGS.energyCarbohydrateHourlyLimitG)),
@@ -460,6 +468,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       touchGuardUnlockHoldMsSchemaVersion: partial.touchGuardUnlockHoldMs !== undefined
         ? TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION
         : settings.touchGuardUnlockHoldMsSchemaVersion,
+      daylightAlertLeadMinutes: normalizeDaylightAlertLeadMinutes(
+        partial.daylightAlertLeadMinutes ?? settings.daylightAlertLeadMinutes,
+      ),
     };
     setSettings(next);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));

@@ -2432,6 +2432,7 @@ export default function MapScreen() {
       actions.forEach((action) => acknowledgeDaylightAlert({
         key: action.eventKey,
         kind: action.kind,
+        eventAtMs: Date.now(),
         triggerAtMs: Date.now(),
       }));
     };
@@ -2451,16 +2452,17 @@ export default function MapScreen() {
         latitude: currentPos.lat,
         longitude: currentPos.lon,
         acknowledgedKeys: daylightAcknowledgedRef.current,
+        leadMinutes: settings.daylightAlertLeadMinutes,
       };
       const due = getDueDaylightAlert(input);
       if (due) setDaylightAlert((active) => active?.key === due.key ? active : due);
       const next = getNextDaylightAlert(input);
-      if (next) void scheduleDaylightAlertNotification(next.kind, next.key, next.triggerAtMs);
+      if (next) void scheduleDaylightAlertNotification(next.kind, next.key, next.triggerAtMs, settings.daylightAlertLeadMinutes);
     };
     evaluateDaylight();
     const timer = setInterval(evaluateDaylight, 30_000);
     return () => clearInterval(timer);
-  }, [currentPos, mapRideActive, settings.daylightAlertEnabled, settings.notificationEnabled, state.elapsed]);
+  }, [currentPos, mapRideActive, settings.daylightAlertEnabled, settings.daylightAlertLeadMinutes, settings.notificationEnabled, state.elapsed]);
 
   const handleStop = useCallback(() => {
     Alert.alert("結束騎乘", "確定要結束本次騎乘並儲存記錄？", [
@@ -3625,14 +3627,14 @@ export default function MapScreen() {
         <View style={styles.daylightModalBackdrop}>
           <View style={styles.daylightModalCard}>
             <IconSymbol name={daylightAlert?.kind === "sunset" ? "moon.stars.fill" : "sun.max.fill"} size={30} color={daylightAlert?.kind === "sunset" ? "#FCD34D" : "#FDBA74"} />
-            <Text style={styles.daylightModalTitle}>{daylightAlert ? daylightAlertCopy(daylightAlert.kind).title : "安全提醒"}</Text>
-            <Text style={styles.daylightModalBody}>{daylightAlert ? daylightAlertCopy(daylightAlert.kind).body : ""}</Text>
+            <Text style={styles.daylightModalTitle}>{daylightAlert ? daylightAlertCopy(daylightAlert.kind, settings.daylightAlertLeadMinutes).title : "安全提醒"}</Text>
+            <Text style={styles.daylightModalBody}>{daylightAlert ? daylightAlertCopy(daylightAlert.kind, settings.daylightAlertLeadMinutes).body : ""}</Text>
             {daylightAlert && (
               <Pressable
                 style={({ pressed }) => [styles.daylightModalConfirm, { opacity: pressed ? 0.82 : 1 }]}
                 onPress={() => acknowledgeDaylightAlert(daylightAlert)}
               >
-                <Text style={styles.daylightModalConfirmText}>{daylightAlertCopy(daylightAlert.kind).confirmation}</Text>
+                <Text style={styles.daylightModalConfirmText}>{daylightAlertCopy(daylightAlert.kind, settings.daylightAlertLeadMinutes).confirmation}</Text>
               </Pressable>
             )}
           </View>

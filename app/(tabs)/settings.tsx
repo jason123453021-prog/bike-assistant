@@ -51,6 +51,7 @@ export default function SettingsScreen() {
   });
   const currentAge = calculateAgeFromBirthday(settings.birthday) ?? settings.age;
   const supplyControlsDisabled = !settings.supplyReminderEnabled;
+  const daylightControlsDisabled = !settings.notificationEnabled || !settings.daylightAlertEnabled;
   const effectiveCarbohydrateHourlyLimitG = resolveCarbohydrateHourlyLimit({
     riderWeightKg: settings.weight,
     energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
@@ -340,12 +341,15 @@ export default function SettingsScreen() {
       return;
     }
     const num = parseFloat(editModal.value);
-    if (isNaN(num) || num <= 0) {
+    const allowsZero = editModal.key === "daylightAlertLeadMinutes";
+    if (isNaN(num) || num < 0 || (!allowsZero && num === 0)) {
       Alert.alert("錯誤", "請輸入有效的數值");
       return;
     }
     const boundedNum = editModal.key === "touchGuardAutoRelockSec"
       ? Math.min(60, Math.max(1, Math.round(num)))
+      : editModal.key === "daylightAlertLeadMinutes"
+        ? Math.min(60, Math.max(0, Math.round(num)))
       : editModal.key === "energyServingCarbohydrateG"
         ? Math.min(100, Math.max(10, Math.round(num)))
         : editModal.key === "energyCarbohydrateHourlyLimitG"
@@ -800,10 +804,50 @@ export default function SettingsScreen() {
             disabled={!settings.notificationEnabled}
             onToggle={(enabled) => updateSettings({ daylightAlertEnabled: enabled })}
           />
+          <Divider colors={colors} />
+          <NumberRow
+            icon="clock.fill"
+            label="提前提醒時間"
+            value={settings.daylightAlertLeadMinutes}
+            unit="分鐘"
+            colors={colors}
+            iconColor="#F59E0B"
+            hint={settings.daylightAlertLeadMinutes === 0 ? "在實際日出或日落時提醒" : `日出與日落前 ${settings.daylightAlertLeadMinutes} 分鐘提醒`}
+            disabled={daylightControlsDisabled}
+            onPress={() => openEdit("daylightAlertLeadMinutes", "日照提前提醒時間（0–60 分鐘）", settings.daylightAlertLeadMinutes, "分鐘")}
+          />
+          <View style={styles.supplyRepeatPresetRow}>
+            <Text style={[styles.supplyRepeatPresetLabel, { color: colors.muted }]}>快速設定</Text>
+            {[0, 5, 10, 15, 30].map((minutes) => {
+              const selected = settings.daylightAlertLeadMinutes === minutes;
+              return (
+                <Pressable
+                  key={minutes}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected, disabled: daylightControlsDisabled }}
+                  accessibilityLabel={minutes === 0 ? "在日出日落時提醒" : `提前 ${minutes} 分鐘提醒`}
+                  disabled={daylightControlsDisabled}
+                  onPress={() => void updateSettings({ daylightAlertLeadMinutes: minutes })}
+                  style={({ pressed }) => [
+                    styles.supplyRepeatPreset,
+                    {
+                      backgroundColor: selected && !daylightControlsDisabled ? colors.accent : colors.surface,
+                      borderColor: selected && !daylightControlsDisabled ? colors.accent : colors.border,
+                      opacity: daylightControlsDisabled ? 0.45 : pressed ? 0.65 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: selected && !daylightControlsDisabled ? colors.onAccent : daylightControlsDisabled ? colors.muted : colors.foreground, fontSize: 14, fontWeight: "800" }}>
+                    {minutes === 0 ? "準時" : `${minutes} 分`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
             <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
               {settings.daylightAlertEnabled && settings.notificationEnabled
-                ? "騎乘跨越日出或日落時，會依 GPS 座標與裝置時間提醒您開啟或關閉自行車警示燈；需按下確認才結束提醒。"
+                ? "依 GPS 座標與裝置時間安排日出／日落提醒；可設定提前 0–60 分鐘，且需按下確認才結束提醒。"
                 : "已關閉日出／日落警示燈提醒。"}
             </Text>
           </View>

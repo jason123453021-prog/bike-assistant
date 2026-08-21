@@ -3,7 +3,20 @@ export type DaylightAlertKind = "sunrise" | "sunset";
 export interface DaylightAlertEvent {
   key: string;
   kind: DaylightAlertKind;
+  /** 實際日出或日落時刻，保留供使用者文案與可追溯性使用。 */
+  eventAtMs: number;
+  /** 套用使用者提前分鐘數後的提醒觸發時刻。 */
   triggerAtMs: number;
+}
+
+export const DAYLIGHT_ALERT_LEAD_MINUTES_PRESETS = [0, 5, 10, 15, 30] as const;
+export const DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES = 0;
+export const MAX_DAYLIGHT_ALERT_LEAD_MINUTES = 60;
+
+export function normalizeDaylightAlertLeadMinutes(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES;
+  return Math.min(MAX_DAYLIGHT_ALERT_LEAD_MINUTES, Math.max(0, Math.round(numeric)));
 }
 
 const ZENITH_DEG = 90.833;
@@ -50,10 +63,16 @@ function calculateSolarEventMs(date: Date, latitude: number, longitude: number, 
   return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) + Math.round(utcMinutes * 60_000);
 }
 
-export function getDaylightEvents(date: Date, latitude: number, longitude: number): DaylightAlertEvent[] {
+export function getDaylightEvents(date: Date, latitude: number, longitude: number, leadMinutes = DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES): DaylightAlertEvent[] {
+  const normalizedLeadMinutes = normalizeDaylightAlertLeadMinutes(leadMinutes);
   return (["sunrise", "sunset"] as const).flatMap((kind) => {
-    const triggerAtMs = calculateSolarEventMs(date, latitude, longitude, kind);
-    return triggerAtMs === undefined ? [] : [{ key: `${localDateKey(date)}-${kind}`, kind, triggerAtMs }];
+    const eventAtMs = calculateSolarEventMs(date, latitude, longitude, kind);
+    return eventAtMs === undefined ? [] : [{
+      key: `${localDateKey(date)}-${kind}`,
+      kind,
+      eventAtMs,
+      triggerAtMs: eventAtMs - normalizedLeadMinutes * 60_000,
+    }];
   }).sort((a, b) => a.triggerAtMs - b.triggerAtMs);
 }
 
@@ -61,9 +80,13 @@ function datesBetween(startedAtMs: number, nowMs: number) {
   const dates: Date[] = [];
   const cursor = new Date(startedAtMs);
   cursor.setHours(12, 0, 0, 0);
+  // 太陽位置公式以裝置所在地日曆日計算；在 UTC 與使用者所在地相差較大時，
+  // 清晨日出可能落在 UTC 前一日，因此兩端各保留一個日曆日候選。
+  cursor.setDate(cursor.getDate() - 1);
   const end = new Date(nowMs);
   end.setHours(12, 0, 0, 0);
-  while (cursor.getTime() <= end.getTime() && dates.length < 3) {
+  end.setDate(end.getDate() + 1);
+  while (cursor.getTime() <= end.getTime() && dates.length < 5) {
     dates.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
@@ -76,9 +99,10 @@ export function getDueDaylightAlert(input: {
   latitude: number;
   longitude: number;
   acknowledgedKeys: ReadonlySet<string>;
+  leadMinutes?: number;
 }): DaylightAlertEvent | undefined {
   const dueEvents = datesBetween(input.rideStartedAtMs, input.nowMs)
-    .flatMap((date) => getDaylightEvents(date, input.latitude, input.longitude))
+    .flatMap((date) => getDaylightEvents(date, input.latitude, input.longitude, input.leadMinutes))
     .filter((event) => event.triggerAtMs >= input.rideStartedAtMs && event.triggerAtMs <= input.nowMs && !input.acknowledgedKeys.has(event.key));
   return dueEvents.at(-1);
 }
@@ -89,16 +113,27 @@ export function getNextDaylightAlert(input: {
   latitude: number;
   longitude: number;
   acknowledgedKeys: ReadonlySet<string>;
+  leadMinutes?: number;
 }): DaylightAlertEvent | undefined {
   const tomorrow = new Date(input.nowMs);
   tomorrow.setDate(tomorrow.getDate() + 1);
   return [new Date(input.nowMs), tomorrow]
-    .flatMap((date) => getDaylightEvents(date, input.latitude, input.longitude))
+    .flatMap((date) => getDaylightEvents(date, input.latitude, input.longitude, input.leadMinutes))
     .find((event) => event.triggerAtMs > input.nowMs && event.triggerAtMs >= input.rideStartedAtMs && !input.acknowledgedKeys.has(event.key));
 }
 
-export function daylightAlertCopy(kind: DaylightAlertKind) {
+export function daylightAlertCopy(kind: DaylightAlertKind, leadMinutes = DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES) {
+  const normalizedLeadMinutes = normalizeDaylightAlertLeadMinutes(leadMinutes);
+  const early = normalizedLeadMinutes > 0;
   return kind === "sunrise"
-    ? { title: "日出安全提醒", body: "天色已亮，請確認後關閉您的警示燈。", confirmation: "已關閉警示燈" }
-    : { title: "日落安全提醒", body: "天色將暗，請確認後開啟您的警示燈。", confirmation: "已開啟警示燈" };
+    ? {
+        title: early ? "日出提前安全提醒" : "日出安全提醒",
+        body: early ? `約 ${normalizedLeadMinutes} 分鐘後日出，請確認後關閉您的警示燈。` : "天色已亮，請確認後關閉您的警示燈。",
+        confirmation: "已關閉警示燈",
+      }
+    : {
+        title: early ? "日落提前安全提醒" : "日落安全提醒",
+        body: early ? `約 ${normalizedLeadMinutes} 分鐘後日落，請確認後開啟您的警示燈。` : "天色將暗，請確認後開啟您的警示燈。",
+        confirmation: "已開啟警示燈",
+      };
 }
