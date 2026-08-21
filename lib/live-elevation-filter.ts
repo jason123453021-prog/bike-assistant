@@ -4,6 +4,8 @@
  */
 export interface LiveElevationFilterState {
   anchorAltitudeM: number | null;
+  /** 舊版恢復快照沒有此欄位時，第一次樣本會安全建立。 */
+  recentAltitudesM?: number[];
 }
 
 export interface LiveElevationChange {
@@ -12,11 +14,14 @@ export interface LiveElevationChange {
   acceptedAltitudeM?: number;
 }
 
-export const LIVE_ELEVATION_DEADBAND_M = 10;
-export const LIVE_ELEVATION_MIN_DISTANCE_M = 12;
+/** 3–5 個樣本移動平均，抑制 GPS 垂直雜訊而保留連續坡度。 */
+export const LIVE_ELEVATION_SMOOTHING_WINDOW = 5;
+/** 平滑後跨越 3 m 才確認為有效爬升／下降。 */
+export const LIVE_ELEVATION_DEADBAND_M = 3;
+export const LIVE_ELEVATION_MIN_DISTANCE_M = 3;
 
 export function createLiveElevationFilterState(): LiveElevationFilterState {
-  return { anchorAltitudeM: null };
+  return { anchorAltitudeM: null, recentAltitudesM: [] };
 }
 
 export function acceptLiveElevationDelta(
@@ -26,21 +31,25 @@ export function acceptLiveElevationDelta(
 ): LiveElevationChange {
   if (!Number.isFinite(altitudeM)) return { ascentM: 0, descentM: 0 };
   const altitude = Number(altitudeM);
+  const recentAltitudesM = state.recentAltitudesM ?? (state.recentAltitudesM = []);
+  recentAltitudesM.push(altitude);
+  if (recentAltitudesM.length > LIVE_ELEVATION_SMOOTHING_WINDOW) recentAltitudesM.shift();
+  const smoothedAltitude = recentAltitudesM.reduce((total, value) => total + value, 0) / recentAltitudesM.length;
   if (state.anchorAltitudeM === null) {
-    state.anchorAltitudeM = altitude;
-    return { ascentM: 0, descentM: 0, acceptedAltitudeM: altitude };
+    state.anchorAltitudeM = smoothedAltitude;
+    return { ascentM: 0, descentM: 0, acceptedAltitudeM: smoothedAltitude };
   }
   if (distanceM < LIVE_ELEVATION_MIN_DISTANCE_M) return { ascentM: 0, descentM: 0 };
 
-  const delta = altitude - state.anchorAltitudeM;
+  const delta = smoothedAltitude - state.anchorAltitudeM;
   if (Math.abs(delta) < LIVE_ELEVATION_DEADBAND_M) return { ascentM: 0, descentM: 0 };
 
   // 越過死區後才將新高度確認為可信平台；爬升、下降與最高／最低海拔共用此資料流。
-  state.anchorAltitudeM = altitude;
+  state.anchorAltitudeM = smoothedAltitude;
   return {
     ascentM: delta > 0 ? delta : 0,
     descentM: delta < 0 ? Math.abs(delta) : 0,
-    acceptedAltitudeM: altitude,
+    acceptedAltitudeM: smoothedAltitude,
   };
 }
 

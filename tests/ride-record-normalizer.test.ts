@@ -38,21 +38,21 @@ describe("ride record normalizer", () => {
         },
       },
       route: [
-        { latitude: 25.0, longitude: 121.0, altitude: 100, speed: 4, timestamp: 1 },
-        { latitude: 25.001, longitude: 121.0, altitude: 120, speed: 4, timestamp: 2 },
-        { latitude: 25.002, longitude: 121.0, altitude: 110, speed: 4, timestamp: 3 },
-        { latitude: 25.003, longitude: 121.0, altitude: 140, speed: 4, timestamp: 4 },
+        { latitude: 25.0, longitude: 121.0, altitude: 100, speed: 4, timestamp: 1_000 },
+        { latitude: 25.001, longitude: 121.0, altitude: 120, speed: 4, timestamp: 4_000 },
+        { latitude: 25.002, longitude: 121.0, altitude: 110, speed: 4, timestamp: 7_000 },
+        { latitude: 25.003, longitude: 121.0, altitude: 140, speed: 4, timestamp: 10_000 },
       ],
     });
 
     expect(record).not.toBeNull();
-    expect(record?.totalAscent).toBe(50);
-    expect(record?.totalDescent).toBe(10);
+    expect(record?.totalAscent).toBeCloseTo(17.5, 3);
+    expect(record?.totalDescent).toBe(0);
     expect(record?.maxElevation).toBe(140);
     expect(record?.minElevation).toBe(100);
     expect(record?.movingTime).toBe(3000);
     expect(record?.avgSpeed).toBeCloseTo(12, 4);
-    expect(record?.averageGrade).toBeGreaterThan(14);
+    expect(record?.averageGrade).toBeGreaterThan(5);
     expect(record?.maxGrade).toBeGreaterThan(0);
     expect(record?.maxGrade).toBeLessThanOrEqual(25);
     expect(record?.normalizedPower).toBe(150);
@@ -86,9 +86,9 @@ describe("ride record normalizer", () => {
   it("repairs legacy kilometres-as-metres distance, raw GPS ascent noise and unsupported calorie totals from its saved route", () => {
     const route = [
       { latitude: 25, longitude: 121, altitude: 100, speed: 4, timestamp: 1_000 },
-      { latitude: 25.001, longitude: 121, altitude: 106, speed: 4, timestamp: 4_000 },
-      { latitude: 25.002, longitude: 121, altitude: 111, speed: 4, timestamp: 7_000 },
-      { latitude: 25.003, longitude: 121, altitude: 119, speed: 4, timestamp: 10_000 },
+      { latitude: 25.0002, longitude: 121, altitude: 106, speed: 4, timestamp: 4_000 },
+      { latitude: 25.0004, longitude: 121, altitude: 111, speed: 4, timestamp: 7_000 },
+      { latitude: 25.0006, longitude: 121, altitude: 119, speed: 4, timestamp: 10_000 },
     ];
     const reconstructedDistance = calculateRouteDistance(route);
     const record = normalizeRideRecord({
@@ -104,7 +104,7 @@ describe("ride record normalizer", () => {
     });
 
     expect(record?.distance).toBeCloseTo(reconstructedDistance, 4);
-    expect(record?.totalAscent).toBe(11);
+    expect(record?.totalAscent).toBeCloseTo(9, 3);
     expect(record?.calories).toBeLessThan(577);
   });
 
@@ -121,17 +121,17 @@ describe("ride record normalizer", () => {
       caloriesSource: "power-estimate",
       route: [
         { latitude: 25, longitude: 121, altitude: 100, speed: 4, timestamp: 1_000 },
-        { latitude: 25.001, longitude: 121, altitude: 106, speed: 4, timestamp: 4_000 },
-        { latitude: 25.002, longitude: 121, altitude: 111, speed: 4, timestamp: 7_000 },
-        { latitude: 25.003, longitude: 121, altitude: 119, speed: 4, timestamp: 10_000 },
+        { latitude: 25.0002, longitude: 121, altitude: 106, speed: 4, timestamp: 4_000 },
+        { latitude: 25.0004, longitude: 121, altitude: 111, speed: 4, timestamp: 7_000 },
+        { latitude: 25.0006, longitude: 121, altitude: 119, speed: 4, timestamp: 10_000 },
       ],
       calculationProfile: { riderWeightKg: 70, bikeWeightKg: 10, ftpW: 240 },
     });
 
-    expect(record?.distance).toBeGreaterThan(300);
-    expect(record?.totalAscent).toBe(11);
+    expect(record?.distance).toBeGreaterThan(50);
+    expect(record?.totalAscent).toBeCloseTo(9, 3);
     expect(record?.powerSource).toBe("estimated");
-    expect(record?.caloriesSource).toBe("power-estimate");
+    expect(record?.caloriesSource).toBe("met-estimate");
     expect(record?.calories).toBeLessThan(577);
   });
 

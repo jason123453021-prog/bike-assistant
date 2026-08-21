@@ -7,9 +7,11 @@
 // 物理常數
 const RHO_STD = 1.225;   // 標準空氣密度 kg/m³（海平面 15°C）
 export const G = 9.81;   // 重力加速度 m/s²
-// 公路車騎乘姿勢預設值（下把姿勢）
-const CDA = 0.32;        // 空氣阻力係數 × 正面面積 m²（公路車下把姿勢）
-const CRR = 0.004;       // 滾動阻力係數（公路車胎，良好路面）
+// 公路車一般騎姿與一般柏油路面的保守預設值。
+export const ROAD_CDA = 0.4; // 空氣阻力係數 × 正面面積 m²
+export const ASPHALT_CRR = 0.005; // 滾動阻力係數
+export const DEFAULT_ROAD_BIKE_MASS_KG = 9;
+export const DEFAULT_CYCLING_MECHANICAL_EFFICIENCY = 0.21;
 const DRIVETRAIN_LOSS = 0.97; // 傳動效率（鏈條損耗約 3%）
 // 加速阻力：含旋轉質量修正（輪組等效質量 ≈ 總質量 × 1.05）
 const ROTATING_MASS_FACTOR = 1.05;
@@ -33,7 +35,7 @@ export interface PowerInput {
   gradePct: number;         // 坡度 % (正值=上坡，負值=下坡)
   windSpeedMs: number;      // 逆風分量 m/s (逆風為正，順風為負)
   riderMassKg: number;      // 騎士體重 kg
-  bikeMassKg?: number;      // 自行車重量 kg (預設 8kg)
+  bikeMassKg?: number;      // 自行車重量 kg (預設 9kg)
   /** 空氣密度 kg/m³，預設 1.225（可由 calcAirDensity(tempC, humidityPct) 獲得） */
   airDensityKgM3?: number;
 }
@@ -51,7 +53,7 @@ export function calculatePower(input: PowerInput): number {
     gradePct,
     windSpeedMs,
     riderMassKg,
-    bikeMassKg = 8,
+    bikeMassKg = DEFAULT_ROAD_BIKE_MASS_KG,
     airDensityKgM3 = RHO_STD,
   } = input;
 
@@ -66,11 +68,11 @@ export function calculatePower(input: PowerInput): number {
   // ── 1. 空氣阻力功率 ──────────────────────────────────────────────────────
   // 相對風速 = 騎行速度 + 逆風分量（順風時為負）
   const vAir = speedMs + windSpeedMs;
-  const fAero = 0.5 * airDensityKgM3 * CDA * vAir * Math.abs(vAir);
+  const fAero = 0.5 * airDensityKgM3 * ROAD_CDA * vAir * Math.abs(vAir);
   const pAero = Math.max(0, fAero * speedMs);
 
   // ── 2. 滾動阻力功率 ──────────────────────────────────────────────────────
-  const fRoll = CRR * totalMass * G * Math.cos(slopeAngle);
+  const fRoll = ASPHALT_CRR * totalMass * G * Math.cos(slopeAngle);
   const pRoll = fRoll * speedMs;
 
   // ── 3. 重力阻力功率（下坡時為負值，騎士少踩踏）────────────────────────────
@@ -91,14 +93,16 @@ export function calculatePower(input: PowerInput): number {
 
 /**
  * 計算卡路里消耗（基於功率和時間）
- * 人體機械效率約 25%（肌肉代謝效率）
+ * 人體機械效率預設 21%（接受 21–24% 的一般單車騎乘範圍）
  * 公式：kcal = (W × s) / (4184 × efficiency)
  */
-export function calculateCalories(powerWatts: number, durationSeconds: number): number {
+export function calculateCalories(
+  powerWatts: number,
+  durationSeconds: number,
+  mechanicalEfficiency = DEFAULT_CYCLING_MECHANICAL_EFFICIENCY,
+): number {
   if (powerWatts <= 0 || durationSeconds <= 0) return 0;
-  // 修正：效率係數為 0.25（正確的人體肌肉代謝效率）
-  // 公式：kcal = (W × s) / (4184 × 0.25) = (W × s) / 1046
-  const efficiency = 0.25;
+  const efficiency = Math.min(0.24, Math.max(0.21, mechanicalEfficiency));
   const joules = powerWatts * durationSeconds;
   const kcal = joules / (4184 * efficiency);
   return kcal;

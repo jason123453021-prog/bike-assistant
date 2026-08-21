@@ -288,6 +288,9 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         const candidateDistanceM = !segmentStart && state.lastLat !== 0 && state.lastLon !== 0
           ? bgHaversine(state.lastLat, state.lastLon, latitude, longitude)
           : 0;
+        const statisticsIntervalSec = !segmentStart
+          ? resolveStatisticsIntervalSec(state.lastTimestamp || null, timestamp, 10)
+          : 0;
         const hasReliableMovement = hasReliableRideMovement({
           speedKmh,
           distanceM: candidateDistanceM,
@@ -306,15 +309,13 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           continue;
         }
 
-        // 計算距離增量；過濾 GPS 跳動（單次距離超過 200m 視為異常）。
-        if (!segmentStart && candidateDistanceM < 200 && candidateDistanceM > 1) {
+        // 只累計 10 秒內、Haversine 推導速度合理的連續 GPS 樣本。
+        const impliedSpeedKmh = statisticsIntervalSec > 0 ? (candidateDistanceM / statisticsIntervalSec) * 3.6 : 0;
+        if (!segmentStart && statisticsIntervalSec > 0 && candidateDistanceM < 250 && candidateDistanceM >= 0.5 && impliedSpeedKmh <= 110) {
           state.totalDistanceM += candidateDistanceM;
           acceptedLocation.distanceM = candidateDistanceM;
         }
 
-        const statisticsIntervalSec = !segmentStart
-          ? resolveStatisticsIntervalSec(state.lastTimestamp || null, timestamp)
-          : 0;
         const elevationState = { anchorAltitudeM: segmentStart ? null : state.elevationAnchorM ?? null };
         const elevationDelta = acceptLiveElevationDelta(elevationState, loc.coords.altitude, acceptedLocation.distanceM);
         state.elevationAnchorM = elevationState.anchorAltitudeM;
@@ -343,8 +344,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         }
 
         // 鎖屏期間沿用前景的個人 FTP、體重與最近環境摘要；沒有天氣資料時安全回退為預設環境。
-        if (!segmentStart && speedKmh > 3) {
-          if (statisticsIntervalSec > 0) {
+        if (!segmentStart && hasReliableMovement && statisticsIntervalSec > 0) {
             const profile = state.riderProfile ?? { weightKg: 70, heightCm: 175, ageYears: 32, ftpW: 245, bikeWeightKg: 10 };
             const environment = state.environment ?? {
               temperatureC: 25,
@@ -354,14 +354,14 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               weatherCode: 3,
               precipitationProb: 0,
             };
-            const distanceM = state.lastLat !== 0 && state.lastLon !== 0
-              ? bgHaversine(state.lastLat, state.lastLon, latitude, longitude)
-              : 0;
+            const distanceM = acceptedLocation.distanceM ?? candidateDistanceM;
+            const effectiveSpeedMs = speedMs > 0 ? speedMs : distanceM / statisticsIntervalSec;
+            const effectiveSpeedKmh = effectiveSpeedMs * 3.6;
             const gradePct = calcGrade((loc.coords.altitude ?? 0) - (state.lastAltitude ?? loc.coords.altitude ?? 0), distanceM);
             const heading = loc.coords.heading ?? 0;
             const headwindMs = getHeadwindMs(heading, environment.windDirection, environment.windSpeedKmh);
             const power = clampVirtualPowerForRider(calculatePower({
-              speedMs,
+              speedMs: effectiveSpeedMs,
               prevSpeedMs: state.lastSpeedMs,
               intervalSec: statisticsIntervalSec,
               gradePct,
@@ -373,7 +373,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
             const calorieResult = calculatePersonalizedCalories({
               powerW: power,
               hasMeasuredPower: power > 0,
-              speedKmh,
+              speedKmh: effectiveSpeedKmh,
               gradePct,
               riderWeightKg: profile.weightKg,
               ftpW: profile.ftpW,
@@ -390,7 +390,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               ageYears: profile.ageYears,
               ftpW: profile.ftpW,
               powerW: power,
-              speedKmh,
+              speedKmh: effectiveSpeedKmh,
               ascentPerInterval: elevationDelta.ascentM,
               intervalSec: statisticsIntervalSec,
               temperatureC: environment.temperatureC,
@@ -425,14 +425,13 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           });
             activeCalorieThreshold = latestSupplyPlan.calorieTriggerKcal;
             activeWaterThreshold = latestSupplyPlan.waterTriggerMl;
-          }
         }
 
         state.lastLat = latitude;
         state.lastLon = longitude;
         state.lastTimestamp = timestamp;
         state.lastAccuracy = loc.coords.accuracy ?? undefined;
-        state.lastSpeedMs = speedMs;
+        state.lastSpeedMs = speedMs > 0 ? speedMs : candidateDistanceM / Math.max(1, statisticsIntervalSec);
         state.lastAltitude = loc.coords.altitude;
 
         addTrackPoint(

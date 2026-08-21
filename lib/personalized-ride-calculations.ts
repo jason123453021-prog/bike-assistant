@@ -48,9 +48,9 @@ export function calculatePersonalizedCalories(input: PersonalizedCalorieInput): 
   const hasUsablePower = input.hasMeasuredPower && input.powerW > 0;
 
   if (hasUsablePower) {
-    // 功率越接近 FTP，機械效率略降；區間限制在常見的 21–25%。
-    const efficiency = clamp(0.25 - Math.max(0, intensityFactor - 0.7) * 0.035, 0.21, 0.25);
-    const baseKcal = calculateCalories(input.powerW, input.intervalSec) * (0.25 / efficiency);
+    // 本機預設以 21% 機械效率由外部作功反推代謝能量；避免對未量測的熱調節成本重複計入坡度或風阻。
+    const efficiency = 0.21;
+    const baseKcal = calculateCalories(input.powerW, input.intervalSec, efficiency);
     return {
       kcal: baseKcal * environmentFactor,
       source: "power",

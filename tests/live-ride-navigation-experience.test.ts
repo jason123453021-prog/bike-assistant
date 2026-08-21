@@ -58,7 +58,7 @@ describe("live ride navigation experience", () => {
 
   it("zeros live readings for stopped traffic and indoor GPS drift without treating genuine movement as stopped", () => {
     const stationaryRedLight = shouldZeroLiveRideReadings({
-      rawSpeedKmh: 2.2,
+      rawSpeedKmh: 1.2,
       displacementM: 4,
       accuracyM: 6,
       motionStill: true,
@@ -66,7 +66,7 @@ describe("live ride navigation experience", () => {
       driftThresholdM: 5,
     });
     const stationaryIndoors = shouldZeroLiveRideReadings({
-      rawSpeedKmh: 4.7,
+      rawSpeedKmh: 1.2,
       displacementM: 8,
       accuracyM: 18,
       motionStill: true,

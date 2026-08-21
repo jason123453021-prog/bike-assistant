@@ -198,7 +198,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const ARRIVAL_THRESHOLD_M = 30;
 const TURN_LOOKAHEAD_M = 150;
 const TURN_ANGLE_DEG = 30;
-const AUTO_PAUSE_RESUME_THRESHOLD = 3; // 自動恢復速度閾值（km/h）- 高於暫停閾值，避免頻繁切換
+const AUTO_PAUSE_RESUME_THRESHOLD = 1.8; // 0.5 m/s，與單車低速移動門檻一致
 const WEATHER_INTERVAL = 10 * 60 * 1000;
 const LOCATION_INTERVAL_SEC = 3;
 
@@ -374,9 +374,8 @@ export default function MapScreen() {
   // 功率平滑：5 點滑動平均
   const powerWindowRef = useRef<number[]>([]);
 
-  // 自動暫停連續計數（需連續 4 次低速才暫停，避免 GPS 抖動誤觸發）
+  // 累積連續低速秒數，避免依定位回呼次數而在不同裝置提早暫停。
   const lowSpeedCountRef = useRef(0);
-  const AUTO_PAUSE_CONSECUTIVE = 4;
   // 速度平滑窗口（用於過濾 GPS 速度抖動）
   const speedWindowRef = useRef<number[]>([]);
   const lastValidSpeedRef = useRef<number>(0);
@@ -1815,6 +1814,13 @@ export default function MapScreen() {
             distanceM: displacementM,
             accuracyM: loc.coords.accuracy,
           });
+          const autoPauseSampleSec = Math.min(
+            5,
+            Math.max(
+              1,
+              resolveStatisticsIntervalSec(lastLocationRef.current?.timestamp ?? null, loc.timestamp, 10) || LOCATION_INTERVAL_SEC,
+            ),
+          );
           let smoothedSpeed = speedKmh;
           
           // GPS 漂移過濾
@@ -1839,8 +1845,8 @@ export default function MapScreen() {
           if (currentState.status === "active") {
             const satisfiesStillness = !autoPausePolicy.requiresStillness || motionStillRef.current;
             if (autoPausePolicy.mode === "automatic" && !hasReliableMovement && avgSpeed < autoPausePolicy.speedBelowKmh && satisfiesStillness) {
-              lowSpeedCountRef.current += 1;
-              if (lowSpeedCountRef.current >= AUTO_PAUSE_CONSECUTIVE) {
+              lowSpeedCountRef.current += autoPauseSampleSec;
+              if (lowSpeedCountRef.current >= autoPausePolicy.stillForSeconds) {
                 lowSpeedCountRef.current = 0;
                 pausedElapsedRef.current = currentState.elapsed;
                 dispatch({ type: "PAUSE" });
@@ -1850,9 +1856,8 @@ export default function MapScreen() {
                 return;
               }
             } else if (autoPausePolicy.mode === "suggest" && avgSpeed < autoPausePolicy.speedBelowKmh) {
-              lowSpeedCountRef.current += 1;
-              const hikingPromptCount = Math.ceil(autoPausePolicy.stillForSeconds / LOCATION_INTERVAL_SEC);
-              if (lowSpeedCountRef.current >= hikingPromptCount && !hikingPauseSuggestedRef.current) {
+              lowSpeedCountRef.current += autoPauseSampleSec;
+              if (lowSpeedCountRef.current >= autoPausePolicy.stillForSeconds && !hikingPauseSuggestedRef.current) {
                 hikingPauseSuggestedRef.current = true;
                 Alert.alert("登山停留提示", "已偵測到長時間低速停留。登山模式不會自動暫停；若正在休息，可手動暫停以保持移動時間精確。");
               }
@@ -1934,14 +1939,21 @@ export default function MapScreen() {
           let grade = 0;
           let distanceM = 0;
           const previousLocation = lastLocationRef.current;
-          if (!trackPointDecision.segmentStart && lastLocationRef.current) {
-            distanceM = haversineDistance(
+          const statisticsIntervalSec = !trackPointDecision.segmentStart
+            ? resolveStatisticsIntervalSec(previousLocation?.timestamp ?? null, loc.timestamp, 10)
+            : 0;
+          if (!trackPointDecision.segmentStart && lastLocationRef.current && statisticsIntervalSec > 0) {
+            const candidateDistanceM = haversineDistance(
               lastLocationRef.current.coords.latitude,
               lastLocationRef.current.coords.longitude,
               latitude, longitude
             );
-            const altDiff = (altitude ?? 0) - (lastLocationRef.current.coords.altitude ?? 0);
-            grade = calcGrade(altDiff, distanceM);
+            const impliedSpeedKmh = (candidateDistanceM / statisticsIntervalSec) * 3.6;
+            if (Number.isFinite(candidateDistanceM) && candidateDistanceM >= 0.5 && impliedSpeedKmh <= 110) {
+              distanceM = candidateDistanceM;
+              const altDiff = (altitude ?? 0) - (lastLocationRef.current.coords.altitude ?? 0);
+              grade = calcGrade(altDiff, distanceM);
+            }
           }
           if (trackPointDecision.segmentStart) {
             // 背景／定位中斷後開啟新資料段，不能用舊段高度跨距離推導爬升或下降。
@@ -1949,9 +1961,6 @@ export default function MapScreen() {
           }
           const elevationDelta = acceptLiveElevationDelta(liveElevationFilterRef.current, altitude, distanceM);
           const ascent = elevationDelta.ascentM;
-          const statisticsIntervalSec = !trackPointDecision.segmentStart
-            ? resolveStatisticsIntervalSec(previousLocation?.timestamp ?? null, loc.timestamp)
-            : 0;
           lastLocationRef.current = loc;
 
           const headwindMs = getHeadwindMs(headingRef.current, windDataRef.current.direction, windDataRef.current.speed * 3.6);
@@ -1967,7 +1976,9 @@ export default function MapScreen() {
             summary.latestWeatherCode = currentWeather.weatherCode;
             summary.hadLiveWeather = true;
           }
-          const currentSpeedMs = speed ?? 0;
+          const currentSpeedMs = speed && speed > 0
+            ? speed
+            : statisticsIntervalSec > 0 && distanceM > 0 ? distanceM / statisticsIntervalSec : 0;
           const isCyclingSport = currentState.sportType === "cycling";
           const rawPower = isCyclingSport ? calculatePower({
             speedMs: currentSpeedMs,

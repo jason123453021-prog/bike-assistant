@@ -25,6 +25,11 @@ export interface RideMovementSample {
   accuracyM: number | null | undefined;
 }
 
+/** 與本機軌跡品質規則對齊：30 m 內精度可作為騎乘統計資料。 */
+export const MAX_RIDE_STATISTICS_ACCURACY_M = 30;
+/** 0.5 m/s，避免緩坡、逆風與慢速起步過早被當成暫停。 */
+export const MIN_CYCLING_MOVEMENT_SPEED_KMH = 1.8;
+
 /**
  * 前景與背景共用的保守移動門檻。
  *
@@ -36,17 +41,13 @@ export function hasReliableRideMovement(sample: RideMovementSample): boolean {
   const distanceM = Number.isFinite(sample.distanceM) ? Math.max(0, Number(sample.distanceM)) : 0;
   const accuracyM = Number.isFinite(sample.accuracyM) ? Math.max(0, Number(sample.accuracyM)) : 0;
 
-  // 精度很差時，低速與小位移通常只是室內或停車時的定位漂移。
-  if (accuracyM >= 15 && speedKmh < 6 && distanceM < accuracyM) return false;
-  if (speedKmh >= 3) return true;
+  // 僅讓可接受精度的樣本寫入距離與移動時間；高精度低速爬坡不可因過度濾波遺失。
+  if (accuracyM > MAX_RIDE_STATISTICS_ACCURACY_M) return false;
+  if (speedKmh >= MIN_CYCLING_MOVEMENT_SPEED_KMH) return true;
 
-  // 長坡、逆風或載重時仍可能低於 3 km/h。只有精度良好、已有至少 3 m 實際位移
-  // 且 GPS 速度超過步行速度時，才保留此類慢速單車樣本；避免停車漂移混入距離。
-  if (accuracyM <= 10 && speedKmh >= 1.8 && distanceM >= 3) return true;
-
-  // 對一般手機 GPS，至少需跨越 8 m，且位移必須高於回報精度的 75%。
-  const displacementThresholdM = Math.max(8, Math.min(18, accuracyM * 0.75));
-  return distanceM >= displacementThresholdM;
+  // 少數裝置會在剛起步或衛星切換時短暫回報 0 速度；僅在位移已明顯超過該點
+  // 精度誤差（且至少 1.5 m）時，才以位移作為保守回退，避免停止漂移被累加。
+  return distanceM >= Math.max(1.5, accuracyM);
 }
 
 /**
@@ -56,8 +57,12 @@ export function hasReliableRideMovement(sample: RideMovementSample): boolean {
 export function shouldZeroLiveRideReadings(sample: LiveRideReadingSample): boolean {
   const speedKmh = Number.isFinite(sample.rawSpeedKmh) ? Math.max(0, sample.rawSpeedKmh) : 0;
   const noReliableMovement = sample.displacementM !== null && sample.displacementM < sample.driftThresholdM;
-  const stationarySpeedLimit = sample.pauseThresholdKmh + 1.5;
-  if (noReliableMovement && sample.motionStill && speedKmh <= stationarySpeedLimit) return true;
+  const hasReliableMovement = hasReliableRideMovement({
+    speedKmh,
+    distanceM: sample.displacementM,
+    accuracyM: sample.accuracyM,
+  });
+  if (noReliableMovement && sample.motionStill && speedKmh < sample.pauseThresholdKmh && !hasReliableMovement) return true;
 
   // 手機固定在車把上時，加速度計本來就可能接近靜止；不得僅因 GPS 瞬間回報 0 km/h
   // 就中斷仍在移動的活動。第一個定位樣本沒有前點時才以低速作為保守回退。
@@ -66,9 +71,5 @@ export function shouldZeroLiveRideReadings(sample: LiveRideReadingSample): boole
   const indoorDrift = sample.motionStill
     && (sample.accuracyM ?? 0) >= 15
     && speedKmh <= Math.max(sample.pauseThresholdKmh + 2, 5);
-  return indoorDrift && !hasReliableRideMovement({
-    speedKmh,
-    distanceM: sample.displacementM,
-    accuracyM: sample.accuracyM,
-  });
+  return indoorDrift && !hasReliableMovement;
 }

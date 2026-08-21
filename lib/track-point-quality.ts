@@ -17,7 +17,8 @@ export interface TrackPointDecision {
   reason?: "invalid-coordinate" | "poor-accuracy" | "stale-timestamp" | "duplicate" | "impossible-speed" | "resume-gap";
 }
 
-export const MAX_TRACK_ACCURACY_M = 65;
+/** 與騎乘統計共用的 GPS 精度上限；30 m 內的連續樣本均保留。 */
+export const MAX_TRACK_ACCURACY_M = 30;
 export const MAX_TRACK_SPEED_KMH = 110;
 export const TRACK_RESUME_GAP_MS = 75_000;
 export const TRACK_RESUME_BREAK_DISTANCE_M = 80;

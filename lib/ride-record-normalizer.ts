@@ -74,8 +74,10 @@ export function calculateRouteDistance(route: LocationPoint[]): number {
     if (current.segmentStart) continue;
     const segmentDistance = distanceBetween(previous, current);
     const elapsedMs = current.timestamp - previous.timestamp;
-    if (!Number.isFinite(segmentDistance) || segmentDistance < 1) continue;
-    if (segmentDistance > 200 && elapsedMs < 75_000) continue;
+    if (!Number.isFinite(segmentDistance) || segmentDistance < 0.5) continue;
+    if (!Number.isFinite(elapsedMs) || elapsedMs <= 0 || elapsedMs > 10_000) continue;
+    const impliedSpeedKmh = (segmentDistance / (elapsedMs / 1_000)) * 3.6;
+    if (impliedSpeedKmh > 110) continue;
     distanceM += segmentDistance;
   }
   return distanceM;
@@ -93,7 +95,7 @@ export function calculateRouteMovingTime(route: LocationPoint[]): number {
     if (current.segmentStart) continue;
     const elapsedSec = (current.timestamp - previous.timestamp) / 1000;
     const distanceM = distanceBetween(previous, current);
-    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 30 || !Number.isFinite(distanceM) || distanceM > 200) continue;
+    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 10 || !Number.isFinite(distanceM) || distanceM > 250) continue;
     const derivedSpeedKmh = (distanceM / elapsedSec) * 3.6;
     const speedKmh = current.speed !== null && Number.isFinite(current.speed)
       ? Math.max(0, current.speed * 3.6)
@@ -114,7 +116,7 @@ export function calculateRouteMaxSpeed(route: LocationPoint[]): number | undefin
     if (current.segmentStart) continue;
     const elapsedSec = (current.timestamp - previous.timestamp) / 1_000;
     const distanceM = distanceBetween(previous, current);
-    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 30 || !Number.isFinite(distanceM) || distanceM > 200) continue;
+    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 10 || !Number.isFinite(distanceM) || distanceM > 250) continue;
     const derivedSpeedKmh = (distanceM / elapsedSec) * 3.6;
     const speedKmh = current.speed !== null && Number.isFinite(current.speed) && current.speed > 0
       ? current.speed * 3.6
@@ -199,11 +201,11 @@ function deriveEstimatedPowerHistory(route: LocationPoint[], profile: RideCalcul
     }
     const elapsedSec = (current.timestamp - previous.timestamp) / 1000;
     const distanceM = distanceBetween(previous, current);
-    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 30 || !Number.isFinite(distanceM) || distanceM > 200) continue;
+    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 10 || !Number.isFinite(distanceM) || distanceM > 250) continue;
     const speedMs = current.speed !== null && Number.isFinite(current.speed)
       ? Math.max(0, current.speed)
       : Math.max(0, distanceM / elapsedSec);
-    const rawGrade = previous.altitude !== null && current.altitude !== null && distanceM >= MIN_SUSTAINED_GRADE_DISTANCE_M
+    const rawGrade = previous.altitude !== null && current.altitude !== null && distanceM >= 3
       ? ((current.altitude - previous.altitude) / distanceM) * 100
       : 0;
     const gradePct = Math.max(-MAX_SUSTAINED_GRADE_PCT, Math.min(MAX_SUSTAINED_GRADE_PCT, rawGrade));
@@ -370,14 +372,14 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const routeTimingIsComparable = routeMovingTime >= 60
     && declaredMovingTime > 0
     && routeMovingTime >= declaredMovingTime * 0.3
-    && routeMovingTime <= declaredMovingTime * 1.05;
+    && routeMovingTime <= declaredMovingTime * 1.35;
   const movingTime = routeTimingIsComparable ? routeMovingTime : declaredMovingTime;
   const totalPausedSec = Math.max(declaredPausedSec, Math.max(0, duration - movingTime));
   const storedDistanceM = nonNegative(source.distance);
-  const distanceWasCorrupted = reconstructedDistanceM >= 50
-    // 已抽樣的歷史路線可能只保留部分點位，故僅修正「公里數被當作公尺」這類明顯過小值；
-    // 不以稀疏路線反向縮短原本合理的完整活動距離。
-    && storedDistanceM < reconstructedDistanceM * 0.45;
+  const routeDistanceIsComparable = reconstructedDistanceM >= 50
+    && (storedDistanceM < 1 || (reconstructedDistanceM >= storedDistanceM * 0.7 && reconstructedDistanceM <= storedDistanceM * 1.35));
+  // 僅以完整連續 GPS 路線補回明顯被過濾掉的距離，不以稀疏路線縮短既有活動。
+  const distanceWasCorrupted = routeDistanceIsComparable && (storedDistanceM <= 0 || reconstructedDistanceM > storedDistanceM * 1.01);
   const distanceM = distanceWasCorrupted ? reconstructedDistanceM : storedDistanceM;
   const storedAscent = nonNegative(source.totalAscent);
   const storedDescent = nonNegative(source.totalDescent);
@@ -395,9 +397,14 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const directPowerHistory = powerHistory.map((power) => normalizePowerValue(power, declaredPowerSource, virtualFtpW));
   const hasDirectPowerSamples = directPowerHistory.some((power) => power > 0);
   const hasDeclaredPowerValues = nonNegative(source.avgPower) > 0 || nonNegative(source.maxPower) > 0;
-  const reconstructedPowerHistory = hasDirectPowerSamples
-    ? directPowerHistory
-    : deriveEstimatedPowerHistory(route, calculationProfile);
+  const regeneratedEstimatedPowerHistory = declaredPowerSource === "estimated"
+    ? deriveEstimatedPowerHistory(route, calculationProfile)
+    : [];
+  const reconstructedPowerHistory = regeneratedEstimatedPowerHistory.some((power) => power > 0)
+    ? regeneratedEstimatedPowerHistory
+    : hasDirectPowerSamples
+      ? directPowerHistory
+      : deriveEstimatedPowerHistory(route, calculationProfile);
   const effectivePowerSource: RideRecord["powerSource"] = hasDirectPowerSamples || hasDeclaredPowerValues
     ? declaredPowerSource
     : reconstructedPowerHistory.some((power) => power > 0) ? "estimated" : "unavailable";
@@ -407,7 +414,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     : 0;
   const storedAveragePower = nonNegative(source.avgPower);
   const normalizedAveragePower = normalizePowerValue(
-    storedAveragePower > 0 ? storedAveragePower : derivedAveragePower,
+    effectivePowerSource === "estimated" && derivedAveragePower > 0 ? derivedAveragePower : storedAveragePower > 0 ? storedAveragePower : derivedAveragePower,
     effectivePowerSource,
     virtualFtpW,
   );
@@ -416,10 +423,13 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const averagePower = hasUsablePower ? normalizedAveragePower : 0;
   const maxPower = hasUsablePower ? normalizedMaxPower : 0;
   const powerSource = hasUsablePower ? effectivePowerSource : "unavailable";
+  const hasComparableEstimatedPowerCoverage = effectivePowerSource !== "estimated"
+    || (routeMovingTime >= 60 && routeMovingTime >= movingTime * 0.5);
   const declaredCaloriesSource = normalizeCaloriesSource(source.caloriesSource);
+  const hasStoredPowerWorkEvidence = nonNegative(source.totalWorkKj) > 0 && nonNegative(source.avgPower) > 0;
   const totalWorkKj = hasUsablePower && source.totalWorkKj !== undefined
     ? nonNegative(source.totalWorkKj)
-    : hasUsablePower && movingTime > 0 && averagePower > 0 ? (averagePower * movingTime) / 1000 : undefined;
+    : hasUsablePower && hasComparableEstimatedPowerCoverage && movingTime > 0 && averagePower > 0 ? (averagePower * movingTime) / 1000 : undefined;
   const derivedNormalizedPower = hasUsablePower ? calculateNormalizedPowerFromHistory(normalizedPowerHistory, movingTime) : undefined;
   const derivedTraining = hasUsablePower && calculationProfile
     ? analyzeTraining(movingTime, averagePower, maxPower, calculationProfile.ftpW, normalizedPowerHistory)
@@ -442,10 +452,12 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   );
   // 僅修復「距離已證實錯誤、沒有功率資料、卻仍保留高熱量」的歷史紀錄；
   // 量測功率與正常新紀錄絕不被此相容性修復覆寫。
-  const estimatedPowerCalories = hasUsablePower && movingTime > 0
+  const estimatedPowerCalories = hasUsablePower && hasComparableEstimatedPowerCoverage && movingTime > 0
     ? calculateCalories(averagePower, movingTime)
     : 0;
-  const caloriesNeedsRepair = distanceWasCorrupted || (declaredCaloriesSource === "power-estimate" && !hasUsablePower);
+  const caloriesNeedsRepair = distanceWasCorrupted
+    || (declaredCaloriesSource === "power-estimate"
+      && (!hasUsablePower || (effectivePowerSource === "estimated" && !hasComparableEstimatedPowerCoverage && !hasStoredPowerWorkEvidence)));
   const calories = caloriesNeedsRepair
     ? Math.round(estimatedPowerCalories > 0 ? estimatedPowerCalories : fallbackCalories)
     : storedCalories;

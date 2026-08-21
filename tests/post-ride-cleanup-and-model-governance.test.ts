@@ -10,7 +10,7 @@ const projectRoot = resolve(__dirname, "..");
 
 describe("post-ride cleanup and local model governance", () => {
   it("keeps the governed academic sources and version policy with the local model", () => {
-    expect(MODEL_GOVERNANCE.version).toMatch(/^2026\.08\.16$/);
+    expect(MODEL_GOVERNANCE.version).toMatch(/^2026\.08\.22$/);
     expect(MODEL_GOVERNANCE.sources.map((source) => source.id)).toEqual(expect.arrayContaining([
       "adult-compendium-2024",
       "minetti-2002",
