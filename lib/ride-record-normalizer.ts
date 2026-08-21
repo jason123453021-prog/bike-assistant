@@ -1,9 +1,12 @@
 import { calculateNormalizedPowerFromHistory } from "./tss-calc";
 import type { LocationPoint, RideActivityType, RideCalculationProfile, RideRecord, SportType, SupplyConfirmation } from "./ride-context";
-import { calculateCaloriesMET } from "./power-calc";
+import { calculateCalories, calculateCaloriesMET, calculatePower } from "./power-calc";
 import { acceptLiveElevationDelta, clampVirtualPowerForRider, createLiveElevationFilterState } from "./live-elevation-filter";
+import { hasReliableRideMovement } from "./live-ride-readings";
 
 const EARTH_RADIUS_M = 6_371_000;
+const MIN_SUSTAINED_GRADE_DISTANCE_M = 40;
+const MAX_SUSTAINED_GRADE_PCT = 25;
 
 function finiteNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -77,6 +80,30 @@ export function calculateRouteDistance(route: LocationPoint[]): number {
   return distanceM;
 }
 
+/**
+ * 依連續 GPS 點重建騎乘移動時間。資料點間斷、靜止漂移與短距離低速樣本不列入；
+ * 呼叫端只會在軌跡時間具有足夠覆蓋時採用，避免稀疏舊路線覆寫原始時間。
+ */
+export function calculateRouteMovingTime(route: LocationPoint[]): number {
+  let movingSeconds = 0;
+  for (let index = 1; index < route.length; index += 1) {
+    const previous = route[index - 1];
+    const current = route[index];
+    if (current.segmentStart) continue;
+    const elapsedSec = (current.timestamp - previous.timestamp) / 1000;
+    const distanceM = distanceBetween(previous, current);
+    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 30 || !Number.isFinite(distanceM) || distanceM > 200) continue;
+    const derivedSpeedKmh = (distanceM / elapsedSec) * 3.6;
+    const speedKmh = current.speed !== null && Number.isFinite(current.speed)
+      ? Math.max(0, current.speed * 3.6)
+      : derivedSpeedKmh;
+    if (hasReliableRideMovement({ speedKmh, distanceM, accuracyM: 0 })) {
+      movingSeconds += elapsedSec;
+    }
+  }
+  return Math.round(movingSeconds);
+}
+
 /** 從已儲存的軌跡安全重建地形資料；沒有可靠高度樣本時不偽造數值。 */
 export function calculateTerrainMetrics(route: LocationPoint[]): TerrainMetrics {
   const elevations = route.flatMap((point) => (typeof point.altitude === "number" && Number.isFinite(point.altitude) ? [point.altitude] : []));
@@ -86,13 +113,19 @@ export function calculateTerrainMetrics(route: LocationPoint[]): TerrainMetrics 
   let totalDescent = 0;
   let horizontalDistance = 0;
   let maxGrade = 0;
+  let gradeWindowDistanceM = 0;
+  let gradeWindowNetElevationM = 0;
   let elevationState = createLiveElevationFilterState();
 
   for (let index = 0; index < route.length; index += 1) {
     const current = route[index];
     const previous = index > 0 ? route[index - 1] : undefined;
     if (current.altitude === null) continue;
-    if (current.segmentStart) elevationState = createLiveElevationFilterState();
+    if (current.segmentStart) {
+      elevationState = createLiveElevationFilterState();
+      gradeWindowDistanceM = 0;
+      gradeWindowNetElevationM = 0;
+    }
     const segmentDistance = previous && !current.segmentStart ? distanceBetween(previous, current) : 0;
     const elapsedMs = previous ? current.timestamp - previous.timestamp : 0;
     const isPlausibleSegment = !previous
@@ -103,8 +136,17 @@ export function calculateTerrainMetrics(route: LocationPoint[]): TerrainMetrics 
     if (acceptedDistance > 0) horizontalDistance += acceptedDistance;
     totalAscent += elevation.ascentM;
     totalDescent += elevation.descentM;
-    if (elevation.ascentM > 0 && acceptedDistance > 0) {
-      maxGrade = Math.max(maxGrade, (elevation.ascentM / acceptedDistance) * 100);
+    if (acceptedDistance > 0) {
+      gradeWindowDistanceM += acceptedDistance;
+      gradeWindowNetElevationM += elevation.ascentM - elevation.descentM;
+    }
+    if (gradeWindowDistanceM >= MIN_SUSTAINED_GRADE_DISTANCE_M) {
+      const sustainedGrade = (gradeWindowNetElevationM / gradeWindowDistanceM) * 100;
+      if (sustainedGrade > 0) {
+        maxGrade = Math.max(maxGrade, Math.min(MAX_SUSTAINED_GRADE_PCT, sustainedGrade));
+      }
+      gradeWindowDistanceM = 0;
+      gradeWindowNetElevationM = 0;
     }
   }
 
@@ -114,8 +156,48 @@ export function calculateTerrainMetrics(route: LocationPoint[]): TerrainMetrics 
     maxElevation: Math.max(...elevations),
     minElevation: Math.min(...elevations),
     averageGrade: horizontalDistance > 0 ? (totalAscent / horizontalDistance) * 100 : undefined,
-    maxGrade: horizontalDistance > 0 ? maxGrade : undefined,
+    maxGrade: horizontalDistance > 0 && maxGrade > 0 ? maxGrade : undefined,
   };
+}
+
+/**
+ * 只在具有完整個人設定與連續 GPS 資料時，為舊活動補建本機虛擬功率。
+ * 平均值包含滑行的 0 W；資料不足時回傳空陣列，交由畫面顯示「資料不足」。
+ */
+function deriveEstimatedPowerHistory(route: LocationPoint[], profile: RideCalculationProfile | undefined): number[] {
+  if (!profile || route.length < 2) return [];
+  const samples: number[] = [];
+  let previousSpeedMs: number | undefined;
+  for (let index = 1; index < route.length; index += 1) {
+    const previous = route[index - 1];
+    const current = route[index];
+    if (current.segmentStart) {
+      previousSpeedMs = undefined;
+      continue;
+    }
+    const elapsedSec = (current.timestamp - previous.timestamp) / 1000;
+    const distanceM = distanceBetween(previous, current);
+    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 30 || !Number.isFinite(distanceM) || distanceM > 200) continue;
+    const speedMs = current.speed !== null && Number.isFinite(current.speed)
+      ? Math.max(0, current.speed)
+      : Math.max(0, distanceM / elapsedSec);
+    const rawGrade = previous.altitude !== null && current.altitude !== null && distanceM >= MIN_SUSTAINED_GRADE_DISTANCE_M
+      ? ((current.altitude - previous.altitude) / distanceM) * 100
+      : 0;
+    const gradePct = Math.max(-MAX_SUSTAINED_GRADE_PCT, Math.min(MAX_SUSTAINED_GRADE_PCT, rawGrade));
+    const power = clampVirtualPowerForRider(calculatePower({
+      speedMs,
+      prevSpeedMs: previousSpeedMs,
+      intervalSec: elapsedSec,
+      gradePct,
+      windSpeedMs: 0,
+      riderMassKg: profile.riderWeightKg,
+      bikeMassKg: profile.bikeWeightKg,
+    }), profile.ftpW);
+    samples.push(power);
+    previousSpeedMs = speedMs;
+  }
+  return samples;
 }
 
 function normalizePowerZones(value: unknown): number[] {
@@ -232,10 +314,17 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     return normalized ? [normalized] : [];
   });
   const duration = nonNegative(source.duration);
-  const totalPausedSec = Math.min(duration, nonNegative(source.totalPausedSec));
-  const movingTime = Math.max(0, duration - totalPausedSec);
+  const declaredPausedSec = Math.min(duration, nonNegative(source.totalPausedSec));
+  const declaredMovingTime = Math.max(0, duration - declaredPausedSec);
   const terrain = calculateTerrainMetrics(route);
   const reconstructedDistanceM = calculateRouteDistance(route);
+  const routeMovingTime = calculateRouteMovingTime(route);
+  const routeTimingIsComparable = routeMovingTime >= 60
+    && declaredMovingTime > 0
+    && routeMovingTime >= declaredMovingTime * 0.3
+    && routeMovingTime <= declaredMovingTime * 1.05;
+  const movingTime = routeTimingIsComparable ? routeMovingTime : declaredMovingTime;
+  const totalPausedSec = Math.max(declaredPausedSec, Math.max(0, duration - movingTime));
   const storedDistanceM = nonNegative(source.distance);
   const distanceWasCorrupted = reconstructedDistanceM >= 50
     // 已抽樣的歷史路線可能只保留部分點位，故僅修正「公里數被當作公尺」這類明顯過小值；
@@ -255,16 +344,30 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const powerHistory = Array.isArray(source.powerHistory)
     ? source.powerHistory.filter((power): power is number => typeof power === "number" && Number.isFinite(power) && power >= 0)
     : [];
-  const normalizedPowerHistory = powerHistory.map((power) => normalizePowerValue(power, declaredPowerSource, virtualFtpW));
-  const derivedAveragePower = powerHistory.length
+  const directPowerHistory = powerHistory.map((power) => normalizePowerValue(power, declaredPowerSource, virtualFtpW));
+  const hasDirectPowerSamples = directPowerHistory.some((power) => power > 0);
+  const hasDeclaredPowerValues = nonNegative(source.avgPower) > 0 || nonNegative(source.maxPower) > 0;
+  const reconstructedPowerHistory = hasDirectPowerSamples
+    ? directPowerHistory
+    : deriveEstimatedPowerHistory(route, calculationProfile);
+  const effectivePowerSource: RideRecord["powerSource"] = hasDirectPowerSamples || hasDeclaredPowerValues
+    ? declaredPowerSource
+    : reconstructedPowerHistory.some((power) => power > 0) ? "estimated" : "unavailable";
+  const normalizedPowerHistory = reconstructedPowerHistory.map((power) => normalizePowerValue(power, effectivePowerSource, virtualFtpW));
+  const derivedAveragePower = normalizedPowerHistory.length
     ? normalizedPowerHistory.reduce((sum, power) => sum + power, 0) / normalizedPowerHistory.length
     : 0;
-  const normalizedAveragePower = normalizePowerValue(nonNegative(source.avgPower, derivedAveragePower || 0), declaredPowerSource, virtualFtpW);
-  const normalizedMaxPower = normalizePowerValue(Math.max(nonNegative(source.maxPower), ...normalizedPowerHistory, 0), declaredPowerSource, virtualFtpW);
+  const storedAveragePower = nonNegative(source.avgPower);
+  const normalizedAveragePower = normalizePowerValue(
+    storedAveragePower > 0 ? storedAveragePower : derivedAveragePower,
+    effectivePowerSource,
+    virtualFtpW,
+  );
+  const normalizedMaxPower = normalizePowerValue(Math.max(nonNegative(source.maxPower), ...normalizedPowerHistory, 0), effectivePowerSource, virtualFtpW);
   const hasUsablePower = normalizedAveragePower > 0 || normalizedMaxPower > 0;
   const averagePower = hasUsablePower ? normalizedAveragePower : 0;
   const maxPower = hasUsablePower ? normalizedMaxPower : 0;
-  const powerSource = hasUsablePower ? declaredPowerSource : "unavailable";
+  const powerSource = hasUsablePower ? effectivePowerSource : "unavailable";
   const declaredCaloriesSource = normalizeCaloriesSource(source.caloriesSource);
   const totalWorkKj = hasUsablePower && source.totalWorkKj !== undefined
     ? nonNegative(source.totalWorkKj)
@@ -288,9 +391,16 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   );
   // 僅修復「距離已證實錯誤、沒有功率資料、卻仍保留高熱量」的歷史紀錄；
   // 量測功率與正常新紀錄絕不被此相容性修復覆寫。
-  const caloriesWasRecalculated = distanceWasCorrupted && !hasUsablePower && fallbackCalories > 0;
-  const calories = caloriesWasRecalculated ? Math.round(fallbackCalories) : storedCalories;
-  const caloriesSource = caloriesWasRecalculated ? "met-estimate" : declaredCaloriesSource;
+  const estimatedPowerCalories = hasUsablePower && movingTime > 0
+    ? calculateCalories(averagePower, movingTime)
+    : 0;
+  const caloriesNeedsRepair = distanceWasCorrupted || (declaredCaloriesSource === "power-estimate" && !hasUsablePower);
+  const calories = caloriesNeedsRepair
+    ? Math.round(estimatedPowerCalories > 0 ? estimatedPowerCalories : fallbackCalories)
+    : storedCalories;
+  const caloriesSource = caloriesNeedsRepair
+    ? estimatedPowerCalories > 0 ? "power-estimate" : "met-estimate"
+    : declaredCaloriesSource;
 
   return {
     id: recordId,
@@ -305,7 +415,9 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     maxElevation: hasTerrainAltitude && (storedMaxElevation === undefined || (storedMaxElevation === 0 && terrain.maxElevation !== 0)) ? terrain.maxElevation : storedMaxElevation,
     minElevation: hasTerrainAltitude && (storedMinElevation === undefined || (storedMinElevation === 0 && terrain.minElevation !== 0)) ? terrain.minElevation : storedMinElevation,
     averageGrade: terrain.averageGrade !== undefined && (!storedAverageGrade || storedAverageGrade < 0) ? terrain.averageGrade : storedAverageGrade,
-    maxGrade: terrain.maxGrade !== undefined && (!storedMaxGrade || storedMaxGrade < 0) ? terrain.maxGrade : storedMaxGrade,
+    maxGrade: terrain.maxGrade !== undefined && (!storedMaxGrade || storedMaxGrade < 0 || storedMaxGrade > MAX_SUSTAINED_GRADE_PCT)
+      ? terrain.maxGrade
+      : storedMaxGrade,
     movingTime,
     calories,
     avgPower: Math.round(averagePower),

@@ -691,6 +691,18 @@ export default function RideDetailScreen() {
   const activityStats = buildStoredActivityStatistics(record);
   const movingDuration = activityStats.movingTimeSec;
   const averageMovingSpeed = activityStats.averageSpeedKmh;
+  const powerUnit = activityStats.powerSource === "measured"
+    ? "W（量測）"
+    : activityStats.powerSource === "estimated"
+      ? "W（本機估算）"
+      : "資料不足";
+  const caloriesUnit = activityStats.caloriesSource === "power-estimate"
+    ? "kcal（功率估算）"
+    : activityStats.caloriesSource === "met-estimate"
+      ? "kcal（MET 估算）"
+      : activityStats.caloriesSource === "mixed-estimate"
+        ? "kcal（綜合估算）"
+        : "資料不足";
   const activityHighlights = buildLocalActivityHighlights(record, state.records);
   const bestPowerEfforts = calculateBestPowerEfforts(record);
 
@@ -1101,7 +1113,7 @@ export default function RideDetailScreen() {
                 <DetailCell label="移動時間" value={formatDuration(activityStats.movingTimeSec)} unit="" />
                 <DetailCell label="平均速度" value={activityStats.averageSpeedKmh.toFixed(1)} unit="km/h" />
                 <DetailCell label="最高速度" value={`${activityStats.maxSpeedKmh.toFixed(1)}`} unit="km/h" />
-                <DetailCell label="消耗熱量" value={`${Math.round(activityStats.caloriesKcal)}`} unit="kcal（估算）" />
+                <DetailCell label="消耗熱量" value={activityStats.caloriesSource === "unavailable" ? "--" : `${Math.round(activityStats.caloriesKcal)}`} unit={caloriesUnit} />
                 <DetailCell label="暫停時間" value={formatDuration(activityStats.pausedTimeSec)} unit="" />
               </View>
             </View>
@@ -1115,7 +1127,7 @@ export default function RideDetailScreen() {
                 <DetailCell label="最大海拔" value={activityStats.maxElevationM === undefined ? "--" : `${Math.round(activityStats.maxElevationM)}`} unit="m" />
                 <DetailCell label="最小海拔" value={activityStats.minElevationM === undefined ? "--" : `${Math.round(activityStats.minElevationM)}`} unit="m" />
                 <DetailCell label="平均坡度" value={activityStats.averageGradePct === undefined ? "--" : activityStats.averageGradePct.toFixed(1)} unit="%" />
-                <DetailCell label="最大坡度" value={record.maxGrade !== undefined ? record.maxGrade.toFixed(1) : "--"} unit="%" />
+                <DetailCell label="最高持續坡度" value={record.maxGrade !== undefined ? record.maxGrade.toFixed(1) : "--"} unit={record.maxGrade === undefined ? "資料不足" : "%（至少 40 m）"} />
               </View>
             </View>
 
@@ -1125,8 +1137,8 @@ export default function RideDetailScreen() {
               <View style={styles.statsGrid}>
                 <DetailCell label="平均心率" value={record.avgHeartRate ? `${record.avgHeartRate}` : "--"} unit="bpm" color="#EF4444" />
                 <DetailCell label="最大心率" value={record.maxHeartRate ? `${record.maxHeartRate}` : "--"} unit="bpm" color="#EF4444" />
-                <DetailCell label="平均功率" value={activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)}`} unit="W（估算）" accent />
-                <DetailCell label="最大功率" value={activityStats.maxPowerW === undefined ? "--" : `${Math.round(activityStats.maxPowerW)}`} unit={activityStats.maxPowerW === undefined ? "資料不足" : "W（估算）"} accent />
+                <DetailCell label="平均功率" value={activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)}`} unit={powerUnit} accent />
+                <DetailCell label="最大功率" value={activityStats.maxPowerW === undefined ? "--" : `${Math.round(activityStats.maxPowerW)}`} unit={powerUnit} accent />
                 <DetailCell label="機械工作量" value={activityStats.totalWorkKj === undefined ? "--" : `${Math.round(activityStats.totalWorkKj)}`} unit="kJ" accent />
                 <DetailCell label="標準化功率" value={record.normalizedPower !== undefined ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" accent />
                 <DetailCell label="平均踏頻" value={record.avgCadence ? `${record.avgCadence}` : "--"} unit="rpm" />
@@ -1236,7 +1248,7 @@ export default function RideDetailScreen() {
                   <DetailCell label="平均溫度" value={record.calculationProfile.environment.averageTemperatureC === undefined ? "--" : record.calculationProfile.environment.averageTemperatureC.toFixed(1)} unit="°C" color="#F97316" />
                   <DetailCell label="平均濕度" value={record.calculationProfile.environment.averageHumidityPct === undefined ? "--" : record.calculationProfile.environment.averageHumidityPct.toFixed(0)} unit="%" color="#60A5FA" />
                   <DetailCell label="平均風速" value={record.calculationProfile.environment.averageWindSpeedKmh === undefined ? "--" : record.calculationProfile.environment.averageWindSpeedKmh.toFixed(1)} unit="km/h" />
-                  <DetailCell label="計算來源" value={record.calculationProfile.environment.source === "live-weather" ? "當日天氣" : "離線回退"} unit="" />
+                  <DetailCell label="計算來源" value={record.calculationProfile.environment.source === "live-weather" ? "當日天氣" : "本機環境基準"} unit="" />
                 </View>
                 {(record.supplyConfirmations?.length ?? 0) > 0 && (
                   <View style={styles.confirmationList}>
@@ -1246,7 +1258,7 @@ export default function RideDetailScreen() {
                         {entry.type === "water"
                           ? `補水 ${entry.recommendedWaterMl ?? "--"} ml`
                           : `能量 ${entry.recommendedEnergyKcal ?? "--"} kcal／碳水 ${entry.recommendedCarbohydrateG ?? "--"} g`}
-                        {entry.source ? ` · ${entry.source === "custom" ? "固定門檻" : entry.source === "smart" ? "智慧計算" : "離線回退"}` : ""}
+                        {entry.source ? ` · ${entry.source === "custom" ? "固定門檻" : entry.source === "smart" ? "智慧計算" : "本機環境基準"}` : ""}
                       </Text>
                     ))}
                   </View>

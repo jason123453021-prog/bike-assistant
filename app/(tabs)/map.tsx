@@ -2017,15 +2017,16 @@ export default function MapScreen() {
             ascentPerInterval: ascent,
             gradePct: grade,
             intervalSec: statisticsIntervalSec,
-            temperatureC: weatherRef.current?.temperature ?? 25,
-            humidityPct: weatherRef.current?.humidity ?? 60,
-            weatherCode: weatherRef.current?.weatherCode ?? 1,
-            isDaylight: new Date().getHours() >= 6 && new Date().getHours() < 18,
+            temperatureC: currentWeather?.temperature ?? 20,
+            humidityPct: currentWeather?.humidity ?? 60,
+            weatherCode: currentWeather?.weatherCode ?? 3,
+            isDaylight: currentWeather ? new Date().getHours() >= 6 && new Date().getHours() < 18 : false,
             ftpW: estimateFtpW,
-            headwindMs,
+            headwindMs: currentWeather ? headwindMs : 0,
             precipitationProb: currentWeather?.precipitationProb ?? 0,
             ageYears: estimateAgeYears ?? 32,
             calibrationMultiplier: settings.sweatRateCalibrationMultiplier,
+            environmentSource: currentWeather ? "live-weather" : "offline-baseline",
           });
           dispatch({
             type: "SWEAT_UPDATE",
@@ -3502,7 +3503,7 @@ export default function MapScreen() {
             const item = settings.supplyItems.find(i => i.id === id);
             return {
               id,
-              name: item?.name || 'Unknown',
+              name: item?.name || "未命名補給品",
               target: item?.target ?? "energy",
               onConfirm: () => handleConfirmCustomSupply(id, item?.triggerType || 'time'),
             };

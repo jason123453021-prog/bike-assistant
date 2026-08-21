@@ -128,7 +128,7 @@ describe("smart supply plan", () => {
     const plan = createSupplyPlan({ ...baseInput, mode: "smart", weatherAvailable: false });
 
     expect(plan.source).toBe("smart-offline-fallback");
-    expect(plan.reason).toContain("離線");
+    expect(plan.reason).toContain("本機環境基準");
     expect(plan.calorieTriggerKcal).toBeGreaterThan(0);
     expect(plan.waterTriggerMl).toBeGreaterThan(0);
   });

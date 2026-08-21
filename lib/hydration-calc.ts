@@ -46,6 +46,8 @@ export interface HydrationInput {
   ageYears?: number;
   /** 使用者騎後確認補水後的本機校正倍率；保守限制在基準值的 ±25%。 */
   calibrationMultiplier?: number;
+  /** 即時天氣不可用時使用中性本機基準，避免以假定晴熱天氣放大流失。 */
+  environmentSource?: "live-weather" | "offline-baseline";
 }
 
 export interface HydrationResult {
@@ -188,7 +190,16 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
     precipitationProb = 0,
     ageYears = 32,
     calibrationMultiplier = 1,
+    environmentSource = "live-weather",
   } = input;
+
+  const usesOfflineBaseline = environmentSource === "offline-baseline";
+  const resolvedTemperatureC = usesOfflineBaseline ? 20 : temperatureC;
+  const resolvedHumidityPct = usesOfflineBaseline ? 60 : humidityPct;
+  const resolvedWeatherCode = usesOfflineBaseline ? 3 : weatherCode;
+  const resolvedDaylight = usesOfflineBaseline ? false : isDaylight;
+  const resolvedHeadwindMs = usesOfflineBaseline ? 0 : headwindMs;
+  const resolvedPrecipitationProb = usesOfflineBaseline ? 0 : precipitationProb;
 
   // 體表面積（標準人 BSA ≈ 1.7 m²）
   const bsa = calcBSA(heightCm, weightKg);
@@ -202,15 +213,15 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   const hrFactor = hrZoneSweatFactor(hrZone);
 
   // 各環境修正係數
-  const tFactor = tempFactor(temperatureC);
-  const hFactor = humidityFactor(humidityPct);
-  const sFactor = solarFactor(weatherCode, isDaylight);
+  const tFactor = tempFactor(resolvedTemperatureC);
+  const hFactor = humidityFactor(resolvedHumidityPct);
+  const sFactor = solarFactor(resolvedWeatherCode, resolvedDaylight);
   const aBonusFactor = 1 + ascentBonus(ascentPerInterval, intervalSec);
   const gFactor = gradeFactor(gradePct);
   // 逆風增加工作量，但也提高蒸發冷卻；雨勢／降雨機率則降低日照熱負荷。
-  const headwindWorkFactor = 1 + Math.min(0.12, Math.max(0, headwindMs) * 0.025);
-  const windCoolingFactor = 1 - Math.min(0.1, Math.abs(headwindMs) * 0.012);
-  const rainCoolingFactor = 1 - Math.min(0.08, Math.max(0, precipitationProb) / 100 * 0.08);
+  const headwindWorkFactor = 1 + Math.min(0.12, Math.max(0, resolvedHeadwindMs) * 0.025);
+  const windCoolingFactor = 1 - Math.min(0.1, Math.abs(resolvedHeadwindMs) * 0.012);
+  const rainCoolingFactor = 1 - Math.min(0.08, Math.max(0, resolvedPrecipitationProb) / 100 * 0.08);
 
   // 基礎汗液流失率 L/h（標準人、Zone2 強度、20°C、60%濕度）
   // 注意：intFactor 與 hrFactor 同樣基於功率推算，直接相乘會造成強度雙重計算
@@ -238,7 +249,7 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   const recommendedRefillMl = Math.min(250, Math.max(150, Math.round(sweatRatePerHour * (12.5 / 60))));
   const environmentLoad = Math.max(
     0,
-    Math.min(1, ((Math.max(0, temperatureC - 20) / 18) * 0.55) + ((Math.max(0, humidityPct - 60) / 40) * 0.3) + (weatherCode <= 2 ? 0.15 : 0)),
+    Math.min(1, ((Math.max(0, resolvedTemperatureC - 20) / 18) * 0.55) + ((Math.max(0, resolvedHumidityPct - 60) / 40) * 0.3) + (resolvedWeatherCode <= 2 ? 0.15 : 0)),
   );
 
   return {

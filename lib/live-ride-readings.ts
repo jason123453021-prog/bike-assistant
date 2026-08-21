@@ -40,6 +40,10 @@ export function hasReliableRideMovement(sample: RideMovementSample): boolean {
   if (accuracyM >= 15 && speedKmh < 6 && distanceM < accuracyM) return false;
   if (speedKmh >= 3) return true;
 
+  // 長坡、逆風或載重時仍可能低於 3 km/h。只有精度良好、已有至少 3 m 實際位移
+  // 且 GPS 速度超過步行速度時，才保留此類慢速單車樣本；避免停車漂移混入距離。
+  if (accuracyM <= 10 && speedKmh >= 1.8 && distanceM >= 3) return true;
+
   // 對一般手機 GPS，至少需跨越 8 m，且位移必須高於回報精度的 75%。
   const displacementThresholdM = Math.max(8, Math.min(18, accuracyM * 0.75));
   return distanceM >= displacementThresholdM;

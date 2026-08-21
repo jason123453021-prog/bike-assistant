@@ -399,6 +399,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               headwindMs,
               precipitationProb: environment.precipitationProb,
               calibrationMultiplier: profile.sweatRateCalibrationMultiplier,
+              environmentSource: state.environment ? "live-weather" : "offline-baseline",
             });
             state.calories += calorieResult.kcal;
             state.powerWorkJ = (state.powerWorkJ ?? 0) + power * statisticsIntervalSec;

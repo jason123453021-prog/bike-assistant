@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateRouteDistance, normalizeRideRecord, normalizeRideRecords } from "../lib/ride-record-normalizer";
+import { calculateRouteDistance, calculateRouteMovingTime, normalizeRideRecord, normalizeRideRecords } from "../lib/ride-record-normalizer";
 import { calculateNormalizedPowerFromHistory } from "../lib/tss-calc";
 
 describe("ride record normalizer", () => {
@@ -53,7 +53,8 @@ describe("ride record normalizer", () => {
     expect(record?.movingTime).toBe(3000);
     expect(record?.avgSpeed).toBeCloseTo(12, 4);
     expect(record?.averageGrade).toBeGreaterThan(14);
-    expect(record?.maxGrade).toBeGreaterThan(25);
+    expect(record?.maxGrade).toBeGreaterThan(0);
+    expect(record?.maxGrade).toBeLessThanOrEqual(25);
     expect(record?.normalizedPower).toBe(150);
     expect(record?.calculationProfile?.ftpW).toBe(245);
     expect(record?.calculationProfile?.environment?.averageTemperatureC).toBe(31);
@@ -129,9 +130,54 @@ describe("ride record normalizer", () => {
 
     expect(record?.distance).toBeGreaterThan(300);
     expect(record?.totalAscent).toBe(11);
-    expect(record?.powerSource).toBe("unavailable");
-    expect(record?.caloriesSource).toBe("met-estimate");
+    expect(record?.powerSource).toBe("estimated");
+    expect(record?.caloriesSource).toBe("power-estimate");
     expect(record?.calories).toBeLessThan(577);
+  });
+
+  it("only rebuilds virtual power from a continuous route when the rider profile is complete", () => {
+    const route = [
+      { latitude: 25, longitude: 121, altitude: 100, speed: 4, timestamp: 1_000 },
+      { latitude: 25.001, longitude: 121, altitude: 108, speed: 4, timestamp: 4_000 },
+      { latitude: 25.002, longitude: 121, altitude: 114, speed: 4, timestamp: 7_000 },
+    ];
+    const withoutProfile = normalizeRideRecord({ id: "no-profile", distance: 220, duration: 6, route });
+    const withProfile = normalizeRideRecord({
+      id: "with-profile",
+      distance: 220,
+      duration: 6,
+      route,
+      calculationProfile: { riderWeightKg: 70, bikeWeightKg: 10, ftpW: 240 },
+    });
+
+    expect(withoutProfile?.powerSource).toBe("unavailable");
+    expect(withoutProfile?.avgPower).toBe(0);
+    expect(withProfile?.powerSource).toBe("estimated");
+    expect(withProfile?.avgPower).toBeGreaterThan(0);
+    expect(withProfile?.maxPower).toBeLessThanOrEqual(600);
+  });
+
+  it("rebuilds comparable moving time from GPS while excluding a stationary drift interval", () => {
+    const route = [
+      { latitude: 25, longitude: 121, altitude: 100, speed: 4, timestamp: 1_000 },
+      { latitude: 25.0005, longitude: 121, altitude: 102, speed: 4, timestamp: 11_000 },
+      { latitude: 25.00051, longitude: 121, altitude: 102, speed: 0, timestamp: 131_000 },
+      { latitude: 25.001, longitude: 121, altitude: 105, speed: 4, timestamp: 141_000 },
+      { latitude: 25.0015, longitude: 121, altitude: 108, speed: 4, timestamp: 151_000 },
+      { latitude: 25.002, longitude: 121, altitude: 110, speed: 4, timestamp: 161_000 },
+      { latitude: 25.0025, longitude: 121, altitude: 112, speed: 4, timestamp: 171_000 },
+      { latitude: 25.003, longitude: 121, altitude: 114, speed: 4, timestamp: 181_000 },
+    ];
+    expect(calculateRouteMovingTime(route)).toBe(60);
+    const record = normalizeRideRecord({
+      id: "gps-moving-time",
+      distance: 350,
+      duration: 180,
+      totalPausedSec: 0,
+      route,
+    });
+    expect(record?.movingTime).toBe(60);
+    expect(record?.totalPausedSec).toBe(120);
   });
 
   it("clamps impossible virtual-power spikes to the rider FTP ceiling while retaining measured power provenance", () => {

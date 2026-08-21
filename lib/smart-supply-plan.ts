@@ -184,7 +184,7 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
   const reasonParts = [
     `全自動智慧計畫（單包 ${energyServingCarbohydrateG} g 碳水；每小時上限 ${carbohydrateHourlyLimit.gramsPerHour} g${carbohydrateHourlyLimit.mode === "science" ? "，科學建議" : "，手動設定"}；補水約每 10–15 分鐘）`,
     intensityLoad >= 0.3 ? "騎乘強度較高" : "騎乘強度一般",
-    environmentLoad >= 0.4 ? "環境熱負荷提高" : input.weatherAvailable ? "環境負荷穩定" : "離線環境回退",
+    environmentLoad >= 0.4 ? "環境熱負荷提高" : input.weatherAvailable ? "環境負荷穩定" : "本機環境基準",
     input.elapsedSec >= 2 * 60 * 60 ? "長時間騎乘" : "騎乘時間尚短",
   ];
 
