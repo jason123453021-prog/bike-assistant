@@ -129,8 +129,8 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
       `爬升／下降：${Math.round(activityStats.totalAscentM)}／${Math.round(activityStats.totalDescentM)} m`,
       `卡路里：${Math.round(activityStats.caloriesKcal)} kcal（估算）`,
       `暫停時間：${formatDuration(activityStats.pausedTimeSec)}`,
-      `均功率：${Math.round(activityStats.averagePowerW ?? 0)} W（${powerSourceLabel}）`,
-      `最大功率：${Math.round(activityStats.maxPowerW)} W`,
+      `均功率：${activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)} W`}（${powerSourceLabel}）`,
+      `最大功率：${activityStats.maxPowerW === undefined ? "--" : `${Math.round(activityStats.maxPowerW)} W`}`,
     ].join("\n");
     try { await Share.share({ message: msg }); } catch {}
   };
@@ -278,7 +278,7 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>進階訓練數據</Text>
               <View style={styles.statsGrid}>
                 <StatCell label="平均功率" value={activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)}`} unit="W" colors={colors} accent />
-                <StatCell label="最大功率" value={`${Math.round(activityStats.maxPowerW)}`} unit="W" colors={colors} accent />
+                <StatCell label="最大功率" value={activityStats.maxPowerW === undefined ? "--" : `${Math.round(activityStats.maxPowerW)}`} unit={activityStats.maxPowerW === undefined ? "資料不足" : "W"} colors={colors} accent />
                 <StatCell label="機械工作量" value={activityStats.totalWorkKj === undefined ? "--" : `${Math.round(activityStats.totalWorkKj)}`} unit="kJ" colors={colors} />
                 <StatCell label="暫停時間" value={formatDuration(activityStats.pausedTimeSec)} unit="" colors={colors} />
               </View>

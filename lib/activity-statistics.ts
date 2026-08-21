@@ -37,7 +37,8 @@ export interface ActivityStatisticsSnapshot {
   minElevationM?: number;
   maxElevationM?: number;
   averageGradePct?: number;
-  maxPowerW: number;
+  /** 缺乏任何可信功率樣本時不以 0 W 假裝成有效最大功率。 */
+  maxPowerW?: number;
   averagePowerW?: number;
   totalWorkKj?: number;
   caloriesKcal: number;
@@ -66,7 +67,9 @@ export function buildActivityStatistics(input: ActivityStatisticsInput): Activit
   const totalDescentM = nonNegative(input.totalDescentM);
   const powerSampleDurationSec = nonNegative(input.powerSampleDurationSec);
   const powerWorkJ = nonNegative(input.powerWorkJ);
-  const averagePowerW = powerSampleDurationSec > 0 ? powerWorkJ / powerSampleDurationSec : undefined;
+  const rawMaxPowerW = nonNegative(input.maxPowerW);
+  const hasUsablePower = rawMaxPowerW > 0 || powerWorkJ > 0;
+  const averagePowerW = hasUsablePower && powerSampleDurationSec > 0 ? powerWorkJ / powerSampleDurationSec : undefined;
   const averageGradePct = distanceM > 0 ? (totalAscentM / distanceM) * 100 : undefined;
 
   return {
@@ -81,11 +84,11 @@ export function buildActivityStatistics(input: ActivityStatisticsInput): Activit
     minElevationM: optionalFinite(input.minElevationM),
     maxElevationM: optionalFinite(input.maxElevationM),
     averageGradePct,
-    maxPowerW: nonNegative(input.maxPowerW),
+    maxPowerW: hasUsablePower ? rawMaxPowerW : undefined,
     averagePowerW,
     totalWorkKj: averagePowerW === undefined ? undefined : powerWorkJ / 1000,
     caloriesKcal: nonNegative(input.caloriesKcal),
-    powerSource: input.powerSource,
+    powerSource: hasUsablePower ? input.powerSource : "unavailable",
     caloriesSource: input.caloriesSource,
   };
 }

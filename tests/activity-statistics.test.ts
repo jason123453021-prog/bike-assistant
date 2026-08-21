@@ -47,8 +47,30 @@ describe("活動統計統一計算", () => {
 
     expect(stats.averageSpeedKmh).toBe(0);
     expect(stats.averagePowerW).toBeUndefined();
+    expect(stats.maxPowerW).toBeUndefined();
     expect(stats.totalWorkKj).toBeUndefined();
     expect(stats.averageGradePct).toBeUndefined();
+  });
+
+  it("不會在來源標記為估算但實際沒有任何瓦數時顯示 0 W 最大功率", () => {
+    const stats = buildActivityStatistics({
+      distanceM: 8_000,
+      movingTimeSec: 1_800,
+      pausedTimeSec: 0,
+      totalAscentM: 120,
+      totalDescentM: 110,
+      maxSpeedKmh: 38,
+      maxPowerW: 0,
+      powerWorkJ: 0,
+      powerSampleDurationSec: 1_800,
+      caloriesKcal: 420,
+      powerSource: "estimated",
+      caloriesSource: "power-estimate",
+    });
+
+    expect(stats.powerSource).toBe("unavailable");
+    expect(stats.averagePowerW).toBeUndefined();
+    expect(stats.maxPowerW).toBeUndefined();
   });
 
   it("只接受合理且連續的定位樣本時間，避免背景中斷被當成持續功率輸出", () => {

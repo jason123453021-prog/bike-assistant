@@ -40,4 +40,17 @@ describe("local ride share card", () => {
   it("creates a safe local SVG filename", () => {
     expect(createRideShareCardFilename(record)).toBe("bike-ride-晨騎-測試-share-001.svg");
   });
+
+  it("marks unavailable power as insufficient data instead of presenting an invented 0 W", () => {
+    const svg = createRideShareCardSvg({
+      ...record,
+      avgPower: 0,
+      maxPower: 0,
+      powerSource: "unavailable",
+      powerHistory: [],
+    });
+
+    expect(svg).toContain("資料不足");
+    expect(svg).toContain(">--<");
+  });
 });

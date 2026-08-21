@@ -16,7 +16,7 @@
 
 > 這個雙層程序可避免未經本地 QC 的變更直接交付，也能避免雲端 APK 在品質檢查失敗後仍被產生。若 GitHub Actions 任一品質步驟失敗，後續 prebuild、Gradle 與 APK 上傳會自動停止。
 
-日常使用時，你不需要手動按下 EAS Build。當我完成新功能並告知 QC 通過後，只要完成 GitHub 同步，就會由 `main` 推送自動建立新的 `bike-assistant-preview-apk`。如需在沒有程式變更時重新建置，才在 GitHub Actions 頁面使用 **Run workflow**。
+日常使用時，你不需要手動按下 EAS Build。當我完成新功能並告知 QC 通過後，只要完成 GitHub 同步，就會由 `main` 推送自動建立新的 `bike-assistant-preview-apk`。**每一次功能或 bug 修復的最終交付訊息，都必須附上該次成功 GitHub Actions run 的直接連結**，讓你可直接下載對應 artifact，而不是只提供 checkpoint。如需在沒有程式變更時重新建置，才在 GitHub Actions 頁面使用 **Run workflow**。
 
 ## 簽署邊界
 

@@ -107,6 +107,61 @@ describe("ride record normalizer", () => {
     expect(record?.calories).toBeLessThan(577);
   });
 
+  it("rebuilds a corrupted no-power calorie total even when an older record mislabeled it as a power estimate", () => {
+    const record = normalizeRideRecord({
+      id: "mislabelled-legacy-calories",
+      distance: 0.32,
+      duration: 1_800,
+      totalAscent: 579,
+      calories: 577,
+      avgPower: 0,
+      maxPower: 0,
+      powerSource: "estimated",
+      caloriesSource: "power-estimate",
+      route: [
+        { latitude: 25, longitude: 121, altitude: 100, speed: 4, timestamp: 1_000 },
+        { latitude: 25.001, longitude: 121, altitude: 106, speed: 4, timestamp: 4_000 },
+        { latitude: 25.002, longitude: 121, altitude: 111, speed: 4, timestamp: 7_000 },
+        { latitude: 25.003, longitude: 121, altitude: 119, speed: 4, timestamp: 10_000 },
+      ],
+      calculationProfile: { riderWeightKg: 70, bikeWeightKg: 10, ftpW: 240 },
+    });
+
+    expect(record?.distance).toBeGreaterThan(300);
+    expect(record?.totalAscent).toBe(11);
+    expect(record?.powerSource).toBe("unavailable");
+    expect(record?.caloriesSource).toBe("met-estimate");
+    expect(record?.calories).toBeLessThan(577);
+  });
+
+  it("clamps impossible virtual-power spikes to the rider FTP ceiling while retaining measured power provenance", () => {
+    const estimated = normalizeRideRecord({
+      id: "virtual-power-spike",
+      distance: 5_000,
+      duration: 900,
+      avgPower: 1_800,
+      maxPower: 4_000,
+      powerSource: "estimated",
+      powerHistory: [120, 2_000, 4_000],
+      route: [],
+      calculationProfile: { riderWeightKg: 70, bikeWeightKg: 10, ftpW: 240 },
+    });
+    const measured = normalizeRideRecord({
+      id: "measured-power",
+      distance: 5_000,
+      duration: 900,
+      avgPower: 310,
+      maxPower: 1_200,
+      powerSource: "measured",
+      powerHistory: [300, 1_200],
+      route: [],
+    });
+
+    expect(estimated?.maxPower).toBe(600);
+    expect(estimated?.avgPower).toBeLessThanOrEqual(600);
+    expect(measured?.maxPower).toBe(1_200);
+  });
+
   it("keeps valid local records only, fills safe defaults, deduplicates IDs and sorts newest first", () => {
     const records = normalizeRideRecords([
       { id: "invalid", distance: "x", route: [] },

@@ -1,4 +1,5 @@
-import type { RideRecord } from "@/lib/ride-context";
+import type { RideRecord } from "./ride-context";
+import { buildActivityStatistics } from "./activity-statistics";
 
 const CARD_WIDTH = 1080;
 const CARD_HEIGHT = 1920;
@@ -53,8 +54,23 @@ export function createRideShareCardSvg(record: RideRecord): string {
   const photoUri = hasPhotos ? record.mediaItems![0] : "";
   const hasPreviewPhoto = hasPhotos && !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(photoUri);
   const points = routePoints(record);
-  const movingTime = Math.max(0, record.duration - (record.totalPausedSec ?? 0));
-  const movingSpeed = movingTime > 0 ? (record.distance / 1000) / (movingTime / 3600) : 0;
+  const hasPowerEvidence = record.powerSource !== "unavailable" && (record.avgPower > 0 || record.maxPower > 0 || (record.powerHistory?.some((power) => power > 0) ?? false));
+  const stats = buildActivityStatistics({
+    distanceM: record.distance,
+    movingTimeSec: record.movingTime ?? Math.max(0, record.duration - (record.totalPausedSec ?? 0)),
+    pausedTimeSec: record.totalPausedSec ?? 0,
+    totalAscentM: record.totalAscent,
+    totalDescentM: record.totalDescent ?? 0,
+    maxSpeedKmh: record.maxSpeed,
+    maxPowerW: record.maxPower,
+    powerWorkJ: (record.totalWorkKj ?? 0) * 1000,
+    powerSampleDurationSec: hasPowerEvidence ? (record.movingTime ?? Math.max(0, record.duration - (record.totalPausedSec ?? 0))) : 0,
+    caloriesKcal: record.calories,
+    powerSource: record.powerSource ?? "unavailable",
+    caloriesSource: record.caloriesSource ?? "unavailable",
+  });
+  const movingTime = stats.movingTimeSec;
+  const movingSpeed = stats.averageSpeedKmh;
   const bests = record.personalBests?.map((best) => best.label).join("、") ?? "";
   const routeName = escapeXml(record.name || "未命名騎乘");
   const splitPoints = points.split(" ");
@@ -74,7 +90,7 @@ export function createRideShareCardSvg(record: RideRecord): string {
   <rect x="0" y="650" width="1080" height="1270" rx="42" fill="#101114"/>
   <text x="70" y="724" fill="#00E676" font-size="24" font-weight="700" font-family="sans-serif">活動摘要</text><text x="70" y="792" fill="#FFFFFF" font-size="50" font-weight="800" font-family="sans-serif">${routeName}</text><text x="70" y="836" fill="#A4ADB9" font-size="24" font-family="sans-serif">${formatDate(record.date)}</text>
   ${hasPhotos ? `<rect x="70" y="865" width="940" height="210" rx="20" fill="#1E222A"/>${hasPreviewPhoto ? `<image href="${escapeXml(photoUri)}" x="88" y="886" width="238" height="168" preserveAspectRatio="xMidYMid slice" clip-path="url(#mediaClip)"/>` : `<rect x="88" y="886" width="238" height="168" rx="14" fill="#123126"/><text x="207" y="965" fill="#9CFFB5" font-size="40" font-family="sans-serif" text-anchor="middle">▶</text><text x="207" y="1007" fill="#D9FFEC" font-size="18" font-family="sans-serif" text-anchor="middle">活動影片</text>`}<text x="360" y="915" fill="#00E676" font-size="20" font-weight="700" font-family="sans-serif">活動媒體</text><text x="360" y="960" fill="#FFFFFF" font-size="28" font-weight="700" font-family="sans-serif">${hasPreviewPhoto ? "首張活動照片" : "已附加本機影片"}</text><text x="360" y="1002" fill="#A4ADB9" font-size="21" font-family="sans-serif">共 ${record.mediaItems!.length} 項本機媒體</text>` : ""}
-  ${metric(260, hasPhotos ? 1140 : 960, "距離", (record.distance / 1000).toFixed(2), "公里")}${metric(820, hasPhotos ? 1140 : 960, "爬升海拔", `${Math.round(record.totalAscent)}`, "公尺")}${metric(260, hasPhotos ? 1320 : 1140, "移動時間", formatDuration(movingTime), "")}${metric(820, hasPhotos ? 1320 : 1140, "平均功率", `${Math.round(record.avgPower)}`, "瓦")}${metric(260, hasPhotos ? 1500 : 1320, "平均速度", movingSpeed.toFixed(1), "公里／小時")}${metric(820, hasPhotos ? 1500 : 1320, "卡路里", `${Math.round(record.calories)}`, "卡")}
+  ${metric(260, hasPhotos ? 1140 : 960, "距離", (stats.distanceM / 1000).toFixed(2), "公里")}${metric(820, hasPhotos ? 1140 : 960, "爬升海拔", `${Math.round(stats.totalAscentM)}`, "公尺")}${metric(260, hasPhotos ? 1320 : 1140, "移動時間", formatDuration(movingTime), "")}${metric(820, hasPhotos ? 1320 : 1140, "平均功率", stats.averagePowerW === undefined ? "--" : `${Math.round(stats.averagePowerW)}`, stats.averagePowerW === undefined ? "資料不足" : "瓦")}${metric(260, hasPhotos ? 1500 : 1320, "平均速度", movingSpeed.toFixed(1), "公里／小時")}${metric(820, hasPhotos ? 1500 : 1320, "卡路里", `${Math.round(stats.caloriesKcal)}`, "卡")}
   <line x1="540" y1="${hasPhotos ? 1100 : 920}" x2="540" y2="${hasPhotos ? 1550 : 1370}" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/><line x1="120" y1="${hasPhotos ? 1230 : 1050}" x2="960" y2="${hasPhotos ? 1230 : 1050}" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/><line x1="120" y1="${hasPhotos ? 1410 : 1230}" x2="960" y2="${hasPhotos ? 1410 : 1230}" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/>
   <text x="540" y="1815" fill="#6E7783" font-size="22" font-family="sans-serif" text-anchor="middle">由單車助手在此裝置離線產生</text>
 </svg>`;

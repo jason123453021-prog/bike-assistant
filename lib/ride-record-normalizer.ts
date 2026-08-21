@@ -1,7 +1,7 @@
 import { calculateNormalizedPowerFromHistory } from "./tss-calc";
 import type { LocationPoint, RideActivityType, RideCalculationProfile, RideRecord, SportType, SupplyConfirmation } from "./ride-context";
 import { calculateCaloriesMET } from "./power-calc";
-import { acceptLiveElevationDelta, createLiveElevationFilterState } from "./live-elevation-filter";
+import { acceptLiveElevationDelta, clampVirtualPowerForRider, createLiveElevationFilterState } from "./live-elevation-filter";
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -203,6 +203,15 @@ function normalizeCaloriesSource(value: unknown): RideRecord["caloriesSource"] {
     : "unavailable";
 }
 
+/** 虛擬功率保留依 FTP 的上限；量測功率則僅拒絕不可能的資料損壞尖峰。 */
+function normalizePowerValue(value: number, source: RideRecord["powerSource"], ftpW: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (source === "estimated") return clampVirtualPowerForRider(value, ftpW);
+  if (source === "measured") return Math.min(2_500, Math.round(value));
+  // 舊版沒有來源欄位但保留了正值功率時，保留其作為未驗證歷史資料，並使用虛擬功率的保守上限。
+  return Math.min(650, Math.round(value));
+}
+
 function normalizeRpe(value: unknown): number | undefined {
   const rpe = normalizedOptional(value);
   return rpe !== undefined && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : undefined;
@@ -240,20 +249,27 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const storedMinElevation = normalizedOptional(source.minElevation);
   const storedAverageGrade = normalizedOptional(source.averageGrade);
   const storedMaxGrade = normalizedOptional(source.maxGrade);
+  const calculationProfile = normalizeCalculationProfile(source.calculationProfile);
+  const declaredPowerSource = normalizePowerSource(source.powerSource);
+  const virtualFtpW = calculationProfile?.ftpW ?? 250;
   const powerHistory = Array.isArray(source.powerHistory)
     ? source.powerHistory.filter((power): power is number => typeof power === "number" && Number.isFinite(power) && power >= 0)
     : [];
+  const normalizedPowerHistory = powerHistory.map((power) => normalizePowerValue(power, declaredPowerSource, virtualFtpW));
   const derivedAveragePower = powerHistory.length
-    ? powerHistory.reduce((sum, power) => sum + power, 0) / powerHistory.length
+    ? normalizedPowerHistory.reduce((sum, power) => sum + power, 0) / normalizedPowerHistory.length
     : 0;
-  const averagePower = nonNegative(source.avgPower, derivedAveragePower || 0) || derivedAveragePower;
-  const maxPower = Math.max(nonNegative(source.maxPower), ...powerHistory, 0);
-  const powerSource = normalizePowerSource(source.powerSource);
-  const caloriesSource = normalizeCaloriesSource(source.caloriesSource);
-  const totalWorkKj = source.totalWorkKj !== undefined
+  const normalizedAveragePower = normalizePowerValue(nonNegative(source.avgPower, derivedAveragePower || 0), declaredPowerSource, virtualFtpW);
+  const normalizedMaxPower = normalizePowerValue(Math.max(nonNegative(source.maxPower), ...normalizedPowerHistory, 0), declaredPowerSource, virtualFtpW);
+  const hasUsablePower = normalizedAveragePower > 0 || normalizedMaxPower > 0;
+  const averagePower = hasUsablePower ? normalizedAveragePower : 0;
+  const maxPower = hasUsablePower ? normalizedMaxPower : 0;
+  const powerSource = hasUsablePower ? declaredPowerSource : "unavailable";
+  const declaredCaloriesSource = normalizeCaloriesSource(source.caloriesSource);
+  const totalWorkKj = hasUsablePower && source.totalWorkKj !== undefined
     ? nonNegative(source.totalWorkKj)
-    : movingTime > 0 && averagePower > 0 ? (averagePower * movingTime) / 1000 : undefined;
-  const derivedNormalizedPower = calculateNormalizedPowerFromHistory(powerHistory, movingTime);
+    : hasUsablePower && movingTime > 0 && averagePower > 0 ? (averagePower * movingTime) / 1000 : undefined;
+  const derivedNormalizedPower = hasUsablePower ? calculateNormalizedPowerFromHistory(normalizedPowerHistory, movingTime) : undefined;
   const recordId = typeof source.id === "string" && source.id.trim() ? source.id.trim() : fallbackId ?? `legacy-${date}`;
   const name = typeof source.name === "string" && source.name.trim() ? source.name.trim() : "匯入騎乘紀錄";
   const terrainDisagreesWithStoredAscent = terrain.totalAscent > 0
@@ -272,12 +288,9 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   );
   // 僅修復「距離已證實錯誤、沒有功率資料、卻仍保留高熱量」的歷史紀錄；
   // 量測功率與正常新紀錄絕不被此相容性修復覆寫。
-  const calories = distanceWasCorrupted
-    && (source.powerSource === undefined || source.powerSource === "unavailable")
-    && averagePower === 0
-    && fallbackCalories > 0
-    ? Math.round(fallbackCalories)
-    : storedCalories;
+  const caloriesWasRecalculated = distanceWasCorrupted && !hasUsablePower && fallbackCalories > 0;
+  const calories = caloriesWasRecalculated ? Math.round(fallbackCalories) : storedCalories;
+  const caloriesSource = caloriesWasRecalculated ? "met-estimate" : declaredCaloriesSource;
 
   return {
     id: recordId,
@@ -304,7 +317,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     intensityFactor: normalizedOptional(source.intensityFactor),
     tss: normalizedOptional(source.tss),
     powerZones: normalizePowerZones(source.powerZones),
-    powerHistory,
+    powerHistory: normalizedPowerHistory,
     route,
     totalSweatMl: nonNegative(source.totalSweatMl),
     refillCount: Math.round(nonNegative(source.refillCount)),
@@ -316,7 +329,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     gradeDistribution: Array.isArray(source.gradeDistribution) ? source.gradeDistribution.map((v) => nonNegative(v)) : [0, 0, 0, 0, 0, 0],
     gradeAscentDistribution: Array.isArray(source.gradeAscentDistribution) ? source.gradeAscentDistribution.map((v) => nonNegative(v)) : [0, 0, 0, 0, 0, 0],
     personalBests: Array.isArray(source.personalBests) ? source.personalBests : undefined,
-    calculationProfile: normalizeCalculationProfile(source.calculationProfile),
+    calculationProfile,
     supplyConfirmations: normalizeSupplyConfirmations(source.supplyConfirmations),
     description: typeof source.description === "string" ? source.description : undefined,
     activityType: normalizeActivityType(source.activityType),

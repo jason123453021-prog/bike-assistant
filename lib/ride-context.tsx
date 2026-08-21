@@ -675,7 +675,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     const trainingAnalysis = analyzeTraining(
       movingTime,
       activityStats.averagePowerW ?? 0,
-      activityStats.maxPowerW,
+      activityStats.maxPowerW ?? 0,
       ftpW,
       state.powerHistory,
     );
@@ -706,7 +706,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       averageGrade: activityStats.averageGradePct,
       calories: Math.round(activityStats.caloriesKcal),  // 使用全程總卡路里（不被補給重置）
       avgPower: Math.round(activityStats.averagePowerW ?? 0),
-      maxPower: activityStats.maxPowerW,
+      maxPower: activityStats.maxPowerW ?? 0,
       totalWorkKj: activityStats.totalWorkKj,
       powerSource: activityStats.powerSource,
       caloriesSource: activityStats.caloriesSource,

@@ -74,7 +74,8 @@ const ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT 
 
 function buildStoredActivityStatistics(record: RideRecord) {
   const movingTimeSec = record.movingTime ?? Math.max(0, record.duration - (record.totalPausedSec ?? 0));
-  const powerSampleDurationSec = record.avgPower > 0 ? movingTimeSec : 0;
+  const hasPowerEvidence = record.powerSource !== "unavailable" && (record.avgPower > 0 || record.maxPower > 0 || (record.powerHistory?.some((power) => power > 0) ?? false));
+  const powerSampleDurationSec = hasPowerEvidence ? movingTimeSec : 0;
   const powerWorkJ = (record.totalWorkKj ?? ((record.avgPower * movingTimeSec) / 1000)) * 1000;
   return buildActivityStatistics({
     distanceM: record.distance,
@@ -646,8 +647,8 @@ export default function RideDetailScreen() {
       `⚡ 速度與功率`,
       `均速：${activityStats.averageSpeedKmh.toFixed(1)} km/h`,
       `最高速：${activityStats.maxSpeedKmh.toFixed(1)} km/h`,
-      `均功率：${Math.round(activityStats.averagePowerW ?? 0)} W（${powerSourceLabel}）`,
-      `最大功率：${Math.round(activityStats.maxPowerW)} W`,
+      `均功率：${activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)} W`}（${powerSourceLabel}）`,
+      `最大功率：${activityStats.maxPowerW === undefined ? "--" : `${Math.round(activityStats.maxPowerW)} W`}`,
       `機械工作量：${activityStats.totalWorkKj === undefined ? "--" : Math.round(activityStats.totalWorkKj)} kJ`,
       ``,
       `⛰️ 爬升與地形`,
@@ -1125,7 +1126,7 @@ export default function RideDetailScreen() {
                 <DetailCell label="平均心率" value={record.avgHeartRate ? `${record.avgHeartRate}` : "--"} unit="bpm" color="#EF4444" />
                 <DetailCell label="最大心率" value={record.maxHeartRate ? `${record.maxHeartRate}` : "--"} unit="bpm" color="#EF4444" />
                 <DetailCell label="平均功率" value={activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)}`} unit="W（估算）" accent />
-                <DetailCell label="最大功率" value={`${Math.round(activityStats.maxPowerW)}`} unit="W（估算）" accent />
+                <DetailCell label="最大功率" value={activityStats.maxPowerW === undefined ? "--" : `${Math.round(activityStats.maxPowerW)}`} unit={activityStats.maxPowerW === undefined ? "資料不足" : "W（估算）"} accent />
                 <DetailCell label="機械工作量" value={activityStats.totalWorkKj === undefined ? "--" : `${Math.round(activityStats.totalWorkKj)}`} unit="kJ" accent />
                 <DetailCell label="標準化功率" value={record.normalizedPower !== undefined ? `${Math.round(record.normalizedPower)}` : "--"} unit="W" accent />
                 <DetailCell label="平均踏頻" value={record.avgCadence ? `${record.avgCadence}` : "--"} unit="rpm" />
