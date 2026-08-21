@@ -6,7 +6,7 @@
 - [x] 讓日照事件排程與前景彈窗依日出、日落或雙向模式精準過濾
 - [x] 重整設定頁日照與通知區塊的標題、模式選擇、提前時間與狀態說明，提升掃讀性
 - [x] 新增回歸測試並完成完整 QC（TypeScript、Lint、Vitest、Expo Doctor 與 Android Hermes 匯出）
-- [ ] 保存版本、同步 GitHub 並確認 Android APK artifact
+- [x] 保存版本、同步 GitHub 並確認 Android APK artifact（GitHub run 32483901494）
 
 ## 僅日落模式與彈窗通知同步清理（2026-08-21）
 - [x] 盤點日照模式設定、日照彈窗與補給／補水彈窗的通知建立及清除資料流
