@@ -6,7 +6,7 @@
 - [x] 在設定頁提供高對比的開關與快速提前時間選項，關閉時鎖定相關時間設定
 - [x] 讓本機日出／日落排程、前景待確認彈窗與背景通知均套用提前時間與開關
 - [x] 新增回歸測試並完成完整 QC（TypeScript、Lint、Vitest、Expo Doctor 與 Android Hermes 匯出）
-- [ ] 保存版本、同步 GitHub 並確認 Android APK artifact
+- [x] 保存版本、同步 GitHub 並確認 Android APK artifact（GitHub run 32477619930）
 
 ## 活動詳情、日照警示與手動 Lap 修復（2026-08-21）
 - [x] 補齊騎乘紀錄 GPX 檔案匯出與系統分享入口，讓使用者可選擇已安裝的社群或通訊 App 分享
