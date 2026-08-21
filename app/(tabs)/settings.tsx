@@ -805,6 +805,15 @@ export default function SettingsScreen() {
             onToggle={(enabled) => updateSettings({ daylightAlertEnabled: enabled })}
           />
           <Divider colors={colors} />
+          <ToggleRow
+            icon="moon.stars.fill"
+            label="僅日落提醒"
+            value={settings.daylightAlertMode === "sunset-only"}
+            colors={colors}
+            disabled={daylightControlsDisabled}
+            onToggle={(enabled) => updateSettings({ daylightAlertMode: enabled ? "sunset-only" : "sunrise-and-sunset" })}
+          />
+          <Divider colors={colors} />
           <NumberRow
             icon="clock.fill"
             label="提前提醒時間"
@@ -847,7 +856,9 @@ export default function SettingsScreen() {
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
             <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
               {settings.daylightAlertEnabled && settings.notificationEnabled
-                ? "依 GPS 座標與裝置時間安排日出／日落提醒；可設定提前 0–60 分鐘，且需按下確認才結束提醒。"
+                ? settings.daylightAlertMode === "sunset-only"
+                  ? "僅在日落前依 GPS 座標與裝置時間提醒開啟警示燈；可設定提前 0–60 分鐘，且需按下確認才結束提醒。"
+                  : "依 GPS 座標與裝置時間安排日出／日落提醒；可設定提前 0–60 分鐘，且需按下確認才結束提醒。"
                 : "已關閉日出／日落警示燈提醒。"}
             </Text>
           </View>

@@ -13,6 +13,7 @@ import {
 import {
   DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES,
   normalizeDaylightAlertLeadMinutes,
+  type DaylightAlertMode,
 } from "./daylight-alert";
 
 // 正常導航模式可顯示的欄位
@@ -168,6 +169,8 @@ export interface AppSettings {
   daylightAlertEnabled: boolean;
   /** 日出或日落前幾分鐘提醒；0 代表在實際日照事件時提醒。 */
   daylightAlertLeadMinutes: number;
+  /** 可選擇同時提醒日出／日落，或僅在傍晚提醒開啟警示燈。 */
+  daylightAlertMode: DaylightAlertMode;
   // 精簡導航模式
   simplifiedNavMode: "off" | "manual" | "auto"; // off=關閉, manual=手動, auto=自動
   simplifiedNavIdleSec: number; // 自動模式開啟前的閒置秒數（預設 30 秒）
@@ -267,6 +270,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   notificationEnabled: true,
   daylightAlertEnabled: true,
   daylightAlertLeadMinutes: DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES,
+  daylightAlertMode: "sunrise-and-sunset",
   simplifiedNavMode: "off",
   simplifiedNavIdleSec: 30,
   autoRecenterSec: 12,
@@ -432,6 +436,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           touchGuardAutoRelockSec: Math.min(60, Math.max(1, Number(saved.touchGuardAutoRelockSec) || DEFAULT_SETTINGS.touchGuardAutoRelockSec)),
           autoRecenterSec: Math.min(60, Math.max(3, Number(saved.autoRecenterSec) || DEFAULT_SETTINGS.autoRecenterSec)),
           daylightAlertLeadMinutes: normalizeDaylightAlertLeadMinutes(saved.daylightAlertLeadMinutes),
+          daylightAlertMode: saved.daylightAlertMode === "sunset-only" ? "sunset-only" : "sunrise-and-sunset",
           energyServingCarbohydrateG: Math.min(100, Math.max(10, Number(saved.energyServingCarbohydrateG) || DEFAULT_SETTINGS.energyServingCarbohydrateG)),
           energyCarbohydrateHourlyLimitMode: saved.energyCarbohydrateHourlyLimitMode === "manual" ? "manual" : "science",
           energyCarbohydrateHourlyLimitG: Math.min(90, Math.max(20, Number(saved.energyCarbohydrateHourlyLimitG) || DEFAULT_SETTINGS.energyCarbohydrateHourlyLimitG)),
@@ -471,6 +476,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       daylightAlertLeadMinutes: normalizeDaylightAlertLeadMinutes(
         partial.daylightAlertLeadMinutes ?? settings.daylightAlertLeadMinutes,
       ),
+      daylightAlertMode: partial.daylightAlertMode === "sunset-only" ? "sunset-only" : partial.daylightAlertMode === "sunrise-and-sunset" ? "sunrise-and-sunset" : settings.daylightAlertMode,
     };
     setSettings(next);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));

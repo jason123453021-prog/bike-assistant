@@ -1,4 +1,5 @@
 export type DaylightAlertKind = "sunrise" | "sunset";
+export type DaylightAlertMode = "sunrise-and-sunset" | "sunset-only";
 
 export interface DaylightAlertEvent {
   key: string;
@@ -12,6 +13,10 @@ export interface DaylightAlertEvent {
 export const DAYLIGHT_ALERT_LEAD_MINUTES_PRESETS = [0, 5, 10, 15, 30] as const;
 export const DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES = 0;
 export const MAX_DAYLIGHT_ALERT_LEAD_MINUTES = 60;
+
+export function isDaylightAlertKindEnabled(kind: DaylightAlertKind, mode: DaylightAlertMode = "sunrise-and-sunset") {
+  return mode === "sunrise-and-sunset" || kind === "sunset";
+}
 
 export function normalizeDaylightAlertLeadMinutes(value: unknown): number {
   const numeric = Number(value);
@@ -100,9 +105,11 @@ export function getDueDaylightAlert(input: {
   longitude: number;
   acknowledgedKeys: ReadonlySet<string>;
   leadMinutes?: number;
+  mode?: DaylightAlertMode;
 }): DaylightAlertEvent | undefined {
   const dueEvents = datesBetween(input.rideStartedAtMs, input.nowMs)
     .flatMap((date) => getDaylightEvents(date, input.latitude, input.longitude, input.leadMinutes))
+    .filter((event) => isDaylightAlertKindEnabled(event.kind, input.mode))
     .filter((event) => event.triggerAtMs >= input.rideStartedAtMs && event.triggerAtMs <= input.nowMs && !input.acknowledgedKeys.has(event.key));
   return dueEvents.at(-1);
 }
@@ -114,12 +121,13 @@ export function getNextDaylightAlert(input: {
   longitude: number;
   acknowledgedKeys: ReadonlySet<string>;
   leadMinutes?: number;
+  mode?: DaylightAlertMode;
 }): DaylightAlertEvent | undefined {
   const tomorrow = new Date(input.nowMs);
   tomorrow.setDate(tomorrow.getDate() + 1);
   return [new Date(input.nowMs), tomorrow]
     .flatMap((date) => getDaylightEvents(date, input.latitude, input.longitude, input.leadMinutes))
-    .find((event) => event.triggerAtMs > input.nowMs && event.triggerAtMs >= input.rideStartedAtMs && !input.acknowledgedKeys.has(event.key));
+    .find((event) => isDaylightAlertKindEnabled(event.kind, input.mode) && event.triggerAtMs > input.nowMs && event.triggerAtMs >= input.rideStartedAtMs && !input.acknowledgedKeys.has(event.key));
 }
 
 export function daylightAlertCopy(kind: DaylightAlertKind, leadMinutes = DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES) {

@@ -187,7 +187,7 @@ import {
 } from "@/lib/live-elevation-filter";
 import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
-import { daylightAlertCopy, getDueDaylightAlert, getNextDaylightAlert, type DaylightAlertEvent } from "@/lib/daylight-alert";
+import { daylightAlertCopy, getDueDaylightAlert, getNextDaylightAlert, isDaylightAlertKindEnabled, type DaylightAlertEvent } from "@/lib/daylight-alert";
 import {
   consumeDaylightNotificationActions,
   subscribeToDaylightNotificationActions,
@@ -885,6 +885,7 @@ export default function MapScreen() {
       dismissTimeoutId: null,
       repeatIntervalId: null,
     };
+    void clearAllSupplyNotifications();
     vibrateLight();
   }, [state.elapsed, state.distance]);
 
@@ -898,6 +899,7 @@ export default function MapScreen() {
     intervalSupplyAlertsRef.current = nextAlerts;
     setIntervalSupplyAlerts(nextAlerts);
     if (!Object.values(nextAlerts).some(Boolean)) clearIntervalSupplyRepeatTimer();
+    void clearAllSupplyNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
   }, [clearIntervalSupplyRepeatTimer, settings.vibrationEnabled]);
 
@@ -983,7 +985,7 @@ export default function MapScreen() {
     if (!calorieStillPending) clearSupplyRepeatTimer();
   }, [calorieAlert, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, smartWaterSupplyEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
 
-  const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind, customItemId?: string) => {
+  const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind, customItemId?: string, notificationsAlreadyCleared = false) => {
     if ((kind === "calorie" && smartEnergySupplyEnabled) || (kind === "water" && smartWaterSupplyEnabled)) return;
     const until = Date.now() + 5 * 60 * 1000;
     if (kind === "calorie" || kind === "water") {
@@ -1011,7 +1013,11 @@ export default function MapScreen() {
       setIntervalSupplyAlerts(nextAlerts);
       clearIntervalSupplyRepeatTimer();
     }
-    void scheduleSupplySnooze(kind);
+    if (notificationsAlreadyCleared) {
+      void scheduleSupplySnooze(kind);
+    } else {
+      void clearAllSupplyNotifications().finally(() => { void scheduleSupplySnooze(kind); });
+    }
   }, [clearIntervalSupplyRepeatTimer, clearSupplyAutoDismissTimer, smartEnergySupplyEnabled, smartWaterSupplyEnabled]);
 
   const processSupplyNotificationAction = useCallback((action: SupplyNotificationAction) => {
@@ -2422,7 +2428,7 @@ export default function MapScreen() {
   const acknowledgeDaylightAlert = useCallback((event: DaylightAlertEvent) => {
     daylightAcknowledgedRef.current.add(event.key);
     setDaylightAlert((current) => current?.key === event.key ? null : current);
-    void clearDaylightAlertNotification(event.key);
+    void clearAllDaylightAlertNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
   }, [settings.vibrationEnabled]);
 
@@ -2441,6 +2447,18 @@ export default function MapScreen() {
   }, [acknowledgeDaylightAlert]);
 
   useEffect(() => {
+    if (!settings.daylightAlertEnabled || !settings.notificationEnabled) {
+      setDaylightAlert(null);
+      void clearAllDaylightAlertNotifications();
+      return;
+    }
+    if (daylightAlert && !isDaylightAlertKindEnabled(daylightAlert.kind, settings.daylightAlertMode)) {
+      setDaylightAlert(null);
+      void clearAllDaylightAlertNotifications();
+    }
+  }, [daylightAlert, settings.daylightAlertEnabled, settings.daylightAlertMode, settings.notificationEnabled]);
+
+  useEffect(() => {
     if (!mapRideActive || !settings.daylightAlertEnabled || !settings.notificationEnabled || !currentPos) return;
     const rideStartedAtMs = daylightRideStartedAtRef.current ?? (Date.now() - state.elapsed * 1_000);
     daylightRideStartedAtRef.current = rideStartedAtMs;
@@ -2450,9 +2468,10 @@ export default function MapScreen() {
         nowMs,
         rideStartedAtMs,
         latitude: currentPos.lat,
-        longitude: currentPos.lon,
-        acknowledgedKeys: daylightAcknowledgedRef.current,
-        leadMinutes: settings.daylightAlertLeadMinutes,
+      longitude: currentPos.lon,
+      acknowledgedKeys: daylightAcknowledgedRef.current,
+      leadMinutes: settings.daylightAlertLeadMinutes,
+      mode: settings.daylightAlertMode,
       };
       const due = getDueDaylightAlert(input);
       if (due) setDaylightAlert((active) => active?.key === due.key ? active : due);
@@ -2462,7 +2481,7 @@ export default function MapScreen() {
     evaluateDaylight();
     const timer = setInterval(evaluateDaylight, 30_000);
     return () => clearInterval(timer);
-  }, [currentPos, mapRideActive, settings.daylightAlertEnabled, settings.daylightAlertLeadMinutes, settings.notificationEnabled, state.elapsed]);
+  }, [currentPos, mapRideActive, settings.daylightAlertEnabled, settings.daylightAlertLeadMinutes, settings.daylightAlertMode, settings.notificationEnabled, state.elapsed]);
 
   const handleStop = useCallback(() => {
     Alert.alert("結束騎乘", "確定要結束本次騎乘並儲存記錄？", [
@@ -3618,8 +3637,17 @@ export default function MapScreen() {
         onConfirmWater={handleConfirmWaterSupply}
         allowSnooze={(!calorieAlert || !smartEnergySupplyEnabled) && (!waterAlert || !smartWaterSupplyEnabled)}
         onDismiss={() => {
-          if (calorieAlert) handleSnoozeSupply("calorie");
-          if (waterAlert) handleSnoozeSupply("water");
+          void clearAllSupplyNotifications().finally(() => {
+            if (calorieAlert) handleSnoozeSupply("calorie", undefined, true);
+            if (waterAlert) handleSnoozeSupply("water", undefined, true);
+            sortedActiveAlerts.forEach((id) => {
+              const item = settings.supplyItems.find((candidate) => candidate.id === id);
+              handleSnoozeSupply(item?.target === "water" ? "custom-water" : "custom-energy", id, true);
+            });
+            (Object.entries(intervalSupplyAlerts) as [SupplyIntervalKind, boolean][])
+              .filter(([, active]) => active)
+              .forEach(([kind]) => handleSnoozeSupply(`interval-${kind}` as SupplyNotificationKind, undefined, true));
+          });
         }}
       />
 

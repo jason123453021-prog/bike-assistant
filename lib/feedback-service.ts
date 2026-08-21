@@ -236,11 +236,19 @@ export async function clearAllSupplyNotifications() {
   if (!Notifications) return;
   try {
     await clearAllSmartSupplyDueNotifications();
-    const presented = await Notifications.getPresentedNotificationsAsync();
+    const [presented, scheduled] = await Promise.all([
+      Notifications.getPresentedNotificationsAsync(),
+      Notifications.getAllScheduledNotificationsAsync(),
+    ]);
     await Promise.all(
-      presented
-        .filter((notification) => notification.request.content.data?.type === "supply_reminder")
-        .map((notification) => Notifications.dismissNotificationAsync(notification.request.identifier).catch(() => {})),
+      [
+        ...presented
+          .filter((notification) => notification.request.content.data?.type === "supply_reminder")
+          .map((notification) => Notifications.dismissNotificationAsync(notification.request.identifier).catch(() => {})),
+        ...scheduled
+          .filter((notification) => notification.content.data?.type === "supply_reminder")
+          .map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier).catch(() => {})),
+      ],
     );
   } catch {}
 }
@@ -256,8 +264,12 @@ export async function scheduleDaylightAlertNotification(kind: DaylightAlertKind,
   const copy = daylightAlertCopy(kind, leadMinutes);
   try {
     await configureDaylightNotificationActions();
+    // 每次僅保留下一個日照事件的未到期排程；不會移除已呈現、尚待使用者確認的通知。
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(scheduled
+      .filter((notification) => notification.content.data?.type === "daylight_alert")
+      .map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier).catch(() => {})));
     const identifier = daylightNotificationId(eventKey);
-    await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => {});
     await Notifications.scheduleNotificationAsync({
       identifier,
       content: {
@@ -288,10 +300,18 @@ export async function clearAllDaylightAlertNotifications() {
   const Notifications = await getLocalNotifications();
   if (!Notifications) return;
   try {
-    const presented = await Notifications.getPresentedNotificationsAsync();
-    await Promise.all(presented
-      .filter((notification) => notification.request.content.data?.type === "daylight_alert")
-      .map((notification) => Notifications.dismissNotificationAsync(notification.request.identifier).catch(() => {})));
+    const [presented, scheduled] = await Promise.all([
+      Notifications.getPresentedNotificationsAsync(),
+      Notifications.getAllScheduledNotificationsAsync(),
+    ]);
+    await Promise.all([
+      ...presented
+        .filter((notification) => notification.request.content.data?.type === "daylight_alert")
+        .map((notification) => Notifications.dismissNotificationAsync(notification.request.identifier).catch(() => {})),
+      ...scheduled
+        .filter((notification) => notification.content.data?.type === "daylight_alert")
+        .map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier).catch(() => {})),
+    ]);
   } catch {}
 }
 
