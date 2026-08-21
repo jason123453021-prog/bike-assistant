@@ -1,5 +1,5 @@
 export type DaylightAlertKind = "sunrise" | "sunset";
-export type DaylightAlertMode = "sunrise-and-sunset" | "sunset-only";
+export type DaylightAlertMode = "sunrise-and-sunset" | "sunrise-only" | "sunset-only";
 
 export interface DaylightAlertEvent {
   key: string;
@@ -15,7 +15,14 @@ export const DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES = 0;
 export const MAX_DAYLIGHT_ALERT_LEAD_MINUTES = 60;
 
 export function isDaylightAlertKindEnabled(kind: DaylightAlertKind, mode: DaylightAlertMode = "sunrise-and-sunset") {
-  return mode === "sunrise-and-sunset" || kind === "sunset";
+  return mode === "sunrise-and-sunset"
+    || (mode === "sunrise-only" && kind === "sunrise")
+    || (mode === "sunset-only" && kind === "sunset");
+}
+
+export function normalizeDaylightAlertMode(value: unknown): DaylightAlertMode {
+  if (value === "sunrise-only" || value === "sunset-only") return value;
+  return "sunrise-and-sunset";
 }
 
 export function normalizeDaylightAlertLeadMinutes(value: unknown): number {

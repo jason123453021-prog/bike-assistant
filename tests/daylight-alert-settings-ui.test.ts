@@ -11,13 +11,14 @@ describe("日照警示設定介面守門", () => {
     expect(settingsSource).toContain("daylightAlertEnabled: boolean");
     expect(settingsSource).toContain("daylightAlertLeadMinutes: number");
     expect(settingsSource).toContain("daylightAlertMode: DaylightAlertMode");
-    expect(settingsSource).toContain('daylightAlertMode: saved.daylightAlertMode === "sunset-only" ? "sunset-only" : "sunrise-and-sunset"');
+    expect(settingsSource).toContain("normalizeDaylightAlertMode(saved.daylightAlertMode)");
     expect(settingsSource).toContain("normalizeDaylightAlertLeadMinutes(saved.daylightAlertLeadMinutes)");
     expect(screenSource).toContain("const daylightControlsDisabled = !settings.notificationEnabled || !settings.daylightAlertEnabled");
     expect(screenSource).toContain("[0, 5, 10, 15, 30].map((minutes)");
     expect(screenSource).toContain('openEdit("daylightAlertLeadMinutes", "日照提前提醒時間（0–60 分鐘）"');
     expect(screenSource).toContain("disabled={daylightControlsDisabled}");
-    expect(screenSource).toContain('label="僅日落提醒"');
-    expect(screenSource).toContain('daylightAlertMode: enabled ? "sunset-only" : "sunrise-and-sunset"');
+    expect(screenSource).toContain('{ key: "sunrise-only", label: "僅日出" }');
+    expect(screenSource).toContain('{ key: "sunset-only", label: "僅日落" }');
+    expect(screenSource).toContain("styles.daylightModeOptions");
   });
 });

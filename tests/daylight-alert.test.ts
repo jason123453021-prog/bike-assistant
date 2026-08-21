@@ -68,6 +68,21 @@ describe("daylight alert", () => {
     expect(getNextDaylightAlert({ ...input, nowMs: sunrise.triggerAtMs - 60_000 })?.key).toBe(sunset.key);
   });
 
+  it("僅日出模式不會建立日落待確認提醒，且下一個事件為日出", () => {
+    const events = getDaylightEvents(new Date("2026-08-21T12:00:00.000Z"), 25.033, 121.5654);
+    const sunrise = events[0];
+    const sunset = events[1];
+    const input = {
+      rideStartedAtMs: sunrise.triggerAtMs - 60_000,
+      latitude: 25.033,
+      longitude: 121.5654,
+      acknowledgedKeys: new Set<string>(),
+      mode: "sunrise-only" as const,
+    };
+    expect(getDueDaylightAlert({ ...input, nowMs: sunset.triggerAtMs })?.key).toBe(sunrise.key);
+    expect(getNextDaylightAlert({ ...input, nowMs: sunrise.triggerAtMs - 60_000 })?.key).toBe(sunrise.key);
+  });
+
   it("只接受明確的日照確認通知動作", () => {
     expect(parseDaylightNotificationAction({
       actionIdentifier: DAYLIGHT_CONFIRM_ACTION,
