@@ -11,7 +11,7 @@
 - [x] 建立日出／日落警示燈提醒，沿用補給彈窗的待確認、背景通知與確認後結束邏輯
 - [x] 建立可在騎乘中手動建立 Lap、保存 Lap 統計並在活動詳情呈現的本機流程
 - [x] 新增對應回歸測試並完成完整 QC（TypeScript、Lint、Vitest、Expo Doctor 與 Android Hermes 匯出）
-- [ ] 保存版本、同步 GitHub 並確認 Android APK artifact
+- [x] 保存版本、同步 GitHub 並確認 Android APK artifact（GitHub run 32474921851）
 
 ## Strava 對照統計、文字與圖示完整校正（2026-08-21）
 - [x] 盤點距離、移動時間、均速、爬升、卡路里、功率、坡度與水分流失的實際資料來源及與截圖差異
