@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeRideRecord, normalizeRideRecords } from "../lib/ride-record-normalizer";
+import { calculateRouteDistance, normalizeRideRecord, normalizeRideRecords } from "../lib/ride-record-normalizer";
 import { calculateNormalizedPowerFromHistory } from "../lib/tss-calc";
 
 describe("ride record normalizer", () => {
@@ -80,6 +80,31 @@ describe("ride record normalizer", () => {
     expect(record?.totalWorkKj).toBe(270);
     expect(record?.powerSource).toBe("estimated");
     expect(record?.caloriesSource).toBe("power-estimate");
+  });
+
+  it("repairs legacy kilometres-as-metres distance, raw GPS ascent noise and unsupported calorie totals from its saved route", () => {
+    const route = [
+      { latitude: 25, longitude: 121, altitude: 100, speed: 4, timestamp: 1_000 },
+      { latitude: 25.001, longitude: 121, altitude: 106, speed: 4, timestamp: 4_000 },
+      { latitude: 25.002, longitude: 121, altitude: 111, speed: 4, timestamp: 7_000 },
+      { latitude: 25.003, longitude: 121, altitude: 119, speed: 4, timestamp: 10_000 },
+    ];
+    const reconstructedDistance = calculateRouteDistance(route);
+    const record = normalizeRideRecord({
+      id: "recovery-unit-mismatch",
+      distance: 0.32,
+      duration: 1_800,
+      totalAscent: 579,
+      calories: 577,
+      avgPower: 0,
+      powerSource: "unavailable",
+      route,
+      calculationProfile: { riderWeightKg: 70, bikeWeightKg: 10, ftpW: 240 },
+    });
+
+    expect(record?.distance).toBeCloseTo(reconstructedDistance, 4);
+    expect(record?.totalAscent).toBe(11);
+    expect(record?.calories).toBeLessThan(577);
   });
 
   it("keeps valid local records only, fills safe defaults, deduplicates IDs and sorts newest first", () => {

@@ -173,6 +173,7 @@ import {
   type NavigationDashboardSummaryKey,
 } from "@/lib/navigation-dashboard-summary";
 import {
+  hasReliableRideMovement,
   shouldScheduleTouchGuardRelock,
   shouldZeroLiveRideReadings,
 } from "@/lib/live-ride-readings";
@@ -1787,6 +1788,11 @@ export default function MapScreen() {
             pauseThresholdKmh: autoPausePolicy.speedBelowKmh,
             driftThresholdM: driftFilterM,
           });
+          const hasReliableMovement = hasReliableRideMovement({
+            speedKmh,
+            distanceM: displacementM,
+            accuracyM: loc.coords.accuracy,
+          });
           let smoothedSpeed = speedKmh;
           
           // GPS 漂移過濾
@@ -1810,14 +1816,14 @@ export default function MapScreen() {
           // 自動暫停/恢復邏輯
           if (currentState.status === "active") {
             const satisfiesStillness = !autoPausePolicy.requiresStillness || motionStillRef.current;
-            if (autoPausePolicy.mode === "automatic" && avgSpeed < autoPausePolicy.speedBelowKmh && satisfiesStillness) {
+            if (autoPausePolicy.mode === "automatic" && !hasReliableMovement && avgSpeed < autoPausePolicy.speedBelowKmh && satisfiesStillness) {
               lowSpeedCountRef.current += 1;
               if (lowSpeedCountRef.current >= AUTO_PAUSE_CONSECUTIVE) {
                 lowSpeedCountRef.current = 0;
                 pausedElapsedRef.current = currentState.elapsed;
                 dispatch({ type: "PAUSE" });
-                // 暫停時強制歸零速度與功率
-                dispatch({ type: "LOCATION_UPDATE", point: { latitude, longitude, altitude: altitude ?? 0, speed: 0, timestamp: Date.now() }, power: 0, calories: 0, ascent: 0 });
+                // 暫停時僅歸零即時讀數；定位漂移不得額外寫入軌跡或統計。
+                dispatch({ type: "LIVE_READINGS_STATIONARY" });
                 if (settings.vibrationEnabled) vibrateMedium();
                 return;
               }
@@ -1832,7 +1838,7 @@ export default function MapScreen() {
               lowSpeedCountRef.current = 0;
               hikingPauseSuggestedRef.current = false;
             }
-          } else if (currentState.status === "paused" && autoPausePolicy.mode === "automatic" && avgSpeed >= Math.max(AUTO_PAUSE_RESUME_THRESHOLD, autoPausePolicy.speedBelowKmh + 0.5)) {
+          } else if (currentState.status === "paused" && autoPausePolicy.mode === "automatic" && hasReliableMovement && avgSpeed >= Math.max(AUTO_PAUSE_RESUME_THRESHOLD, autoPausePolicy.speedBelowKmh + 0.5)) {
             lowSpeedCountRef.current = 0;
             dispatch({ type: "RESUME" });
             return;
@@ -1842,6 +1848,10 @@ export default function MapScreen() {
             // 不追加軌跡、不更新距離／均速／爬升／卡路里；只讓即時速度與功率安全歸零。
             powerWindowRef.current = [];
             prevSpeedMsRef.current = 0;
+            // 每一筆靜止樣本都前移距離參考點，避免 GPS 漂移累積到門檻後被誤認為真正騎乘。
+            lastLocationRef.current = loc;
+            prevPosRef.current = { lat: latitude, lon: longitude };
+            prevAltRef.current = altitude ?? null;
             setCurrentGrade(0);
             dispatch({ type: "LIVE_READINGS_STATIONARY" });
             return;

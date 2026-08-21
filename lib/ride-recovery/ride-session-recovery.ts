@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { reportRecoverableIssue } from '../release-safe-log';
+import { acceptLiveElevationDelta, createLiveElevationFilterState } from '../live-elevation-filter';
 
 /**
  * 騎乘會話恢復系統
@@ -19,7 +20,12 @@ export interface RideTrackPoint {
 }
 
 export interface RideStats {
+  /** 全程距離，單位固定為公尺；與 RideState／RideRecord 一致。 */
   totalDistance: number;
+  /** 統計已依公尺距離與濾波海拔重建的版本。 */
+  trackingStatsVersion?: 2;
+  /** 下一筆高度樣本的濾波參考高度。 */
+  elevationAnchorM?: number | null;
   totalTime: number;
   totalElevationGain: number;
   totalElevationLoss: number;
@@ -62,6 +68,9 @@ export async function initializeRideSession(): Promise<RideSession | null> {
       const session = JSON.parse(sessionJson);
       // 驗證會話數據完整性
       if (validateRideSession(session)) {
+        // 舊版會把 Haversine 的公里結果直接恢復為公尺，並逐點加總 GPS 高度雜訊。
+        // 每次讀取時依原始軌跡重建可導出的統計，讓既有未完成活動安全遷移到 SI 單位。
+        if (session.stats.trackingStatsVersion !== 2) rebuildTrackDerivedStats(session);
         return session;
       }
     }
@@ -84,6 +93,8 @@ export function createNewRideSession(gpxRouteId?: string, navigationTarget?: any
     trackPoints: [],
     stats: {
       totalDistance: 0,
+      trackingStatsVersion: 2,
+      elevationAnchorM: null,
       totalTime: 0,
       totalElevationGain: 0,
       totalElevationLoss: 0,
@@ -129,15 +140,20 @@ export function addTrackPoint(
   session.trackPoints.push(point);
   session.lastUpdateTime = point.timestamp;
 
-  // 計算距離增量
+  // 計算距離增量（固定使用公尺，與 RideState／RideRecord 相同）。
+  let distanceM = 0;
   if (previousPoint && !point.segmentStart) {
-    const distance = calculateDistance(
+    distanceM = calculateDistanceMeters(
       previousPoint.latitude,
       previousPoint.longitude,
       point.latitude,
       point.longitude
     );
-    session.stats.totalDistance += distance;
+    session.stats.totalDistance += distanceM;
+    const intervalMs = point.timestamp - previousPoint.timestamp;
+    if (intervalMs > 0 && intervalMs <= 30_000) {
+      session.stats.totalTime += intervalMs;
+    }
   }
 
   // 更新高度數據
@@ -145,15 +161,13 @@ export function addTrackPoint(
     session.stats.maxAltitude = Math.max(session.stats.maxAltitude, point.altitude);
     session.stats.minAltitude = Math.min(session.stats.minAltitude, point.altitude);
 
-    // 計算爬升/下降
-    if (previousPoint && previousPoint.altitude !== undefined && !point.segmentStart) {
-      const elevationDiff = point.altitude - previousPoint.altitude;
-      if (elevationDiff > 0) {
-        session.stats.totalElevationGain += elevationDiff;
-      } else {
-        session.stats.totalElevationLoss += Math.abs(elevationDiff);
-      }
-    }
+    // 復原資料與即時活動共用 10 m 死區／12 m 最小位移，避免手機 GPS 高度抖動被反覆加成爬升。
+    const elevationState = { anchorAltitudeM: session.stats.elevationAnchorM ?? null };
+    if (point.segmentStart) elevationState.anchorAltitudeM = null;
+    const elevation = acceptLiveElevationDelta(elevationState, point.altitude, point.segmentStart ? 0 : distanceM);
+    session.stats.elevationAnchorM = elevationState.anchorAltitudeM;
+    session.stats.totalElevationGain += elevation.ascentM;
+    session.stats.totalElevationLoss += elevation.descentM;
   }
 
   // 更新速度數據
@@ -161,12 +175,9 @@ export function addTrackPoint(
     session.stats.maxSpeed = Math.max(session.stats.maxSpeed, point.speed);
   }
 
-  // 更新時間
-  session.stats.totalTime = point.timestamp - session.startTime;
-
   // 計算平均速度
   if (session.stats.totalTime > 0) {
-    session.stats.averageSpeed = session.stats.totalDistance / (session.stats.totalTime / 3600000);
+    session.stats.averageSpeed = (session.stats.totalDistance / 1000) / (session.stats.totalTime / 3600000);
   }
 
   return session;
@@ -227,13 +238,13 @@ function validateRideSession(session: any): boolean {
 /**
  * 計算兩點之間的距離（Haversine 公式）
  */
-function calculateDistance(
+function calculateDistanceMeters(
   lat1: number,
   lon1: number,
   lat2: number,
   lon2: number
 ): number {
-  const R = 6371; // 地球半徑（公里）
+  const R = 6_371_000; // 地球半徑（公尺）
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -244,6 +255,65 @@ function calculateDistance(
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+}
+
+/**
+ * 重新建立僅由原始軌跡決定的統計，修復舊版公里／公尺混用與逐點高度雜訊累計。
+ * 卡路里與汗液來自活動期間的模型積分，並不由軌跡推回，因此保持原值。
+ */
+function rebuildTrackDerivedStats(session: RideSession): void {
+  if (!session.trackPoints.length) return;
+  let distanceM = 0;
+  let ascentM = 0;
+  let descentM = 0;
+  let maxAltitude = -Infinity;
+  let minAltitude = Infinity;
+  let maxSpeed = 0;
+  let movingTimeMs = 0;
+  let previous: RideTrackPoint | undefined;
+  let elevationState = createLiveElevationFilterState();
+
+  for (const point of session.trackPoints) {
+    if (point.segmentStart) elevationState = createLiveElevationFilterState();
+    const segmentDistanceM = previous && !point.segmentStart
+      ? calculateDistanceMeters(previous.latitude, previous.longitude, point.latitude, point.longitude)
+      : 0;
+    const elapsedMs = previous ? point.timestamp - previous.timestamp : 0;
+    const isPlausibleSegment = !previous
+      || point.segmentStart
+      || (segmentDistanceM <= 200 || elapsedMs >= 75_000);
+    if (previous && !point.segmentStart && isPlausibleSegment) {
+      distanceM += segmentDistanceM;
+      if (elapsedMs > 0 && elapsedMs <= 30_000) movingTimeMs += elapsedMs;
+    }
+
+    if (typeof point.altitude === "number" && Number.isFinite(point.altitude)) {
+      maxAltitude = Math.max(maxAltitude, point.altitude);
+      minAltitude = Math.min(minAltitude, point.altitude);
+      const elevation = acceptLiveElevationDelta(
+        elevationState,
+        point.altitude,
+        previous && !point.segmentStart && isPlausibleSegment ? segmentDistanceM : 0,
+      );
+      ascentM += elevation.ascentM;
+      descentM += elevation.descentM;
+    }
+    if (typeof point.speed === "number" && Number.isFinite(point.speed)) maxSpeed = Math.max(maxSpeed, point.speed);
+    previous = point;
+  }
+
+  session.stats.totalDistance = distanceM;
+  session.stats.trackingStatsVersion = 2;
+  session.stats.elevationAnchorM = elevationState.anchorAltitudeM;
+  session.stats.totalElevationGain = ascentM;
+  session.stats.totalElevationLoss = descentM;
+  session.stats.maxAltitude = maxAltitude;
+  session.stats.minAltitude = minAltitude;
+  session.stats.maxSpeed = maxSpeed;
+  session.stats.totalTime = movingTimeMs;
+  session.stats.averageSpeed = session.stats.totalTime > 0
+    ? (distanceM / 1000) / (session.stats.totalTime / 3_600_000)
+    : 0;
 }
 
 /**

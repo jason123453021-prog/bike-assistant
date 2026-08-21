@@ -13,6 +13,12 @@ describe("導航頁使用者地圖方向守門", () => {
     expect(mapScreenSource).not.toContain("stabilizeMapHeading(");
   });
 
+  it("目前位置以高可見度圓形標記呈現，航向不再改變定位圖示形狀", () => {
+    expect(leafletSource).toContain("makeCircleIcon('#007AFF', 18, '#fff')");
+    expect(leafletSource).toContain("Position marker is intentionally a circular blue dot");
+    expect(leafletSource).not.toContain('d="M16 2 L28 28 L16 22 L4 28 Z"');
+  });
+
   it("不允許定位或羅盤回呼覆寫使用者手動旋轉方向", () => {
     expect(mapScreenSource).toContain("onMapRotateEnd={() => scheduleAutoRecenter()}");
     expect(mapScreenSource).not.toContain("applyResponsiveMapBearing(");

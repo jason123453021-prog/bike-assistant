@@ -6,6 +6,7 @@ import {
 } from "../lib/navigation-dashboard-defaults";
 import {
   DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
+  hasReliableRideMovement,
   shouldScheduleTouchGuardRelock,
   shouldZeroLiveRideReadings,
   TOUCH_GUARD_AUTO_RELOCK_MS,
@@ -84,6 +85,19 @@ describe("live ride navigation experience", () => {
     expect(stationaryRedLight).toBe(true);
     expect(stationaryIndoors).toBe(true);
     expect(genuineMovement).toBe(false);
+  });
+
+  it("keeps counting a real ride when a handlebar-mounted phone briefly reports zero speed", () => {
+    expect(hasReliableRideMovement({ speedKmh: 0, distanceM: 16, accuracyM: 5 })).toBe(true);
+    expect(shouldZeroLiveRideReadings({
+      rawSpeedKmh: 0,
+      displacementM: 16,
+      accuracyM: 5,
+      motionStill: true,
+      pauseThresholdKmh: 1.5,
+      driftThresholdM: 8,
+    })).toBe(false);
+    expect(hasReliableRideMovement({ speedKmh: 1, distanceM: 4, accuracyM: 18 })).toBe(false);
   });
 
   it("uses a 400 ms hold and schedules a 3 second safety relock only during an active guarded ride", () => {

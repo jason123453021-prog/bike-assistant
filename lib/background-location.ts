@@ -32,6 +32,7 @@ import type { SportType } from "@/lib/sport-metrics";
 import { acceptLiveElevationDelta, clampVirtualPowerForRider } from "@/lib/live-elevation-filter";
 import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 import { isSmartSupplyChannelEnabled, resolveSmartSupplyChannels } from "@/lib/smart-supply-channels";
+import { hasReliableRideMovement } from "@/lib/live-ride-readings";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
@@ -221,6 +222,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         powerW?: number;
         caloriesKcal?: number;
         intervalSec?: number;
+        isStationary?: boolean;
       }> = [];
       let qualityAnchor: TrackQualityPoint | null = state.lastLat !== 0 && state.lastLon !== 0
         ? {
@@ -283,14 +285,31 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           continue;
         }
 
-        // 計算距離增量
-        if (!segmentStart && state.lastLat !== 0 && state.lastLon !== 0) {
-          const dist = bgHaversine(state.lastLat, state.lastLon, latitude, longitude);
-          // 過濾 GPS 跳動（單次距離超過 200m 視為異常）
-          if (dist < 200 && dist > 1) {
-            state.totalDistanceM += dist;
-            acceptedLocation.distanceM = dist;
-          }
+        const candidateDistanceM = !segmentStart && state.lastLat !== 0 && state.lastLon !== 0
+          ? bgHaversine(state.lastLat, state.lastLon, latitude, longitude)
+          : 0;
+        const hasReliableMovement = hasReliableRideMovement({
+          speedKmh,
+          distanceM: candidateDistanceM,
+          accuracyM: loc.coords.accuracy,
+        });
+
+        // 停車或室內時保留最新定位作為下個樣本參考，但完全凍結距離、海拔、功率工作量、熱量與軌跡。
+        if (!hasReliableMovement) {
+          state.lastLat = latitude;
+          state.lastLon = longitude;
+          state.lastTimestamp = timestamp;
+          state.lastAccuracy = loc.coords.accuracy ?? undefined;
+          state.lastSpeedMs = 0;
+          state.supplyCountdownPausedAtMs ??= timestamp;
+          acceptedLocation.isStationary = true;
+          continue;
+        }
+
+        // 計算距離增量；過濾 GPS 跳動（單次距離超過 200m 視為異常）。
+        if (!segmentStart && candidateDistanceM < 200 && candidateDistanceM > 1) {
+          state.totalDistanceM += candidateDistanceM;
+          acceptedLocation.distanceM = candidateDistanceM;
         }
 
         const statisticsIntervalSec = !segmentStart
@@ -314,7 +333,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
             : Math.max(state.maxElevationM, elevationDelta.acceptedAltitudeM);
         }
 
-        const isReliablyMovingForSupply = speedKmh >= 3 || acceptedLocation.distanceM >= 18;
+        const isReliablyMovingForSupply = hasReliableMovement;
         if (!isReliablyMovingForSupply) {
           state.supplyCountdownPausedAtMs ??= timestamp;
           acceptedLocation.intervalSec = 0;
@@ -556,7 +575,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
 
       // 以記憶體快取合併軌跡批次，避免每次背景回呼讀取和重寫全部歷史軌跡。
-      await appendBackgroundTrackBatch(acceptedLocations.map((point) => (
+      await appendBackgroundTrackBatch(acceptedLocations.filter((point) => !point.isStationary).map((point) => (
         {
           lat: point.loc.coords.latitude,
           lon: point.loc.coords.longitude,

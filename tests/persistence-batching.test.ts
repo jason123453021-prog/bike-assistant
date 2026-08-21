@@ -21,7 +21,7 @@ describe("ride persistence batching", () => {
     expect(backgroundSource).toContain("appendBackgroundTrackBatch");
     expect(backgroundSource).toContain("const acceptedLocations");
     expect(backgroundSource).toContain("evaluateTrackPoint(qualityAnchor");
-    expect(backgroundSource).toContain("await appendBackgroundTrackBatch(acceptedLocations.map");
+    expect(backgroundSource).toContain("acceptedLocations.filter((point) => !point.isStationary).map");
     expect(backgroundSource).not.toContain("const trackStr = await AsyncStorage.getItem(BG_TRACK_KEY)");
   });
 

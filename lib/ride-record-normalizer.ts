@@ -1,5 +1,7 @@
 import { calculateNormalizedPowerFromHistory } from "./tss-calc";
 import type { LocationPoint, RideActivityType, RideCalculationProfile, RideRecord, SportType, SupplyConfirmation } from "./ride-context";
+import { calculateCaloriesMET } from "./power-calc";
+import { acceptLiveElevationDelta, createLiveElevationFilterState } from "./live-elevation-filter";
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -35,6 +37,7 @@ function normalizeLocationPoint(value: unknown, fallbackTimestamp: number): Loca
     heartRate: Number.isFinite(finiteNumber(point.heartRate, Number.NaN)) ? Math.max(0, finiteNumber(point.heartRate)) : undefined,
     cadence: Number.isFinite(finiteNumber(point.cadence, Number.NaN)) ? Math.max(0, finiteNumber(point.cadence)) : undefined,
     slope: Number.isFinite(finiteNumber(point.slope, Number.NaN)) ? finiteNumber(point.slope) : undefined,
+    segmentStart: point.segmentStart === true || undefined,
   };
 }
 
@@ -58,6 +61,22 @@ export interface TerrainMetrics {
   maxGrade?: number;
 }
 
+/** 從已保存軌跡重建距離；跳過明確資料段斷點及短時間不合理跳點。 */
+export function calculateRouteDistance(route: LocationPoint[]): number {
+  let distanceM = 0;
+  for (let index = 1; index < route.length; index += 1) {
+    const previous = route[index - 1];
+    const current = route[index];
+    if (current.segmentStart) continue;
+    const segmentDistance = distanceBetween(previous, current);
+    const elapsedMs = current.timestamp - previous.timestamp;
+    if (!Number.isFinite(segmentDistance) || segmentDistance < 1) continue;
+    if (segmentDistance > 200 && elapsedMs < 75_000) continue;
+    distanceM += segmentDistance;
+  }
+  return distanceM;
+}
+
 /** 從已儲存的軌跡安全重建地形資料；沒有可靠高度樣本時不偽造數值。 */
 export function calculateTerrainMetrics(route: LocationPoint[]): TerrainMetrics {
   const elevations = route.flatMap((point) => (typeof point.altitude === "number" && Number.isFinite(point.altitude) ? [point.altitude] : []));
@@ -67,19 +86,26 @@ export function calculateTerrainMetrics(route: LocationPoint[]): TerrainMetrics 
   let totalDescent = 0;
   let horizontalDistance = 0;
   let maxGrade = 0;
+  let elevationState = createLiveElevationFilterState();
 
-  for (let index = 1; index < route.length; index += 1) {
-    const previous = route[index - 1];
+  for (let index = 0; index < route.length; index += 1) {
     const current = route[index];
-    if (previous.altitude === null || current.altitude === null) continue;
-    const segmentDistance = distanceBetween(previous, current);
-    // 跳過重複 GPS 點，避免除以零及無意義坡度。
-    if (!Number.isFinite(segmentDistance) || segmentDistance < 1) continue;
-    const altitudeDifference = current.altitude - previous.altitude;
-    horizontalDistance += segmentDistance;
-    if (altitudeDifference > 0) totalAscent += altitudeDifference;
-    if (altitudeDifference < 0) totalDescent += Math.abs(altitudeDifference);
-    if (altitudeDifference > 0) maxGrade = Math.max(maxGrade, (altitudeDifference / segmentDistance) * 100);
+    const previous = index > 0 ? route[index - 1] : undefined;
+    if (current.altitude === null) continue;
+    if (current.segmentStart) elevationState = createLiveElevationFilterState();
+    const segmentDistance = previous && !current.segmentStart ? distanceBetween(previous, current) : 0;
+    const elapsedMs = previous ? current.timestamp - previous.timestamp : 0;
+    const isPlausibleSegment = !previous
+      || current.segmentStart
+      || (segmentDistance <= 200 || elapsedMs >= 75_000);
+    const acceptedDistance = previous && !current.segmentStart && isPlausibleSegment ? segmentDistance : 0;
+    const elevation = acceptLiveElevationDelta(elevationState, current.altitude, acceptedDistance);
+    if (acceptedDistance > 0) horizontalDistance += acceptedDistance;
+    totalAscent += elevation.ascentM;
+    totalDescent += elevation.descentM;
+    if (elevation.ascentM > 0 && acceptedDistance > 0) {
+      maxGrade = Math.max(maxGrade, (elevation.ascentM / acceptedDistance) * 100);
+    }
   }
 
   return {
@@ -200,6 +226,13 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const totalPausedSec = Math.min(duration, nonNegative(source.totalPausedSec));
   const movingTime = Math.max(0, duration - totalPausedSec);
   const terrain = calculateTerrainMetrics(route);
+  const reconstructedDistanceM = calculateRouteDistance(route);
+  const storedDistanceM = nonNegative(source.distance);
+  const distanceWasCorrupted = reconstructedDistanceM >= 50
+    // 已抽樣的歷史路線可能只保留部分點位，故僅修正「公里數被當作公尺」這類明顯過小值；
+    // 不以稀疏路線反向縮短原本合理的完整活動距離。
+    && storedDistanceM < reconstructedDistanceM * 0.45;
+  const distanceM = distanceWasCorrupted ? reconstructedDistanceM : storedDistanceM;
   const storedAscent = nonNegative(source.totalAscent);
   const storedDescent = nonNegative(source.totalDescent);
   const hasTerrainAltitude = terrain.maxElevation !== undefined;
@@ -223,23 +256,45 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const derivedNormalizedPower = calculateNormalizedPowerFromHistory(powerHistory, movingTime);
   const recordId = typeof source.id === "string" && source.id.trim() ? source.id.trim() : fallbackId ?? `legacy-${date}`;
   const name = typeof source.name === "string" && source.name.trim() ? source.name.trim() : "匯入騎乘紀錄";
+  const terrainDisagreesWithStoredAscent = terrain.totalAscent > 0
+    && (storedAscent === 0 || storedAscent > terrain.totalAscent * 1.45 || storedAscent < terrain.totalAscent * 0.45);
+  const terrainDisagreesWithStoredDescent = terrain.totalDescent > 0
+    && (storedDescent === 0 || storedDescent > terrain.totalDescent * 1.45 || storedDescent < terrain.totalDescent * 0.45);
+  const totalAscent = terrainDisagreesWithStoredAscent ? terrain.totalAscent : storedAscent;
+  const totalDescent = terrainDisagreesWithStoredDescent ? terrain.totalDescent : storedDescent;
+  const averageSpeedKmh = movingTime > 0 ? (distanceM / 1000) / (movingTime / 3600) : nonNegative(source.avgSpeed);
+  const storedCalories = nonNegative(source.calories);
+  const fallbackCalories = calculateCaloriesMET(
+    averageSpeedKmh,
+    normalizeCalculationProfile(source.calculationProfile)?.riderWeightKg ?? 70,
+    movingTime,
+    terrain.averageGrade ?? 0,
+  );
+  // 僅修復「距離已證實錯誤、沒有功率資料、卻仍保留高熱量」的歷史紀錄；
+  // 量測功率與正常新紀錄絕不被此相容性修復覆寫。
+  const calories = distanceWasCorrupted
+    && (source.powerSource === undefined || source.powerSource === "unavailable")
+    && averagePower === 0
+    && fallbackCalories > 0
+    ? Math.round(fallbackCalories)
+    : storedCalories;
 
   return {
     id: recordId,
     date,
     name,
     duration,
-    distance: nonNegative(source.distance),
-    avgSpeed: movingTime > 0 ? (nonNegative(source.distance) / 1000) / (movingTime / 3600) : nonNegative(source.avgSpeed),
+    distance: distanceM,
+    avgSpeed: averageSpeedKmh,
     maxSpeed: nonNegative(source.maxSpeed),
-    totalAscent: storedAscent > 0 || terrain.totalAscent === 0 ? storedAscent : terrain.totalAscent,
-    totalDescent: storedDescent > 0 || terrain.totalDescent === 0 ? storedDescent : terrain.totalDescent,
+    totalAscent,
+    totalDescent,
     maxElevation: hasTerrainAltitude && (storedMaxElevation === undefined || (storedMaxElevation === 0 && terrain.maxElevation !== 0)) ? terrain.maxElevation : storedMaxElevation,
     minElevation: hasTerrainAltitude && (storedMinElevation === undefined || (storedMinElevation === 0 && terrain.minElevation !== 0)) ? terrain.minElevation : storedMinElevation,
     averageGrade: terrain.averageGrade !== undefined && (!storedAverageGrade || storedAverageGrade < 0) ? terrain.averageGrade : storedAverageGrade,
     maxGrade: terrain.maxGrade !== undefined && (!storedMaxGrade || storedMaxGrade < 0) ? terrain.maxGrade : storedMaxGrade,
     movingTime,
-    calories: nonNegative(source.calories),
+    calories,
     avgPower: Math.round(averagePower),
     maxPower: Math.round(maxPower),
     totalWorkKj,
