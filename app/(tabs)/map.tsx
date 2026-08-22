@@ -61,7 +61,7 @@ import {
 import { getModelRevision, subscribeModelUpdates } from "@/lib/model-governance";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday } from "@/lib/personal-profile";
-import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
+import { useSettings, AUTO_LAP_DISTANCE_PRESETS_KM, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
 
 import { type GpxPoint, type GpxRoute } from "@/lib/gpx-parser";
@@ -527,6 +527,7 @@ export default function MapScreen() {
   const [summarySnapshot, setSummarySnapshot] = useState<RideSummarySnapshot | null>(null);
   const [lapFeedback, setLapFeedback] = useState<RideLap | null>(null);
   const lapFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nextAutoLapDistanceMRef = useRef<number | null>(null);
   // 補給提醒分別管理（支援兩種同時顯示）
   const [calorieAlert, setCalorieAlert] = useState(false);
   const [waterAlert, setWaterAlert] = useState(false);
@@ -870,6 +871,12 @@ export default function MapScreen() {
   const lastBgSyncTsRef = useRef<number>(0); // 背景軌跡去重：記錄上次同步的最大時間戳
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  useEffect(() => {
+    if (state.status === "idle" && state.sportType !== settings.defaultSportType) {
+      dispatch({ type: "SET_SPORT_TYPE", sportType: settings.defaultSportType });
+    }
+  }, [dispatch, settings.defaultSportType, state.sportType, state.status]);
 
   // 進度條動畫
   const calorieAnim = useRef(new Animated.Value(0)).current;
@@ -1806,7 +1813,10 @@ export default function MapScreen() {
             ? haversine(prevPosRef.current.lat, prevPosRef.current.lon, latitude, longitude)
             : null;
           const driftFilterM = sportTrackingPolicy.stationaryDriftThresholdM;
-          const autoPausePolicy = getSportTrackingPolicy(currentState.sportType).autoPause;
+          const governedAutoPausePolicy = getSportTrackingPolicy(currentState.sportType).autoPause;
+          const autoPausePolicy = currentState.sportType === "cycling"
+            ? { ...governedAutoPausePolicy, speedBelowKmh: settings.autoPauseSpeedThresholdKmh }
+            : governedAutoPausePolicy;
           const shouldZeroReadings = mapRideActive && shouldZeroLiveRideReadings({
             rawSpeedKmh: speedKmh,
             displacementM,
@@ -1848,9 +1858,10 @@ export default function MapScreen() {
           const avgSpeed = speedWindowRef.current.reduce((a, b) => a + b, 0) / speedWindowRef.current.length;
           
           // 自動暫停/恢復邏輯
+          const autoPauseEnabledForSport = currentState.sportType !== "cycling" || settings.idleAutoPauseEnabled;
           if (currentState.status === "active") {
             const satisfiesStillness = !autoPausePolicy.requiresStillness || motionStillRef.current;
-            if (autoPausePolicy.mode === "automatic" && !hasReliableMovement && avgSpeed < autoPausePolicy.speedBelowKmh && satisfiesStillness) {
+            if (autoPauseEnabledForSport && autoPausePolicy.mode === "automatic" && !hasReliableMovement && avgSpeed < autoPausePolicy.speedBelowKmh && satisfiesStillness) {
               lowSpeedCountRef.current += autoPauseSampleSec;
               if (lowSpeedCountRef.current >= autoPausePolicy.stillForSeconds) {
                 lowSpeedCountRef.current = 0;
@@ -1871,7 +1882,7 @@ export default function MapScreen() {
               lowSpeedCountRef.current = 0;
               hikingPauseSuggestedRef.current = false;
             }
-          } else if (currentState.status === "paused" && autoPausePolicy.mode === "automatic" && hasReliableMovement && avgSpeed >= Math.max(AUTO_PAUSE_RESUME_THRESHOLD, autoPausePolicy.speedBelowKmh + 0.5)) {
+          } else if (currentState.status === "paused" && autoPauseEnabledForSport && autoPausePolicy.mode === "automatic" && hasReliableMovement && avgSpeed >= Math.max(AUTO_PAUSE_RESUME_THRESHOLD, autoPausePolicy.speedBelowKmh + 0.5)) {
             lowSpeedCountRef.current = 0;
             dispatch({ type: "RESUME" });
             return;
@@ -2326,6 +2337,7 @@ export default function MapScreen() {
       hadLiveWeather: false,
     };
     lowSpeedCountRef.current = 0;
+    nextAutoLapDistanceMRef.current = null;
     arrivedRef.current = false;
     setMapRideActive(true);
     setFollowUser(true);
@@ -2435,11 +2447,12 @@ export default function MapScreen() {
     dispatch({ type: "RESUME" });
   }, [dispatch]);
 
-  const handleMarkLap = useCallback(() => {
-    if (state.status !== "active") return;
+  const completeCurrentLap = useCallback(() => {
+    const currentState = stateRef.current;
+    if (currentState.status !== "active") return false;
     // 使用與 reducer 相同的快照函式，確保彈窗、摘要、活動詳情與 FIT 匯出完全一致。
-    const completedLap = buildManualRideLap(state);
-    if (!completedLap) return;
+    const completedLap = buildManualRideLap(currentState);
+    if (!completedLap) return false;
     dispatch({ type: "MARK_LAP" });
     if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
     setLapFeedback(completedLap);
@@ -2448,7 +2461,32 @@ export default function MapScreen() {
       lapFeedbackTimerRef.current = null;
     }, 4_000);
     if (settings.vibrationEnabled) vibrateSuccess();
-  }, [dispatch, settings.vibrationEnabled, state]);
+    return true;
+  }, [dispatch, settings.vibrationEnabled]);
+
+  const handleMarkLap = useCallback(() => {
+    if (!settings.lapEnabled) return;
+    void completeCurrentLap();
+  }, [completeCurrentLap, settings.lapEnabled]);
+
+  useEffect(() => {
+    if (!settings.lapEnabled || settings.lapMode !== "auto" || state.status !== "active") {
+      nextAutoLapDistanceMRef.current = null;
+      return;
+    }
+    const intervalM = settings.autoLapDistanceKm * 1_000;
+    const currentDistanceM = state.distance;
+    const nextDistanceM = nextAutoLapDistanceMRef.current
+      ?? (Math.floor(currentDistanceM / intervalM) + 1) * intervalM;
+    if (currentDistanceM < nextDistanceM) {
+      nextAutoLapDistanceMRef.current = nextDistanceM;
+      return;
+    }
+    if (completeCurrentLap()) {
+      // 以整趟累計距離的固定倍數觸發；手動介入不會改變下一個自動里程碑。
+      nextAutoLapDistanceMRef.current = nextDistanceM + intervalM;
+    }
+  }, [completeCurrentLap, settings.autoLapDistanceKm, settings.lapEnabled, settings.lapMode, state.distance, state.status]);
 
   useEffect(() => () => {
     if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
@@ -3534,15 +3572,17 @@ export default function MapScreen() {
                   <IconSymbol name="play.fill" size={22} color="#00C853" />
                 </Pressable>
               )}
-              <Pressable
-                accessibilityLabel="標記手動 Lap"
-                style={({ pressed }) => [styles.lapControlBtn, { opacity: !isRiding ? 0.45 : pressed ? 0.7 : 1 }]}
-                onPress={handleMarkLap}
-                disabled={!isRiding}
-              >
-                <Text style={styles.lapControlText}>Lap</Text>
-                <Text style={styles.lapControlCount}>{state.laps.length + 1}</Text>
-              </Pressable>
+              {settings.lapEnabled && (
+                <Pressable
+                  accessibilityLabel={settings.lapMode === "auto" ? "手動介入標記 Lap；自動計圈已啟用" : "標記手動 Lap"}
+                  style={({ pressed }) => [styles.lapControlBtn, { opacity: !isRiding ? 0.45 : pressed ? 0.7 : 1 }]}
+                  onPress={handleMarkLap}
+                  disabled={!isRiding}
+                >
+                  <Text style={styles.lapControlText}>Lap</Text>
+                  <Text style={styles.lapControlCount}>{settings.lapMode === "auto" ? `${settings.autoLapDistanceKm}K` : state.laps.length + 1}</Text>
+                </Pressable>
+              )}
               <Pressable
                 style={({ pressed }) => [styles.startBtn, styles.stopBtn, { opacity: pressed ? 0.85 : 1 }]}
                 onPress={handleStop}

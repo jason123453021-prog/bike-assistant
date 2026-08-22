@@ -17,12 +17,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Slider from "@react-native-community/slider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
-import { useSettings, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
+import { useThemeContext } from "@/lib/theme-provider";
+import { useSettings, AUTO_LAP_DISTANCE_PRESETS_KM, DEFAULT_FIELD_ORDER, DEFAULT_SIMPLIFIED_FIELD_ORDER, type NormalFieldKey, type SimplifiedFieldKey, type SupplyItem } from "@/lib/settings-context";
 import { SmartPowerSavingManager, type PowerSavingSettings } from "@/lib/power-saving/smart-power-saving-system";
 import { useRide } from "@/lib/ride-context";
+import { SPORT_META } from "@/lib/sport-metrics";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-profile";
 import { RidePermissionReadiness } from "@/components/ride-permission-readiness";
@@ -40,6 +44,7 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function SettingsScreen() {
   const colors = useColors();
+  const { themePreference, setThemePreference } = useThemeContext();
   const { settings, updateSettings, resetAllSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
   const { state: rideState } = useRide();
   const autoPersonalMetrics = deriveAutoPersonalMetrics(rideState.records, {
@@ -83,6 +88,25 @@ export default function SettingsScreen() {
     const next = { ...powerSavingSettings, ...patch };
     setPowerSavingSettings(next);
     await powerSavingManagerRef.current.saveSettings(patch);
+  };
+
+  const handleClearMapCache = () => {
+    if (rideState.status === "active" || rideState.status === "paused") {
+      Alert.alert("騎乘進行中", "為避免遺失鎖定期間的軌跡資料，請先完成或停止本次騎乘後再清理暫存資料。");
+      return;
+    }
+    Alert.alert("清理地圖與暫存軌跡", "這不會刪除已儲存的活動、GPX 匯出檔或個人設定。", [
+      { text: "取消", style: "cancel" },
+      {
+        text: "清理",
+        style: "destructive",
+        onPress: () => {
+          void AsyncStorage.multiRemove(["@bike_bg_track_points", "@bike_bg_state"])
+            .then(() => Alert.alert("已清理", "地圖與背景追蹤暫存資料已移除。"))
+            .catch(() => Alert.alert("清理失敗", "暫存資料目前無法移除，請稍後再試。"));
+        },
+      },
+    ]);
   };
 
   const [editModal, setEditModal] = useState<{
@@ -188,10 +212,21 @@ export default function SettingsScreen() {
 
   // 各區塊折疊狀態（預設全部展開）
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
   const toggleSection = (key: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+  const toggleCategory = (key: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpenCategories((previous) => ({ ...previous, [key]: !previous[key] }));
+  };
+
+  useEffect(() => {
+    if (settings.appearanceMode !== themePreference) {
+      setThemePreference(settings.appearanceMode);
+    }
+  }, [setThemePreference, settings.appearanceMode, themePreference]);
 
   // 拖曳排序狀態
   const [dragOrder, setDragOrder] = useState<NormalFieldKey[]>(
@@ -359,6 +394,8 @@ export default function SettingsScreen() {
         ? Math.min(100, Math.max(10, Math.round(num)))
         : editModal.key === "energyCarbohydrateHourlyLimitG"
           ? Math.min(90, Math.max(20, Math.round(num)))
+          : editModal.key === "autoPauseSpeedThresholdKmh"
+            ? Math.min(5, Math.max(0.5, Math.round(num * 10) / 10))
           : editModal.key === "bikeWeight"
             ? Math.min(35, Math.max(3, Math.round(num * 10) / 10))
         : num;
@@ -370,6 +407,123 @@ export default function SettingsScreen() {
     <ScreenContainer containerClassName="bg-background">
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={[styles.title, { color: colors.foreground }]}>設定</Text>
+
+        <SettingsCategory
+          icon="bicycle"
+          title="騎乘與儀表板設定"
+          subtitle="計圈、預設運動、定位與儀表欄位"
+          colors={colors}
+          expanded={Boolean(openCategories.riding)}
+          onPress={() => toggleCategory("riding")}
+        >
+        <View style={[styles.lapSettingsCard, { borderColor: colors.border, backgroundColor: colors.surface }]}> 
+          <ToggleRow
+            icon="flag.fill"
+            label="啟用計圈功能"
+            value={settings.lapEnabled}
+            colors={colors}
+            onToggle={(enabled) => updateSettings({ lapEnabled: enabled })}
+          />
+          {settings.lapEnabled && <>
+            <Divider colors={colors} />
+            <View style={styles.lapSettingContent}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>計圈模式</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>自動模式仍保留儀表板 Lap 按鈕，可隨時手動介入。</Text>
+              <View style={styles.lapModeOptions}>
+                {(["manual", "auto"] as const).map((mode) => {
+                  const selected = settings.lapMode === mode;
+                  return (
+                    <Pressable
+                      key={mode}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      onPress={() => void updateSettings({ lapMode: mode })}
+                      style={({ pressed }) => [styles.lapModeOption, {
+                        backgroundColor: selected ? colors.accent : colors.background,
+                        borderColor: selected ? colors.accent : colors.border,
+                        opacity: pressed ? 0.72 : 1,
+                      }]}
+                    >
+                      <Text style={{ color: selected ? colors.onAccent : colors.foreground, fontSize: 14, fontWeight: "800" }}>
+                        {mode === "manual" ? "手動" : "自動"}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {settings.lapMode === "auto" && <>
+                <Text style={[styles.lapDistanceLabel, { color: colors.muted }]}>自動計圈距離</Text>
+                <View style={styles.lapModeOptions}>
+                  {AUTO_LAP_DISTANCE_PRESETS_KM.map((distanceKm) => {
+                    const selected = settings.autoLapDistanceKm === distanceKm;
+                    return (
+                      <Pressable
+                        key={distanceKm}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        onPress={() => void updateSettings({ autoLapDistanceKm: distanceKm })}
+                        style={({ pressed }) => [styles.lapModeOption, {
+                          backgroundColor: selected ? colors.accent : colors.background,
+                          borderColor: selected ? colors.accent : colors.border,
+                          opacity: pressed ? 0.72 : 1,
+                        }]}
+                      >
+                        <Text style={{ color: selected ? colors.onAccent : colors.foreground, fontSize: 14, fontWeight: "800" }}>{distanceKm} km</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>}
+            </View>
+          </>}
+        </View>
+
+        <View style={[styles.defaultSportCard, { borderColor: colors.border, backgroundColor: colors.surface }]}> 
+          <Text style={[styles.rowLabel, { color: colors.foreground }]}>預設運動模式</Text>
+          <Text style={[styles.rowHint, { color: colors.muted }]}>下次開始騎乘時預先選取；開始前仍可在儀表板切換。</Text>
+          <View style={styles.defaultSportOptions}>
+            {Object.entries(SPORT_META).map(([sportType, meta]) => {
+              const selected = settings.defaultSportType === sportType;
+              return (
+                <Pressable
+                  key={sportType}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  onPress={() => void updateSettings({ defaultSportType: sportType as keyof typeof SPORT_META })}
+                  style={({ pressed }) => [styles.defaultSportOption, {
+                    borderColor: selected ? meta.accent : colors.border,
+                    backgroundColor: selected ? `${meta.accent}22` : colors.background,
+                    opacity: pressed ? 0.7 : 1,
+                  }]}
+                >
+                  <Text style={styles.defaultSportIcon}>{meta.icon}</Text>
+                  <Text numberOfLines={1} style={{ color: selected ? meta.accent : colors.foreground, fontSize: 12, fontWeight: "800" }}>{meta.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={[styles.defaultSportCard, { borderColor: colors.border, backgroundColor: colors.surface, marginTop: 14 }]}> 
+          <ToggleRow
+            icon="pause.circle.fill"
+            label="自動暫停"
+            value={settings.idleAutoPauseEnabled}
+            colors={colors}
+            onToggle={(enabled) => updateSettings({ idleAutoPauseEnabled: enabled })}
+          />
+          <Divider colors={colors} />
+          <NumberRow
+            icon="speedometer"
+            label="自動暫停速度門檻"
+            value={settings.autoPauseSpeedThresholdKmh}
+            unit="km/h"
+            colors={colors}
+            hint="單車低於此速度且持續 9 秒才暫停；高於此門檻 0.5 km/h 即恢復"
+            disabled={!settings.idleAutoPauseEnabled}
+            onPress={() => openEdit("autoPauseSpeedThresholdKmh", "自動暫停速度門檻", settings.autoPauseSpeedThresholdKmh, "km/h")}
+          />
+        </View>
 
         {/* ── 個人資料 ── */}
         <SectionHeader title="個人資料" colors={colors} onToggle={() => toggleSection("personal")} collapsed={collapsedSections["personal"]} />
@@ -408,8 +562,6 @@ export default function SettingsScreen() {
             <Text style={[styles.rowHint, { color: colors.muted }]}>{autoPersonalMetrics.sourceRideCount ? `依 ${autoPersonalMetrics.sourceRideCount} 次有效本機騎乘更新` : "尚無足夠功率歷史，暫用安全基準並持續校正"}</Text>
           </View>
         </View>}
-
-        <RidePermissionReadiness />
 
         {/* ── 背景 GPS 精度 ── */}
         <SectionHeader title="背景 GPS 精度" colors={colors} onToggle={() => toggleSection("gpsAccuracy")} collapsed={collapsedSections["gpsAccuracy"]} />
@@ -454,7 +606,16 @@ export default function SettingsScreen() {
             </View>
           </View>
         </View>}
+        </SettingsCategory>
 
+        <SettingsCategory
+          icon="bell.fill"
+          title="補給與提醒設定"
+          subtitle="補給、補水、通知、語音與震動"
+          colors={colors}
+          expanded={Boolean(openCategories.alerts)}
+          onPress={() => toggleCategory("alerts")}
+        >
         {/* ── 補給提醒 ── */}
         <SectionHeader title="補給提醒" colors={colors} onToggle={() => toggleSection("supply")} collapsed={collapsedSections["supply"]} />
         {!collapsedSections["supply"] && <View style={[styles.section, { borderColor: colors.border }]}> 
@@ -910,7 +1071,44 @@ export default function SettingsScreen() {
             </Text>
           </View>
         </View>}
+        </SettingsCategory>
 
+        <SettingsCategory
+          icon="moon.fill"
+          title="顯示與外觀"
+          subtitle="主題、螢幕常亮、省電與儀表版面"
+          colors={colors}
+          expanded={Boolean(openCategories.display)}
+          onPress={() => toggleCategory("display")}
+        >
+        <View style={[styles.appearanceCard, { borderColor: colors.border, backgroundColor: colors.surface }]}> 
+          <Text style={[styles.rowLabel, { color: colors.foreground }]}>外觀主題</Text>
+          <Text style={[styles.rowHint, { color: colors.muted }]}>選擇淺色、深色或讓 App 跟隨手機系統主題。</Text>
+          <View style={styles.lapModeOptions}>
+            {([
+              { key: "system", label: "跟隨系統" },
+              { key: "light", label: "淺色" },
+              { key: "dark", label: "深色" },
+            ] as const).map(({ key, label }) => {
+              const selected = settings.appearanceMode === key;
+              return (
+                <Pressable
+                  key={key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  onPress={() => void updateSettings({ appearanceMode: key })}
+                  style={({ pressed }) => [styles.lapModeOption, {
+                    backgroundColor: selected ? colors.accent : colors.background,
+                    borderColor: selected ? colors.accent : colors.border,
+                    opacity: pressed ? 0.72 : 1,
+                  }]}
+                >
+                  <Text numberOfLines={1} style={{ color: selected ? colors.onAccent : colors.foreground, fontSize: 13, fontWeight: "800" }}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
         {/* ── 智慧省電模式 ── */}
         <SectionHeader title="智慧省電模式" colors={colors} onToggle={() => toggleSection("powerSaving")} collapsed={collapsedSections["powerSaving"]} />
         {!collapsedSections["powerSaving"] && <View style={[styles.section, { borderColor: colors.border }]}> 
@@ -941,14 +1139,6 @@ export default function SettingsScreen() {
             />
             <Text style={[styles.rowHint, { color: colors.muted, marginLeft: 6 }]}>秒</Text>
           </View>
-          <Divider colors={colors} />
-          <ToggleRow
-            icon="pause.circle.fill"
-            label="靜止自動暫停定位"
-            value={settings.idleAutoPauseEnabled}
-            colors={colors}
-            onToggle={(enabled) => updateSettings({ idleAutoPauseEnabled: enabled })}
-          />
           <Divider colors={colors} />
           <View style={styles.row}>
             <IconSymbol name="clock.badge.exclamationmark" size={18} color={colors.muted} />
@@ -1309,8 +1499,47 @@ export default function SettingsScreen() {
             </>
           );
         })()}
+        </SettingsCategory>
 
-        <View style={[styles.section, { borderColor: colors.border, marginTop: 24 }]}>
+        <SettingsCategory
+          icon="gearshape.fill"
+          title="系統與資料管理"
+          subtitle="權限狀態、本機資料與版本資訊"
+          colors={colors}
+          expanded={Boolean(openCategories.system)}
+          onPress={() => toggleCategory("system")}
+        >
+        <RidePermissionReadiness />
+        <View style={[styles.section, { borderColor: colors.border, marginTop: 14 }]}> 
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="清理地圖與暫存軌跡"
+            onPress={handleClearMapCache}
+            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.68 : 1 }]}
+          >
+            <IconSymbol name="trash.fill" size={18} color={colors.error} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>清理地圖與暫存軌跡</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>不會刪除已完成的活動、GPX 匯出檔或個人設定</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+          </Pressable>
+          <Divider colors={colors} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="前往活動紀錄備份 GPX"
+            onPress={() => router.push("/history")}
+            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.68 : 1 }]}
+          >
+            <IconSymbol name="square.and.arrow.up" size={18} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>匯出／備份 GPX 軌跡</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>前往活動紀錄，選擇騎乘後可透過系統分享面板備份 GPX 或 FIT</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+          </Pressable>
+        </View>
+        <View style={[styles.section, { borderColor: colors.border, marginTop: 24 }]}> 
           <Text style={{ fontSize: 15, fontWeight: "800", color: colors.foreground }}>設定管理</Text>
           <Text style={{ fontSize: 12, lineHeight: 18, color: colors.muted, marginTop: 6 }}>
             恢復個人資料、補給、提醒、儀表板與省電預設值；不會刪除騎乘活動、軌跡或照片。
@@ -1341,6 +1570,7 @@ export default function SettingsScreen() {
             單車助手 v{Constants.expoConfig?.version ?? "1.0.1"}
           </Text>
         </View>
+        </SettingsCategory>
       </ScrollView>
 
       {/* Edit Modal */}
@@ -1589,6 +1819,44 @@ function SectionHeader({
   );
 }
 
+function SettingsCategory({
+  icon, title, subtitle, colors, expanded, onPress, children,
+}: {
+  icon: string;
+  title: string;
+  subtitle: string;
+  colors: any;
+  expanded: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={[styles.categoryCard, { borderColor: colors.border, backgroundColor: colors.surface }]}> 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={onPress}
+        style={({ pressed }) => [styles.categoryTrigger, { opacity: pressed ? 0.72 : 1 }]}
+      >
+        <View style={[styles.categoryIcon, { backgroundColor: `${colors.accent}18` }]}>
+          <IconSymbol name={icon as any} size={20} color={colors.accent} />
+        </View>
+        <View style={styles.categoryCopy}>
+          <Text style={[styles.categoryTitle, { color: colors.foreground }]}>{title}</Text>
+          <Text style={[styles.categorySubtitle, { color: colors.muted }]}>{subtitle}</Text>
+        </View>
+        <IconSymbol
+          name="chevron.right"
+          size={20}
+          color={colors.muted}
+          style={{ transform: [{ rotate: expanded ? "90deg" : "0deg" }] }}
+        />
+      </Pressable>
+      {expanded ? <View style={styles.categoryContent}>{children}</View> : null}
+    </View>
+  );
+}
+
 function Divider({ colors }: { colors: any }) {
   return (
     <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -1668,6 +1936,23 @@ function ToggleRow({
 const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 /* internal spacing */ },
   title: { fontSize: 28, fontWeight: "700", letterSpacing: -0.5, marginBottom: 24 /* internal spacing */ },
+  categoryCard: { borderWidth: 1, borderRadius: 18, marginBottom: 14, overflow: "hidden" },
+  categoryTrigger: { minHeight: 76, paddingHorizontal: 16, paddingVertical: 14, flexDirection: "row", alignItems: "center", gap: 12 },
+  categoryIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  categoryCopy: { flex: 1, gap: 3 },
+  categoryTitle: { fontSize: 17, fontWeight: "900", lineHeight: 22 },
+  categorySubtitle: { fontSize: 12, lineHeight: 17, fontWeight: "600" },
+  categoryContent: { paddingHorizontal: 12, paddingBottom: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(128,128,128,0.24)" },
+  lapSettingsCard: { borderWidth: 1, borderRadius: 14, overflow: "hidden", marginTop: 14, marginBottom: 14 },
+  lapSettingContent: { paddingHorizontal: 16, paddingVertical: 14 },
+  lapModeOptions: { flexDirection: "row", gap: 8, marginTop: 10 },
+  lapModeOption: { flex: 1, minHeight: 42, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
+  lapDistanceLabel: { fontSize: 12, fontWeight: "800", marginTop: 15 },
+  defaultSportCard: { borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 2 },
+  defaultSportOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
+  defaultSportOption: { width: "47%", minHeight: 48, borderRadius: 11, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 7 },
+  defaultSportIcon: { fontSize: 17 },
+  appearanceCard: { borderWidth: 1, borderRadius: 14, padding: 16, marginTop: 14, marginBottom: 2 },
   sectionHeader: {
     fontSize: 13,
     fontWeight: "800",

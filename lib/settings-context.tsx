@@ -17,9 +17,29 @@ import {
   type DaylightAlertMode,
 } from "./daylight-alert";
 import { DEFAULT_ROAD_BIKE_MASS_KG } from "./power-calc";
+import type { SportType } from "./sport-metrics";
 
 export const MIN_BIKE_WEIGHT_KG = 3;
 export const MAX_BIKE_WEIGHT_KG = 35;
+export const AUTO_LAP_DISTANCE_PRESETS_KM = [1, 5, 10] as const;
+export type LapMode = "manual" | "auto";
+export type AppearanceMode = "system" | "light" | "dark";
+const SPORT_TYPES: SportType[] = ["cycling", "running", "hiking", "trail_running"];
+
+function normalizeDefaultSportType(value: unknown): SportType {
+  return typeof value === "string" && SPORT_TYPES.includes(value as SportType)
+    ? value as SportType
+    : "cycling";
+}
+
+/** 將舊版或任意輸入收斂為儀表板可讀、可驗證的常用自動計圈距離。 */
+export function normalizeAutoLapDistanceKm(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 5;
+  return AUTO_LAP_DISTANCE_PRESETS_KM.reduce((nearest, preset) => (
+    Math.abs(preset - numeric) < Math.abs(nearest - numeric) ? preset : nearest
+  ));
+}
 
 /** 將舊設定、手動輸入與重設流程收斂至適用於公路車、通勤車與輕型電輔車的安全範圍。 */
 export function normalizeBikeWeightKg(value: unknown): number {
@@ -131,6 +151,18 @@ export interface AppSettings {
   age: number;          // 騎手年齡（用於推算最大心率 MHR）
   ftp: number;          // Functional Threshold Power (watts)
   bikeWeight: number;   // kg 自行車與隨車裝備總重
+  /** 全域計圈主開關；關閉時隱藏儀表板 Lap 控制且不建立自動分段。 */
+  lapEnabled: boolean;
+  /** 手動模式只接受按鈕分段；自動模式按距離分段且保留手動介入。 */
+  lapMode: LapMode;
+  /** 自動模式每次累計達此距離（km）建立一筆分段。 */
+  autoLapDistanceKm: number;
+  /** 下次開始騎乘時預先選取的運動類型；不會改寫進行中的活動。 */
+  defaultSportType: SportType;
+  /** 單車模式的自動暫停速度閾值（km/h）；仍須通過模型治理的連續低速防抖。 */
+  autoPauseSpeedThresholdKmh: number;
+  /** 跟隨系統、固定淺色或固定深色的全域外觀偏好。 */
+  appearanceMode: AppearanceMode;
   /** 預設使用本機歷史推定 FTP 與心率基準；關閉後才完全採用手動數值。 */
   autoPersonalMetricsEnabled: boolean;
   /** 騎乘完成後自動寫入 App 推定 RPE；使用者仍可於活動編輯手動覆寫。 */
@@ -252,6 +284,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   age: 32,
   ftp: 200,
   bikeWeight: DEFAULT_ROAD_BIKE_MASS_KG,
+  lapEnabled: true,
+  lapMode: "manual",
+  autoLapDistanceKm: 5,
+  defaultSportType: "cycling",
+  autoPauseSpeedThresholdKmh: 1.1,
+  appearanceMode: "system",
   autoPersonalMetricsEnabled: true,
   autoRpeEnabled: true,
   maxHeartRate: 200,
@@ -450,6 +488,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           daylightAlertLeadMinutes: normalizeDaylightAlertLeadMinutes(saved.daylightAlertLeadMinutes),
           daylightAlertMode: normalizeDaylightAlertMode(saved.daylightAlertMode),
           bikeWeight: normalizeBikeWeightKg(saved.bikeWeight),
+          lapEnabled: saved.lapEnabled !== false,
+          lapMode: saved.lapMode === "auto" ? "auto" : "manual",
+          autoLapDistanceKm: normalizeAutoLapDistanceKm(saved.autoLapDistanceKm),
+          defaultSportType: normalizeDefaultSportType(saved.defaultSportType),
+          autoPauseSpeedThresholdKmh: Math.min(5, Math.max(0.5, Number.isFinite(Number(saved.autoPauseSpeedThresholdKmh)) ? Number(saved.autoPauseSpeedThresholdKmh) : 1.1)),
+          appearanceMode: saved.appearanceMode === "light" || saved.appearanceMode === "dark" ? saved.appearanceMode : "system",
           energyServingCarbohydrateG: Math.min(100, Math.max(10, Number(saved.energyServingCarbohydrateG) || DEFAULT_SETTINGS.energyServingCarbohydrateG)),
           energyCarbohydrateHourlyLimitMode: saved.energyCarbohydrateHourlyLimitMode === "manual" ? "manual" : "science",
           energyCarbohydrateHourlyLimitG: Math.min(90, Math.max(20, Number(saved.energyCarbohydrateHourlyLimitG) || DEFAULT_SETTINGS.energyCarbohydrateHourlyLimitG)),
@@ -478,6 +522,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       ...partial,
       birthday,
       bikeWeight: normalizeBikeWeightKg(partial.bikeWeight ?? settings.bikeWeight),
+      lapEnabled: partial.lapEnabled ?? settings.lapEnabled,
+      lapMode: partial.lapMode === "auto" ? "auto" : partial.lapMode === "manual" ? "manual" : settings.lapMode,
+      autoLapDistanceKm: normalizeAutoLapDistanceKm(partial.autoLapDistanceKm ?? settings.autoLapDistanceKm),
+      defaultSportType: normalizeDefaultSportType(partial.defaultSportType ?? settings.defaultSportType),
+      autoPauseSpeedThresholdKmh: Math.min(5, Math.max(0.5, Number.isFinite(Number(partial.autoPauseSpeedThresholdKmh)) ? Number(partial.autoPauseSpeedThresholdKmh) : settings.autoPauseSpeedThresholdKmh)),
+      appearanceMode: partial.appearanceMode === "light" || partial.appearanceMode === "dark" || partial.appearanceMode === "system"
+        ? partial.appearanceMode
+        : settings.appearanceMode,
       age: calculateAgeFromBirthday(birthday) ?? settings.age,
       smartEnergySupplyEnabled: nextEnergySmartEnabled,
       smartWaterSupplyEnabled: nextWaterSmartEnabled,

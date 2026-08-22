@@ -1,19 +1,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Appearance, View, useColorScheme as useSystemColorScheme } from "react-native";
 import { colorScheme as nativewindColorScheme, vars } from "nativewind";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { SchemeColors, type ColorScheme } from "@/constants/theme";
 
+export type ThemePreference = ColorScheme | "system";
+
 type ThemeContextValue = {
   colorScheme: ColorScheme;
+  themePreference: ThemePreference;
   setColorScheme: (scheme: ColorScheme) => void;
+  setThemePreference: (preference: ThemePreference) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useSystemColorScheme() ?? "light";
-  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(systemScheme);
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>("system");
+  const colorScheme: ColorScheme = themePreference === "system" ? systemScheme : themePreference;
 
   const applyScheme = useCallback((scheme: ColorScheme) => {
     nativewindColorScheme.set(scheme);
@@ -29,14 +35,32 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const setThemePreference = useCallback((preference: ThemePreference) => {
+    setThemePreferenceState(preference);
+  }, []);
+
   const setColorScheme = useCallback((scheme: ColorScheme) => {
-    setColorSchemeState(scheme);
-    applyScheme(scheme);
-  }, [applyScheme]);
+    setThemePreference(scheme);
+  }, [setThemePreference]);
+
+  useEffect(() => {
+    AsyncStorage.getItem("@bike_settings").then((raw) => {
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw) as { appearanceMode?: unknown };
+        if (parsed.appearanceMode === "light" || parsed.appearanceMode === "dark" || parsed.appearanceMode === "system") {
+          setThemePreferenceState(parsed.appearanceMode);
+        }
+      } catch {
+        // 設定資料受損時維持跟隨系統；不得讓啟動流程中斷。
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     applyScheme(colorScheme);
-  }, [applyScheme, colorScheme]);
+    Appearance.setColorScheme?.(themePreference === "system" ? null : colorScheme);
+  }, [applyScheme, colorScheme, themePreference]);
 
   const themeVariables = useMemo(
     () =>
@@ -65,9 +89,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       colorScheme,
+      themePreference,
       setColorScheme,
+      setThemePreference,
     }),
-    [colorScheme, setColorScheme],
+    [colorScheme, setColorScheme, setThemePreference, themePreference],
   );
   return (
     <ThemeContext.Provider value={value}>

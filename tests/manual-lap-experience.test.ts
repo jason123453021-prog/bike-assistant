@@ -66,7 +66,7 @@ describe("專業手動 Lap 體驗", () => {
 
   it("提供四秒即時完成回饋、摘要 Lap 列表及不重疊的鎖定狀態堆疊", () => {
     expect(mapSource).toContain("const [lapFeedback, setLapFeedback]");
-    expect(mapSource).toContain("buildManualRideLap(state)");
+    expect(mapSource).toContain("buildManualRideLap(currentState)");
     expect(mapSource).toContain("}, 4_000);");
     expect(mapSource).toContain("Lap {lapFeedback.index} 已完成");
     expect(mapSource).toContain("touchGuardStatusStack");
