@@ -22,7 +22,7 @@ const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
   owner: "jason1234530",
-  version: "1.0.3",
+  version: "1.0.4",
   // Android 16 會忽略大螢幕的強制方向；改採自適應視窗與 Safe Area 佈局。
   orientation: "default",
   icon: "./assets/images/icon.png",
@@ -52,7 +52,7 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    versionCode: 10087,
+    versionCode: 10088,
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
@@ -183,8 +183,8 @@ const config: ExpoConfig = {
     },
   },
   // 正式 AAB 與 EAS Update 使用固定 runtime；Expo Go 開發 manifest 則採 SDK 相容 runtime，
-  // 避免 Expo Go 將 1.0.3 當成不相容的已安裝原生 runtime 而拒絕下載遠端 bundle。
-  runtimeVersion: isProductionEasBuild ? "1.0.3" : undefined,
+  // 避免 Expo Go 將 1.0.4 當成不相容的已安裝原生 runtime 而拒絕下載遠端 bundle。
+  runtimeVersion: isProductionEasBuild ? "1.0.4" : undefined,
 };
 
 export default config;
