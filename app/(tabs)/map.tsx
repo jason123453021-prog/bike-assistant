@@ -2313,7 +2313,30 @@ export default function MapScreen() {
     dispatch({ type: "START", hydrationThresholdMl });
     calorieReminderSentRef.current = false;
     waterReminderSentRef.current = false;
+    // 新騎乘必須立即建立本機倒數：首筆有效 GPS／速度樣本到來前，仍可用個人資料與
+    // 離線基準產生可解釋的時間；之後只更新建議量，不重設既有倒數。
+    const initialSupplyPlan = createSupplyPlan({
+      mode: settings.supplyCalculationMode,
+      sportType: state.sportType,
+      calorieThresholdKcal: settings.calorieThreshold,
+      waterThresholdMl: hydrationThresholdMl,
+      elapsedSec: 0,
+      riderWeightKg: settings.weight,
+      ftpW: estimateFtpW,
+      intensityFactor: 0.65,
+      sweatRatePerHour: 550,
+      environmentLoad: 0,
+      weatherAvailable: false,
+      energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+      energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
+      energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+    });
+    setActiveSupplyPlan(initialSupplyPlan);
+    lastBackgroundCountdownSnapshotRef.current = "";
     syncSmartSupplyCountdown(null);
+    if (settings.supplyReminderEnabled && (smartEnergySupplyEnabled || smartWaterSupplyEnabled)) {
+      syncSmartSupplyCountdown(createSmartSupplyCountdown(initialSupplyPlan, 0));
+    }
     calorieAnim.setValue(0);
     waterAnim.setValue(0);
     lastLocationRef.current = null;

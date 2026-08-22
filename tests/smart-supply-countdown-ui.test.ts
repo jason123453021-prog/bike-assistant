@@ -21,6 +21,14 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).not.toContain("refreshSmartSupplyCountdown");
   });
 
+  it("initializes concrete smart countdowns at ride start without waiting for the first accepted GPS sample", () => {
+    expect(mapSource).toContain("const initialSupplyPlan = createSupplyPlan({");
+    expect(mapSource).toContain("elapsedSec: 0,");
+    expect(mapSource).toContain("weatherAvailable: false,");
+    expect(mapSource).toContain('lastBackgroundCountdownSnapshotRef.current = "";');
+    expect(mapSource).toContain("syncSmartSupplyCountdown(createSmartSupplyCountdown(initialSupplyPlan, 0));");
+  });
+
   it("uses a native modal over the map and omits amount guidance", () => {
     expect(modalSource).toContain("<Modal");
     expect(modalSource).toContain("hardwareAccelerated");
