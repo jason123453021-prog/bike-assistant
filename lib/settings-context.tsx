@@ -10,12 +10,6 @@ import {
   DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
   TOUCH_GUARD_UNLOCK_HOLD_PRESETS,
 } from "./live-ride-readings";
-import {
-  DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES,
-  normalizeDaylightAlertLeadMinutes,
-  normalizeDaylightAlertMode,
-  type DaylightAlertMode,
-} from "./daylight-alert";
 import { DEFAULT_ROAD_BIKE_MASS_KG } from "./power-calc";
 import type { SportType } from "./sport-metrics";
 
@@ -209,12 +203,6 @@ export interface AppSettings {
   ttsEnabled: boolean;
   soundEnabled: boolean;
   notificationEnabled: boolean;
-  /** 騎乘跨越日出／日落時，以本機通知與待確認彈窗提醒開啟或關閉警示燈。 */
-  daylightAlertEnabled: boolean;
-  /** 日出或日落前幾分鐘提醒；0 代表在實際日照事件時提醒。 */
-  daylightAlertLeadMinutes: number;
-  /** 可選擇日出日落雙向、僅日出或僅日落的警示燈提醒範圍。 */
-  daylightAlertMode: DaylightAlertMode;
   // 精簡導航模式
   simplifiedNavMode: "off" | "manual" | "auto"; // off=關閉, manual=手動, auto=自動
   simplifiedNavIdleSec: number; // 自動模式開啟前的閒置秒數（預設 30 秒）
@@ -318,9 +306,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   ttsEnabled: true,
   soundEnabled: true,
   notificationEnabled: true,
-  daylightAlertEnabled: true,
-  daylightAlertLeadMinutes: DEFAULT_DAYLIGHT_ALERT_LEAD_MINUTES,
-  daylightAlertMode: "sunrise-and-sunset",
   simplifiedNavMode: "off",
   simplifiedNavIdleSec: 30,
   autoRecenterSec: 12,
@@ -416,6 +401,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           waterRepeatUntilDismissed: _legacyWaterRepeatUntilDismissed,
           caloriePauseOnDownhill: _legacyCaloriePauseOnDownhill,
           waterPauseOnDownhill: _legacyWaterPauseOnDownhill,
+          daylightAlertEnabled: _legacyDaylightAlertEnabled,
+          daylightAlertLeadMinutes: _legacyDaylightAlertLeadMinutes,
+          daylightAlertMode: _legacyDaylightAlertMode,
           ...savedWithoutRemovedSettings
         } = saved;
         const hasIndependentIntervalSettings = [
@@ -485,8 +473,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           touchGuardUnlockHoldMsSchemaVersion: TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION,
           touchGuardAutoRelockSec: Math.min(60, Math.max(1, Number(saved.touchGuardAutoRelockSec) || DEFAULT_SETTINGS.touchGuardAutoRelockSec)),
           autoRecenterSec: Math.min(60, Math.max(3, Number(saved.autoRecenterSec) || DEFAULT_SETTINGS.autoRecenterSec)),
-          daylightAlertLeadMinutes: normalizeDaylightAlertLeadMinutes(saved.daylightAlertLeadMinutes),
-          daylightAlertMode: normalizeDaylightAlertMode(saved.daylightAlertMode),
           bikeWeight: normalizeBikeWeightKg(saved.bikeWeight),
           lapEnabled: saved.lapEnabled !== false,
           lapMode: saved.lapMode === "auto" ? "auto" : "manual",
@@ -539,10 +525,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       touchGuardUnlockHoldMsSchemaVersion: partial.touchGuardUnlockHoldMs !== undefined
         ? TOUCH_GUARD_UNLOCK_HOLD_MS_SCHEMA_VERSION
         : settings.touchGuardUnlockHoldMsSchemaVersion,
-      daylightAlertLeadMinutes: normalizeDaylightAlertLeadMinutes(
-        partial.daylightAlertLeadMinutes ?? settings.daylightAlertLeadMinutes,
-      ),
-      daylightAlertMode: normalizeDaylightAlertMode(partial.daylightAlertMode ?? settings.daylightAlertMode),
     };
     setSettings(next);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));

@@ -11,8 +11,6 @@ import * as Speech from "expo-speech";
 import { Platform } from "react-native";
 import { getLocalNotifications } from "@/lib/local-notifications";
 import { configureSupplyNotificationActions, SUPPLY_NOTIFICATION_CATEGORY, type SupplyNotificationKind } from "@/lib/supply-notification-actions";
-import { daylightAlertCopy, type DaylightAlertKind } from "@/lib/daylight-alert";
-import { configureDaylightNotificationActions, DAYLIGHT_SUNRISE_CATEGORY, DAYLIGHT_SUNSET_CATEGORY } from "@/lib/daylight-notification-actions";
 import type { SupplyPlan } from "@/lib/smart-supply-plan";
 
 let rideSpeechSuppressed = false;
@@ -153,7 +151,6 @@ export async function setupNotifications() {
     });
   } catch {}
   await configureSupplyNotificationActions();
-  await configureDaylightNotificationActions();
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {
@@ -250,68 +247,6 @@ export async function clearAllSupplyNotifications() {
           .map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier).catch(() => {})),
       ],
     );
-  } catch {}
-}
-
-function daylightNotificationId(eventKey: string) {
-  return `bike-assistant-daylight-${eventKey}`;
-}
-
-/** 日出／日落提醒只在本機建立，確認後與補給提醒相同會移除系統通知。 */
-export async function scheduleDaylightAlertNotification(kind: DaylightAlertKind, eventKey: string, dueAtMs: number, leadMinutes = 0) {
-  const Notifications = await getLocalNotifications();
-  if (!Notifications || dueAtMs <= Date.now()) return;
-  const copy = daylightAlertCopy(kind, leadMinutes);
-  try {
-    await configureDaylightNotificationActions();
-    // 每次僅保留下一個日照事件的未到期排程；不會移除已呈現、尚待使用者確認的通知。
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    await Promise.all(scheduled
-      .filter((notification) => notification.content.data?.type === "daylight_alert")
-      .map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier).catch(() => {})));
-    const identifier = daylightNotificationId(eventKey);
-    await Notifications.scheduleNotificationAsync({
-      identifier,
-      content: {
-        title: copy.title,
-        body: copy.body,
-        sound: true,
-        badge: 1,
-        categoryIdentifier: kind === "sunrise" ? DAYLIGHT_SUNRISE_CATEGORY : DAYLIGHT_SUNSET_CATEGORY,
-        data: { type: "daylight_alert", daylightKind: kind, daylightEventKey: eventKey },
-        ...(Platform.OS === "android" ? { channelId: "supply" } : {}),
-      } as any,
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(dueAtMs) } as any,
-    });
-  } catch {}
-}
-
-export async function clearDaylightAlertNotification(eventKey: string) {
-  const Notifications = await getLocalNotifications();
-  if (!Notifications) return;
-  const identifier = daylightNotificationId(eventKey);
-  try {
-    await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => {});
-    await Notifications.dismissNotificationAsync(identifier).catch(() => {});
-  } catch {}
-}
-
-export async function clearAllDaylightAlertNotifications() {
-  const Notifications = await getLocalNotifications();
-  if (!Notifications) return;
-  try {
-    const [presented, scheduled] = await Promise.all([
-      Notifications.getPresentedNotificationsAsync(),
-      Notifications.getAllScheduledNotificationsAsync(),
-    ]);
-    await Promise.all([
-      ...presented
-        .filter((notification) => notification.request.content.data?.type === "daylight_alert")
-        .map((notification) => Notifications.dismissNotificationAsync(notification.request.identifier).catch(() => {})),
-      ...scheduled
-        .filter((notification) => notification.content.data?.type === "daylight_alert")
-        .map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier).catch(() => {})),
-    ]);
   } catch {}
 }
 

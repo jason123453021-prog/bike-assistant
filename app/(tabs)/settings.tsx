@@ -56,12 +56,6 @@ export default function SettingsScreen() {
   });
   const currentAge = calculateAgeFromBirthday(settings.birthday) ?? settings.age;
   const supplyControlsDisabled = !settings.supplyReminderEnabled;
-  const daylightControlsDisabled = !settings.notificationEnabled || !settings.daylightAlertEnabled;
-  const daylightModeCopy = settings.daylightAlertMode === "sunrise-only"
-    ? "僅日出"
-    : settings.daylightAlertMode === "sunset-only"
-      ? "僅日落"
-      : "日出＋日落";
   const effectiveCarbohydrateHourlyLimitG = resolveCarbohydrateHourlyLimit({
     riderWeightKg: settings.weight,
     energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
@@ -381,15 +375,12 @@ export default function SettingsScreen() {
       return;
     }
     const num = parseFloat(editModal.value);
-    const allowsZero = editModal.key === "daylightAlertLeadMinutes";
-    if (isNaN(num) || num < 0 || (!allowsZero && num === 0)) {
+    if (isNaN(num) || num <= 0) {
       Alert.alert("錯誤", "請輸入有效的數值");
       return;
     }
     const boundedNum = editModal.key === "touchGuardAutoRelockSec"
       ? Math.min(60, Math.max(1, Math.round(num)))
-      : editModal.key === "daylightAlertLeadMinutes"
-        ? Math.min(60, Math.max(0, Math.round(num)))
       : editModal.key === "energyServingCarbohydrateG"
         ? Math.min(100, Math.max(10, Math.round(num)))
         : editModal.key === "energyCarbohydrateHourlyLimitG"
@@ -973,103 +964,6 @@ export default function SettingsScreen() {
             colors={colors}
             onToggle={(v) => updateSettings({ notificationEnabled: v })}
           />
-          <Divider colors={colors} />
-          <ToggleRow
-            icon="sun.max.fill"
-            label="日照警示燈提醒"
-            value={settings.daylightAlertEnabled}
-            colors={colors}
-            disabled={!settings.notificationEnabled}
-            onToggle={(enabled) => updateSettings({ daylightAlertEnabled: enabled })}
-          />
-          <Divider colors={colors} />
-          <View style={[styles.daylightModeCard, daylightControlsDisabled && { opacity: 0.45 }]}>
-            <View style={styles.daylightModeHeader}>
-              <IconSymbol name="sun.max.fill" size={18} color="#F59E0B" />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.rowLabel, { color: colors.foreground }]}>提醒時段</Text>
-                <Text style={[styles.rowHint, { color: colors.muted }]}>選擇本次騎乘需要的日照安全提醒</Text>
-              </View>
-            </View>
-            <View style={styles.daylightModeOptions}>
-              {([
-                { key: "sunrise-and-sunset", label: "日出＋日落" },
-                { key: "sunrise-only", label: "僅日出" },
-                { key: "sunset-only", label: "僅日落" },
-              ] as const).map(({ key, label }) => {
-                const selected = settings.daylightAlertMode === key;
-                return (
-                  <Pressable
-                    key={key}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected, disabled: daylightControlsDisabled }}
-                    accessibilityLabel={`${label}警示燈提醒`}
-                    disabled={daylightControlsDisabled}
-                    onPress={() => void updateSettings({ daylightAlertMode: key })}
-                    style={({ pressed }) => [
-                      styles.daylightModeOption,
-                      {
-                        backgroundColor: selected && !daylightControlsDisabled ? colors.accent : colors.surface,
-                        borderColor: selected && !daylightControlsDisabled ? colors.accent : colors.border,
-                        opacity: pressed ? 0.68 : 1,
-                      },
-                    ]}
-                  >
-                    <Text numberOfLines={1} style={{ color: selected && !daylightControlsDisabled ? colors.onAccent : daylightControlsDisabled ? colors.muted : colors.foreground, fontSize: 13, fontWeight: "800" }}>
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-          <Divider colors={colors} />
-          <NumberRow
-            icon="clock.fill"
-            label="提前提醒時間"
-            value={settings.daylightAlertLeadMinutes}
-            unit="分鐘"
-            colors={colors}
-            iconColor="#F59E0B"
-            hint={settings.daylightAlertLeadMinutes === 0 ? `在${daylightModeCopy}時提醒` : `${daylightModeCopy}前 ${settings.daylightAlertLeadMinutes} 分鐘提醒`}
-            disabled={daylightControlsDisabled}
-            onPress={() => openEdit("daylightAlertLeadMinutes", "日照提前提醒時間（0–60 分鐘）", settings.daylightAlertLeadMinutes, "分鐘")}
-          />
-          <View style={styles.supplyRepeatPresetRow}>
-            <Text style={[styles.supplyRepeatPresetLabel, { color: colors.muted }]}>快速設定</Text>
-            {[0, 5, 10, 15, 30].map((minutes) => {
-              const selected = settings.daylightAlertLeadMinutes === minutes;
-              return (
-                <Pressable
-                  key={minutes}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected, disabled: daylightControlsDisabled }}
-                  accessibilityLabel={minutes === 0 ? "在日出日落時提醒" : `提前 ${minutes} 分鐘提醒`}
-                  disabled={daylightControlsDisabled}
-                  onPress={() => void updateSettings({ daylightAlertLeadMinutes: minutes })}
-                  style={({ pressed }) => [
-                    styles.supplyRepeatPreset,
-                    {
-                      backgroundColor: selected && !daylightControlsDisabled ? colors.accent : colors.surface,
-                      borderColor: selected && !daylightControlsDisabled ? colors.accent : colors.border,
-                      opacity: daylightControlsDisabled ? 0.45 : pressed ? 0.65 : 1,
-                    },
-                  ]}
-                >
-                  <Text style={{ color: selected && !daylightControlsDisabled ? colors.onAccent : daylightControlsDisabled ? colors.muted : colors.foreground, fontSize: 14, fontWeight: "800" }}>
-                    {minutes === 0 ? "準時" : `${minutes} 分`}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-            <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
-              {settings.daylightAlertEnabled && settings.notificationEnabled
-                ? `${daylightModeCopy}模式已啟用；依 GPS 座標與裝置時間安排提醒，可設定提前 0–60 分鐘，且需按下確認才結束提醒。`
-                : "已關閉日照警示燈提醒。"}
-            </Text>
-          </View>
         </View>}
         </SettingsCategory>
 
@@ -2218,30 +2112,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 10,
     borderWidth: 1,
-  },
-  daylightModeCard: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 12,
-    gap: 12,
-  },
-  daylightModeHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  daylightModeOptions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  daylightModeOption: {
-    flex: 1,
-    minHeight: 42,
-    borderRadius: 11,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 8,
   },
   guardModeRow: {
     flexDirection: "row",

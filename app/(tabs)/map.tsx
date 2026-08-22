@@ -77,11 +77,9 @@ import {
   scheduleSmartSupplyDueNotification,
   clearAllSmartSupplyDueNotifications,
   clearAllSupplyNotifications,
-  clearAllDaylightAlertNotifications,
   showSupplyNotification,
   cancelRidingNotification,
   requestNotificationPermission,
-  scheduleDaylightAlertNotification,
   setRideSpeechSuppressed,
   stopSpeech,
 } from "@/lib/feedback-service";
@@ -191,11 +189,6 @@ import { createRideSummarySnapshot, type RideSummarySnapshot } from "@/lib/ride-
 import { buildManualRideLap } from "@/lib/ride-lap";
 import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
-import { daylightAlertCopy, getDueDaylightAlert, getNextDaylightAlert, isDaylightAlertKindEnabled, type DaylightAlertEvent } from "@/lib/daylight-alert";
-import {
-  consumeDaylightNotificationActions,
-  subscribeToDaylightNotificationActions,
-} from "@/lib/daylight-notification-actions";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -298,9 +291,6 @@ export default function MapScreen() {
   const [currentPos, setCurrentPos] = useState<{ lat: number; lon: number; heading: number } | null>(null);
   const currentPosRef = useRef<{ lat: number; lon: number; heading: number } | null>(null);
   const [currentClock, setCurrentClock] = useState(() => new Date());
-  const [daylightAlert, setDaylightAlert] = useState<DaylightAlertEvent | null>(null);
-  const daylightAcknowledgedRef = useRef(new Set<string>());
-  const daylightRideStartedAtRef = useRef<number | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const idlePauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pausedAtRef = useRef<number | null>(null);
@@ -2312,9 +2302,6 @@ export default function MapScreen() {
     setRideLocationTrackingMode("full");
     pausedElapsedRef.current = 0;
     dispatch({ type: "START", hydrationThresholdMl });
-    daylightRideStartedAtRef.current = Date.now();
-    daylightAcknowledgedRef.current = new Set();
-    setDaylightAlert(null);
     calorieReminderSentRef.current = false;
     waterReminderSentRef.current = false;
     syncSmartSupplyCountdown(null);
@@ -2562,64 +2549,6 @@ export default function MapScreen() {
   }, [isActive, state.distance, state.elapsed, state.lapAnchor, state.laps, state.powerSampleDurationSec, state.powerWorkJ, state.totalAscent, state.totalDescent]);
   const currentLapHighlight = currentLap ? getLapHighlightMetric(state.sportType, currentLap) : null;
 
-  const acknowledgeDaylightAlert = useCallback((event: DaylightAlertEvent) => {
-    daylightAcknowledgedRef.current.add(event.key);
-    setDaylightAlert((current) => current?.key === event.key ? null : current);
-    void clearAllDaylightAlertNotifications();
-    if (settings.vibrationEnabled) vibrateSuccess();
-  }, [settings.vibrationEnabled]);
-
-  useEffect(() => {
-    const processQueuedActions = async () => {
-      const actions = await consumeDaylightNotificationActions();
-      actions.forEach((action) => acknowledgeDaylightAlert({
-        key: action.eventKey,
-        kind: action.kind,
-        eventAtMs: Date.now(),
-        triggerAtMs: Date.now(),
-      }));
-    };
-    void processQueuedActions();
-    return subscribeToDaylightNotificationActions(() => { void processQueuedActions(); });
-  }, [acknowledgeDaylightAlert]);
-
-  useEffect(() => {
-    if (!settings.daylightAlertEnabled || !settings.notificationEnabled) {
-      setDaylightAlert(null);
-      void clearAllDaylightAlertNotifications();
-      return;
-    }
-    if (daylightAlert && !isDaylightAlertKindEnabled(daylightAlert.kind, settings.daylightAlertMode)) {
-      setDaylightAlert(null);
-      void clearAllDaylightAlertNotifications();
-    }
-  }, [daylightAlert, settings.daylightAlertEnabled, settings.daylightAlertMode, settings.notificationEnabled]);
-
-  useEffect(() => {
-    if (!mapRideActive || !settings.daylightAlertEnabled || !settings.notificationEnabled || !currentPos) return;
-    const rideStartedAtMs = daylightRideStartedAtRef.current ?? (Date.now() - state.elapsed * 1_000);
-    daylightRideStartedAtRef.current = rideStartedAtMs;
-    const evaluateDaylight = () => {
-      const nowMs = Date.now();
-      const input = {
-        nowMs,
-        rideStartedAtMs,
-        latitude: currentPos.lat,
-      longitude: currentPos.lon,
-      acknowledgedKeys: daylightAcknowledgedRef.current,
-      leadMinutes: settings.daylightAlertLeadMinutes,
-      mode: settings.daylightAlertMode,
-      };
-      const due = getDueDaylightAlert(input);
-      if (due) setDaylightAlert((active) => active?.key === due.key ? active : due);
-      const next = getNextDaylightAlert(input);
-      if (next) void scheduleDaylightAlertNotification(next.kind, next.key, next.triggerAtMs, settings.daylightAlertLeadMinutes);
-    };
-    evaluateDaylight();
-    const timer = setInterval(evaluateDaylight, 30_000);
-    return () => clearInterval(timer);
-  }, [currentPos, mapRideActive, settings.daylightAlertEnabled, settings.daylightAlertLeadMinutes, settings.daylightAlertMode, settings.notificationEnabled, state.elapsed]);
-
   const handleStop = useCallback(() => {
     Alert.alert("結束騎乘", "確定要結束本次騎乘並儲存記錄？", [
       { text: "取消", style: "cancel" },
@@ -2647,10 +2576,6 @@ export default function MapScreen() {
           if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
           await cancelRidingNotification();
           await clearAllSmartSupplyDueNotifications();
-          await clearAllDaylightAlertNotifications();
-          daylightRideStartedAtRef.current = null;
-          daylightAcknowledgedRef.current = new Set();
-          setDaylightAlert(null);
           // 結束騎乘清除補給重複提醒計時器
           clearSupplyRepeatTimer();
           setCalorieAlert(false);
@@ -3793,24 +3718,6 @@ export default function MapScreen() {
         }}
       />
 
-      <Modal visible={daylightAlert !== null} transparent animationType="fade" onRequestClose={() => {}}>
-        <View style={styles.daylightModalBackdrop}>
-          <View style={styles.daylightModalCard}>
-            <IconSymbol name={daylightAlert?.kind === "sunset" ? "moon.stars.fill" : "sun.max.fill"} size={30} color={daylightAlert?.kind === "sunset" ? "#FCD34D" : "#FDBA74"} />
-            <Text style={styles.daylightModalTitle}>{daylightAlert ? daylightAlertCopy(daylightAlert.kind, settings.daylightAlertLeadMinutes).title : "安全提醒"}</Text>
-            <Text style={styles.daylightModalBody}>{daylightAlert ? daylightAlertCopy(daylightAlert.kind, settings.daylightAlertLeadMinutes).body : ""}</Text>
-            {daylightAlert && (
-              <Pressable
-                style={({ pressed }) => [styles.daylightModalConfirm, { opacity: pressed ? 0.82 : 1 }]}
-                onPress={() => acknowledgeDaylightAlert(daylightAlert)}
-              >
-                <Text style={styles.daylightModalConfirmText}>{daylightAlertCopy(daylightAlert.kind, settings.daylightAlertLeadMinutes).confirmation}</Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
-      </Modal>
-
       {/* ── 騎乘摘要 Modal ── */}
       <RideSummaryModal
         visible={showSummary}
@@ -4712,28 +4619,6 @@ const styles = StyleSheet.create({
   },
   lapFloatingText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900", lineHeight: 16 },
   lapFloatingCount: { color: "#E7E3FF", fontSize: 10, fontWeight: "800", lineHeight: 13 },
-  daylightModalBackdrop: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    backgroundColor: "rgba(0,0,0,0.62)",
-  },
-  daylightModalCard: {
-    width: "100%",
-    maxWidth: 420,
-    borderRadius: 24,
-    alignItems: "center",
-    backgroundColor: "#17251E",
-    borderWidth: 1,
-    borderColor: "rgba(253, 186, 116, 0.72)",
-    padding: 24,
-  },
-  daylightModalTitle: { color: "#FFFFFF", fontSize: 22, fontWeight: "900", lineHeight: 29, textAlign: "center", marginTop: 12 },
-  daylightModalBody: { color: "rgba(255,255,255,0.9)", fontSize: 16, fontWeight: "600", lineHeight: 24, textAlign: "center", marginTop: 8 },
-  daylightModalConfirm: { width: "100%", minHeight: 52, borderRadius: 16, marginTop: 22, backgroundColor: "#D97706", alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
-  daylightModalConfirmText: { color: "#FFFFFF", fontSize: 16, fontWeight: "900", lineHeight: 22, textAlign: "center" },
-
   expandHint: {
     flexDirection: "row",
     alignItems: "center",
