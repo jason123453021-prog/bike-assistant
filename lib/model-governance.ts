@@ -24,7 +24,7 @@ export interface SportModelProfile {
 }
 
 export const MODEL_GOVERNANCE = {
-  version: "2026.08.22",
+  version: "2026.08.22-r2",
   updatePolicy: "離線內建資料；僅在來源審核、版本號更新與回歸測試同時通過後更新。",
   sources: [
     {
@@ -63,7 +63,7 @@ export const MODEL_GOVERNANCE = {
 export const SPORT_MODEL_PROFILES: Record<GovernedSportType, SportModelProfile> = {
   cycling: {
     label: "單車",
-    tracking: { gpsDistanceIntervalM: 3, stationaryDriftThresholdM: 1.5, autoPauseMode: "automatic", autoPauseSpeedBelowKmh: 1.8, autoPauseStillForSeconds: 5, requiresStillness: false },
+    tracking: { gpsDistanceIntervalM: 3, stationaryDriftThresholdM: 1.5, autoPauseMode: "automatic", autoPauseSpeedBelowKmh: 1.08, autoPauseStillForSeconds: 9, requiresStillness: false },
     calorieMetMultiplier: 1,
     supply: { carbohydrateRateMultiplier: 1, hydrationRateMultiplier: 1 },
   },

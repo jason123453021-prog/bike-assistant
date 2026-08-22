@@ -14,10 +14,10 @@ export interface LiveElevationChange {
   acceptedAltitudeM?: number;
 }
 
-/** 3–5 個樣本移動平均，抑制 GPS 垂直雜訊而保留連續坡度。 */
-export const LIVE_ELEVATION_SMOOTHING_WINDOW = 5;
-/** 平滑後跨越 3 m 才確認為有效爬升／下降。 */
-export const LIVE_ELEVATION_DEADBAND_M = 3;
+/** 11 個樣本移動平均，優先濾除手機 GPS 的垂直跳動。 */
+export const LIVE_ELEVATION_SMOOTHING_WINDOW = 11;
+/** 平滑後持續跨越 5 m 才確認為有效爬升／下降。 */
+export const LIVE_ELEVATION_DEADBAND_M = 5;
 export const LIVE_ELEVATION_MIN_DISTANCE_M = 3;
 
 export function createLiveElevationFilterState(): LiveElevationFilterState {

@@ -104,7 +104,7 @@ describe("ride record normalizer", () => {
     });
 
     expect(record?.distance).toBeCloseTo(reconstructedDistance, 4);
-    expect(record?.totalAscent).toBeCloseTo(9, 3);
+    expect(record?.totalAscent).toBeCloseTo(5.666666666666671, 3);
     expect(record?.calories).toBeLessThan(577);
   });
 
@@ -129,7 +129,7 @@ describe("ride record normalizer", () => {
     });
 
     expect(record?.distance).toBeGreaterThan(50);
-    expect(record?.totalAscent).toBeCloseTo(9, 3);
+    expect(record?.totalAscent).toBeCloseTo(5.666666666666671, 3);
     expect(record?.powerSource).toBe("estimated");
     expect(record?.caloriesSource).toBe("met-estimate");
     expect(record?.calories).toBeLessThan(577);

@@ -21,10 +21,13 @@ import { persistRideMedia } from "@/lib/local-ride-media";
 import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power-calc";
 import { buildActivityStatistics } from "@/lib/activity-statistics";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import type { RideSummarySnapshot } from "@/lib/ride-summary-snapshot";
 
 interface RideSummaryModalProps {
   visible: boolean;
   recordId?: string | null;
+  /** 結束騎乘時凍結的統計，避免完成流程重設即時 state 後顯示全零。 */
+  snapshot?: RideSummarySnapshot | null;
   /** 關閉時傳入使用者輸入的路線名稱（空字串代表使用預設名稱） */
   onClose: (routeName?: string, mediaItems?: string[]) => void | Promise<void>;
 }
@@ -73,7 +76,7 @@ function generateDefaultName(): string {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModalProps) {
+export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideSummaryModalProps) {
   const colors = useColors();
   const { state } = useRide();
 
@@ -89,26 +92,27 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
     }
   }, [visible]);
 
-  const totalPowerSamples = state.powerZones.reduce((a, b) => a + b, 0);
-  const zonePcts = state.powerZones.map((v) =>
+  const summary = snapshot ?? state;
+  const totalPowerSamples = summary.powerZones.reduce((a, b) => a + b, 0);
+  const zonePcts = summary.powerZones.map((v) =>
     totalPowerSamples > 0 ? Math.round((v / totalPowerSamples) * 100) : 0
   );
 
   const activityStats = buildActivityStatistics({
-    distanceM: state.distance,
-    movingTimeSec: state.elapsed,
-    pausedTimeSec: state.totalPausedSec,
-    totalAscentM: state.totalAscent,
-    totalDescentM: state.totalDescent,
-    minElevationM: state.minElevation ?? undefined,
-    maxElevationM: state.maxElevation ?? undefined,
-    maxSpeedKmh: state.maxSpeed,
-    maxPowerW: state.maxPower,
-    powerWorkJ: state.powerWorkJ,
-    powerSampleDurationSec: state.powerSampleDurationSec,
-    caloriesKcal: state.totalCalories,
-    powerSource: state.powerSource,
-    caloriesSource: state.caloriesSource,
+    distanceM: summary.distance,
+    movingTimeSec: summary.elapsed,
+    pausedTimeSec: summary.totalPausedSec,
+    totalAscentM: summary.totalAscent,
+    totalDescentM: summary.totalDescent,
+    minElevationM: summary.minElevation ?? undefined,
+    maxElevationM: summary.maxElevation ?? undefined,
+    maxSpeedKmh: summary.maxSpeed,
+    maxPowerW: summary.maxPower,
+    powerWorkJ: summary.powerWorkJ,
+    powerSampleDurationSec: summary.powerSampleDurationSec,
+    caloriesKcal: summary.totalCalories,
+    powerSource: summary.powerSource,
+    caloriesSource: summary.caloriesSource,
   });
   const distKm = (activityStats.distanceM / 1000).toFixed(2);
   const avgSpd = activityStats.averageSpeedKmh.toFixed(1);
@@ -125,7 +129,7 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
       `活動時間：${formatDuration(activityStats.elapsedTimeSec)}`,
       `移動時間：${formatDuration(activityStats.movingTimeSec)}`,
       `均速：${avgSpd} km/h`,
-      `最高速：${state.maxSpeed.toFixed(1)} km/h`,
+      `最高速：${summary.maxSpeed.toFixed(1)} km/h`,
       `爬升／下降：${Math.round(activityStats.totalAscentM)}／${Math.round(activityStats.totalDescentM)} m`,
       `卡路里：${Math.round(activityStats.caloriesKcal)} kcal（估算）`,
       `暫停時間：${formatDuration(activityStats.pausedTimeSec)}`,
@@ -290,7 +294,7 @@ export function RideSummaryModal({ visible, recordId, onClose }: RideSummaryModa
               <View style={[styles.chartSection, { borderColor: colors.border }]}>
                 <Text style={[styles.sectionTitle, { color: colors.foreground }]}>功率分布</Text>
                 <View style={styles.chartRow}>
-                  <PieChart data={state.powerZones} colors={POWER_ZONE_COLORS} />
+                  <PieChart data={summary.powerZones} colors={POWER_ZONE_COLORS} />
                   <View style={styles.legend}>
                     {POWER_ZONE_NAMES.map((name, i) => (
                       <View key={i} style={styles.legendItem}>

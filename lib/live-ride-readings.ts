@@ -27,8 +27,8 @@ export interface RideMovementSample {
 
 /** 與本機軌跡品質規則對齊：30 m 內精度可作為騎乘統計資料。 */
 export const MAX_RIDE_STATISTICS_ACCURACY_M = 30;
-/** 0.5 m/s，避免緩坡、逆風與慢速起步過早被當成暫停。 */
-export const MIN_CYCLING_MOVEMENT_SPEED_KMH = 1.8;
+/** 0.3 m/s，保留極低速爬坡、逆風與起步的移動時間。 */
+export const MIN_CYCLING_MOVEMENT_SPEED_KMH = 1.08;
 
 /**
  * 前景與背景共用的保守移動門檻。
@@ -62,7 +62,7 @@ export function shouldZeroLiveRideReadings(sample: LiveRideReadingSample): boole
     distanceM: sample.displacementM,
     accuracyM: sample.accuracyM,
   });
-  if (noReliableMovement && sample.motionStill && speedKmh < sample.pauseThresholdKmh && !hasReliableMovement) return true;
+  if (noReliableMovement && sample.motionStill && speedKmh < sample.pauseThresholdKmh) return true;
 
   // 手機固定在車把上時，加速度計本來就可能接近靜止；不得僅因 GPS 瞬間回報 0 km/h
   // 就中斷仍在移動的活動。第一個定位樣本沒有前點時才以低速作為保守回退。
@@ -71,5 +71,5 @@ export function shouldZeroLiveRideReadings(sample: LiveRideReadingSample): boole
   const indoorDrift = sample.motionStill
     && (sample.accuracyM ?? 0) >= 15
     && speedKmh <= Math.max(sample.pauseThresholdKmh + 2, 5);
-  return indoorDrift && !hasReliableMovement;
+  return indoorDrift;
 }

@@ -5,12 +5,13 @@ import { MODEL_GOVERNANCE, SPORT_MODEL_PROFILES } from "../lib/model-governance"
 import { shouldZeroLiveRideReadings } from "../lib/live-ride-readings";
 import { createSupplyPlan } from "../lib/smart-supply-plan";
 import { SPORT_TRACKING_POLICIES } from "../lib/sport-metrics";
+import { createRideSummarySnapshot } from "../lib/ride-summary-snapshot";
 
 const projectRoot = resolve(__dirname, "..");
 
 describe("post-ride cleanup and local model governance", () => {
   it("keeps the governed academic sources and version policy with the local model", () => {
-    expect(MODEL_GOVERNANCE.version).toMatch(/^2026\.08\.22$/);
+    expect(MODEL_GOVERNANCE.version).toMatch(/^2026\.08\.22-r2$/);
     expect(MODEL_GOVERNANCE.sources.map((source) => source.id)).toEqual(expect.arrayContaining([
       "adult-compendium-2024",
       "minetti-2002",
@@ -21,6 +22,8 @@ describe("post-ride cleanup and local model governance", () => {
   });
 
   it("uses sport-specific GPS and pause thresholds without treating slow hiking movement as still", () => {
+    expect(SPORT_MODEL_PROFILES.cycling.tracking.autoPauseSpeedBelowKmh).toBe(1.08);
+    expect(SPORT_MODEL_PROFILES.cycling.tracking.autoPauseStillForSeconds).toBe(9);
     expect(SPORT_TRACKING_POLICIES.hiking.autoPause.mode).toBe("suggest");
     expect(SPORT_TRACKING_POLICIES.hiking.autoPause.speedBelowKmh).toBeLessThan(0.5);
     expect(SPORT_TRACKING_POLICIES.trail_running.autoPause.speedBelowKmh).toBeLessThan(SPORT_TRACKING_POLICIES.running.autoPause.speedBelowKmh);
@@ -58,14 +61,42 @@ describe("post-ride cleanup and local model governance", () => {
     expect(trailRunning.waterRecommendationMl).toBeGreaterThan(cycling.waterRecommendationMl);
   });
 
-  it("clears smart notifications and resets only local ride state after successful record storage", () => {
+  it("freezes the completed summary before local state reset, while preserving post-save cleanup", () => {
     const feedback = readFileSync(resolve(projectRoot, "lib/feedback-service.ts"), "utf8");
     const map = readFileSync(resolve(projectRoot, "app/(tabs)/map.tsx"), "utf8");
 
     expect(feedback).toContain("export async function clearAllSmartSupplyDueNotifications()");
     expect(map).toContain("await clearAllSmartSupplyDueNotifications();");
     expect(map).toContain("setLiveTrail([]);");
+    expect(map).toContain("const completedRideSnapshot = createRideSummarySnapshot(stateRef.current);");
+    expect(map).toContain("setSummarySnapshot(completedRideSnapshot);");
+    expect(map).toContain("snapshot={summarySnapshot}");
     expect(map).toContain('dispatch({ type: "RESET" });');
     expect(map).toContain("if (savedRecordId) {");
+  });
+
+  it("copies summary arrays so a later reset cannot erase the completed ride", () => {
+    const source = {
+      distance: 12_770,
+      elapsed: 1_441,
+      totalPausedSec: 30,
+      totalAscent: 36,
+      totalDescent: 42,
+      minElevation: 5,
+      maxElevation: 39,
+      maxSpeed: 43,
+      maxPower: 231,
+      powerWorkJ: 332_640,
+      powerSampleDurationSec: 1_440,
+      totalCalories: 404,
+      powerSource: "estimated" as const,
+      caloriesSource: "power-estimate" as const,
+      powerZones: [3, 4, 5, 6, 7],
+    };
+    const snapshot = createRideSummarySnapshot(source);
+    source.powerZones[0] = 0;
+
+    expect(snapshot).toMatchObject({ distance: 12_770, totalAscent: 36, totalCalories: 404 });
+    expect(snapshot.powerZones).toEqual([3, 4, 5, 6, 7]);
   });
 });

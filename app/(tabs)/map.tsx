@@ -185,6 +185,7 @@ import {
   clampVirtualPowerForRider,
   createLiveElevationFilterState,
 } from "@/lib/live-elevation-filter";
+import { createRideSummarySnapshot, type RideSummarySnapshot } from "@/lib/ride-summary-snapshot";
 import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
 import { daylightAlertCopy, getDueDaylightAlert, getNextDaylightAlert, isDaylightAlertKindEnabled, type DaylightAlertEvent } from "@/lib/daylight-alert";
@@ -522,6 +523,7 @@ export default function MapScreen() {
   }, [alertPlayer]);
   const [showSummary, setShowSummary] = useState(false);
   const [summaryRecordId, setSummaryRecordId] = useState<string | null>(null);
+  const [summarySnapshot, setSummarySnapshot] = useState<RideSummarySnapshot | null>(null);
   // 補給提醒分別管理（支援兩種同時顯示）
   const [calorieAlert, setCalorieAlert] = useState(false);
   const [waterAlert, setWaterAlert] = useState(false);
@@ -2501,6 +2503,8 @@ export default function MapScreen() {
         text: "結束",
         style: "destructive",
           onPress: async () => {
+          // 在所有非同步儲存與後續畫面重設之前，封存這次騎乘完整統計。
+          const completedRideSnapshot = createRideSummarySnapshot(stateRef.current);
           dispatch({ type: "STOP" });
           setMapRideActive(false);
           setIsNavigating(false);
@@ -2574,6 +2578,7 @@ export default function MapScreen() {
             });
             setSummaryRecordId(savedRecordId);
             if (!savedRecordId) throw new Error("活動記錄未建立");
+            setSummarySnapshot(completedRideSnapshot);
 
             // 僅在歷史活動已成功保存後清除恢復資料，避免儲存空間不足時遺失本次騎乘。
             await clearSnapshot();
@@ -2634,7 +2639,6 @@ export default function MapScreen() {
             gradeWindowRef.current = [];
             prevSpeedMsRef.current = 0;
             lowSpeedCountRef.current = 0;
-            dispatch({ type: "RESET" });
             setShowSummary(true);
             if (settings.vibrationEnabled) vibrateSuccess();
           } catch {
@@ -3684,6 +3688,7 @@ export default function MapScreen() {
       <RideSummaryModal
         visible={showSummary}
         recordId={summaryRecordId}
+        snapshot={summarySnapshot}
         onClose={async (routeName, mediaItems) => {
           setShowSummary(false);
           if (summaryRecordId) {
@@ -3693,6 +3698,7 @@ export default function MapScreen() {
             });
           }
           setSummaryRecordId(null);
+          setSummarySnapshot(null);
           dispatch({ type: "RESET" });
         }}
       />
