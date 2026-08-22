@@ -25,7 +25,7 @@ import { calculateAgeFromBirthday } from "@/lib/personal-profile";
 import * as Location from "expo-location";
 import { type GpxRoute } from "@/lib/gpx-parser";
 import { useGpx } from "@/lib/gpx-context";
-import { formatDuration, formatDistance, calcAirDensity } from "@/lib/power-calc";
+import { DEFAULT_ROAD_BIKE_MASS_KG, formatDuration, formatDistance, calcAirDensity } from "@/lib/power-calc";
 import { fetchWeather, type WeatherData } from "@/lib/weather-service";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -48,9 +48,9 @@ export default function NavigateScreen() {
   // 是否已將天氣連結到路線起點（GPX 匯入後更新）
   const [weatherLinkedToRoute, setWeatherLinkedToRoute] = useState(false);
 
-  // 只使用設定頁必要的手動資料（體重）與 App 自動推定的訓練數據。
+  // 使用設定頁的體重與自行車重量，以及 App 本機推定的訓練數據。
   const riderKg = settings.weight || 70;
-  const bikeKg = settings.bikeWeight ?? 10;
+  const bikeKg = settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG;
   const totalMassKg = riderKg + bikeKg;
   const autoMetrics = useMemo(() => deriveAutoPersonalMetrics(rideState.records, {
     ftpW: settings.ftp,
@@ -266,7 +266,7 @@ export default function NavigateScreen() {
             <Text style={[styles.weightCardTitle, { color: colors.foreground }]}>自動騎乘條件</Text>
             <Text style={[styles.weightCardSub, { color: colors.muted }]}>使用設定頁體重與 App 本機推定 FTP，不需要另外輸入均速或訓練數據。</Text>
             <View style={[styles.totalMassRow, { borderTopColor: colors.border }]}>
-              <Text style={[styles.totalMassLabel, { color: colors.muted }]}>體重 + 預設單車裝備</Text>
+              <Text style={[styles.totalMassLabel, { color: colors.muted }]}>體重 + 自行車裝備</Text>
               <Text style={[styles.totalMassValue, { color: colors.accent }]}>{totalMassKg.toFixed(1)} kg</Text>
             </View>
             <View style={[styles.totalMassRow, { borderTopColor: colors.border }]}> 

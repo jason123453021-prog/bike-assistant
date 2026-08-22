@@ -359,6 +359,8 @@ export default function SettingsScreen() {
         ? Math.min(100, Math.max(10, Math.round(num)))
         : editModal.key === "energyCarbohydrateHourlyLimitG"
           ? Math.min(90, Math.max(20, Math.round(num)))
+          : editModal.key === "bikeWeight"
+            ? Math.min(35, Math.max(3, Math.round(num * 10) / 10))
         : num;
     await updateSettings({ [editModal.key]: boundedNum });
     setEditModal({ ...editModal, visible: false });
@@ -382,6 +384,16 @@ export default function SettingsScreen() {
           />
           <Divider colors={colors} />
           <NumberRow icon="person.fill" label="體重" value={settings.weight} unit="kg" colors={colors} onPress={() => openEdit("weight", "體重", settings.weight, "kg")} />
+          <Divider colors={colors} />
+          <NumberRow
+            icon="bicycle"
+            label="自行車重量"
+            value={settings.bikeWeight}
+            unit="kg"
+            colors={colors}
+            hint="可設定 3–35 kg；會套用至即時功率、卡路里、背景追蹤與路線預估"
+            onPress={() => openEdit("bikeWeight", "自行車重量（含隨車裝備）", settings.bikeWeight, "kg")}
+          />
           <Divider colors={colors} />
           <NumberRow icon="arrow.up" label="身高" value={settings.height} unit="cm" colors={colors} onPress={() => openEdit("height", "身高", settings.height, "cm")} />
           <Divider colors={colors} />

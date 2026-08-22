@@ -1,6 +1,6 @@
 import { calculateNormalizedPowerFromHistory } from "./tss-calc";
 import type { LocationPoint, RideActivityType, RideCalculationProfile, RideLap, RideRecord, SportType, SupplyConfirmation } from "./ride-context";
-import { calculateCalories, calculateCaloriesMET, calculatePower } from "./power-calc";
+import { calculateCalories, calculateCaloriesMET, calculatePower, DEFAULT_ROAD_BIKE_MASS_KG } from "./power-calc";
 import { acceptLiveElevationDelta, clampVirtualPowerForRider, createLiveElevationFilterState } from "./live-elevation-filter";
 import { hasReliableRideMovement } from "./live-ride-readings";
 import { analyzeTraining } from "./tss-calc";
@@ -237,7 +237,7 @@ function normalizeCalculationProfile(value: unknown): RideCalculationProfile | u
   if (!value || typeof value !== "object") return undefined;
   const profile = value as Partial<RideCalculationProfile>;
   const riderWeightKg = normalizedOptional(profile.riderWeightKg);
-  const bikeWeightKg = normalizedOptional(profile.bikeWeightKg);
+  const bikeWeightKg = normalizedOptional(profile.bikeWeightKg) ?? DEFAULT_ROAD_BIKE_MASS_KG;
   const ftpW = normalizedOptional(profile.ftpW);
   if (!riderWeightKg || !bikeWeightKg || !ftpW || riderWeightKg <= 0 || bikeWeightKg <= 0 || ftpW <= 0) return undefined;
 

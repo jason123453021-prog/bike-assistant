@@ -1,5 +1,6 @@
 import { calculatePower, calcAirDensity, haversineDistance } from "./power-calc";
 import type { GpxRoute } from "./gpx-parser";
+import { DEFAULT_ROAD_BIKE_MASS_KG } from "./power-calc";
 import { getHeadwindMs } from "./weather-service";
 
 export interface RouteTimeEstimate {
@@ -66,7 +67,7 @@ export function estimateRouteCompletionTime(input: {
 }): RouteTimeEstimate {
   const { route } = input;
   const riderWeightKg = clamp(input.riderWeightKg, 35, 180);
-  const bikeWeightKg = clamp(input.bikeWeightKg ?? 10, 5, 35);
+  const bikeWeightKg = clamp(input.bikeWeightKg ?? DEFAULT_ROAD_BIKE_MASS_KG, 3, 35);
   const intensityFactor = selectSustainableIntensity(route);
   const targetPowerW = Math.round(clamp(input.ftpW, 80, 600) * intensityFactor);
   const airDensityKgM3 = calcAirDensity(input.temperatureC ?? 20, input.humidityPct ?? 60);

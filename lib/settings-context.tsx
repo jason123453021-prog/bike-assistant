@@ -16,6 +16,17 @@ import {
   normalizeDaylightAlertMode,
   type DaylightAlertMode,
 } from "./daylight-alert";
+import { DEFAULT_ROAD_BIKE_MASS_KG } from "./power-calc";
+
+export const MIN_BIKE_WEIGHT_KG = 3;
+export const MAX_BIKE_WEIGHT_KG = 35;
+
+/** 將舊設定、手動輸入與重設流程收斂至適用於公路車、通勤車與輕型電輔車的安全範圍。 */
+export function normalizeBikeWeightKg(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return DEFAULT_ROAD_BIKE_MASS_KG;
+  return Math.min(MAX_BIKE_WEIGHT_KG, Math.max(MIN_BIKE_WEIGHT_KG, Math.round(numeric * 10) / 10));
+}
 
 // 正常導航模式可顯示的欄位
 export interface NormalModeFields {
@@ -119,7 +130,7 @@ export interface AppSettings {
   birthday?: string;
   age: number;          // 騎手年齡（用於推算最大心率 MHR）
   ftp: number;          // Functional Threshold Power (watts)
-  bikeWeight: number;   // kg 单軋+裝備總重
+  bikeWeight: number;   // kg 自行車與隨車裝備總重
   /** 預設使用本機歷史推定 FTP 與心率基準；關閉後才完全採用手動數值。 */
   autoPersonalMetricsEnabled: boolean;
   /** 騎乘完成後自動寫入 App 推定 RPE；使用者仍可於活動編輯手動覆寫。 */
@@ -240,7 +251,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   height: 175,
   age: 32,
   ftp: 200,
-  bikeWeight: 10,
+  bikeWeight: DEFAULT_ROAD_BIKE_MASS_KG,
   autoPersonalMetricsEnabled: true,
   autoRpeEnabled: true,
   maxHeartRate: 200,
@@ -438,6 +449,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           autoRecenterSec: Math.min(60, Math.max(3, Number(saved.autoRecenterSec) || DEFAULT_SETTINGS.autoRecenterSec)),
           daylightAlertLeadMinutes: normalizeDaylightAlertLeadMinutes(saved.daylightAlertLeadMinutes),
           daylightAlertMode: normalizeDaylightAlertMode(saved.daylightAlertMode),
+          bikeWeight: normalizeBikeWeightKg(saved.bikeWeight),
           energyServingCarbohydrateG: Math.min(100, Math.max(10, Number(saved.energyServingCarbohydrateG) || DEFAULT_SETTINGS.energyServingCarbohydrateG)),
           energyCarbohydrateHourlyLimitMode: saved.energyCarbohydrateHourlyLimitMode === "manual" ? "manual" : "science",
           energyCarbohydrateHourlyLimitG: Math.min(90, Math.max(20, Number(saved.energyCarbohydrateHourlyLimitG) || DEFAULT_SETTINGS.energyCarbohydrateHourlyLimitG)),
@@ -465,6 +477,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       ...settings,
       ...partial,
       birthday,
+      bikeWeight: normalizeBikeWeightKg(partial.bikeWeight ?? settings.bikeWeight),
       age: calculateAgeFromBirthday(birthday) ?? settings.age,
       smartEnergySupplyEnabled: nextEnergySmartEnabled,
       smartWaterSupplyEnabled: nextWaterSmartEnabled,

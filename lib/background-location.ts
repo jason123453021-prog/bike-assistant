@@ -19,7 +19,7 @@ import {
   initializeRideSession,
   saveRideSessionSnapshot,
 } from "@/lib/ride-recovery/ride-session-recovery";
-import { calcAirDensity, calcGrade, calculatePower } from "@/lib/power-calc";
+import { calcAirDensity, calcGrade, calculatePower, DEFAULT_ROAD_BIKE_MASS_KG } from "@/lib/power-calc";
 import {
   calculatePersonalizedCalories,
 } from "@/lib/personalized-ride-calculations";
@@ -345,7 +345,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
 
         // 鎖屏期間沿用前景的個人 FTP、體重與最近環境摘要；沒有天氣資料時安全回退為預設環境。
         if (!segmentStart && hasReliableMovement && statisticsIntervalSec > 0) {
-            const profile = state.riderProfile ?? { weightKg: 70, heightCm: 175, ageYears: 32, ftpW: 245, bikeWeightKg: 10 };
+            const profile = state.riderProfile ?? { weightKg: 70, heightCm: 175, ageYears: 32, ftpW: 245, bikeWeightKg: DEFAULT_ROAD_BIKE_MASS_KG };
             const environment = state.environment ?? {
               temperatureC: 25,
               humidityPct: 60,

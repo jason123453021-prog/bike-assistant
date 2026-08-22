@@ -87,6 +87,7 @@ import {
   calculatePower,
   calcAirDensity,
   calcGrade,
+  DEFAULT_ROAD_BIKE_MASS_KG,
   haversineDistance,
   formatDuration,
 } from "@/lib/power-calc";
@@ -842,7 +843,7 @@ export default function MapScreen() {
       heightCm: settings.height,
       ageYears: estimateAgeYears ?? 32,
       ftpW: estimateFtpW,
-      bikeWeightKg: settings.bikeWeight ?? 10,
+      bikeWeightKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG,
       sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
       energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
       energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
@@ -1987,7 +1988,7 @@ export default function MapScreen() {
             gradePct: grade,
             windSpeedMs: headwindMs,
             riderMassKg: settings.weight,
-            bikeMassKg: settings.bikeWeight ?? 10,
+            bikeMassKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG,
             airDensityKgM3: airDensityRef.current,
           }) : 0;
           const boundedVirtualPower = clampVirtualPowerForRider(rawPower, estimateFtpW);
@@ -2557,7 +2558,7 @@ export default function MapScreen() {
             const sampleCount = environmentSummary.sampleCount;
             const savedRecordId = await saveRecord(undefined, {
               riderWeightKg: settings.weight,
-              bikeWeightKg: settings.bikeWeight ?? 10,
+              bikeWeightKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG,
               ftpW: estimateFtpW,
               autoRpeEnabled: settings.autoRpeEnabled,
               environment: {
