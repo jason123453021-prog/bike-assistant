@@ -21,25 +21,25 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     expect(normalizeAutoLapDistanceKm(8.7)).toBe(10);
   });
 
-  it("持久化主開關、模式與距離，並在設定頁完整呈現控制項", () => {
+  it("持久化自動計圈主開關與距離，並在設定頁完整呈現控制項", () => {
     expect(settingsSource).toContain("啟用計圈功能");
-    expect(settingsSource).toContain("計圈模式");
     expect(settingsSource).toContain("自動計圈距離");
     expect(settingsSource).toContain("AUTO_LAP_DISTANCE_PRESETS_KM");
     expect(settingsSource).toContain("lapEnabled");
-    expect(settingsSource).toContain("lapMode");
     expect(settingsSource).toContain("autoLapDistanceKm");
+    expect(settingsSource).not.toContain("計圈模式");
+    expect(settingsSource).not.toContain("手動介入");
     expect(settingsSource).toContain("預設運動模式");
     expect(settingsSource).toContain("自動暫停速度門檻");
   });
 
-  it("關閉時隱藏 Lap 控制；自動模式以全程里程倍數觸發且保留手動介入", () => {
-    expect(mapSource).toContain("settings.lapEnabled && (");
-    expect(mapSource).toContain("settings.lapMode === \"auto\"");
+  it("開啟時以全程里程倍數自動觸發，且不保留手動 Lap 控制", () => {
+    expect(mapSource).toContain("if (!settings.lapEnabled || state.status !== \"active\")");
     expect(mapSource).toContain("nextAutoLapDistanceMRef");
     expect(mapSource).toContain("nextAutoLapDistanceMRef.current = nextDistanceM + intervalM");
-    expect(mapSource).toContain('completeCurrentLap("auto")');
-    expect(mapSource).toContain('completeCurrentLap("manual")');
+    expect(mapSource).toContain("if (completeCurrentLap())");
+    expect(mapSource).not.toContain("handleMarkLap");
+    expect(mapSource).not.toContain("lapFloatingControlWrap");
     expect(mapSource).toContain("autoPauseSpeedThresholdKmh");
     expect(mapSource).toContain("autoPauseEnabledForSport");
   });

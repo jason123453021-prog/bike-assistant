@@ -16,7 +16,6 @@ import type { SportType } from "./sport-metrics";
 export const MIN_BIKE_WEIGHT_KG = 3;
 export const MAX_BIKE_WEIGHT_KG = 35;
 export const AUTO_LAP_DISTANCE_PRESETS_KM = [1, 5, 10] as const;
-export type LapMode = "manual" | "auto";
 export type AppearanceMode = "system" | "light" | "dark";
 const SPORT_TYPES: SportType[] = ["cycling", "running", "hiking", "trail_running"];
 
@@ -145,11 +144,9 @@ export interface AppSettings {
   age: number;          // 騎手年齡（用於推算最大心率 MHR）
   ftp: number;          // Functional Threshold Power (watts)
   bikeWeight: number;   // kg 自行車與隨車裝備總重
-  /** 全域計圈主開關；關閉時隱藏儀表板 Lap 控制且不建立自動分段。 */
+  /** 全域自動計圈主開關；關閉時不建立距離分段。 */
   lapEnabled: boolean;
-  /** 手動模式只接受按鈕分段；自動模式按距離分段且保留手動介入。 */
-  lapMode: LapMode;
-  /** 自動模式每次累計達此距離（km）建立一筆分段。 */
+  /** 每次累計達此距離（km）自動建立一筆分段。 */
   autoLapDistanceKm: number;
   /** 下次開始騎乘時預先選取的運動類型；不會改寫進行中的活動。 */
   defaultSportType: SportType;
@@ -273,7 +270,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   ftp: 200,
   bikeWeight: DEFAULT_ROAD_BIKE_MASS_KG,
   lapEnabled: true,
-  lapMode: "manual",
   autoLapDistanceKm: 5,
   defaultSportType: "cycling",
   autoPauseSpeedThresholdKmh: 1.1,
@@ -401,6 +397,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           waterRepeatUntilDismissed: _legacyWaterRepeatUntilDismissed,
           caloriePauseOnDownhill: _legacyCaloriePauseOnDownhill,
           waterPauseOnDownhill: _legacyWaterPauseOnDownhill,
+          lapMode: _legacyLapMode,
           daylightAlertEnabled: _legacyDaylightAlertEnabled,
           daylightAlertLeadMinutes: _legacyDaylightAlertLeadMinutes,
           daylightAlertMode: _legacyDaylightAlertMode,
@@ -475,7 +472,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           autoRecenterSec: Math.min(60, Math.max(3, Number(saved.autoRecenterSec) || DEFAULT_SETTINGS.autoRecenterSec)),
           bikeWeight: normalizeBikeWeightKg(saved.bikeWeight),
           lapEnabled: saved.lapEnabled !== false,
-          lapMode: saved.lapMode === "auto" ? "auto" : "manual",
           autoLapDistanceKm: normalizeAutoLapDistanceKm(saved.autoLapDistanceKm),
           defaultSportType: normalizeDefaultSportType(saved.defaultSportType),
           autoPauseSpeedThresholdKmh: Math.min(5, Math.max(0.5, Number.isFinite(Number(saved.autoPauseSpeedThresholdKmh)) ? Number(saved.autoPauseSpeedThresholdKmh) : 1.1)),
@@ -509,7 +505,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       birthday,
       bikeWeight: normalizeBikeWeightKg(partial.bikeWeight ?? settings.bikeWeight),
       lapEnabled: partial.lapEnabled ?? settings.lapEnabled,
-      lapMode: partial.lapMode === "auto" ? "auto" : partial.lapMode === "manual" ? "manual" : settings.lapMode,
       autoLapDistanceKm: normalizeAutoLapDistanceKm(partial.autoLapDistanceKm ?? settings.autoLapDistanceKm),
       defaultSportType: normalizeDefaultSportType(partial.defaultSportType ?? settings.defaultSportType),
       autoPauseSpeedThresholdKmh: Math.min(5, Math.max(0.5, Number.isFinite(Number(partial.autoPauseSpeedThresholdKmh)) ? Number(partial.autoPauseSpeedThresholdKmh) : settings.autoPauseSpeedThresholdKmh)),

@@ -418,53 +418,28 @@ export default function SettingsScreen() {
           {settings.lapEnabled && <>
             <Divider colors={colors} />
             <View style={styles.lapSettingContent}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>計圈模式</Text>
-              <Text style={[styles.rowHint, { color: colors.muted }]}>自動模式仍保留儀表板 Lap 按鈕，可隨時手動介入。</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>自動計圈距離</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>依累計騎乘距離自動建立分圈，不顯示 Lap 按鈕或提示，避免干擾導航。</Text>
               <View style={styles.lapModeOptions}>
-                {(["manual", "auto"] as const).map((mode) => {
-                  const selected = settings.lapMode === mode;
+                {AUTO_LAP_DISTANCE_PRESETS_KM.map((distanceKm) => {
+                  const selected = settings.autoLapDistanceKm === distanceKm;
                   return (
                     <Pressable
-                      key={mode}
+                      key={distanceKm}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
-                      onPress={() => void updateSettings({ lapMode: mode })}
+                      onPress={() => void updateSettings({ autoLapDistanceKm: distanceKm })}
                       style={({ pressed }) => [styles.lapModeOption, {
                         backgroundColor: selected ? colors.accent : colors.background,
                         borderColor: selected ? colors.accent : colors.border,
                         opacity: pressed ? 0.72 : 1,
                       }]}
                     >
-                      <Text style={{ color: selected ? colors.onAccent : colors.foreground, fontSize: 14, fontWeight: "800" }}>
-                        {mode === "manual" ? "手動" : "自動"}
-                      </Text>
+                      <Text style={{ color: selected ? colors.onAccent : colors.foreground, fontSize: 14, fontWeight: "800" }}>{distanceKm} km</Text>
                     </Pressable>
                   );
                 })}
               </View>
-              {settings.lapMode === "auto" && <>
-                <Text style={[styles.lapDistanceLabel, { color: colors.muted }]}>自動計圈距離</Text>
-                <View style={styles.lapModeOptions}>
-                  {AUTO_LAP_DISTANCE_PRESETS_KM.map((distanceKm) => {
-                    const selected = settings.autoLapDistanceKm === distanceKm;
-                    return (
-                      <Pressable
-                        key={distanceKm}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        onPress={() => void updateSettings({ autoLapDistanceKm: distanceKm })}
-                        style={({ pressed }) => [styles.lapModeOption, {
-                          backgroundColor: selected ? colors.accent : colors.background,
-                          borderColor: selected ? colors.accent : colors.border,
-                          opacity: pressed ? 0.72 : 1,
-                        }]}
-                      >
-                        <Text style={{ color: selected ? colors.onAccent : colors.foreground, fontSize: 14, fontWeight: "800" }}>{distanceKm} km</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </>}
             </View>
           </>}
         </View>

@@ -98,10 +98,10 @@ export interface SupplyConfirmation {
   reason?: string;
 }
 
-/** 使用者手動或自動觸發時封存的本機分圈。 */
+/** 自動距離門檻觸發時封存的本機分圈；舊資料可保留原有來源。 */
 export interface RideLap {
   index: number;
-  /** 分圈由使用者按鍵或距離里程碑建立；舊資料未帶來源時視為手動分圈。 */
+  /** 新資料由距離里程碑建立；舊活動可保留既有來源供歷史相容。 */
   source?: "manual" | "auto";
   startedAtElapsedSec: number;
   endedAtElapsedSec: number;
@@ -199,7 +199,7 @@ export interface RideRecord {
     isPR: boolean;          // 是否為個人紀錄 PR
     date: string;
   }[];
-  /** 騎乘中手動或設定的自動模式標記的分圈。 */
+  /** 自動距離記圈與舊活動既有分圈。 */
   laps?: RideLap[];
 }
 
@@ -298,7 +298,7 @@ type RideAction =
   | { type: "CONSUME_CALORIES" }
   | { type: "CONSUME_WATER" }
   | { type: "SUPPLY_CONFIRMED"; confirmation: SupplyConfirmation }
-  | { type: "MARK_LAP"; source: "manual" | "auto" }
+  | { type: "MARK_LAP" }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
   | { type: "ADD_RECORD"; record: RideRecord }
   | { type: "SET_SPORT_TYPE"; sportType: SportType }
@@ -592,7 +592,7 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
       return {
         ...state,
         // 使用 reducer 的不可變更新累加全部分圈；單次活動不設圈數上限。
-        laps: [...state.laps, { ...lap, source: action.source }],
+        laps: [...state.laps, { ...lap, source: "auto" }],
         // 全程統計保留；僅切換下一圈的相對統計錨點。
         lapAnchor: createNextRideLapAnchor(state),
       };

@@ -27,7 +27,6 @@ import {
   Animated,
   AppState,
   Dimensions,
-  Easing,
   Modal,
   PanResponder,
   Platform,
@@ -48,7 +47,7 @@ import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import Svg, { Circle } from "react-native-svg";
 
-import { useRide, type RideLap } from "@/lib/ride-context";
+import { useRide } from "@/lib/ride-context";
 import {
   buildSportDashboardMetrics,
   calculateGapPaceSecPerKm,
@@ -59,7 +58,6 @@ import {
   SPORT_META,
   type SportType,
 } from "@/lib/sport-metrics";
-import { getLapHighlightMetric, getLapPresentationMetrics } from "@/lib/lap-presentation";
 import { getModelRevision, subscribeModelUpdates } from "@/lib/model-governance";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday } from "@/lib/personal-profile";
@@ -517,10 +515,6 @@ export default function MapScreen() {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryRecordId, setSummaryRecordId] = useState<string | null>(null);
   const [summarySnapshot, setSummarySnapshot] = useState<RideSummarySnapshot | null>(null);
-  const [lapFeedback, setLapFeedback] = useState<RideLap | null>(null);
-  const lapFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lapToastOpacity = useRef(new Animated.Value(0)).current;
-  const lapToastTranslateY = useRef(new Animated.Value(-18)).current;
   const nextAutoLapDistanceMRef = useRef<number | null>(null);
   // 補給提醒分別管理（支援兩種同時顯示）
   const [calorieAlert, setCalorieAlert] = useState(false);
@@ -2438,29 +2432,20 @@ export default function MapScreen() {
     dispatch({ type: "RESUME" });
   }, [dispatch]);
 
-  const completeCurrentLap = useCallback((source: "manual" | "auto") => {
+  const completeCurrentLap = useCallback(() => {
     try {
       const currentState = stateRef.current;
       if (currentState.status !== "active") return false;
-      // 使用與 reducer 相同的快照函式，確保 Toast、摘要、活動詳情與 FIT 匯出完全一致。
+      // 使用與 reducer 相同的快照函式，確保自動距離分圈、摘要、活動詳情與 FIT 匯出完全一致。
       const completedLap = buildManualRideLap(currentState);
       if (!completedLap) return false;
-      dispatch({ type: "MARK_LAP", source });
-      if (source === "manual") {
-        setLapFeedback(completedLap);
-        if (settings.vibrationEnabled) vibrateSuccess();
-      }
+      dispatch({ type: "MARK_LAP" });
       return true;
     } catch {
       // 計圈失敗時保留進行中的騎乘與導航，不清空目前圈資料。
       return false;
     }
-  }, [dispatch, settings.vibrationEnabled]);
-
-  const handleMarkLap = useCallback(() => {
-    if (!settings.lapEnabled) return;
-    void completeCurrentLap("manual");
-  }, [completeCurrentLap, settings.lapEnabled]);
+  }, [dispatch]);
 
   const handleSelectSportType = useCallback((sportType: SportType) => {
     if (state.status === "active" || state.status === "paused") {
@@ -2476,7 +2461,7 @@ export default function MapScreen() {
   }, [setSportType, state.status, updateSettings]);
 
   useEffect(() => {
-    if (!settings.lapEnabled || settings.lapMode !== "auto" || state.status !== "active") {
+    if (!settings.lapEnabled || state.status !== "active") {
       nextAutoLapDistanceMRef.current = null;
       return;
     }
@@ -2488,66 +2473,11 @@ export default function MapScreen() {
       nextAutoLapDistanceMRef.current = nextDistanceM;
       return;
     }
-    if (completeCurrentLap("auto")) {
-      // 以整趟累計距離的固定倍數觸發；手動介入不會改變下一個自動里程碑。
+    if (completeCurrentLap()) {
+      // 以整趟累計距離的固定倍數自動觸發，避免任何手動操作干擾導航。
       nextAutoLapDistanceMRef.current = nextDistanceM + intervalM;
     }
-  }, [completeCurrentLap, settings.autoLapDistanceKm, settings.lapEnabled, settings.lapMode, state.distance, state.status]);
-
-  useEffect(() => () => {
-    if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
-  }, []);
-
-  useEffect(() => {
-    if (!lapFeedback) return;
-    if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
-    lapToastOpacity.stopAnimation();
-    lapToastTranslateY.stopAnimation();
-    lapToastOpacity.setValue(0);
-    lapToastTranslateY.setValue(-18);
-    const enter = Animated.parallel([
-      Animated.timing(lapToastOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(lapToastTranslateY, { toValue: 0, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-    ]);
-    enter.start();
-    lapFeedbackTimerRef.current = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(lapToastOpacity, { toValue: 0, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(lapToastTranslateY, { toValue: -12, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-      ]).start(({ finished }) => {
-        if (finished) setLapFeedback((current) => current?.index === lapFeedback.index ? null : current);
-      });
-      lapFeedbackTimerRef.current = null;
-    }, 3_000);
-    return () => {
-      if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
-      enter.stop();
-    };
-  }, [lapFeedback, lapToastOpacity, lapToastTranslateY]);
-
-  const currentLap = useMemo<RideLap | null>(() => {
-    const hasManualLap = state.laps.some((lap) => lap.source !== "auto");
-    if (!isActive || !hasManualLap) return null;
-    const anchor = state.lapAnchor;
-    const movingTimeSec = Math.max(0, state.elapsed - anchor.elapsedSec);
-    const distanceM = Math.max(0, state.distance - anchor.distanceM);
-    const powerDurationSec = Math.max(0, state.powerSampleDurationSec - anchor.powerSampleDurationSec);
-    const averagePowerW = powerDurationSec > 0
-      ? Math.round(Math.max(0, (state.powerWorkJ - anchor.powerWorkJ) / powerDurationSec))
-      : undefined;
-    return {
-      index: state.laps.length + 1,
-      startedAtElapsedSec: anchor.elapsedSec,
-      endedAtElapsedSec: state.elapsed,
-      movingTimeSec,
-      distanceM,
-      ascentM: Math.max(0, state.totalAscent - anchor.ascentM),
-      descentM: Math.max(0, state.totalDescent - anchor.descentM),
-      averageSpeedKmh: movingTimeSec > 0 ? (distanceM / 1_000) / (movingTimeSec / 3_600) : undefined,
-      averagePowerW: averagePowerW && averagePowerW > 0 ? averagePowerW : undefined,
-    };
-  }, [isActive, state.distance, state.elapsed, state.lapAnchor, state.laps, state.powerSampleDurationSec, state.powerWorkJ, state.totalAscent, state.totalDescent]);
-  const currentLapHighlight = currentLap ? getLapHighlightMetric(state.sportType, currentLap) : null;
+  }, [completeCurrentLap, settings.autoLapDistanceKm, settings.lapEnabled, state.distance, state.status]);
 
   const handleStop = useCallback(() => {
     Alert.alert("結束騎乘", "確定要結束本次騎乘並儲存記錄？", [
@@ -3595,22 +3525,6 @@ export default function MapScreen() {
         </Pressable>
       </Animated.View>
 
-      {isActive && settings.lapEnabled && (
-        <Animated.View style={[styles.lapFloatingControlWrap, { bottom: Animated.add(panelAnim, 18) }]}>
-          <Pressable
-            accessibilityLabel={settings.lapMode === "auto" ? "手動標記 Lap；自動計圈已啟用" : "標記手動 Lap"}
-            accessibilityState={{ disabled: !isRiding }}
-            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-            style={({ pressed }) => [styles.lapFloatingControl, { opacity: !isRiding ? 0.45 : pressed ? 0.72 : 1 }]}
-            onPress={handleMarkLap}
-            disabled={!isRiding}
-          >
-            <Text style={styles.lapFloatingText}>Lap</Text>
-            <Text style={styles.lapFloatingCount}>{state.laps.length + 1}</Text>
-          </Pressable>
-        </Animated.View>
-      )}
-
       <Modal
         visible={sportPickerVisible}
         transparent
@@ -3878,48 +3792,6 @@ export default function MapScreen() {
             </Pressable>
           </View>
         </View>
-      )}
-
-      {currentLap && currentLapHighlight && (
-        <View
-          accessibilityLabel={`目前第 ${currentLap.index} 圈：圈時 ${formatDuration(currentLap.movingTimeSec)}，${currentLapHighlight.label} ${currentLapHighlight.value}`}
-          style={[styles.currentLapOverlay, { top: insets.top + 82, pointerEvents: "none" }]}
-        >
-          <Text style={styles.currentLapTitle}>Lap {currentLap.index}</Text>
-          <View style={styles.currentLapRow}>
-            <Text style={styles.currentLapLabel}>圈時</Text>
-            <Text style={styles.currentLapValue}>{formatDuration(currentLap.movingTimeSec)}</Text>
-          </View>
-          <View style={styles.currentLapRow}>
-            <Text style={styles.currentLapLabel}>{currentLapHighlight.label}</Text>
-            <Text style={styles.currentLapValue}>{currentLapHighlight.value}</Text>
-          </View>
-        </View>
-      )}
-
-      {lapFeedback && (
-        <Animated.View
-          accessibilityLiveRegion="polite"
-          style={[
-            styles.lapFeedbackToast,
-            {
-              top: insets.top + 12,
-              opacity: lapToastOpacity,
-              pointerEvents: "none",
-              transform: [{ translateY: lapToastTranslateY }],
-            },
-          ]}
-        >
-          <View style={styles.lapToastHeading}>
-            <Text style={styles.lapToastTitle}>開始第 {lapFeedback.index + 1} 圈</Text>
-            <Text style={styles.lapToastPrevious}>上一圈 {formatDuration(lapFeedback.movingTimeSec)} · {getLapHighlightMetric(state.sportType, lapFeedback).label} {getLapHighlightMetric(state.sportType, lapFeedback).value}</Text>
-          </View>
-          <View style={styles.lapToastMetrics}>
-            {getLapPresentationMetrics(state.sportType, lapFeedback).slice(0, 2).map((metric) => (
-              <Text key={metric.id} style={styles.lapToastMetric}>{metric.label} {metric.value}</Text>
-            ))}
-          </View>
-        </Animated.View>
       )}
 
       {touchGuardEnabled && isActive && (
@@ -4237,41 +4109,6 @@ const styles = StyleSheet.create({
     zIndex: 20,
     backgroundColor: "transparent",
   },
-  lapFeedbackToast: {
-    position: "absolute",
-    alignSelf: "center",
-    maxWidth: "82%",
-    zIndex: 42,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: "rgba(7, 28, 19, 0.92)",
-    borderWidth: 1,
-    borderColor: "rgba(156,255,181,0.56)",
-    boxShadow: "0px 4px 12px rgba(0,0,0,0.24)",
-  },
-  lapToastHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 10 },
-  lapToastTitle: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
-  lapToastPrevious: { color: "#9CFFB5", fontSize: 12, fontWeight: "800" },
-  lapToastMetrics: { flexDirection: "row", flexWrap: "wrap", columnGap: 9, rowGap: 3, marginTop: 5 },
-  lapToastMetric: { color: "rgba(255,255,255,0.82)", fontSize: 11, fontWeight: "700" },
-  currentLapOverlay: {
-    position: "absolute",
-    left: 12,
-    zIndex: 30,
-    minWidth: 116,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: "rgba(20,20,20,0.72)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.18)",
-    boxShadow: "0px 3px 10px rgba(0,0,0,0.18)",
-  },
-  currentLapTitle: { color: "#9CFFB5", fontSize: 12, fontWeight: "900", marginBottom: 5 },
-  currentLapRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginTop: 2 },
-  currentLapLabel: { color: "rgba(255,255,255,0.68)", fontSize: 10, fontWeight: "700" },
-  currentLapValue: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
   touchGuardStatusStack: {
     position: "absolute",
     right: 10,
@@ -4601,24 +4438,6 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
   },
-  lapFloatingControlWrap: {
-    position: "absolute",
-    left: 18,
-    zIndex: 24,
-  },
-  lapFloatingControl: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(74, 61, 178, 0.94)",
-    borderWidth: 1.5,
-    borderColor: "rgba(210, 204, 255, 0.94)",
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: "0px 4px 12px rgba(0,0,0,0.30)",
-  },
-  lapFloatingText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900", lineHeight: 16 },
-  lapFloatingCount: { color: "#E7E3FF", fontSize: 10, fontWeight: "800", lineHeight: 13 },
   expandHint: {
     flexDirection: "row",
     alignItems: "center",
