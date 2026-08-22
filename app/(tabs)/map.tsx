@@ -61,7 +61,7 @@ import {
 import { getModelRevision, subscribeModelUpdates } from "@/lib/model-governance";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday } from "@/lib/personal-profile";
-import { useSettings, AUTO_LAP_DISTANCE_PRESETS_KM, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
+import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
 
 import { type GpxPoint, type GpxRoute } from "@/lib/gpx-parser";
