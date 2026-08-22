@@ -591,7 +591,8 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
       if (!lap) return state;
       return {
         ...state,
-        laps: [...state.laps, { ...lap, source: action.source }].slice(-100),
+        // 使用 reducer 的不可變更新累加全部分圈；單次活動不設圈數上限。
+        laps: [...state.laps, { ...lap, source: action.source }],
         // 全程統計保留；僅切換下一圈的相對統計錨點。
         lapAnchor: createNextRideLapAnchor(state),
       };

@@ -7,6 +7,7 @@ import { buildManualRideLap, createNextRideLapAnchor } from "../lib/ride-lap";
 const root = process.cwd();
 const mapSource = readFileSync(resolve(root, "app/(tabs)/map.tsx"), "utf8");
 const summarySource = readFileSync(resolve(root, "components/ride-summary-modal.tsx"), "utf8");
+const rideContextSource = readFileSync(resolve(root, "lib/ride-context.tsx"), "utf8");
 
 const activeLapState = {
   elapsed: 132,
@@ -74,7 +75,7 @@ describe("專業手動 Lap 體驗", () => {
     expect(mapSource).toContain('completeCurrentLap("auto")');
     expect(mapSource).toContain("Animated.timing(lapToastOpacity");
     expect(mapSource).toContain("lapToastTranslateY");
-    expect(mapSource).toContain("}, 3_800);");
+    expect(mapSource).toContain("}, 3_000);");
     expect(mapSource).toContain("top: insets.top + 12");
     expect(mapSource).toContain("開始第 {lapFeedback.index + 1} 圈");
     expect(mapSource).toContain("上一圈 {formatDuration(lapFeedback.movingTimeSec)}");
@@ -87,5 +88,23 @@ describe("專業手動 Lap 體驗", () => {
     expect(summarySource).toContain("計圈（Laps）");
     expect(summarySource).toContain("laps.map((lap)");
     expect(summarySource).toContain("getLapPresentationMetrics(lapSportType, lap)");
+  });
+
+  it("將 Lap 控制固定於左下角、底部儀表板上方，並以擴大觸控範圍支援單手騎乘操作", () => {
+    expect(mapSource).toContain("lapFloatingControlWrap");
+    expect(mapSource).toContain("left: 18");
+    expect(mapSource).toContain("bottom: Animated.add(panelAnim, 18)");
+    expect(mapSource).toContain("width: 56");
+    expect(mapSource).toContain("height: 56");
+    expect(mapSource).toContain('hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}');
+    expect(mapSource).toContain("accessibilityState={{ disabled: !isRiding }}");
+    expect(mapSource).not.toContain("lapControlBtn");
+  });
+
+  it("連續計圈不設圈數上限，且快照與分派例外不會中斷騎乘", () => {
+    expect(mapSource).toContain('try {\n      const currentState = stateRef.current;');
+    expect(mapSource).toContain("計圈失敗時保留進行中的騎乘與導航");
+    expect(rideContextSource).toContain("laps: [...state.laps, { ...lap, source: action.source }],");
+    expect(rideContextSource).not.toContain("laps: [...state.laps, { ...lap, source: action.source }].slice(-100)");
   });
 });

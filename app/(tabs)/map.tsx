@@ -2452,17 +2452,22 @@ export default function MapScreen() {
   }, [dispatch]);
 
   const completeCurrentLap = useCallback((source: "manual" | "auto") => {
-    const currentState = stateRef.current;
-    if (currentState.status !== "active") return false;
-    // 使用與 reducer 相同的快照函式，確保彈窗、摘要、活動詳情與 FIT 匯出完全一致。
-    const completedLap = buildManualRideLap(currentState);
-    if (!completedLap) return false;
-    dispatch({ type: "MARK_LAP", source });
-    if (source === "manual") {
-      setLapFeedback(completedLap);
-      if (settings.vibrationEnabled) vibrateSuccess();
+    try {
+      const currentState = stateRef.current;
+      if (currentState.status !== "active") return false;
+      // 使用與 reducer 相同的快照函式，確保 Toast、摘要、活動詳情與 FIT 匯出完全一致。
+      const completedLap = buildManualRideLap(currentState);
+      if (!completedLap) return false;
+      dispatch({ type: "MARK_LAP", source });
+      if (source === "manual") {
+        setLapFeedback(completedLap);
+        if (settings.vibrationEnabled) vibrateSuccess();
+      }
+      return true;
+    } catch {
+      // 計圈失敗時保留進行中的騎乘與導航，不清空目前圈資料。
+      return false;
     }
-    return true;
   }, [dispatch, settings.vibrationEnabled]);
 
   const handleMarkLap = useCallback(() => {
@@ -2526,7 +2531,7 @@ export default function MapScreen() {
         if (finished) setLapFeedback((current) => current?.index === lapFeedback.index ? null : current);
       });
       lapFeedbackTimerRef.current = null;
-    }, 3_800);
+    }, 3_000);
     return () => {
       if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
       enter.stop();
@@ -3637,17 +3642,6 @@ export default function MapScreen() {
                   <IconSymbol name="play.fill" size={22} color="#00C853" />
                 </Pressable>
               )}
-              {settings.lapEnabled && (
-                <Pressable
-                  accessibilityLabel={settings.lapMode === "auto" ? "手動介入標記 Lap；自動計圈已啟用" : "標記手動 Lap"}
-                  style={({ pressed }) => [styles.lapControlBtn, { opacity: !isRiding ? 0.45 : pressed ? 0.7 : 1 }]}
-                  onPress={handleMarkLap}
-                  disabled={!isRiding}
-                >
-                  <Text style={styles.lapControlText}>Lap</Text>
-                  <Text style={styles.lapControlCount}>{settings.lapMode === "auto" ? `${settings.autoLapDistanceKm}K` : state.laps.length + 1}</Text>
-                </Pressable>
-              )}
               <Pressable
                 style={({ pressed }) => [styles.startBtn, styles.stopBtn, { opacity: pressed ? 0.85 : 1 }]}
                 onPress={handleStop}
@@ -3675,6 +3669,22 @@ export default function MapScreen() {
           />
         </Pressable>
       </Animated.View>
+
+      {isActive && settings.lapEnabled && (
+        <Animated.View style={[styles.lapFloatingControlWrap, { bottom: Animated.add(panelAnim, 18) }]}>
+          <Pressable
+            accessibilityLabel={settings.lapMode === "auto" ? "手動標記 Lap；自動計圈已啟用" : "標記手動 Lap"}
+            accessibilityState={{ disabled: !isRiding }}
+            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+            style={({ pressed }) => [styles.lapFloatingControl, { opacity: !isRiding ? 0.45 : pressed ? 0.72 : 1 }]}
+            onPress={handleMarkLap}
+            disabled={!isRiding}
+          >
+            <Text style={styles.lapFloatingText}>Lap</Text>
+            <Text style={styles.lapFloatingCount}>{state.laps.length + 1}</Text>
+          </Pressable>
+        </Animated.View>
+      )}
 
       <Modal
         visible={sportPickerVisible}
@@ -4684,18 +4694,24 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
   },
-  lapControlBtn: {
-    minWidth: 54,
-    minHeight: 48,
-    borderRadius: 16,
-    backgroundColor: "rgba(96, 80, 214, 0.32)",
-    borderWidth: 1,
-    borderColor: "rgba(190, 183, 255, 0.78)",
+  lapFloatingControlWrap: {
+    position: "absolute",
+    left: 18,
+    zIndex: 24,
+  },
+  lapFloatingControl: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(74, 61, 178, 0.94)",
+    borderWidth: 1.5,
+    borderColor: "rgba(210, 204, 255, 0.94)",
     alignItems: "center",
     justifyContent: "center",
+    boxShadow: "0px 4px 12px rgba(0,0,0,0.30)",
   },
-  lapControlText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900", lineHeight: 16 },
-  lapControlCount: { color: "#D9D6FF", fontSize: 10, fontWeight: "700", lineHeight: 13 },
+  lapFloatingText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900", lineHeight: 16 },
+  lapFloatingCount: { color: "#E7E3FF", fontSize: 10, fontWeight: "800", lineHeight: 13 },
   daylightModalBackdrop: {
     flex: 1,
     justifyContent: "center",
