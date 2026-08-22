@@ -59,6 +59,7 @@ import { persistRideMedia } from "@/lib/local-ride-media";
 import { ZoomableActivityPhoto } from "@/components/zoomable-activity-photo";
 import { resolveActivityCoverPhotoUri } from "@/lib/activity-media";
 import { calculateGapPaceSecPerKm, formatPaceFromKmh, formatPaceSeconds, SPORT_META, type SportType } from "@/lib/sport-metrics";
+import { formatLapMetricsInline } from "@/lib/lap-presentation";
 import { sampleActivityMapPolyline } from "@/lib/activity-map-presentation";
 import * as ImagePicker from "expo-image-picker";
 
@@ -1211,8 +1212,8 @@ export default function RideDetailScreen() {
 
             {(record.laps?.length ?? 0) > 0 && (
               <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-                <Text style={[styles.panelTitle, { color: colors.foreground }]}>手動 Lap 紀錄</Text>
-                <Text style={[styles.panelHint, { color: colors.muted }]}>僅顯示騎乘中由您主動標記的分段。</Text>
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>Lap 紀錄</Text>
+                <Text style={[styles.panelHint, { color: colors.muted }]}>顯示騎乘中由手動或自動計圈建立的分段。</Text>
                 {record.laps?.map((lap) => (
                   <View key={lap.index} style={[styles.segmentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -1220,7 +1221,7 @@ export default function RideDetailScreen() {
                       <Text style={{ color: colors.muted, fontSize: 12 }}>{formatDuration(lap.movingTimeSec)}</Text>
                     </View>
                     <Text style={{ color: colors.muted, fontSize: 12, marginTop: 6, lineHeight: 18 }}>
-                      {(lap.distanceM / 1_000).toFixed(2)} km · 均速 {lap.averageSpeedKmh?.toFixed(1) ?? "--"} km/h · 爬升 {Math.round(lap.ascentM)} m · 功率 {lap.averagePowerW === undefined ? "資料不足" : `${lap.averagePowerW} W`}
+                      {formatLapMetricsInline(record.sportType ?? "cycling", lap)}
                     </Text>
                   </View>
                 ))}

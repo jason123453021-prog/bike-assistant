@@ -21,6 +21,8 @@ export type RideSummarySnapshot = Pick<
   | "caloriesSource"
   | "powerZones"
 > & {
+  /** 新版摘要封存該次運動模式；舊版快照會由目前狀態安全回退。 */
+  sportType?: RideState["sportType"];
   /** 舊版已保存摘要沒有手動 Lap 時，仍可安全開啟摘要。 */
   laps?: RideState["laps"];
 };

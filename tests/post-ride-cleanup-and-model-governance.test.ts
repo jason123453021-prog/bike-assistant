@@ -92,11 +92,12 @@ describe("post-ride cleanup and local model governance", () => {
       powerSource: "estimated" as const,
       caloriesSource: "power-estimate" as const,
       powerZones: [3, 4, 5, 6, 7],
+      sportType: "trail_running" as const,
     };
     const snapshot = createRideSummarySnapshot(source);
     source.powerZones[0] = 0;
 
-    expect(snapshot).toMatchObject({ distance: 12_770, totalAscent: 36, totalCalories: 404 });
+    expect(snapshot).toMatchObject({ distance: 12_770, totalAscent: 36, totalCalories: 404, sportType: "trail_running" });
     expect(snapshot.powerZones).toEqual([3, 4, 5, 6, 7]);
   });
 });

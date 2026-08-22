@@ -27,6 +27,10 @@ export function buildManualRideLap(state: RideLapStatisticsInput): RideLap | nul
     const speedKmh = (point.speed ?? 0) * 3.6;
     return Number.isFinite(speedKmh) && speedKmh > 0 && speedKmh <= 120 ? [speedKmh] : [];
   });
+  const cadences = state.route.slice(anchor.routePointIndex).flatMap((point) => {
+    const cadenceRpm = point.cadence ?? 0;
+    return Number.isFinite(cadenceRpm) && cadenceRpm > 0 && cadenceRpm <= 300 ? [cadenceRpm] : [];
+  });
   const powerDurationSec = Math.max(0, state.powerSampleDurationSec - anchor.powerSampleDurationSec);
   const averagePowerW = powerDurationSec > 0
     ? (state.powerWorkJ - anchor.powerWorkJ) / powerDurationSec
@@ -43,6 +47,9 @@ export function buildManualRideLap(state: RideLapStatisticsInput): RideLap | nul
     averageSpeedKmh: (distanceM / 1_000) / (movingTimeSec / 3_600),
     maxSpeedKmh: speeds.length > 0 ? Math.max(...speeds) : undefined,
     averagePowerW: averagePowerW !== undefined && averagePowerW > 0 ? Math.round(averagePowerW) : undefined,
+    averageCadenceRpm: cadences.length > 0
+      ? Math.round(cadences.reduce((total, cadence) => total + cadence, 0) / cadences.length)
+      : undefined,
   };
 }
 

@@ -21,4 +21,19 @@ describe("sport picker presentation", () => {
     expect(mapSource).toContain("minHeight: 52");
     expect(mapSource).toContain("marginBottom: 8");
   });
+
+  it("選擇運動後立即更新狀態、儲存為預設並關閉 Bottom Sheet", () => {
+    expect(mapSource).toContain("const handleSelectSportType = useCallback");
+    expect(mapSource).toContain("setSportType(sportType);");
+    expect(mapSource).toContain("void updateSettings({ defaultSportType: sportType });");
+    expect(mapSource).toContain("setSportPickerVisible(false);");
+    expect(mapSource).toContain("onPress={() => handleSelectSportType(sportType)}");
+    expect(mapSource).toContain("SPORT_META[state.sportType]");
+  });
+
+  it("完成活動後允許預選下一項運動，但活動中與暫停時維持鎖定", () => {
+    const rideContextSource = readFileSync(resolve(process.cwd(), "lib/ride-context.tsx"), "utf8");
+    expect(rideContextSource).toContain('return state.status === "active" || state.status === "paused"');
+    expect(rideContextSource).toContain(': { ...state, sportType: action.sportType };');
+  });
 });

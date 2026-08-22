@@ -98,7 +98,7 @@ export interface SupplyConfirmation {
   reason?: string;
 }
 
-/** 使用者在活動中明確按下標記所封存的本機手動 Lap。 */
+/** 使用者手動或自動觸發時封存的本機分圈。 */
 export interface RideLap {
   index: number;
   startedAtElapsedSec: number;
@@ -110,6 +110,8 @@ export interface RideLap {
   averageSpeedKmh?: number;
   maxSpeedKmh?: number;
   averagePowerW?: number;
+  /** 僅在來源定位／感測器有真實步頻樣本時寫入；不由 App 推測。 */
+  averageCadenceRpm?: number;
 }
 
 interface RideLapAnchor {
@@ -195,7 +197,7 @@ export interface RideRecord {
     isPR: boolean;          // 是否為個人紀錄 PR
     date: string;
   }[];
-  /** 騎乘中手動標記的 Lap；不含未經使用者標記的推測分段。 */
+  /** 騎乘中手動或設定的自動模式標記的分圈。 */
   laps?: RideLap[];
 }
 
@@ -600,7 +602,11 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
       return { ...state, records: [action.record, ...state.records] };
 
     case "SET_SPORT_TYPE":
-      return state.status === "idle" ? { ...state, sportType: action.sportType } : state;
+      // 活動進行或暫停時不可變更運動類型，避免同一筆統計混入兩種運動模型；
+      // 已完成但尚未關閉摘要的狀態仍可預先選擇下一次活動的運動類型。
+      return state.status === "active" || state.status === "paused"
+        ? state
+        : { ...state, sportType: action.sportType };
 
     case "UPDATE_RECORD_NAME": {
       const updated = state.records.map((r) =>

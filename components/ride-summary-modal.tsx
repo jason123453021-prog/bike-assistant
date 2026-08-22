@@ -22,6 +22,7 @@ import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power
 import { buildActivityStatistics } from "@/lib/activity-statistics";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import type { RideSummarySnapshot } from "@/lib/ride-summary-snapshot";
+import { getLapPresentationMetrics } from "@/lib/lap-presentation";
 
 interface RideSummaryModalProps {
   visible: boolean;
@@ -94,6 +95,7 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
 
   const summary = snapshot ?? state;
   const laps = summary.laps ?? [];
+  const lapSportType = summary.sportType ?? state.sportType;
   const totalPowerSamples = summary.powerZones.reduce((a, b) => a + b, 0);
   const zonePcts = summary.powerZones.map((v) =>
     totalPowerSamples > 0 ? Math.round((v / totalPowerSamples) * 100) : 0
@@ -295,7 +297,7 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
                 <View style={styles.lapsHeader}>
                   <View style={styles.lapsHeadingCopy}>
                     <Text style={[styles.panelTitle, { color: colors.foreground }]}>計圈（Laps）</Text>
-                    <Text style={[styles.nameHint, { color: colors.muted }]}>僅列出本次騎乘中手動標記的分段；儲存後會與活動詳情及 FIT 匯出一致。</Text>
+                    <Text style={[styles.nameHint, { color: colors.muted }]}>列出本次活動的手動與自動分圈；儲存後會與活動詳情及 FIT 匯出一致。</Text>
                   </View>
                   <Text style={[styles.lapsCount, { color: colors.accent }]}>{laps.length} 圈</Text>
                 </View>
@@ -306,10 +308,9 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
                       <Text style={[styles.lapRowTime, { color: colors.foreground }]}>{formatDuration(lap.movingTimeSec)}</Text>
                     </View>
                     <View style={styles.lapMetricsGrid}>
-                      <LapMetric label="距離" value={`${(lap.distanceM / 1_000).toFixed(2)} km`} colors={colors} />
-                      <LapMetric label="均速" value={lap.averageSpeedKmh === undefined ? "--" : `${lap.averageSpeedKmh.toFixed(1)} km/h`} colors={colors} />
-                      <LapMetric label="均功率" value={lap.averagePowerW === undefined ? "--" : `${lap.averagePowerW} W`} colors={colors} />
-                      <LapMetric label="爬升" value={`${Math.round(lap.ascentM)} m`} colors={colors} />
+                      {getLapPresentationMetrics(lapSportType, lap).map((metric) => (
+                        <LapMetric key={metric.id} label={metric.label} value={metric.value} colors={colors} />
+                      ))}
                     </View>
                   </View>
                 ))}

@@ -18,7 +18,8 @@ describe("活動詳情資料有效性守門", () => {
     expect(source).toContain('split.averagePowerW === undefined ? "--"');
     expect(source).toContain('averageTemperatureC === undefined ? "--"');
     expect(source).toContain("record.calculationProfile?.environment?.sampleCount ?? 0");
-    expect(source).toContain("手動 Lap 紀錄");
+    expect(source).toContain("Lap 紀錄");
+    expect(source).toContain("formatLapMetricsInline(record.sportType ?? \"cycling\", lap)");
     expect(source).not.toContain('label="GPS 點數"');
   });
 });

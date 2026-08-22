@@ -64,14 +64,20 @@ describe("專業手動 Lap 體驗", () => {
     expect(buildManualRideLap({ ...activeLapState, distance: 250 })).toBeNull();
   });
 
-  it("提供四秒即時完成回饋、摘要 Lap 列表及不重疊的鎖定狀態堆疊", () => {
+  it("僅手動 Lap 提供四秒頂端 Toast，自動計圈保持安靜，摘要使用共用多運動欄位", () => {
     expect(mapSource).toContain("const [lapFeedback, setLapFeedback]");
     expect(mapSource).toContain("buildManualRideLap(currentState)");
+    expect(mapSource).toContain('const completeCurrentLap = useCallback((source: "manual" | "auto") =>');
+    expect(mapSource).toContain('if (source === "manual")');
+    expect(mapSource).toContain('completeCurrentLap("manual")');
+    expect(mapSource).toContain('completeCurrentLap("auto")');
     expect(mapSource).toContain("}, 4_000);");
-    expect(mapSource).toContain("Lap {lapFeedback.index} 已完成");
+    expect(mapSource).toContain("開始第 {lapFeedback.index + 1} 圈");
+    expect(mapSource).toContain("lapFeedbackToast");
+    expect(mapSource).not.toContain("Lap {lapFeedback.index} 已完成");
     expect(mapSource).toContain("touchGuardStatusStack");
     expect(summarySource).toContain("計圈（Laps）");
     expect(summarySource).toContain("laps.map((lap)");
-    expect(summarySource).toContain("LapMetric label=\"均功率\"");
+    expect(summarySource).toContain("getLapPresentationMetrics(lapSportType, lap)");
   });
 });

@@ -58,6 +58,7 @@ import {
   SPORT_META,
   type SportType,
 } from "@/lib/sport-metrics";
+import { getLapPresentationMetrics } from "@/lib/lap-presentation";
 import { getModelRevision, subscribeModelUpdates } from "@/lib/model-governance";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday } from "@/lib/personal-profile";
@@ -2447,27 +2448,42 @@ export default function MapScreen() {
     dispatch({ type: "RESUME" });
   }, [dispatch]);
 
-  const completeCurrentLap = useCallback(() => {
+  const completeCurrentLap = useCallback((source: "manual" | "auto") => {
     const currentState = stateRef.current;
     if (currentState.status !== "active") return false;
     // 使用與 reducer 相同的快照函式，確保彈窗、摘要、活動詳情與 FIT 匯出完全一致。
     const completedLap = buildManualRideLap(currentState);
     if (!completedLap) return false;
     dispatch({ type: "MARK_LAP" });
-    if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
-    setLapFeedback(completedLap);
-    lapFeedbackTimerRef.current = setTimeout(() => {
-      setLapFeedback(null);
-      lapFeedbackTimerRef.current = null;
-    }, 4_000);
-    if (settings.vibrationEnabled) vibrateSuccess();
+    if (source === "manual") {
+      if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
+      setLapFeedback(completedLap);
+      lapFeedbackTimerRef.current = setTimeout(() => {
+        setLapFeedback(null);
+        lapFeedbackTimerRef.current = null;
+      }, 4_000);
+      if (settings.vibrationEnabled) vibrateSuccess();
+    }
     return true;
   }, [dispatch, settings.vibrationEnabled]);
 
   const handleMarkLap = useCallback(() => {
     if (!settings.lapEnabled) return;
-    void completeCurrentLap();
+    void completeCurrentLap("manual");
   }, [completeCurrentLap, settings.lapEnabled]);
+
+  const handleSelectSportType = useCallback((sportType: SportType) => {
+    if (state.status === "active" || state.status === "paused") {
+      Alert.alert("活動進行中", "請先結束目前活動，再選擇不同運動模式，以維持本次紀錄的統計一致。 ");
+      return;
+    }
+    // 先更新即時 state，讓 Bottom Sheet 關閉後儀表板圖示與名稱立即同步；
+    // 同步持久化為預設值，避免 idle 狀態的預設運動 effect 將選擇覆寫回去。
+    setSportType(sportType);
+    void updateSettings({ defaultSportType: sportType });
+    setSportPickerQuery("");
+    setSportPickerVisible(false);
+  }, [setSportType, state.status, updateSettings]);
 
   useEffect(() => {
     if (!settings.lapEnabled || settings.lapMode !== "auto" || state.status !== "active") {
@@ -2482,7 +2498,7 @@ export default function MapScreen() {
       nextAutoLapDistanceMRef.current = nextDistanceM;
       return;
     }
-    if (completeCurrentLap()) {
+    if (completeCurrentLap("auto")) {
       // 以整趟累計距離的固定倍數觸發；手動介入不會改變下一個自動里程碑。
       nextAutoLapDistanceMRef.current = nextDistanceM + intervalM;
     }
@@ -3646,12 +3662,8 @@ export default function MapScreen() {
                 <Pressable
                   key={sportType}
                   accessibilityLabel={`選擇${meta.label}`}
-                  style={styles.sportPickerRow}
-                  onPress={() => {
-                    setSportType(sportType);
-                    setSportPickerQuery("");
-                    setSportPickerVisible(false);
-                  }}
+                  style={({ pressed }) => [styles.sportPickerRow, { opacity: pressed ? 0.68 : 1 }]}
+                  onPress={() => handleSelectSportType(sportType)}
                 >
                   <View style={[styles.sportPickerIcon, { backgroundColor: selected ? `${meta.accent}2A` : "rgba(255,255,255,0.09)" }]}>
                     <Text style={styles.sportPickerIconText}>{meta.icon}</Text>
@@ -3905,21 +3917,16 @@ export default function MapScreen() {
       {lapFeedback && (
         <View
           accessibilityLiveRegion="polite"
-          style={[styles.lapFeedbackOverlay, { top: insets.top + 66, pointerEvents: "none" }]}
+          style={[styles.lapFeedbackToast, { top: insets.top + 66, pointerEvents: "none" }]}
         >
-          <View style={styles.lapFeedbackHeading}>
-            <Text style={styles.lapFeedbackTitle}>Lap {lapFeedback.index} 已完成</Text>
-            <Text style={styles.lapFeedbackTime}>{formatDuration(lapFeedback.movingTimeSec)}</Text>
+          <View style={styles.lapToastHeading}>
+            <Text style={styles.lapToastTitle}>開始第 {lapFeedback.index + 1} 圈</Text>
+            <Text style={styles.lapToastPrevious}>第 {lapFeedback.index} 圈 · {formatDuration(lapFeedback.movingTimeSec)}</Text>
           </View>
-          <View style={styles.lapFeedbackMetrics}>
-            <View style={styles.lapFeedbackMetric}>
-              <Text style={styles.lapFeedbackMetricLabel}>距離</Text>
-              <Text style={styles.lapFeedbackMetricValue}>{(lapFeedback.distanceM / 1_000).toFixed(2)} km</Text>
-            </View>
-            <View style={styles.lapFeedbackMetric}>
-              <Text style={styles.lapFeedbackMetricLabel}>平均功率</Text>
-              <Text style={styles.lapFeedbackMetricValue}>{lapFeedback.averagePowerW === undefined ? "--" : `${lapFeedback.averagePowerW} W`}</Text>
-            </View>
+          <View style={styles.lapToastMetrics}>
+            {getLapPresentationMetrics(state.sportType, lapFeedback).slice(0, 3).map((metric) => (
+              <Text key={metric.id} style={styles.lapToastMetric}>{metric.label} {metric.value}</Text>
+            ))}
           </View>
         </View>
       )}
@@ -4239,26 +4246,24 @@ const styles = StyleSheet.create({
     zIndex: 20,
     backgroundColor: "transparent",
   },
-  lapFeedbackOverlay: {
+  lapFeedbackToast: {
     position: "absolute",
-    left: 16,
-    right: 16,
+    left: 28,
+    right: 28,
     zIndex: 42,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    backgroundColor: "rgba(7, 28, 19, 0.97)",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "rgba(7, 28, 19, 0.92)",
     borderWidth: 1,
-    borderColor: "rgba(156,255,181,0.72)",
-    boxShadow: "0px 6px 18px rgba(0,0,0,0.28)",
+    borderColor: "rgba(156,255,181,0.56)",
+    boxShadow: "0px 4px 12px rgba(0,0,0,0.24)",
   },
-  lapFeedbackHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  lapFeedbackTitle: { color: "#FFFFFF", fontSize: 17, fontWeight: "900" },
-  lapFeedbackTime: { color: "#9CFFB5", fontSize: 16, fontWeight: "900" },
-  lapFeedbackMetrics: { flexDirection: "row", gap: 10, marginTop: 10 },
-  lapFeedbackMetric: { flex: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: "rgba(255,255,255,0.08)" },
-  lapFeedbackMetricLabel: { color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: "700" },
-  lapFeedbackMetricValue: { color: "#FFFFFF", fontSize: 16, fontWeight: "900", marginTop: 2 },
+  lapToastHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 10 },
+  lapToastTitle: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
+  lapToastPrevious: { color: "#9CFFB5", fontSize: 12, fontWeight: "800" },
+  lapToastMetrics: { flexDirection: "row", flexWrap: "wrap", columnGap: 9, rowGap: 3, marginTop: 5 },
+  lapToastMetric: { color: "rgba(255,255,255,0.82)", fontSize: 11, fontWeight: "700" },
   touchGuardStatusStack: {
     position: "absolute",
     right: 10,

@@ -38,7 +38,8 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     expect(mapSource).toContain("settings.lapMode === \"auto\"");
     expect(mapSource).toContain("nextAutoLapDistanceMRef");
     expect(mapSource).toContain("nextAutoLapDistanceMRef.current = nextDistanceM + intervalM");
-    expect(mapSource).toContain("void completeCurrentLap()");
+    expect(mapSource).toContain('completeCurrentLap("auto")');
+    expect(mapSource).toContain('completeCurrentLap("manual")');
     expect(mapSource).toContain("autoPauseSpeedThresholdKmh");
     expect(mapSource).toContain("autoPauseEnabledForSport");
   });
