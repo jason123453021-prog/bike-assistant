@@ -27,6 +27,7 @@ import {
   Animated,
   AppState,
   Dimensions,
+  Easing,
   Modal,
   PanResponder,
   Platform,
@@ -58,7 +59,7 @@ import {
   SPORT_META,
   type SportType,
 } from "@/lib/sport-metrics";
-import { getLapPresentationMetrics } from "@/lib/lap-presentation";
+import { getLapHighlightMetric, getLapPresentationMetrics } from "@/lib/lap-presentation";
 import { getModelRevision, subscribeModelUpdates } from "@/lib/model-governance";
 import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
 import { calculateAgeFromBirthday } from "@/lib/personal-profile";
@@ -528,6 +529,8 @@ export default function MapScreen() {
   const [summarySnapshot, setSummarySnapshot] = useState<RideSummarySnapshot | null>(null);
   const [lapFeedback, setLapFeedback] = useState<RideLap | null>(null);
   const lapFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lapToastOpacity = useRef(new Animated.Value(0)).current;
+  const lapToastTranslateY = useRef(new Animated.Value(-18)).current;
   const nextAutoLapDistanceMRef = useRef<number | null>(null);
   // 補給提醒分別管理（支援兩種同時顯示）
   const [calorieAlert, setCalorieAlert] = useState(false);
@@ -2454,14 +2457,9 @@ export default function MapScreen() {
     // 使用與 reducer 相同的快照函式，確保彈窗、摘要、活動詳情與 FIT 匯出完全一致。
     const completedLap = buildManualRideLap(currentState);
     if (!completedLap) return false;
-    dispatch({ type: "MARK_LAP" });
+    dispatch({ type: "MARK_LAP", source });
     if (source === "manual") {
-      if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
       setLapFeedback(completedLap);
-      lapFeedbackTimerRef.current = setTimeout(() => {
-        setLapFeedback(null);
-        lapFeedbackTimerRef.current = null;
-      }, 4_000);
       if (settings.vibrationEnabled) vibrateSuccess();
     }
     return true;
@@ -2507,6 +2505,57 @@ export default function MapScreen() {
   useEffect(() => () => {
     if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!lapFeedback) return;
+    if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
+    lapToastOpacity.stopAnimation();
+    lapToastTranslateY.stopAnimation();
+    lapToastOpacity.setValue(0);
+    lapToastTranslateY.setValue(-18);
+    const enter = Animated.parallel([
+      Animated.timing(lapToastOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(lapToastTranslateY, { toValue: 0, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]);
+    enter.start();
+    lapFeedbackTimerRef.current = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(lapToastOpacity, { toValue: 0, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(lapToastTranslateY, { toValue: -12, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (finished) setLapFeedback((current) => current?.index === lapFeedback.index ? null : current);
+      });
+      lapFeedbackTimerRef.current = null;
+    }, 3_800);
+    return () => {
+      if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
+      enter.stop();
+    };
+  }, [lapFeedback, lapToastOpacity, lapToastTranslateY]);
+
+  const currentLap = useMemo<RideLap | null>(() => {
+    const hasManualLap = state.laps.some((lap) => lap.source !== "auto");
+    if (!isActive || !hasManualLap) return null;
+    const anchor = state.lapAnchor;
+    const movingTimeSec = Math.max(0, state.elapsed - anchor.elapsedSec);
+    const distanceM = Math.max(0, state.distance - anchor.distanceM);
+    const powerDurationSec = Math.max(0, state.powerSampleDurationSec - anchor.powerSampleDurationSec);
+    const averagePowerW = powerDurationSec > 0
+      ? Math.round(Math.max(0, (state.powerWorkJ - anchor.powerWorkJ) / powerDurationSec))
+      : undefined;
+    return {
+      index: state.laps.length + 1,
+      startedAtElapsedSec: anchor.elapsedSec,
+      endedAtElapsedSec: state.elapsed,
+      movingTimeSec,
+      distanceM,
+      ascentM: Math.max(0, state.totalAscent - anchor.ascentM),
+      descentM: Math.max(0, state.totalDescent - anchor.descentM),
+      averageSpeedKmh: movingTimeSec > 0 ? (distanceM / 1_000) / (movingTimeSec / 3_600) : undefined,
+      averagePowerW: averagePowerW && averagePowerW > 0 ? averagePowerW : undefined,
+    };
+  }, [isActive, state.distance, state.elapsed, state.lapAnchor, state.laps, state.powerSampleDurationSec, state.powerWorkJ, state.totalAscent, state.totalDescent]);
+  const currentLapHighlight = currentLap ? getLapHighlightMetric(state.sportType, currentLap) : null;
 
   const acknowledgeDaylightAlert = useCallback((event: DaylightAlertEvent) => {
     daylightAcknowledgedRef.current.add(event.key);
@@ -3914,21 +3963,46 @@ export default function MapScreen() {
         </View>
       )}
 
-      {lapFeedback && (
+      {currentLap && currentLapHighlight && (
         <View
+          accessibilityLabel={`目前第 ${currentLap.index} 圈：圈時 ${formatDuration(currentLap.movingTimeSec)}，${currentLapHighlight.label} ${currentLapHighlight.value}`}
+          style={[styles.currentLapOverlay, { top: insets.top + 82, pointerEvents: "none" }]}
+        >
+          <Text style={styles.currentLapTitle}>Lap {currentLap.index}</Text>
+          <View style={styles.currentLapRow}>
+            <Text style={styles.currentLapLabel}>圈時</Text>
+            <Text style={styles.currentLapValue}>{formatDuration(currentLap.movingTimeSec)}</Text>
+          </View>
+          <View style={styles.currentLapRow}>
+            <Text style={styles.currentLapLabel}>{currentLapHighlight.label}</Text>
+            <Text style={styles.currentLapValue}>{currentLapHighlight.value}</Text>
+          </View>
+        </View>
+      )}
+
+      {lapFeedback && (
+        <Animated.View
           accessibilityLiveRegion="polite"
-          style={[styles.lapFeedbackToast, { top: insets.top + 66, pointerEvents: "none" }]}
+          style={[
+            styles.lapFeedbackToast,
+            {
+              top: insets.top + 12,
+              opacity: lapToastOpacity,
+              pointerEvents: "none",
+              transform: [{ translateY: lapToastTranslateY }],
+            },
+          ]}
         >
           <View style={styles.lapToastHeading}>
             <Text style={styles.lapToastTitle}>開始第 {lapFeedback.index + 1} 圈</Text>
-            <Text style={styles.lapToastPrevious}>第 {lapFeedback.index} 圈 · {formatDuration(lapFeedback.movingTimeSec)}</Text>
+            <Text style={styles.lapToastPrevious}>上一圈 {formatDuration(lapFeedback.movingTimeSec)} · {getLapHighlightMetric(state.sportType, lapFeedback).label} {getLapHighlightMetric(state.sportType, lapFeedback).value}</Text>
           </View>
           <View style={styles.lapToastMetrics}>
-            {getLapPresentationMetrics(state.sportType, lapFeedback).slice(0, 3).map((metric) => (
+            {getLapPresentationMetrics(state.sportType, lapFeedback).slice(0, 2).map((metric) => (
               <Text key={metric.id} style={styles.lapToastMetric}>{metric.label} {metric.value}</Text>
             ))}
           </View>
-        </View>
+        </Animated.View>
       )}
 
       {touchGuardEnabled && isActive && (
@@ -4248,8 +4322,8 @@ const styles = StyleSheet.create({
   },
   lapFeedbackToast: {
     position: "absolute",
-    left: 28,
-    right: 28,
+    alignSelf: "center",
+    maxWidth: "82%",
     zIndex: 42,
     borderRadius: 14,
     paddingHorizontal: 14,
@@ -4264,6 +4338,23 @@ const styles = StyleSheet.create({
   lapToastPrevious: { color: "#9CFFB5", fontSize: 12, fontWeight: "800" },
   lapToastMetrics: { flexDirection: "row", flexWrap: "wrap", columnGap: 9, rowGap: 3, marginTop: 5 },
   lapToastMetric: { color: "rgba(255,255,255,0.82)", fontSize: 11, fontWeight: "700" },
+  currentLapOverlay: {
+    position: "absolute",
+    left: 12,
+    zIndex: 30,
+    minWidth: 116,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "rgba(20,20,20,0.72)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.18)",
+    boxShadow: "0px 3px 10px rgba(0,0,0,0.18)",
+  },
+  currentLapTitle: { color: "#9CFFB5", fontSize: 12, fontWeight: "900", marginBottom: 5 },
+  currentLapRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginTop: 2 },
+  currentLapLabel: { color: "rgba(255,255,255,0.68)", fontSize: 10, fontWeight: "700" },
+  currentLapValue: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
   touchGuardStatusStack: {
     position: "absolute",
     right: 10,

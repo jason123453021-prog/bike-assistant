@@ -101,6 +101,8 @@ export interface SupplyConfirmation {
 /** 使用者手動或自動觸發時封存的本機分圈。 */
 export interface RideLap {
   index: number;
+  /** 分圈由使用者按鍵或距離里程碑建立；舊資料未帶來源時視為手動分圈。 */
+  source?: "manual" | "auto";
   startedAtElapsedSec: number;
   endedAtElapsedSec: number;
   movingTimeSec: number;
@@ -296,7 +298,7 @@ type RideAction =
   | { type: "CONSUME_CALORIES" }
   | { type: "CONSUME_WATER" }
   | { type: "SUPPLY_CONFIRMED"; confirmation: SupplyConfirmation }
-  | { type: "MARK_LAP" }
+  | { type: "MARK_LAP"; source: "manual" | "auto" }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
   | { type: "ADD_RECORD"; record: RideRecord }
   | { type: "SET_SPORT_TYPE"; sportType: SportType }
@@ -583,13 +585,13 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
       };
 
     case "MARK_LAP": {
-      // 手動 Lap 僅能在真正騎乘中建立，避免暫停或地圖操作產生空白分段。
+      // 分圈僅能在真正騎乘中建立，避免暫停或地圖操作產生空白分段。
       if (state.status !== "active") return state;
       const lap = buildManualRideLap(state);
       if (!lap) return state;
       return {
         ...state,
-        laps: [...state.laps, lap].slice(-100),
+        laps: [...state.laps, { ...lap, source: action.source }].slice(-100),
         // 全程統計保留；僅切換下一圈的相對統計錨點。
         lapAnchor: createNextRideLapAnchor(state),
       };

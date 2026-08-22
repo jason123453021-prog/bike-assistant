@@ -7,6 +7,11 @@ export interface LapPresentationMetric {
   value: string;
 }
 
+export interface LapHighlightMetric {
+  label: string;
+  value: string;
+}
+
 function formatDistance(distanceM: number): string {
   return `${(Math.max(0, distanceM) / 1_000).toFixed(2)} km`;
 }
@@ -59,4 +64,21 @@ export function formatLapMetricsInline(sportType: SportType, lap: RideLap): stri
   return getLapPresentationMetrics(sportType, lap)
     .map((metric) => `${metric.label} ${metric.value}`)
     .join(" · ");
+}
+
+/** 地圖 Toast 與即時面板共用的單圈核心指標，依運動類型避免顯示不適用數據。 */
+export function getLapHighlightMetric(sportType: SportType, lap: RideLap): LapHighlightMetric {
+  if (sportType === "running" || sportType === "trail_running") {
+    return { label: "配速", value: `${formatPaceFromKmh(lap.averageSpeedKmh ?? 0)}` };
+  }
+  if (sportType === "hiking") {
+    return { label: "總爬升", value: `+${Math.round(Math.max(0, lap.ascentM))} m` };
+  }
+  if (lap.averagePowerW !== undefined) {
+    return { label: "均功", value: `${Math.round(lap.averagePowerW)} W` };
+  }
+  return {
+    label: "均速",
+    value: lap.averageSpeedKmh === undefined ? "資料不足" : `${lap.averageSpeedKmh.toFixed(1)} km/h`,
+  };
 }
