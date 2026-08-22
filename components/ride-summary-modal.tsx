@@ -93,6 +93,7 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
   }, [visible]);
 
   const summary = snapshot ?? state;
+  const laps = summary.laps ?? [];
   const totalPowerSamples = summary.powerZones.reduce((a, b) => a + b, 0);
   const zonePcts = summary.powerZones.map((v) =>
     totalPowerSamples > 0 ? Math.round((v / totalPowerSamples) * 100) : 0
@@ -289,6 +290,32 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
               <Text style={[styles.nameHint, { color: colors.muted }]}>{powerSourceLabel}；卡路里為本機估算，非功率計或代謝量測值。</Text>
             </View>
 
+            {laps.length > 0 && (
+              <View style={[styles.lapsPanel, { borderColor: colors.border, backgroundColor: colors.surface }]}> 
+                <View style={styles.lapsHeader}>
+                  <View style={styles.lapsHeadingCopy}>
+                    <Text style={[styles.panelTitle, { color: colors.foreground }]}>計圈（Laps）</Text>
+                    <Text style={[styles.nameHint, { color: colors.muted }]}>僅列出本次騎乘中手動標記的分段；儲存後會與活動詳情及 FIT 匯出一致。</Text>
+                  </View>
+                  <Text style={[styles.lapsCount, { color: colors.accent }]}>{laps.length} 圈</Text>
+                </View>
+                {laps.map((lap) => (
+                  <View key={`${lap.index}-${lap.endedAtElapsedSec}`} style={[styles.lapRow, { borderTopColor: colors.border }]}> 
+                    <View style={styles.lapRowHeader}>
+                      <Text style={[styles.lapRowTitle, { color: colors.foreground }]}>Lap {lap.index}</Text>
+                      <Text style={[styles.lapRowTime, { color: colors.foreground }]}>{formatDuration(lap.movingTimeSec)}</Text>
+                    </View>
+                    <View style={styles.lapMetricsGrid}>
+                      <LapMetric label="距離" value={`${(lap.distanceM / 1_000).toFixed(2)} km`} colors={colors} />
+                      <LapMetric label="均速" value={lap.averageSpeedKmh === undefined ? "--" : `${lap.averageSpeedKmh.toFixed(1)} km/h`} colors={colors} />
+                      <LapMetric label="均功率" value={lap.averagePowerW === undefined ? "--" : `${lap.averagePowerW} W`} colors={colors} />
+                      <LapMetric label="爬升" value={`${Math.round(lap.ascentM)} m`} colors={colors} />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
             {/* Power Zone Chart */}
             {totalPowerSamples > 0 && (
               <View style={[styles.chartSection, { borderColor: colors.border }]}>
@@ -354,6 +381,15 @@ function StatCell({
   );
 }
 
+function LapMetric({ label, value, colors }: { label: string; value: string; colors: any }) {
+  return (
+    <View style={styles.lapMetric}>
+      <Text style={[styles.lapMetricLabel, { color: colors.muted }]}>{label}</Text>
+      <Text style={[styles.lapMetricValue, { color: colors.foreground }]} numberOfLines={1}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
@@ -366,6 +402,18 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: "800" },
   content: { padding: 20, paddingBottom: 40 },
+  lapsPanel: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 14, marginBottom: 16, overflow: "hidden" },
+  lapsHeader: { flexDirection: "row", justifyContent: "space-between", gap: 12, paddingVertical: 14, alignItems: "flex-start" },
+  lapsHeadingCopy: { flex: 1 },
+  lapsCount: { fontSize: 13, fontWeight: "900", paddingTop: 3 },
+  lapRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 12 },
+  lapRowHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  lapRowTitle: { fontSize: 16, fontWeight: "900" },
+  lapRowTime: { fontSize: 16, fontWeight: "900" },
+  lapMetricsGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 9, rowGap: 8 },
+  lapMetric: { width: "50%", paddingRight: 8 },
+  lapMetricLabel: { fontSize: 11, fontWeight: "700" },
+  lapMetricValue: { fontSize: 13, fontWeight: "800", marginTop: 2 },
 
   // 路線命名
   nameSection: {

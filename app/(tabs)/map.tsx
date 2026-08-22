@@ -47,7 +47,7 @@ import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import Svg, { Circle } from "react-native-svg";
 
-import { useRide } from "@/lib/ride-context";
+import { useRide, type RideLap } from "@/lib/ride-context";
 import {
   buildSportDashboardMetrics,
   calculateGapPaceSecPerKm,
@@ -186,6 +186,7 @@ import {
   createLiveElevationFilterState,
 } from "@/lib/live-elevation-filter";
 import { createRideSummarySnapshot, type RideSummarySnapshot } from "@/lib/ride-summary-snapshot";
+import { buildManualRideLap } from "@/lib/ride-lap";
 import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
 import { daylightAlertCopy, getDueDaylightAlert, getNextDaylightAlert, isDaylightAlertKindEnabled, type DaylightAlertEvent } from "@/lib/daylight-alert";
@@ -524,6 +525,8 @@ export default function MapScreen() {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryRecordId, setSummaryRecordId] = useState<string | null>(null);
   const [summarySnapshot, setSummarySnapshot] = useState<RideSummarySnapshot | null>(null);
+  const [lapFeedback, setLapFeedback] = useState<RideLap | null>(null);
+  const lapFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 補給提醒分別管理（支援兩種同時顯示）
   const [calorieAlert, setCalorieAlert] = useState(false);
   const [waterAlert, setWaterAlert] = useState(false);
@@ -2434,9 +2437,22 @@ export default function MapScreen() {
 
   const handleMarkLap = useCallback(() => {
     if (state.status !== "active") return;
+    // 使用與 reducer 相同的快照函式，確保彈窗、摘要、活動詳情與 FIT 匯出完全一致。
+    const completedLap = buildManualRideLap(state);
+    if (!completedLap) return;
     dispatch({ type: "MARK_LAP" });
-    if (settings.vibrationEnabled) vibrateLight();
-  }, [dispatch, settings.vibrationEnabled, state.status]);
+    if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
+    setLapFeedback(completedLap);
+    lapFeedbackTimerRef.current = setTimeout(() => {
+      setLapFeedback(null);
+      lapFeedbackTimerRef.current = null;
+    }, 4_000);
+    if (settings.vibrationEnabled) vibrateSuccess();
+  }, [dispatch, settings.vibrationEnabled, state]);
+
+  useEffect(() => () => {
+    if (lapFeedbackTimerRef.current) clearTimeout(lapFeedbackTimerRef.current);
+  }, []);
 
   const acknowledgeDaylightAlert = useCallback((event: DaylightAlertEvent) => {
     daylightAcknowledgedRef.current.add(event.key);
@@ -3846,6 +3862,28 @@ export default function MapScreen() {
         </View>
       )}
 
+      {lapFeedback && (
+        <View
+          accessibilityLiveRegion="polite"
+          style={[styles.lapFeedbackOverlay, { top: insets.top + 66, pointerEvents: "none" }]}
+        >
+          <View style={styles.lapFeedbackHeading}>
+            <Text style={styles.lapFeedbackTitle}>Lap {lapFeedback.index} 已完成</Text>
+            <Text style={styles.lapFeedbackTime}>{formatDuration(lapFeedback.movingTimeSec)}</Text>
+          </View>
+          <View style={styles.lapFeedbackMetrics}>
+            <View style={styles.lapFeedbackMetric}>
+              <Text style={styles.lapFeedbackMetricLabel}>距離</Text>
+              <Text style={styles.lapFeedbackMetricValue}>{(lapFeedback.distanceM / 1_000).toFixed(2)} km</Text>
+            </View>
+            <View style={styles.lapFeedbackMetric}>
+              <Text style={styles.lapFeedbackMetricLabel}>平均功率</Text>
+              <Text style={styles.lapFeedbackMetricValue}>{lapFeedback.averagePowerW === undefined ? "--" : `${lapFeedback.averagePowerW} W`}</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       {touchGuardEnabled && isActive && (
         <Pressable
           style={styles.touchGuard}
@@ -3856,38 +3894,35 @@ export default function MapScreen() {
           }}
           delayLongPress={settings.touchGuardUnlockHoldMs}
         >
-          <Animated.View
-            style={[
-              styles.touchGuardCornerHint,
-              { top: insets.top + 226, opacity: touchGuardHintOpacity, pointerEvents: "none" },
-            ]}
-          >
-            <IconSymbol name="lock.fill" size={14} color="#9CFFB5" />
-            <Text style={styles.touchGuardCornerText}>
-              {`已鎖定 · 長按 ${touchGuardHoldLabel} 解除`}
-            </Text>
-          </Animated.View>
-          {touchGuardHoldProgress > 0 && (
-            <View style={[styles.touchGuardProgressRing, { top: insets.top + 224, pointerEvents: "none" }]}>
-              <Svg width={56} height={56} viewBox="0 0 56 56">
-                <Circle cx="28" cy="28" r="23" stroke="rgba(255,255,255,0.18)" strokeWidth="4" fill="rgba(5, 21, 14, 0.62)" />
-                <Circle
-                  cx="28"
-                  cy="28"
-                  r="23"
-                  stroke="#9CFFB5"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  fill="transparent"
-                  strokeDasharray="144.5 144.5"
-                  strokeDashoffset={144.5 * (1 - touchGuardHoldProgress)}
-                  transform="rotate(-90 28 28)"
-                />
-              </Svg>
-              <Text style={styles.touchGuardProgressText}>{Math.round(touchGuardHoldProgress * 100)}%</Text>
-              <Text style={styles.touchGuardProgressLabel}>長按中</Text>
-            </View>
-          )}
+          <View style={[styles.touchGuardStatusStack, { top: insets.top + 202, pointerEvents: "none" }]}>
+            <Animated.View style={[styles.touchGuardCornerHint, { opacity: touchGuardHintOpacity }]}>
+              <IconSymbol name="lock.fill" size={14} color="#9CFFB5" />
+              <Text style={styles.touchGuardCornerText}>
+                {`已鎖定 · 長按 ${touchGuardHoldLabel} 解除`}
+              </Text>
+            </Animated.View>
+            {touchGuardHoldProgress > 0 && (
+              <View style={styles.touchGuardProgressRing}>
+                <Svg width={56} height={56} viewBox="0 0 56 56">
+                  <Circle cx="28" cy="28" r="23" stroke="rgba(255,255,255,0.18)" strokeWidth="4" fill="rgba(5, 21, 14, 0.62)" />
+                  <Circle
+                    cx="28"
+                    cy="28"
+                    r="23"
+                    stroke="#9CFFB5"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    fill="transparent"
+                    strokeDasharray="144.5 144.5"
+                    strokeDashoffset={144.5 * (1 - touchGuardHoldProgress)}
+                    transform="rotate(-90 28 28)"
+                  />
+                </Svg>
+                <Text style={styles.touchGuardProgressText}>{Math.round(touchGuardHoldProgress * 100)}%</Text>
+                <Text style={styles.touchGuardProgressLabel}>長按中</Text>
+              </View>
+            )}
+          </View>
         </Pressable>
       )}
 
@@ -4164,9 +4199,33 @@ const styles = StyleSheet.create({
     zIndex: 20,
     backgroundColor: "transparent",
   },
-  touchGuardCornerHint: {
+  lapFeedbackOverlay: {
     position: "absolute",
+    left: 16,
     right: 16,
+    zIndex: 42,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    backgroundColor: "rgba(7, 28, 19, 0.97)",
+    borderWidth: 1,
+    borderColor: "rgba(156,255,181,0.72)",
+    boxShadow: "0px 6px 18px rgba(0,0,0,0.28)",
+  },
+  lapFeedbackHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  lapFeedbackTitle: { color: "#FFFFFF", fontSize: 17, fontWeight: "900" },
+  lapFeedbackTime: { color: "#9CFFB5", fontSize: 16, fontWeight: "900" },
+  lapFeedbackMetrics: { flexDirection: "row", gap: 10, marginTop: 10 },
+  lapFeedbackMetric: { flex: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: "rgba(255,255,255,0.08)" },
+  lapFeedbackMetricLabel: { color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: "700" },
+  lapFeedbackMetricValue: { color: "#FFFFFF", fontSize: 16, fontWeight: "900", marginTop: 2 },
+  touchGuardStatusStack: {
+    position: "absolute",
+    right: 10,
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  touchGuardCornerHint: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -4179,8 +4238,6 @@ const styles = StyleSheet.create({
   },
   touchGuardCornerText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
   touchGuardProgressRing: {
-    position: "absolute",
-    right: 10,
     width: 56,
     height: 56,
     alignItems: "center",

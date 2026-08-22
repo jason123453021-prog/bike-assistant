@@ -17,7 +17,8 @@ import {
   canStartRide,
   canStopRide,
   shouldAccumulateRideStatistics,
-} from "@/lib/ride-lifecycle-guard";
+} from "./ride-lifecycle-guard";
+import { buildManualRideLap, createNextRideLapAnchor } from "./ride-lap";
 import type { SportType } from "./sport-metrics";
 
 export type { SportType } from "./sport-metrics";
@@ -582,44 +583,13 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
     case "MARK_LAP": {
       // 手動 Lap 僅能在真正騎乘中建立，避免暫停或地圖操作產生空白分段。
       if (state.status !== "active") return state;
-      const anchor = state.lapAnchor;
-      const movingTimeSec = Math.max(0, state.elapsed - anchor.elapsedSec);
-      const distanceM = Math.max(0, state.distance - anchor.distanceM);
-      if (movingTimeSec < 1 || distanceM < 1) return state;
-
-      const lapRoute = state.route.slice(anchor.routePointIndex);
-      const speeds = lapRoute.flatMap((point) => {
-        const speedKmh = (point.speed ?? 0) * 3.6;
-        return Number.isFinite(speedKmh) && speedKmh > 0 && speedKmh <= 120 ? [speedKmh] : [];
-      });
-      const powerDurationSec = Math.max(0, state.powerSampleDurationSec - anchor.powerSampleDurationSec);
-      const averagePowerW = powerDurationSec > 0
-        ? (state.powerWorkJ - anchor.powerWorkJ) / powerDurationSec
-        : undefined;
-      const lap: RideLap = {
-        index: state.laps.length + 1,
-        startedAtElapsedSec: anchor.elapsedSec,
-        endedAtElapsedSec: state.elapsed,
-        movingTimeSec,
-        distanceM,
-        ascentM: Math.max(0, state.totalAscent - anchor.ascentM),
-        descentM: Math.max(0, state.totalDescent - anchor.descentM),
-        averageSpeedKmh: (distanceM / 1_000) / (movingTimeSec / 3_600),
-        maxSpeedKmh: speeds.length > 0 ? Math.max(...speeds) : undefined,
-        averagePowerW: averagePowerW !== undefined && averagePowerW > 0 ? Math.round(averagePowerW) : undefined,
-      };
+      const lap = buildManualRideLap(state);
+      if (!lap) return state;
       return {
         ...state,
         laps: [...state.laps, lap].slice(-100),
-        lapAnchor: {
-          elapsedSec: state.elapsed,
-          distanceM: state.distance,
-          ascentM: state.totalAscent,
-          descentM: state.totalDescent,
-          powerWorkJ: state.powerWorkJ,
-          powerSampleDurationSec: state.powerSampleDurationSec,
-          routePointIndex: state.route.length,
-        },
+        // 全程統計保留；僅切換下一圈的相對統計錨點。
+        lapAnchor: createNextRideLapAnchor(state),
       };
     }
 

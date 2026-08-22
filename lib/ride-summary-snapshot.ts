@@ -20,11 +20,15 @@ export type RideSummarySnapshot = Pick<
   | "powerSource"
   | "caloriesSource"
   | "powerZones"
->;
+> & {
+  /** 舊版已保存摘要沒有手動 Lap 時，仍可安全開啟摘要。 */
+  laps?: RideState["laps"];
+};
 
 export function createRideSummarySnapshot(state: RideSummarySnapshot): RideSummarySnapshot {
   return {
     ...state,
     powerZones: [...state.powerZones],
+    laps: state.laps?.map((lap) => ({ ...lap })),
   };
 }
