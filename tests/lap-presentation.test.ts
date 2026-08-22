@@ -32,9 +32,11 @@ describe("多運動 Lap 呈現", () => {
     expect(getLapPresentationMetrics("trail_running", lap).map((metric) => metric.id)).toEqual(["distance", "pace", "ascent"]);
   });
 
-  it("登山以爬升與距離為核心，隱藏速度與功率", () => {
+  it("登山以爬升、下降、VAM 與距離為核心，隱藏速度與功率", () => {
     expect(getLapPresentationMetrics("hiking", lap)).toEqual([
       { id: "ascent", label: "爬升", value: "87 m" },
+      { id: "descent", label: "下降", value: "42 m" },
+      { id: "vam", label: "平均爬升速度", value: "522 m/h" },
       { id: "distance", label: "距離", value: "2.00 km" },
     ]);
   });

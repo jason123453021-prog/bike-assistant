@@ -23,7 +23,7 @@ describe("post-ride cleanup and local model governance", () => {
 
   it("uses sport-specific GPS and pause thresholds without treating slow hiking movement as still", () => {
     expect(SPORT_MODEL_PROFILES.cycling.tracking.autoPauseSpeedBelowKmh).toBe(1.08);
-    expect(SPORT_MODEL_PROFILES.cycling.tracking.autoPauseStillForSeconds).toBe(9);
+    expect(SPORT_MODEL_PROFILES.cycling.tracking.autoPauseStillForSeconds).toBe(8);
     expect(SPORT_TRACKING_POLICIES.hiking.autoPause.mode).toBe("suggest");
     expect(SPORT_TRACKING_POLICIES.hiking.autoPause.speedBelowKmh).toBeLessThan(0.5);
     expect(SPORT_TRACKING_POLICIES.trail_running.autoPause.speedBelowKmh).toBeLessThan(SPORT_TRACKING_POLICIES.running.autoPause.speedBelowKmh);

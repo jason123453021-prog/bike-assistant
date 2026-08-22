@@ -128,6 +128,7 @@ import {
   updateBackgroundRiderProfile,
   updateBackgroundSmartSupplyCountdown,
   updateBackgroundSmartSupplyChannels,
+  updateBackgroundAutoLapSettings,
   setBackgroundSupplyReminderPending,
   setBackgroundSupplyReminderEnabled,
   clearBackgroundData,
@@ -515,6 +516,9 @@ export default function MapScreen() {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryRecordId, setSummaryRecordId] = useState<string | null>(null);
   const [summarySnapshot, setSummarySnapshot] = useState<RideSummarySnapshot | null>(null);
+  const [stopConfirmVisible, setStopConfirmVisible] = useState(false);
+  const [stopConfirmHolding, setStopConfirmHolding] = useState(false);
+  const stopConfirmHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nextAutoLapDistanceMRef = useRef<number | null>(null);
   // 補給提醒分別管理（支援兩種同時顯示）
   const [calorieAlert, setCalorieAlert] = useState(false);
@@ -1580,7 +1584,9 @@ export default function MapScreen() {
   // ─── 崩潰恢復檢查 ──────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
+      const contextSnapshot = await checkSnapshot();
       const persistentSession = await initializeRideSession();
+      const backgroundState = await getBackgroundState();
       if (persistentSession?.isActive && persistentSession.trackPoints.length > 0) {
         recoverySessionRef.current = persistentSession;
         const recoveredRoute = persistentSession.trackPoints.map((point) => ({
@@ -1592,6 +1598,12 @@ export default function MapScreen() {
           segmentStart: point.segmentStart,
         }));
         const lastPoint = persistentSession.trackPoints.at(-1);
+        const restoredLaps = backgroundState?.laps?.length
+          ? backgroundState.laps
+          : Array.isArray(contextSnapshot?.laps) ? contextSnapshot.laps : [];
+        const restoredLapAnchor = backgroundState?.autoLapAnchor
+          ? { ...backgroundState.autoLapAnchor, routePointIndex: recoveredRoute.length }
+          : contextSnapshot?.lapAnchor;
         lastAcceptedTrackPointRef.current = lastPoint
           ? {
             latitude: lastPoint.latitude,
@@ -1614,8 +1626,12 @@ export default function MapScreen() {
             totalCalories: persistentSession.stats.caloriesBurned,
             totalSweatMl: persistentSession.stats.waterLoss,
             sweatSinceLastRefill: persistentSession.stats.waterLoss,
+            laps: restoredLaps,
+            lapAnchor: restoredLapAnchor,
           },
         });
+        lastBgSyncTsRef.current = lastPoint?.timestamp ?? 0;
+        nextAutoLapDistanceMRef.current = backgroundState?.nextAutoLapDistanceM ?? null;
         setLiveTrail(recoveredRoute.map((point) => ({
           latitude: point.latitude,
           longitude: point.longitude,
@@ -1624,9 +1640,8 @@ export default function MapScreen() {
         setMapRideActive(true);
         return;
       }
-      const snapshot = await checkSnapshot();
-      if (snapshot && snapshot.elapsed && snapshot.elapsed > 30) {
-        setRecoverySnapshot(snapshot);
+      if (contextSnapshot && contextSnapshot.elapsed && contextSnapshot.elapsed > 30) {
+        setRecoverySnapshot(contextSnapshot);
         setShowRecoveryAlert(true);
       }
     })();
@@ -2373,6 +2388,8 @@ export default function MapScreen() {
       smartWaterSupplyEnabled,
       supplyReminderEnabled: settings.supplyReminderEnabled,
       sportType: state.sportType,
+      autoLapEnabled: settings.lapEnabled,
+      autoLapDistanceKm: settings.autoLapDistanceKm,
       currentLat: lastPos?.coords.latitude ?? 0,
       currentLon: lastPos?.coords.longitude ?? 0,
       currentTimestamp: lastPos?.timestamp,
@@ -2422,6 +2439,14 @@ export default function MapScreen() {
       if (l) updateWeather(l.coords.latitude, l.coords.longitude);
     }, WEATHER_INTERVAL);
   }, [clearIntervalSupplyRepeatTimer, currentPos, dispatch, estimateAgeYears, estimateFtpW, hydrationThresholdMl, gpxRoute, settings, smartEnergySupplyEnabled, smartWaterSupplyEnabled, state.sportType, syncSmartSupplyCountdown, updateWeather, calorieAnim, waterAnim]);
+
+  useEffect(() => {
+    if (!mapRideActive) return;
+    void updateBackgroundAutoLapSettings({
+      enabled: settings.lapEnabled,
+      distanceKm: settings.autoLapDistanceKm,
+    });
+  }, [mapRideActive, settings.autoLapDistanceKm, settings.lapEnabled]);
 
   const handlePause = useCallback(() => {
     pausedElapsedRef.current = state.elapsed;
@@ -2479,13 +2504,7 @@ export default function MapScreen() {
     }
   }, [completeCurrentLap, settings.autoLapDistanceKm, settings.lapEnabled, state.distance, state.status]);
 
-  const handleStop = useCallback(() => {
-    Alert.alert("結束騎乘", "確定要結束本次騎乘並儲存記錄？", [
-      { text: "取消", style: "cancel" },
-      {
-        text: "結束",
-        style: "destructive",
-          onPress: async () => {
+  const finalizeStopRide = useCallback(async () => {
           // 在所有非同步儲存與後續畫面重設之前，封存這次騎乘完整統計。
           const completedRideSnapshot = createRideSummarySnapshot(stateRef.current);
           dispatch({ type: "STOP" });
@@ -2626,11 +2645,38 @@ export default function MapScreen() {
               "本次騎乘無法寫入裝置儲存空間。請確認可用空間後重新開啟 App，並避免在釋放空間前移除應用程式。",
             );
           }
-          
-        },
-      },
-    ]);
   }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, syncSmartSupplyCountdown, updateSettings]);
+
+  const clearStopConfirmHold = useCallback(() => {
+    if (stopConfirmHoldTimerRef.current) clearTimeout(stopConfirmHoldTimerRef.current);
+    stopConfirmHoldTimerRef.current = null;
+    setStopConfirmHolding(false);
+  }, []);
+
+  const handleStop = useCallback(() => {
+    clearStopConfirmHold();
+    setStopConfirmVisible(true);
+  }, [clearStopConfirmHold]);
+
+  const dismissStopConfirmation = useCallback(() => {
+    clearStopConfirmHold();
+    setStopConfirmVisible(false);
+  }, [clearStopConfirmHold]);
+
+  const startStopConfirmHold = useCallback(() => {
+    if (stopConfirmHoldTimerRef.current) return;
+    setStopConfirmHolding(true);
+    stopConfirmHoldTimerRef.current = setTimeout(() => {
+      stopConfirmHoldTimerRef.current = null;
+      setStopConfirmHolding(false);
+      setStopConfirmVisible(false);
+      void finalizeStopRide();
+    }, 1_200);
+  }, [finalizeStopRide]);
+
+  useEffect(() => () => {
+    if (stopConfirmHoldTimerRef.current) clearTimeout(stopConfirmHoldTimerRef.current);
+  }, []);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {
@@ -2656,6 +2702,9 @@ export default function MapScreen() {
         try {
           const bgState = await getBackgroundState();
           const bgTrack = await getBackgroundTrackPoints();
+          if (bgState?.nextAutoLapDistanceM !== undefined) {
+            nextAutoLapDistanceMRef.current = bgState.nextAutoLapDistanceM;
+          }
           if (bgState?.trackingMode === "full" && rideLocationTrackingMode === "idle_monitor") {
             pausedAtRef.current = null;
             setRideLocationTrackingMode("full");
@@ -2714,6 +2763,7 @@ export default function MapScreen() {
                   powerW: point.powerW,
                   caloriesKcal: point.caloriesKcal,
                   intervalSec: point.intervalSec,
+                  autoLapCompleted: point.autoLapCompleted,
                 })),
               lastAcceptedTrackPointRef.current,
             );
@@ -2748,6 +2798,7 @@ export default function MapScreen() {
                   powerSource: point.powerW !== undefined ? "estimated" : "unavailable",
                   caloriesSource: point.caloriesKcal !== undefined ? "power-estimate" : "unavailable",
                 });
+                if (point.autoLapCompleted) dispatch({ type: "MARK_LAP" });
               }
               lastAcceptedTrackPointRef.current = newPoints.at(-1) ?? lastAcceptedTrackPointRef.current;
               // 更新最大同步時間戳
@@ -3316,7 +3367,7 @@ export default function MapScreen() {
         <View style={styles.sixGrid}>
           {state.sportType === "cycling"
             ? dashPanelFields.map((key) => (
-              <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} columnCount={dashboardColumnCount} />
+              <MemoizedDashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} columnCount={dashboardColumnCount} />
             ))
             : sportDashboardMetrics.map((metric) => (
               <View key={metric.label} style={[styles.sportMetric, { width: dashboardCellWidth, minHeight: dashboardCellMinHeight }]}>
@@ -3336,7 +3387,7 @@ export default function MapScreen() {
             {dashOverflowFields.length > 0 && (
               <View style={[styles.sixGrid, { marginBottom: 8 /* internal spacing */ }]}>
                 {dashOverflowFields.map((key) => (
-                  <DashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} columnCount={dashboardColumnCount} />
+                  <MemoizedDashMetric key={key} fieldKey={key} state={state} isActive={isActive} currentGrade={currentGrade} avgSpeed={avgSpeed} columnCount={dashboardColumnCount} />
                 ))}
               </View>
             )}
@@ -3524,6 +3575,33 @@ export default function MapScreen() {
           />
         </Pressable>
       </Animated.View>
+
+      <Modal
+        visible={stopConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={dismissStopConfirmation}
+      >
+        <View style={styles.stopConfirmBackdrop}>
+          <View style={styles.stopConfirmCard}>
+            <Text style={styles.stopConfirmTitle}>確認結束騎乘</Text>
+            <Text style={styles.stopConfirmBody}>為避免騎乘震動或誤觸，請持續按住下方按鈕 1.2 秒。完成後才會停止追蹤並儲存本次本機紀錄。</Text>
+            <Pressable
+              accessibilityLabel="長按確認結束騎乘"
+              accessibilityHint="持續按住一點二秒才會結束本次騎乘"
+              style={({ pressed }) => [styles.stopConfirmHoldButton, (pressed || stopConfirmHolding) && styles.stopConfirmHoldButtonActive]}
+              onPressIn={startStopConfirmHold}
+              onPressOut={clearStopConfirmHold}
+            >
+              <IconSymbol name="stop.fill" size={20} color="#FFFFFF" />
+              <Text style={styles.stopConfirmHoldText}>{stopConfirmHolding ? "請持續按住…" : "長按確認結束"}</Text>
+            </Pressable>
+            <Pressable accessibilityLabel="取消結束騎乘" style={styles.stopConfirmCancelButton} onPress={dismissStopConfirmation}>
+              <Text style={styles.stopConfirmCancelText}>繼續騎乘</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={sportPickerVisible}
@@ -3919,6 +3997,9 @@ function DashMetric({ fieldKey, state, isActive, currentGrade, avgSpeed, columnC
       return null;
   }
 }
+
+/** 系統時鐘與地圖視覺更新不應重算未變動的儀表格。 */
+const MemoizedDashMetric = React.memo(DashMetric);
 
 function DashboardSummaryMetric({ metric, state, isActive, currentGrade, avgSpeed }: {
   metric: NavigationDashboardSummaryKey;
@@ -4708,5 +4789,66 @@ const styles = StyleSheet.create({
     fontSize: 9,
     flex: 1,
     textAlign: "center",
+  },
+  stopConfirmBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    backgroundColor: "rgba(0,0,0,0.68)",
+  },
+  stopConfirmCard: {
+    borderRadius: 20,
+    padding: 22,
+    backgroundColor: "#111418",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  stopConfirmTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  stopConfirmBody: {
+    marginTop: 10,
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+  },
+  stopConfirmHoldButton: {
+    minHeight: 58,
+    marginTop: 22,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#C62828",
+    borderWidth: 2,
+    borderColor: "#FF8A80",
+  },
+  stopConfirmHoldButtonActive: {
+    backgroundColor: "#8E1B1B",
+    transform: [{ scale: 0.98 }],
+  },
+  stopConfirmHoldText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  stopConfirmCancelButton: {
+    minHeight: 48,
+    marginTop: 10,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  stopConfirmCancelText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });

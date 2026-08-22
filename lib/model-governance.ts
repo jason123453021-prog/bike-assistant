@@ -63,7 +63,7 @@ export const MODEL_GOVERNANCE = {
 export const SPORT_MODEL_PROFILES: Record<GovernedSportType, SportModelProfile> = {
   cycling: {
     label: "單車",
-    tracking: { gpsDistanceIntervalM: 3, stationaryDriftThresholdM: 1.5, autoPauseMode: "automatic", autoPauseSpeedBelowKmh: 1.08, autoPauseStillForSeconds: 9, requiresStillness: false },
+    tracking: { gpsDistanceIntervalM: 3, stationaryDriftThresholdM: 1.5, autoPauseMode: "automatic", autoPauseSpeedBelowKmh: 1.08, autoPauseStillForSeconds: 8, requiresStillness: false },
     calorieMetMultiplier: 1,
     supply: { carbohydrateRateMultiplier: 1, hydrationRateMultiplier: 1 },
   },

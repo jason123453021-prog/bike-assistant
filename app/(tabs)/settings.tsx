@@ -485,7 +485,7 @@ export default function SettingsScreen() {
             value={settings.autoPauseSpeedThresholdKmh}
             unit="km/h"
             colors={colors}
-            hint="單車低於此速度且持續 9 秒才暫停；高於此門檻 0.5 km/h 即恢復"
+            hint="單車低於此速度且持續 8 秒才暫停；高於此門檻 0.5 km/h 即恢復"
             disabled={!settings.idleAutoPauseEnabled}
             onPress={() => openEdit("autoPauseSpeedThresholdKmh", "自動暫停速度門檻", settings.autoPauseSpeedThresholdKmh, "km/h")}
           />

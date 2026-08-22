@@ -2,7 +2,7 @@ import type { RideLap } from "./ride-context";
 import { formatPaceFromKmh, type SportType } from "./sport-metrics";
 
 export interface LapPresentationMetric {
-  id: "distance" | "average-speed" | "average-power" | "pace" | "cadence" | "ascent";
+  id: "distance" | "average-speed" | "average-power" | "pace" | "cadence" | "ascent" | "descent" | "vam";
   label: string;
   value: string;
 }
@@ -18,6 +18,11 @@ function formatDistance(distanceM: number): string {
 
 function formatAscent(ascentM: number): string {
   return `${Math.round(Math.max(0, ascentM))} m`;
+}
+
+function formatVam(ascentM: number, movingTimeSec: number): string {
+  if (!Number.isFinite(movingTimeSec) || movingTimeSec <= 0) return "資料不足";
+  return `${Math.round((Math.max(0, ascentM) / movingTimeSec) * 3_600)} m/h`;
 }
 
 /**
@@ -41,7 +46,12 @@ export function getLapPresentationMetrics(sportType: SportType, lap: RideLap): L
   }
 
   if (sportType === "hiking") {
-    return [ascent, distance];
+    return [
+      ascent,
+      { id: "descent", label: "下降", value: formatAscent(lap.descentM) },
+      { id: "vam", label: "平均爬升速度", value: formatVam(lap.ascentM, lap.movingTimeSec) },
+      distance,
+    ];
   }
 
   return [

@@ -28,12 +28,14 @@ import { getHeadwindMs } from "@/lib/weather-service";
 import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import { evaluateTrackPoint, type TrackQualityPoint } from "@/lib/track-point-quality";
 import type { SupplyIntervalKind } from "@/lib/supply-interval";
-import type { SportType } from "@/lib/sport-metrics";
+import { estimateSportCalories, type SportType } from "@/lib/sport-metrics";
 import { acceptLiveElevationDelta, clampVirtualPowerForRider } from "@/lib/live-elevation-filter";
 import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 import { isSmartSupplyChannelEnabled, resolveSmartSupplyChannels } from "@/lib/smart-supply-channels";
 import { hasReliableRideMovement } from "@/lib/live-ride-readings";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
+import { advanceAutoLapMilestones, createAutoLapAnchor, type AutoLapAnchor } from "@/lib/auto-lap-milestones";
+import type { RideLap } from "@/lib/ride-context";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
@@ -56,6 +58,8 @@ type BackgroundTrackPoint = {
   powerW?: number;
   caloriesKcal?: number;
   intervalSec?: number;
+  /** 此樣本跨過距離里程碑，前景回補時建立相同的自動 Lap。 */
+  autoLapCompleted?: boolean;
 };
 
 let backgroundTrackCache: BackgroundTrackPoint[] | null = null;
@@ -88,6 +92,8 @@ async function appendBackgroundTrackBatch(points: BackgroundTrackPoint[], force 
 
 export interface BackgroundState {
   totalDistanceM: number;
+  /** 背景已驗證的移動時間，不把定位中斷或靜止的牆鐘時間算入活動。 */
+  movingTimeSec?: number;
   totalAscentM?: number;
   totalDescentM?: number;
   minElevationM?: number;
@@ -160,6 +166,12 @@ export interface BackgroundState {
     weatherCode: number;
     precipitationProb: number;
   };
+  /** 背景鎖屏期間持久化的自動距離分圈狀態。 */
+  autoLapEnabled?: boolean;
+  autoLapDistanceKm?: number;
+  nextAutoLapDistanceM?: number | null;
+  autoLapAnchor?: AutoLapAnchor;
+  laps?: RideLap[];
 }
 
 // Haversine 距離計算（背景任務中不能 import 其他模組的函數）
@@ -223,6 +235,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         caloriesKcal?: number;
         intervalSec?: number;
         isStationary?: boolean;
+        autoLapCompleted?: boolean;
       }> = [];
       let qualityAnchor: TrackQualityPoint | null = state.lastLat !== 0 && state.lastLon !== 0
         ? {
@@ -315,6 +328,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           state.totalDistanceM += candidateDistanceM;
           acceptedLocation.distanceM = candidateDistanceM;
         }
+        state.movingTimeSec = (state.movingTimeSec ?? 0) + statisticsIntervalSec;
 
         const elevationState = { anchorAltitudeM: segmentStart ? null : state.elevationAnchorM ?? null };
         const elevationDelta = acceptLiveElevationDelta(elevationState, loc.coords.altitude, acceptedLocation.distanceM);
@@ -360,30 +374,46 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
             const gradePct = calcGrade((loc.coords.altitude ?? 0) - (state.lastAltitude ?? loc.coords.altitude ?? 0), distanceM);
             const heading = loc.coords.heading ?? 0;
             const headwindMs = getHeadwindMs(heading, environment.windDirection, environment.windSpeedKmh);
-            const power = clampVirtualPowerForRider(calculatePower({
-              speedMs: effectiveSpeedMs,
-              prevSpeedMs: state.lastSpeedMs,
-              intervalSec: statisticsIntervalSec,
-              gradePct,
-              windSpeedMs: headwindMs,
-              riderMassKg: profile.weightKg,
-              bikeMassKg: profile.bikeWeightKg,
-              airDensityKgM3: calcAirDensity(environment.temperatureC, environment.humidityPct),
-            }), profile.ftpW);
-            const calorieResult = calculatePersonalizedCalories({
-              powerW: power,
-              hasMeasuredPower: power > 0,
-              speedKmh: effectiveSpeedKmh,
-              gradePct,
-              riderWeightKg: profile.weightKg,
-              ftpW: profile.ftpW,
-              intervalSec: statisticsIntervalSec,
-              temperatureC: environment.temperatureC,
-              humidityPct: environment.humidityPct,
-              weatherCode: environment.weatherCode,
-              precipitationProb: environment.precipitationProb,
-              headwindMs,
-            });
+            const sportType = state.sportType ?? "cycling";
+            const power = sportType === "cycling"
+              ? clampVirtualPowerForRider(calculatePower({
+                speedMs: effectiveSpeedMs,
+                prevSpeedMs: state.lastSpeedMs,
+                intervalSec: statisticsIntervalSec,
+                gradePct,
+                windSpeedMs: headwindMs,
+                riderMassKg: profile.weightKg,
+                bikeMassKg: profile.bikeWeightKg,
+                airDensityKgM3: calcAirDensity(environment.temperatureC, environment.humidityPct),
+              }), profile.ftpW)
+              : 0;
+            const calorieResult = sportType === "cycling"
+              ? calculatePersonalizedCalories({
+                powerW: power,
+                hasMeasuredPower: power > 0,
+                speedKmh: effectiveSpeedKmh,
+                gradePct,
+                riderWeightKg: profile.weightKg,
+                ftpW: profile.ftpW,
+                intervalSec: statisticsIntervalSec,
+                temperatureC: environment.temperatureC,
+                humidityPct: environment.humidityPct,
+                weatherCode: environment.weatherCode,
+                precipitationProb: environment.precipitationProb,
+                headwindMs,
+              })
+              : {
+                kcal: estimateSportCalories({
+                  sportType,
+                  weightKg: profile.weightKg,
+                  durationSec: statisticsIntervalSec,
+                  speedKmh: effectiveSpeedKmh,
+                  gradePct,
+                  vamMPerHour: elevationDelta.ascentM / Math.max(1, statisticsIntervalSec) * 3_600,
+                }),
+                intensityFactor: 0,
+                environmentFactor: 1,
+              };
             const hydrationResult = calculateSweatLoss({
               weightKg: profile.weightKg,
               heightCm: profile.heightCm,
@@ -433,6 +463,35 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
         state.lastAccuracy = loc.coords.accuracy ?? undefined;
         state.lastSpeedMs = speedMs > 0 ? speedMs : candidateDistanceM / Math.max(1, statisticsIntervalSec);
         state.lastAltitude = loc.coords.altitude;
+
+        const autoLapResult = advanceAutoLapMilestones(
+          {
+            elapsedSec: state.movingTimeSec ?? 0,
+            distanceM: state.totalDistanceM,
+            ascentM: state.totalAscentM ?? 0,
+            descentM: state.totalDescentM ?? 0,
+            powerWorkJ: state.powerWorkJ ?? 0,
+            powerSampleDurationSec: state.powerSampleDurationSec ?? 0,
+          },
+          {
+            enabled: state.autoLapEnabled === true,
+            intervalM: Math.max(0, state.autoLapDistanceKm ?? 0) * 1_000,
+            nextDistanceM: state.nextAutoLapDistanceM ?? null,
+            laps: state.laps ?? [],
+            anchor: state.autoLapAnchor ?? createAutoLapAnchor({
+              elapsedSec: 0,
+              distanceM: 0,
+              ascentM: 0,
+              descentM: 0,
+              powerWorkJ: 0,
+              powerSampleDurationSec: 0,
+            }),
+          },
+        );
+        state.laps = autoLapResult.laps;
+        state.autoLapAnchor = autoLapResult.anchor;
+        state.nextAutoLapDistanceM = autoLapResult.nextDistanceM;
+        acceptedLocation.autoLapCompleted = autoLapResult.completedLaps.length > 0;
 
         addTrackPoint(
           recoverySession,
@@ -591,6 +650,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           powerW: point.powerW,
           caloriesKcal: point.caloriesKcal,
           intervalSec: point.intervalSec || undefined,
+          autoLapCompleted: point.autoLapCompleted || undefined,
         }
       )));
   } catch (e) {
@@ -624,10 +684,13 @@ export async function initBackgroundState(params: {
   supplyWaterDistanceIntervalKm: number;
   riderProfile?: BackgroundState["riderProfile"];
   environment?: BackgroundState["environment"];
+  autoLapEnabled?: boolean;
+  autoLapDistanceKm?: number;
 }) {
   const startedAt = Date.now();
   const state: BackgroundState = {
     totalDistanceM: 0,
+    movingTimeSec: 0,
     totalAscentM: 0,
     totalDescentM: 0,
     elevationAnchorM: null,
@@ -673,6 +736,20 @@ export async function initBackgroundState(params: {
     gpsAccuracy: "standard",
     riderProfile: params.riderProfile,
     environment: params.environment,
+    autoLapEnabled: params.autoLapEnabled === true,
+    autoLapDistanceKm: params.autoLapDistanceKm,
+    nextAutoLapDistanceM: params.autoLapEnabled && (params.autoLapDistanceKm ?? 0) > 0
+      ? (params.autoLapDistanceKm ?? 0) * 1_000
+      : null,
+    autoLapAnchor: createAutoLapAnchor({
+      elapsedSec: 0,
+      distanceM: 0,
+      ascentM: 0,
+      descentM: 0,
+      powerWorkJ: 0,
+      powerSampleDurationSec: 0,
+    }),
+    laps: [],
   };
   await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   // 清空舊軌跡
@@ -730,6 +807,35 @@ export async function updateBackgroundSmartSupplyChannels(params: {
       state.smartWaterCountdownStartedElapsedSec = elapsedSec;
       state.waterReminderSent = false;
     }
+    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+/** 騎乘中更新自動距離記圈設定；只影響尚未建立的圈，不覆寫已封存分段。 */
+export async function updateBackgroundAutoLapSettings(params: {
+  enabled: boolean;
+  distanceKm: number;
+}) {
+  try {
+    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+    if (!stateStr) return;
+    const state: BackgroundState = JSON.parse(stateStr);
+    if (!state.isRiding) return;
+    const intervalM = Math.max(0, params.distanceKm) * 1_000;
+    state.autoLapEnabled = params.enabled;
+    state.autoLapDistanceKm = params.distanceKm;
+    state.nextAutoLapDistanceM = params.enabled && intervalM > 0
+      ? (Math.floor(state.totalDistanceM / intervalM) + 1) * intervalM
+      : null;
+    state.autoLapAnchor ??= createAutoLapAnchor({
+      elapsedSec: 0,
+      distanceM: 0,
+      ascentM: 0,
+      descentM: 0,
+      powerWorkJ: 0,
+      powerSampleDurationSec: 0,
+    });
+    state.laps ??= [];
     await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   } catch {}
 }
