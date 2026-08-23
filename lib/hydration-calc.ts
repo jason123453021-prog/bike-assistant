@@ -68,6 +68,10 @@ function calcBSA(heightCm: number, weightKg: number): number {
   return 0.007184 * Math.pow(heightCm, 0.725) * Math.pow(weightKg, 0.425);
 }
 
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
 // ─── 溫度修正係數（基準 20°C）──────────────────────────────────────────────────
 // 每升高 1°C 汗液流失增加約 5-8%
 function tempFactor(tempC: number): number {
@@ -247,10 +251,12 @@ export function calculateSweatLoss(input: HydrationInput): HydrationResult {
   // 例如：600 ml/h 約為 125 ml，會以保守的 150 ml 小口補充提示；
   // 1,200 ml/h 約為 250 ml。避免舊模型一次建議 400–500 ml 而造成腸胃不適。
   const recommendedRefillMl = Math.min(250, Math.max(150, Math.round(sweatRatePerHour * (12.5 / 60))));
-  const environmentLoad = Math.max(
-    0,
-    Math.min(1, ((Math.max(0, resolvedTemperatureC - 20) / 18) * 0.55) + ((Math.max(0, resolvedHumidityPct - 60) / 40) * 0.3) + (resolvedWeatherCode <= 2 ? 0.15 : 0)),
-  );
+  // 補水倒數的環境負荷應把「高濕、暖熱」視為疊加的體感壓力。
+  // 26°C／88% 等暖熱高濕組合不一定需要晴天日照才增加出汗，因此濕度權重不可被夜間日照因子抵銷。
+  const temperatureLoad = clamp((resolvedTemperatureC - 20) / 12, 0, 1) * 0.45;
+  const humidityLoad = clamp((resolvedHumidityPct - 60) / 30, 0, 1) * 0.45;
+  const solarLoad = resolvedWeatherCode <= 2 && resolvedDaylight ? 0.1 : 0;
+  const environmentLoad = clamp(temperatureLoad + humidityLoad + solarLoad, 0, 1);
 
   return {
     sweatLossMl,

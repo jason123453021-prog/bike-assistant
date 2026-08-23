@@ -27,6 +27,7 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).toContain("const initialSupplyPlanInput = buildInitialSupplyPlanInput({");
     expect(mapSource).toContain("const initialSupplyPlan = createSupplyPlan(initialSupplyPlanInput);");
     expect(mapSource).toContain("resolveInitialWeather");
+    expect(mapSource).toContain("setTimeout(() => resolve(null), 1_500)");
     expect(mapSource).toContain('lastBackgroundCountdownSnapshotRef.current = "";');
     expect(mapSource).toContain("syncSmartSupplyCountdown(createSmartSupplyCountdown(initialSupplyPlan, 0));");
   });

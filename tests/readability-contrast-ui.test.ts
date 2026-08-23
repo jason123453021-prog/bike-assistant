@@ -69,6 +69,13 @@ describe("small-screen readability guardrails", () => {
     expect(shareCardSource).toContain("color: colors.onAccent, fontSize: 14, fontWeight: \"600\"");
   });
 
+  it("keeps the ride-summary close control below Android system status chrome", () => {
+    expect(rideSummarySource).toContain('import { SafeAreaView } from "react-native-safe-area-context";');
+    expect(rideSummarySource).toContain('<SafeAreaView edges={["top", "left", "right"]}');
+    expect(rideSummarySource).toContain("headerCloseButton: { minWidth: 44, minHeight: 44");
+    expect(rideSummarySource).toContain("hitSlop={12}");
+  });
+
   it("keeps the remaining custom supply trigger selector legible in both themes", () => {
     expect(settingsSource).not.toContain("整合提醒類別");
     expect(settingsSource).toContain('supplyForm.triggerType === type ? colors.onAccent : colors.foreground');

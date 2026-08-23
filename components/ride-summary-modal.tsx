@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import Svg, { G, Path, Circle } from "react-native-svg";
 import * as ImagePicker from "expo-image-picker";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
 import { persistRideMedia } from "@/lib/local-ride-media";
@@ -176,13 +177,16 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}>
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <Text style={[styles.headerTitle, { color: colors.foreground }]}>騎乘摘要</Text>
             <Pressable
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+              style={({ pressed }) => [styles.headerCloseButton, { opacity: pressed ? 0.6 : 1 }]}
               onPress={() => onClose()}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="關閉騎乘摘要"
             >
               <IconSymbol name="xmark.circle.fill" size={28} color={colors.muted} />
             </Pressable>
@@ -360,7 +364,7 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
               <Text style={[styles.saveBtnText, { color: colors.onAccent }]}>儲存並完成</Text>
             </Pressable>
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -402,6 +406,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: { fontSize: 20, fontWeight: "800" },
+  headerCloseButton: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", marginRight: -8 },
   content: { padding: 20, paddingBottom: 40 },
   lapsPanel: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 14, marginBottom: 16, overflow: "hidden" },
   lapsHeader: { flexDirection: "row", justifyContent: "space-between", gap: 12, paddingVertical: 14, alignItems: "flex-start" },

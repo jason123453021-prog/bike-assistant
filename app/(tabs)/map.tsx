@@ -1369,7 +1369,8 @@ export default function MapScreen() {
     if (weatherRef.current) return weatherRef.current;
     const weatherWithinStartBudget = await Promise.race<WeatherData | null>([
       fetchWeather(latitude, longitude),
-      new Promise((resolve) => setTimeout(() => resolve(null), 900)),
+      // 首輪倒數只建立一次；稍微延長預取時限，優先讓已啟動的暖熱／高濕天氣資料參與首次計算。
+      new Promise((resolve) => setTimeout(() => resolve(null), 1_500)),
     ]);
     if (!weatherWithinStartBudget) return null;
     setWeather(weatherWithinStartBudget);

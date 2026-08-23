@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildInitialSupplyPlanInput } from "../lib/initial-supply-plan";
+import { createSupplyPlan } from "../lib/smart-supply-plan";
 
 const baseContext = {
   mode: "smart" as const,
@@ -64,5 +65,30 @@ describe("個人化首輪補給模型輸入", () => {
     expect(input.energyCarbohydrateHourlyLimitG).toBe(75);
     expect(input.weatherAvailable).toBe(false);
     expect(input.environmentLoad).toBe(0);
+  });
+
+  it("在尚未移動的首輪，仍會以暖熱高濕天氣提前補水倒數", () => {
+    const input = buildInitialSupplyPlanInput({
+      ...baseContext,
+      now: new Date("2026-08-23T14:15:00.000Z"),
+      snapshot: {
+        speedMs: 0,
+        weather: {
+          temperature: 26,
+          humidity: 88,
+          windSpeed: 4,
+          windDirection: 0,
+          precipitationProb: 0,
+          weatherCode: 3,
+          description: "多雲",
+          forecast: [],
+        },
+      },
+    });
+    const plan = createSupplyPlan(input);
+
+    expect(input.environmentLoad).toBeGreaterThanOrEqual(0.6);
+    expect(plan.waterCountdownSec).toBeLessThanOrEqual(25 * 60);
+    expect(plan.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
   });
 });
