@@ -25,7 +25,7 @@ describe("smart supply countdown", () => {
     expect(smartSupplyCountdownRemainingSec(countdown, "water", 120)).toBe(plan.waterCountdownSec);
     expect(isSmartSupplyCountdownDue(countdown, "water", countdown.waterDueElapsedSec)).toBe(true);
     expect(plan.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
-    expect(plan.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
+    expect(plan.waterCountdownSec).toBeLessThanOrEqual(30 * 60);
     expect(plan.energyCountdownSec).toBeGreaterThanOrEqual(20 * 60);
     expect(plan.energyCountdownSec).toBeLessThanOrEqual(75 * 60);
   });

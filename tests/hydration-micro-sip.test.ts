@@ -36,6 +36,6 @@ describe("智慧補水小量分次", () => {
     expect(plan.waterRecommendationMl).toBe(250);
     expect(plan.waterTriggerMl).toBeGreaterThanOrEqual(100);
     expect(plan.waterTriggerMl).toBeLessThanOrEqual(250);
-    expect(plan.reason).toContain("10–15 分鐘");
+    expect(plan.reason).toContain("10–30 分鐘");
   });
 });

@@ -43,11 +43,12 @@ export interface SupplyPlan {
 }
 
 const SMART_ENERGY_TRIGGER_RANGE = { min: 160, max: 280 } as const;
-// 觸發量依 10–15 分鐘的估計汗液流失拆分；它是提醒節奏，不是一次飲水量。
+// 觸發量依約 12.5 分鐘的估計汗液流失拆分；它是單次小口補充量，不是一次大量飲水量。
 const SMART_WATER_TRIGGER_RANGE = { min: 100, max: 250 } as const;
 const SMART_WATER_RECOMMENDATION_RANGE = { min: 150, max: 250 } as const;
 const MICRO_SIP_INTERVAL_MINUTES = 12.5;
-const SMART_WATER_COUNTDOWN_RANGE_SEC = { min: 10 * 60, max: 15 * 60 } as const;
+// 低負荷可延至 30 分鐘；高汗率、強度、熱負荷或長時間騎乘會逐步提前至 10 分鐘。
+const SMART_WATER_COUNTDOWN_RANGE_SEC = { min: 10 * 60, max: 30 * 60 } as const;
 // 耐力活動超過一小時開始主動補碳水；以 30–60 g/h 的分次策略轉成不帶量化處方的提醒節奏。
 const SMART_ENERGY_COUNTDOWN_RANGE_SEC = { min: 30 * 60, max: 60 * 60 } as const;
 
@@ -85,7 +86,7 @@ export function resolveCarbohydrateHourlyLimit(input: Pick<SupplyPlanInput,
 
 /**
  * 將既有的科學化補給模型轉為下一次提醒的時間。
- * 補水固定維持 10–15 分鐘的可耐受小量節奏；高汗率、強度、熱負荷與長時段會提前。
+ * 補水倒數維持 10–30 分鐘：低負荷延長以減少不必要提示，高汗率、強度、熱負荷與長時段會提前。
  * 能量則依每小時碳水目標推導，保守維持 30–60 分鐘提醒，避免以單次大量補給取代規律分次。
  */
 function deriveCountdowns(
@@ -100,7 +101,7 @@ function deriveCountdowns(
   const sweatLoad = clamp((sweatRatePerHour - 350) / 1_450, 0, 1);
   const durationLoad = elapsedSec >= 3 * 60 * 60 ? 1 : elapsedSec >= 2 * 60 * 60 ? 0.6 : elapsedSec >= 60 * 60 ? 0.25 : 0;
   const waterCountdownSec = Math.round(clamp(
-    15 * 60 - sweatLoad * 150 - intensityLoad * 60 - environmentLoad * 70 - durationLoad * 30,
+    30 * 60 - sweatLoad * 10 * 60 - intensityLoad * 4 * 60 - environmentLoad * 4 * 60 - durationLoad * 2 * 60,
     SMART_WATER_COUNTDOWN_RANGE_SEC.min,
     SMART_WATER_COUNTDOWN_RANGE_SEC.max,
   ));
@@ -116,7 +117,7 @@ function deriveCountdowns(
 
 /**
  * 產生單次補給提醒的門檻與建議量。智慧模式僅以個人、騎乘及環境資料動態推導，
- * 補水會拆分為約每 10–15 分鐘一次、每次 150–250 mL 的可耐受小量建議；
+ * 補水倒數會依負荷維持於每 10–30 分鐘，而每次仍提供 150–250 mL 的可耐受小量建議；
  * 固定模式僅保留舊版資料相容。
  */
 export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
@@ -182,7 +183,7 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
     energyServingCarbohydrateG,
   );
   const reasonParts = [
-    `全自動智慧計畫（單包 ${energyServingCarbohydrateG} g 碳水；每小時上限 ${carbohydrateHourlyLimit.gramsPerHour} g${carbohydrateHourlyLimit.mode === "science" ? "，科學建議" : "，手動設定"}；補水約每 10–15 分鐘）`,
+    `全自動智慧計畫（單包 ${energyServingCarbohydrateG} g 碳水；每小時上限 ${carbohydrateHourlyLimit.gramsPerHour} g${carbohydrateHourlyLimit.mode === "science" ? "，科學建議" : "，手動設定"}；補水約每 10–30 分鐘）`,
     intensityLoad >= 0.3 ? "騎乘強度較高" : "騎乘強度一般",
     environmentLoad >= 0.4 ? "環境熱負荷提高" : input.weatherAvailable ? "環境負荷穩定" : "本機環境基準",
     input.elapsedSec >= 2 * 60 * 60 ? "長時間騎乘" : "騎乘時間尚短",

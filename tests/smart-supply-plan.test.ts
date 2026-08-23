@@ -75,7 +75,30 @@ describe("smart supply plan", () => {
     expect(shortEasy.energyCountdownSec).toBeGreaterThanOrEqual(40 * 60);
     expect(longHard.energyCountdownSec).toBeLessThan(shortEasy.energyCountdownSec);
     expect(longHard.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
-    expect(longHard.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
+    expect(longHard.waterCountdownSec).toBeLessThanOrEqual(30 * 60);
+  });
+
+  it("將每輪補水倒數限制在 10–30 分鐘，並依汗率、強度、環境與時長提前提醒", () => {
+    const coolEasy = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 0,
+      intensityFactor: 0.45,
+      sweatRatePerHour: 350,
+      environmentLoad: 0,
+    });
+    const hotHardLong = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 3 * 60 * 60,
+      intensityFactor: 1.25,
+      sweatRatePerHour: 1_800,
+      environmentLoad: 1,
+    });
+
+    expect(coolEasy.waterCountdownSec).toBe(30 * 60);
+    expect(hotHardLong.waterCountdownSec).toBe(10 * 60);
+    expect(hotHardLong.waterCountdownSec).toBeLessThan(coolEasy.waterCountdownSec);
   });
 
   it("uses the user-selected carbohydrate per serving to schedule the next energy countdown", () => {
