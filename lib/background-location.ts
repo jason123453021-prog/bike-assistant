@@ -532,12 +532,16 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
               ftpW: profile.ftpW,
               intensityFactor: calorieResult.intensityFactor,
               sweatRatePerHour: hydrationResult.sweatRatePerHour,
-            environmentLoad: hydrationResult.environmentLoad,
-            weatherAvailable: Boolean(state.environment),
-            energyServingCarbohydrateG: profile.energyServingCarbohydrateG,
-            energyCarbohydrateHourlyLimitMode: profile.energyCarbohydrateHourlyLimitMode,
-            energyCarbohydrateHourlyLimitG: profile.energyCarbohydrateHourlyLimitG,
-          });
+              environmentLoad: hydrationResult.environmentLoad,
+              weatherAvailable: Boolean(state.environment),
+              temperatureC: state.environment?.temperatureC,
+              humidityPct: state.environment?.humidityPct,
+              weatherCode: state.environment?.weatherCode,
+              isFirstWaterCountdown: false,
+              energyServingCarbohydrateG: profile.energyServingCarbohydrateG,
+              energyCarbohydrateHourlyLimitMode: profile.energyCarbohydrateHourlyLimitMode,
+              energyCarbohydrateHourlyLimitG: profile.energyCarbohydrateHourlyLimitG,
+            });
             activeCalorieThreshold = latestSupplyPlan.calorieTriggerKcal;
             activeWaterThreshold = latestSupplyPlan.waterTriggerMl;
         }

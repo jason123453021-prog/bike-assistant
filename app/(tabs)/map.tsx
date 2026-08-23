@@ -108,6 +108,7 @@ import {
 } from "@/lib/personalized-ride-calculations";
 import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import { buildInitialSupplyPlanInput } from "@/lib/initial-supply-plan";
+import { awaitHydrationInputs, resolveWaterCountdownFallbackDuration, type HydrationSensorSnapshot } from "@/lib/hydration-recalculation";
 import { resolveSmartSupplyChannels } from "@/lib/smart-supply-channels";
 import {
   createSmartSupplyCountdown,
@@ -983,20 +984,109 @@ export default function MapScreen() {
     if (!waterStillPending) clearSupplyRepeatTimer();
   }, [calorieAnim, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, smartEnergySupplyEnabled, supplyRecommendation, syncSmartSupplyCountdown, waterAlert]);
 
+  const refreshSmartWaterCountdown = useCallback(async (confirmedPlan: SupplyPlan, confirmedElapsedSec: number, previousWaterDurationSec?: number) => {
+    const location = lastLocationRef.current;
+    const currentHydrationThresholdMl = settings.waterThreshold > 0
+      ? settings.waterThreshold
+      : DEFAULT_HYDRATION_THRESHOLD_ML;
+    const sensorPromise = Promise.resolve<HydrationSensorSnapshot>({
+      elapsedSec: stateRef.current.elapsed,
+      powerW: stateRef.current.currentPower,
+      speedKmh: stateRef.current.currentSpeed,
+      sweatRatePerHour: stateRef.current.currentSweatRatePerHour,
+      headingDeg: location?.coords.heading,
+    });
+    const weatherPromise = location
+      ? fetchWeather(location.coords.latitude, location.coords.longitude)
+      : Promise.resolve(weatherRef.current);
+    const input = await awaitHydrationInputs({ weatherPromise, sensorPromise });
+    const countdown = smartSupplyCountdownRef.current;
+    if (!countdown) return;
+
+    if (input.status !== "complete") {
+      const fallbackDurationSec = resolveWaterCountdownFallbackDuration(previousWaterDurationSec);
+      syncSmartSupplyCountdown(restartSmartSupplyCountdown(
+        countdown,
+        "water",
+        {
+          ...confirmedPlan,
+          waterCountdownSec: fallbackDurationSec,
+          reason: `${confirmedPlan.reason}；資料逾時或不完整，沿用前一輪補水倒數。`,
+        },
+        confirmedElapsedSec,
+      ));
+      return;
+    }
+
+    const { weather: nextWeather, sensors } = input;
+    setWeather(nextWeather);
+    weatherRef.current = nextWeather;
+    const headwindMs = typeof sensors.headingDeg === "number"
+      ? getHeadwindMs(sensors.headingDeg, nextWeather.windDirection, nextWeather.windSpeed)
+      : 0;
+    const sweat = calculateSweatLoss({
+      weightKg: settings.weight,
+      heightCm: settings.height,
+      powerW: sensors.powerW,
+      speedKmh: sensors.speedKmh,
+      ascentPerInterval: 0,
+      gradePct: currentGrade,
+      intervalSec: 60,
+      temperatureC: nextWeather.temperature,
+      humidityPct: nextWeather.humidity,
+      weatherCode: nextWeather.weatherCode,
+      isDaylight: new Date().getHours() >= 6 && new Date().getHours() < 18,
+      ftpW: estimateFtpW,
+      headwindMs,
+      precipitationProb: nextWeather.precipitationProb,
+      ageYears: estimateAgeYears ?? 32,
+      calibrationMultiplier: settings.sweatRateCalibrationMultiplier,
+      environmentSource: "live-weather",
+    });
+    const nextPlan = createSupplyPlan({
+      mode: settings.supplyCalculationMode,
+      sportType: stateRef.current.sportType,
+      calorieThresholdKcal: settings.calorieThreshold,
+      waterThresholdMl: currentHydrationThresholdMl,
+      elapsedSec: sensors.elapsedSec,
+      riderWeightKg: settings.weight,
+      ftpW: estimateFtpW,
+      intensityFactor: stateRef.current.sportType === "cycling" ? Math.min(2, sensors.powerW / Math.max(1, estimateFtpW)) : 1,
+      sweatRatePerHour: sweat.sweatRatePerHour || sensors.sweatRatePerHour,
+      environmentLoad: sweat.environmentLoad,
+      weatherAvailable: true,
+      temperatureC: nextWeather.temperature,
+      humidityPct: nextWeather.humidity,
+      weatherCode: nextWeather.weatherCode,
+      isFirstWaterCountdown: false,
+      energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+      energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
+      energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+    });
+    setActiveSupplyPlan(nextPlan);
+    syncSmartSupplyCountdown(restartSmartSupplyCountdown(countdown, "water", nextPlan, confirmedElapsedSec));
+  }, [currentGrade, estimateAgeYears, estimateFtpW, settings, syncSmartSupplyCountdown]);
+
   const handleConfirmWaterSupply = useCallback(() => {
     clearSupplyAutoDismissTimer("water");
     setWaterAlert(false);
     setSupplyRecommendedMl(undefined);
     const confirmedPlan = pendingSupplyPlansRef.current.water ?? supplyRecommendation;
     if (smartWaterSupplyEnabled && confirmedPlan && smartSupplyCountdownRef.current) {
+      const previousWaterDurationSec = smartSupplyCountdownRef.current.waterDurationSec;
       syncSmartSupplyCountdown(
         restartSmartSupplyCountdown(
           smartSupplyCountdownRef.current,
           "water",
-          confirmedPlan,
+          {
+            ...confirmedPlan,
+            waterCountdownSec: resolveWaterCountdownFallbackDuration(previousWaterDurationSec),
+            reason: `${confirmedPlan.reason}；正在同步天氣與感測資料以校正下一輪補水倒數。`,
+          },
           stateRef.current.elapsed,
         ),
       );
+      void refreshSmartWaterCountdown(confirmedPlan, stateRef.current.elapsed, previousWaterDurationSec);
     } else {
       dispatch({ type: "CONSUME_WATER" });
     }
@@ -1022,7 +1112,7 @@ export default function MapScreen() {
     void clearAllSupplyNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!calorieStillPending) clearSupplyRepeatTimer();
-  }, [calorieAlert, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, smartWaterSupplyEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
+  }, [calorieAlert, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, refreshSmartWaterCountdown, settings.vibrationEnabled, smartWaterSupplyEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
 
   const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind, customItemId?: string, notificationsAlreadyCleared = false) => {
     if ((kind === "calorie" && smartEnergySupplyEnabled) || (kind === "water" && smartWaterSupplyEnabled)) return;
@@ -1261,6 +1351,9 @@ export default function MapScreen() {
     sweatRatePerHour: state.currentSweatRatePerHour || 550,
     environmentLoad: Math.min(1, Math.max(0, ((state.currentSweatRatePerHour || 550) - 550) / 1_000)),
     weatherAvailable: false,
+    temperatureC: weather?.temperature,
+    humidityPct: weather?.humidity,
+    weatherCode: weather?.weatherCode,
     energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
     energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
     energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
@@ -2225,6 +2318,10 @@ export default function MapScreen() {
             sweatRatePerHour: sweatResult.sweatRatePerHour,
             environmentLoad: sweatResult.environmentLoad,
             weatherAvailable: Boolean(currentWeather),
+            temperatureC: currentWeather?.temperature,
+            humidityPct: currentWeather?.humidity,
+            weatherCode: currentWeather?.weatherCode,
+            isFirstWaterCountdown: false,
             energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
             energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
             energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
@@ -2460,12 +2557,12 @@ export default function MapScreen() {
       energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
       energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
       energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
-      snapshot: {
+        snapshot: {
         speedMs: initialKnownLocation?.coords.speed,
         headingDeg: initialKnownLocation?.coords.heading,
         gradePct: currentGrade,
-        weather: initialWeather,
-      },
+          weather: initialWeather,
+        },
     });
     const initialSupplyPlan = createSupplyPlan(initialSupplyPlanInput);
     setActiveSupplyPlan(initialSupplyPlan);

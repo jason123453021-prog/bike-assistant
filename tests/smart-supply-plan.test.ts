@@ -78,14 +78,28 @@ describe("smart supply plan", () => {
     expect(longHard.waterCountdownSec).toBeLessThanOrEqual(30 * 60);
   });
 
-  it("將每輪補水倒數限制在 10–30 分鐘，並依汗率、強度、環境與時長提前提醒", () => {
-    const coolEasy = createSupplyPlan({
+  it("將每輪補水倒數限制在 10–30 分鐘，並以環境基礎區間、汗率、強度與時長動態修正", () => {
+    const coldEasy = createSupplyPlan({
       ...baseInput,
       mode: "smart",
       elapsedSec: 0,
       intensityFactor: 0.45,
       sweatRatePerHour: 350,
       environmentLoad: 0,
+      temperatureC: 10,
+      humidityPct: 70,
+      weatherCode: 61,
+    });
+    const temperate = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 0,
+      intensityFactor: 0.7,
+      sweatRatePerHour: 650,
+      environmentLoad: 0.2,
+      temperatureC: 25,
+      humidityPct: 60,
+      weatherCode: 3,
     });
     const hotHardLong = createSupplyPlan({
       ...baseInput,
@@ -94,11 +108,48 @@ describe("smart supply plan", () => {
       intensityFactor: 1.25,
       sweatRatePerHour: 1_800,
       environmentLoad: 1,
+      temperatureC: 32,
+      humidityPct: 82,
+      weatherCode: 0,
     });
 
-    expect(coolEasy.waterCountdownSec).toBe(30 * 60);
-    expect(hotHardLong.waterCountdownSec).toBe(10 * 60);
-    expect(hotHardLong.waterCountdownSec).toBeLessThan(coolEasy.waterCountdownSec);
+    expect(coldEasy.waterCountdownSec).toBeGreaterThanOrEqual(20 * 60);
+    expect(coldEasy.waterCountdownSec).toBeLessThanOrEqual(30 * 60);
+    expect(temperate.waterCountdownSec).toBeGreaterThanOrEqual(15 * 60);
+    expect(temperate.waterCountdownSec).toBeLessThanOrEqual(20 * 60);
+    expect(hotHardLong.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
+    expect(hotHardLong.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
+    expect(hotHardLong.waterCountdownSec).toBeLessThan(temperate.waterCountdownSec);
+  });
+
+  it("首輪只採環境與預設汗率，首輪斷網則採 10 分鐘安全值", () => {
+    const humidFirstRound = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 0,
+      intensityFactor: 0.45,
+      sweatRatePerHour: 550,
+      environmentLoad: 0.65,
+      weatherAvailable: true,
+      temperatureC: 26,
+      humidityPct: 88,
+      weatherCode: 3,
+      isFirstWaterCountdown: true,
+    });
+    const offlineFirstRound = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 0,
+      intensityFactor: 1.25,
+      sweatRatePerHour: 1_800,
+      environmentLoad: 1,
+      weatherAvailable: false,
+      isFirstWaterCountdown: true,
+    });
+
+    expect(humidFirstRound.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
+    expect(humidFirstRound.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
+    expect(offlineFirstRound.waterCountdownSec).toBe(10 * 60);
   });
 
   it("uses the user-selected carbohydrate per serving to schedule the next energy countdown", () => {

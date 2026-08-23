@@ -88,7 +88,7 @@ describe("個人化首輪補給模型輸入", () => {
     const plan = createSupplyPlan(input);
 
     expect(input.environmentLoad).toBeGreaterThanOrEqual(0.6);
-    expect(plan.waterCountdownSec).toBeLessThanOrEqual(25 * 60);
+    expect(plan.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
     expect(plan.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
   });
 });

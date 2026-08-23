@@ -8,6 +8,7 @@ const feedbackSource = readFileSync(resolve(process.cwd(), "lib/feedback-service
 const settingsSource = readFileSync(resolve(process.cwd(), "app/(tabs)/settings.tsx"), "utf8");
 const settingsContextSource = readFileSync(resolve(process.cwd(), "lib/settings-context.tsx"), "utf8");
 const backgroundSource = readFileSync(resolve(process.cwd(), "lib/background-location.ts"), "utf8");
+const hydrationRecalculationSource = readFileSync(resolve(process.cwd(), "lib/hydration-recalculation.ts"), "utf8");
 
 describe("smart supply countdown UI", () => {
   it("shows countdown status and restarts only after explicit confirmation", () => {
@@ -30,6 +31,14 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).toContain("setTimeout(() => resolve(null), 1_500)");
     expect(mapSource).toContain('lastBackgroundCountdownSnapshotRef.current = "";');
     expect(mapSource).toContain("syncSmartSupplyCountdown(createSmartSupplyCountdown(initialSupplyPlan, 0));");
+  });
+
+  it("waits for weather and sensor inputs when starting the next smart-water round, then uses the defined safe fallback", () => {
+    expect(mapSource).toContain("awaitHydrationInputs({ weatherPromise, sensorPromise })");
+    expect(mapSource).toContain("void refreshSmartWaterCountdown(confirmedPlan");
+    expect(hydrationRecalculationSource).toContain("Promise.all([input.weatherPromise, input.sensorPromise])");
+    expect(hydrationRecalculationSource).toContain("HYDRATION_DATA_TIMEOUT_MS = 60 * 1000");
+    expect(hydrationRecalculationSource).toContain("return MIN_WATER_COUNTDOWN_SEC");
   });
 
   it("uses a native modal over the map and omits amount guidance", () => {

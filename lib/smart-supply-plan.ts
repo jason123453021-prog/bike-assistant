@@ -18,6 +18,12 @@ export interface SupplyPlanInput {
   sweatRatePerHour: number;
   environmentLoad: number;
   weatherAvailable: boolean;
+  /** 即時環境資料可用時，以明確溫／濕度建立補水基礎區間。 */
+  temperatureC?: number;
+  humidityPct?: number;
+  weatherCode?: number;
+  /** 首輪不以尚未形成的功率／時長資料修正，只採環境與預設汗率。 */
+  isFirstWaterCountdown?: boolean;
   /** 使用者單包能量補給可提供的碳水克數，用於推導下一次能量倒數。 */
   energyServingCarbohydrateG?: number;
   /** 每小時碳水上限可採科學建議或由使用者手動指定。 */
@@ -47,7 +53,7 @@ const SMART_ENERGY_TRIGGER_RANGE = { min: 160, max: 280 } as const;
 const SMART_WATER_TRIGGER_RANGE = { min: 100, max: 250 } as const;
 const SMART_WATER_RECOMMENDATION_RANGE = { min: 150, max: 250 } as const;
 const MICRO_SIP_INTERVAL_MINUTES = 12.5;
-// 低負荷可延至 30 分鐘；高汗率、強度、暖熱高濕負荷或長時間騎乘會逐步提前至 10 分鐘。
+// 每輪都限制在 10–30 分鐘；環境先決定基礎區間，再套用汗率、強度與時長修正。
 const SMART_WATER_COUNTDOWN_RANGE_SEC = { min: 10 * 60, max: 30 * 60 } as const;
 // 耐力活動超過一小時開始主動補碳水；以 30–60 g/h 的分次策略轉成不帶量化處方的提醒節奏。
 const SMART_ENERGY_COUNTDOWN_RANGE_SEC = { min: 30 * 60, max: 60 * 60 } as const;
@@ -86,22 +92,46 @@ export function resolveCarbohydrateHourlyLimit(input: Pick<SupplyPlanInput,
 
 /**
  * 將既有的科學化補給模型轉為下一次提醒的時間。
-  * 補水倒數維持 10–30 分鐘：低負荷延長以減少不必要提示，高汗率、強度、暖熱高濕負荷與長時段會提前。
+ * 補水倒數維持 10–30 分鐘：環境先建立基礎值，再由汗率、強度與長時段騎乘逐步修正。
  * 能量則依每小時碳水目標推導，保守維持 30–60 分鐘提醒，避免以單次大量補給取代規律分次。
  */
-function deriveCountdowns(
-  elapsedSec: number,
-  intensity: number,
-  sweatRatePerHour: number,
-  environmentLoad: number,
-  carbohydrateGPerHour: number,
-  energyServingCarbohydrateG: number,
-): { energyCountdownSec: number; waterCountdownSec: number } {
-  const intensityLoad = clamp((intensity - 0.6) / 0.55, 0, 1);
-  const sweatLoad = clamp((sweatRatePerHour - 350) / 1_450, 0, 1);
-  const durationLoad = elapsedSec >= 3 * 60 * 60 ? 1 : elapsedSec >= 2 * 60 * 60 ? 0.6 : elapsedSec >= 60 * 60 ? 0.25 : 0;
+function environmentBaseWaterCountdownSec(input: Pick<SupplyPlanInput,
+  "weatherAvailable" | "temperatureC" | "humidityPct" | "weatherCode" | "environmentLoad" | "isFirstWaterCountdown"
+>): number {
+  if (!input.weatherAvailable) {
+    // 首輪遇到斷網不可等待或猜測環境，採保守的最短安全提醒。
+    return input.isFirstWaterCountdown ? SMART_WATER_COUNTDOWN_RANGE_SEC.min : 20 * 60;
+  }
+
+  const temperatureC = Number(input.temperatureC);
+  const humidityPct = clamp(Number(input.humidityPct) || 60, 0, 100);
+  const weatherCode = Number(input.weatherCode);
+  if (!Number.isFinite(temperatureC)) {
+    if (input.environmentLoad >= 0.75) return 13 * 60;
+    if (input.environmentLoad >= 0.35) return 17 * 60;
+    return 22 * 60;
+  }
+
+  const isWarmHumid = temperatureC >= 25 && humidityPct >= 80;
+  const isRainy = Number.isFinite(weatherCode) && weatherCode >= 51;
+  if (temperatureC > 30 || isWarmHumid) return 13 * 60;
+  if (temperatureC < 15 || (isRainy && temperatureC < 20)) return 25 * 60;
+  if (temperatureC >= 20 && temperatureC <= 28) return 18 * 60;
+  return 20 * 60;
+}
+
+function deriveCountdowns(input: Pick<SupplyPlanInput,
+  "elapsedSec" | "intensityFactor" | "sweatRatePerHour" | "environmentLoad" | "weatherAvailable" |
+  "temperatureC" | "humidityPct" | "weatherCode" | "isFirstWaterCountdown"
+>, carbohydrateGPerHour: number, energyServingCarbohydrateG: number): { energyCountdownSec: number; waterCountdownSec: number } {
+  const firstRound = Boolean(input.isFirstWaterCountdown);
+  const environmentBaseSec = environmentBaseWaterCountdownSec(input);
+  const intensityModifierSec = firstRound ? 0 : input.intensityFactor >= 0.9 ? -2 * 60 : input.intensityFactor <= 0.55 ? 2 * 60 : 0;
+  const sweatModifierSec = input.sweatRatePerHour >= 1_100 ? -2 * 60 : input.sweatRatePerHour >= 800 ? -60 : input.sweatRatePerHour <= 400 ? 60 : 0;
+  const durationModifierSec = firstRound ? 0 : input.elapsedSec >= 3 * 60 * 60 ? -2 * 60 : input.elapsedSec >= 2 * 60 * 60 ? -60 : 0;
+  const highEnvironmentModifierSec = !firstRound && input.environmentLoad >= 0.8 ? -60 : 0;
   const waterCountdownSec = Math.round(clamp(
-    30 * 60 - sweatLoad * 10 * 60 - intensityLoad * 4 * 60 - environmentLoad * 8 * 60 - durationLoad * 2 * 60,
+    environmentBaseSec + intensityModifierSec + sweatModifierSec + durationModifierSec + highEnvironmentModifierSec,
     SMART_WATER_COUNTDOWN_RANGE_SEC.min,
     SMART_WATER_COUNTDOWN_RANGE_SEC.max,
   ));
@@ -174,16 +204,19 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
     SMART_WATER_TRIGGER_RANGE.max,
   ));
   const source = input.weatherAvailable ? "smart" : "smart-offline-fallback";
-  const { energyCountdownSec, waterCountdownSec } = deriveCountdowns(
-    input.elapsedSec,
-    intensity,
-    sweatRate,
+  const { energyCountdownSec, waterCountdownSec } = deriveCountdowns({
+    elapsedSec: input.elapsedSec,
+    intensityFactor: intensity,
+    sweatRatePerHour: sweatRate,
     environmentLoad,
-    carbohydrateG,
-    energyServingCarbohydrateG,
-  );
+    weatherAvailable: input.weatherAvailable,
+    temperatureC: input.temperatureC,
+    humidityPct: input.humidityPct,
+    weatherCode: input.weatherCode,
+    isFirstWaterCountdown: input.isFirstWaterCountdown,
+  }, carbohydrateG, energyServingCarbohydrateG);
   const reasonParts = [
-    `全自動智慧計畫（單包 ${energyServingCarbohydrateG} g 碳水；每小時上限 ${carbohydrateHourlyLimit.gramsPerHour} g${carbohydrateHourlyLimit.mode === "science" ? "，科學建議" : "，手動設定"}；補水約每 10–30 分鐘）`,
+    `全自動智慧計畫（單包 ${energyServingCarbohydrateG} g 碳水；每小時上限 ${carbohydrateHourlyLimit.gramsPerHour} g${carbohydrateHourlyLimit.mode === "science" ? "，科學建議" : "，手動設定"}；補水 ${Math.round(waterCountdownSec / 60)} 分鐘，限制於 10–30 分鐘）`,
     intensityLoad >= 0.3 ? "騎乘強度較高" : "騎乘強度一般",
     environmentLoad >= 0.4 ? "環境熱負荷提高" : input.weatherAvailable ? "環境負荷穩定" : "本機環境基準",
     input.elapsedSec >= 2 * 60 * 60 ? "長時間騎乘" : "騎乘時間尚短",
