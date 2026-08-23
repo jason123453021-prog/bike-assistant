@@ -48,7 +48,6 @@ import { reportRecoverableIssue } from "@/lib/release-safe-log";
 import { buildRideSplits } from "@/lib/ride-splits";
 import { buildElevationBands } from "@/lib/elevation-bands";
 import { buildPhotoRouteMarkers } from "@/lib/photo-route-markers";
-import { compareLocalSplitPersonalBests } from "@/lib/local-split-personal-bests";
 import { buildLocalActivityHighlights, calculateBestPowerEfforts } from "@/lib/local-activity-insights";
 import { buildActivityStatistics } from "@/lib/activity-statistics";
 import { analyzeTraining } from "@/lib/tss-calc";
@@ -59,7 +58,6 @@ import { persistRideMedia } from "@/lib/local-ride-media";
 import { ZoomableActivityPhoto } from "@/components/zoomable-activity-photo";
 import { resolveActivityCoverPhotoUri } from "@/lib/activity-media";
 import { calculateGapPaceSecPerKm, formatPaceFromKmh, formatPaceSeconds, SPORT_META, type SportType } from "@/lib/sport-metrics";
-import { formatLapMetricsInline } from "@/lib/lap-presentation";
 import { sampleActivityMapPolyline } from "@/lib/activity-map-presentation";
 import * as ImagePicker from "expo-image-picker";
 
@@ -324,10 +322,6 @@ export default function RideDetailScreen() {
   const coverPhotoUri = useMemo(
     () => resolveActivityCoverPhotoUri(record?.coverPhotoUri, activityPhotos.map((photo) => photo.uri)),
     [activityPhotos, record?.coverPhotoUri],
-  );
-  const localSplitPersonalBests = useMemo(
-    () => record ? compareLocalSplitPersonalBests(record, state.records) : [],
-    [record, state.records],
   );
   const setActivityViewerDrawer = useCallback((expanded: boolean) => {
     activityViewerDrawerExpandedRef.current = expanded;
@@ -1175,67 +1169,6 @@ export default function RideDetailScreen() {
               </View>
             </View>
 
-            {rideSplits.length > 0 && (
-              <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}> 
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <Text style={[styles.panelTitle, { color: colors.foreground }]}>本機分段功率表現</Text>
-                  <Text style={{ fontSize: 12, color: colors.muted }}>由 GPS 軌跡重建</Text>
-                </View>
-                {rideSplits.slice(0, 4).map((split) => (
-                  <View key={`power-${split.index}`} style={[styles.segmentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                      <Text style={[styles.segmentTitle, { color: colors.foreground }]}>{split.distanceM >= 950 ? `${split.index} km 分段` : `第 ${split.index} 段`}</Text>
-                      <Text style={{ fontSize: 12, color: colors.muted }}>{(split.distanceM / 1000).toFixed(2)} 公里</Text>
-                    </View>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                      <Text style={{ fontSize: 18, fontWeight: "bold", color: colors.foreground }}>{formatDuration(split.movingTimeSeconds)}</Text>
-                      <View style={{ flexDirection: "row", gap: 12 }}>
-                        <Text style={{ fontSize: 13, color: colors.muted }}>{split.averageSpeedKmh?.toFixed(1) ?? "--"} 公里/小時</Text>
-                        <Text style={{ fontSize: 13, fontWeight: "600", color: "#FF9500" }}>{split.averagePowerW === undefined ? "--" : `${split.averagePowerW} 瓦`}</Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {(record.laps?.length ?? 0) > 0 && (
-              <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-                <Text style={[styles.panelTitle, { color: colors.foreground }]}>Lap 紀錄</Text>
-                <Text style={[styles.panelHint, { color: colors.muted }]}>顯示騎乘中依固定距離自動建立的分段。</Text>
-                {record.laps?.map((lap) => (
-                  <View key={lap.index} style={[styles.segmentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                      <Text style={[styles.segmentTitle, { color: colors.foreground }]}>Lap {lap.index}</Text>
-                      <Text style={{ color: colors.muted, fontSize: 12 }}>{formatDuration(lap.movingTimeSec)}</Text>
-                    </View>
-                    <Text style={{ color: colors.muted, fontSize: 12, marginTop: 6, lineHeight: 18 }}>
-                      {formatLapMetricsInline(record.sportType ?? "cycling", lap)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {localSplitPersonalBests.length > 0 && (
-              <View style={[styles.statsPanel, { borderColor: "#F59E0B66", marginTop: 12 }]}> 
-                <Text style={[styles.panelTitle, { color: "#FCD34D" }]}>本機 1 km 個人最佳比較</Text>
-                <Text style={[styles.personalBestHint, { color: colors.muted }]}>僅比較此裝置較早活動的完整 1 km GPS 努力，不會將不同道路誤稱為同一雲端路段。</Text>
-                {localSplitPersonalBests.slice(0, 4).map(({ split, priorBestSeconds, isPersonalBest, comparedEffortCount }) => (
-                  <View key={`local-best-${split.index}`} style={[styles.segmentCard, { backgroundColor: colors.surface, borderColor: isPersonalBest ? "#F59E0B88" : colors.border }]}> 
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                      <Text style={[styles.segmentTitle, { color: colors.foreground }]}>第 {split.index} 個 1 km</Text>
-                      <Text style={{ color: isPersonalBest ? "#FCD34D" : colors.muted, fontSize: 11, fontWeight: "800" }}>{isPersonalBest ? "本機最佳" : `${comparedEffortCount} 次可比努力`}</Text>
-                    </View>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                      <Text style={{ color: colors.foreground, fontSize: 17, fontWeight: "800" }}>{formatDuration(split.movingTimeSeconds)}</Text>
-                      <Text style={{ color: colors.muted, fontSize: 12 }}>{priorBestSeconds === undefined ? "尚無較早可比資料" : `歷史最佳 ${formatDuration(priorBestSeconds)}`}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-
             {/* 僅比較此裝置歷史資料的個人最佳紀錄 */}
             {(record.personalBests?.length ?? 0) > 0 && (
               <View style={[styles.statsPanel, { borderColor: "#F59E0B66", marginTop: 12 }]}> 
@@ -1277,9 +1210,8 @@ export default function RideDetailScreen() {
             </View>
 
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-              <Text style={[styles.panelTitle, { color: colors.foreground }]}>本次環境與智慧補給</Text>
+            <Text style={[styles.panelTitle, { color: colors.foreground }]}>本次環境與智慧補給</Text>
               <View style={styles.statsGrid}>
-                <DetailCell label="環境樣本" value={`${record.calculationProfile?.environment?.sampleCount ?? 0}`} unit="筆" />
                 <DetailCell label="平均溫度" value={record.calculationProfile?.environment?.averageTemperatureC === undefined ? "--" : record.calculationProfile.environment.averageTemperatureC.toFixed(1)} unit="°C" color="#F97316" />
                 <DetailCell label="平均濕度" value={record.calculationProfile?.environment?.averageHumidityPct === undefined ? "--" : record.calculationProfile.environment.averageHumidityPct.toFixed(0)} unit="%" color="#60A5FA" />
                 <DetailCell label="平均風速" value={record.calculationProfile?.environment?.averageWindSpeedKmh === undefined ? "--" : record.calculationProfile.environment.averageWindSpeedKmh.toFixed(1)} unit="km/h" />

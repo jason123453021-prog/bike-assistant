@@ -12,14 +12,19 @@ describe("活動詳情資料有效性守門", () => {
     expect(source).toContain('displayedPower?.source === "estimated"');
   });
 
-  it("活動分析、分段與環境區塊均在缺少樣本時使用空狀態或資料不足標記", () => {
+  it("保留每公里分段與智慧補給核心資訊，同時移除重複的環境樣本、比較、Lap 與功率面板", () => {
     const source = readFileSync(resolve(projectRoot, "app/ride-detail.tsx"), "utf8");
     expect(source).toContain("此活動沒有足夠的 GPS 取樣資料");
+    expect(source).toContain("每公里分段");
     expect(source).toContain('split.averagePowerW === undefined ? "--"');
     expect(source).toContain('averageTemperatureC === undefined ? "--"');
-    expect(source).toContain("record.calculationProfile?.environment?.sampleCount ?? 0");
-    expect(source).toContain("Lap 紀錄");
-    expect(source).toContain("formatLapMetricsInline(record.sportType ?? \"cycling\", lap)");
+    expect(source).toContain("本次環境與智慧補給");
+    expect(source).not.toContain('label="環境樣本"');
+    expect(source).not.toContain("本機 1 km 個人最佳比較");
+    expect(source).not.toContain("Lap 紀錄");
+    expect(source).not.toContain("本機分段功率表現");
+    expect(source).not.toContain("formatLapMetricsInline");
+    expect(source).not.toContain("compareLocalSplitPersonalBests");
     expect(source).not.toContain('label="GPS 點數"');
   });
 });
