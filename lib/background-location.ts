@@ -44,6 +44,7 @@ import {
   type AutoLapAnchor,
   type AutoLapTotals,
 } from "@/lib/auto-lap-milestones";
+import { advanceBackgroundAutoPause } from "@/lib/background-auto-pause";
 import type { RideLap } from "@/lib/ride-context";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
@@ -183,6 +184,13 @@ export interface BackgroundState {
   /** 用於把 GPS 樣本插值到固定距離里程碑的上一筆累計統計。 */
   previousAutoLapTotals?: AutoLapTotals;
   laps?: RideLap[];
+  /** 與前景相同的自動暫停規則，供鎖屏 TaskManager 以 GPS 批次累積。 */
+  autoPauseEnabled?: boolean;
+  autoPauseSpeedBelowKmh?: number;
+  autoPauseStillForSeconds?: number;
+  autoPauseResumeAtOrAboveKmh?: number;
+  autoPauseLowSpeedSec?: number;
+  backgroundAutoPaused?: boolean;
 }
 
 // Haversine 距離計算（背景任務中不能 import 其他模組的函數）
@@ -315,7 +323,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
         const candidateDistanceM = !segmentStart && state.lastLat !== 0 && state.lastLon !== 0
           ? bgHaversine(state.lastLat, state.lastLon, latitude, longitude)
           : 0;
-        const statisticsIntervalSec = !segmentStart
+        const rawStatisticsIntervalSec = !segmentStart
           ? resolveStatisticsIntervalSec(state.lastTimestamp || null, timestamp, 10)
           : 0;
         const hasReliableMovement = hasReliableRideMovement({
@@ -324,14 +332,36 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
           accuracyM: loc.coords.accuracy,
         });
 
-        // 停車或室內時保留最新定位作為下個樣本參考，但完全凍結距離、海拔、功率工作量、熱量與軌跡。
-        if (!hasReliableMovement) {
+        const autoPause = advanceBackgroundAutoPause({
+          paused: state.backgroundAutoPaused === true,
+          accumulatedLowSpeedSec: state.autoPauseLowSpeedSec ?? 0,
+          hasReliableMovement,
+          speedKmh,
+          intervalSec: rawStatisticsIntervalSec,
+          enabled: state.autoPauseEnabled !== false,
+          pauseBelowKmh: state.autoPauseSpeedBelowKmh ?? 1.08,
+          pauseAfterSec: state.autoPauseStillForSeconds ?? 8,
+          resumeAtOrAboveKmh: state.autoPauseResumeAtOrAboveKmh ?? 1.8,
+        });
+        state.backgroundAutoPaused = autoPause.paused;
+        state.autoPauseLowSpeedSec = autoPause.accumulatedLowSpeedSec;
+        const statisticsIntervalSec = autoPause.movingTimeIncrementSec;
+        const isReliablyMovingForSupply = hasReliableMovement && !autoPause.paused;
+
+        // 低速且沒有可靠位移時，前景會在 8 秒防抖內仍由計時器保留移動時間，
+        // 但不會把 GPS 漂移寫成距離、功率或熱量。背景採相同行為：只累積門檻
+        // 前的時間，真正進入暫停後才凍結補給倒數。
+        if (!isReliablyMovingForSupply) {
           state.lastLat = latitude;
           state.lastLon = longitude;
           state.lastTimestamp = timestamp;
           state.lastAccuracy = loc.coords.accuracy ?? undefined;
           state.lastSpeedMs = 0;
-          state.supplyCountdownPausedAtMs ??= timestamp;
+          state.movingTimeSec = (state.movingTimeSec ?? 0) + statisticsIntervalSec;
+          if (autoPause.paused) {
+            state.supplyCountdownPausedAtMs ??= timestamp - Math.round((autoPause.pauseStartedBeforeSampleEndSec ?? 0) * 1_000);
+          }
+          acceptedLocation.intervalSec = statisticsIntervalSec;
           acceptedLocation.isStationary = true;
           continue;
         }
@@ -362,9 +392,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
             : Math.max(state.maxElevationM, elevationDelta.acceptedAltitudeM);
         }
 
-        const isReliablyMovingForSupply = hasReliableMovement;
-        if (!isReliablyMovingForSupply) {
-          state.supplyCountdownPausedAtMs ??= timestamp;
+        if (autoPause.paused) {
+          state.supplyCountdownPausedAtMs ??= timestamp - Math.round((autoPause.pauseStartedBeforeSampleEndSec ?? 0) * 1_000);
           acceptedLocation.intervalSec = 0;
         } else if (state.supplyCountdownPausedAtMs) {
           state.supplyCountdownPausedTotalMs = (state.supplyCountdownPausedTotalMs ?? 0) + Math.max(0, timestamp - state.supplyCountdownPausedAtMs);
@@ -707,6 +736,10 @@ export async function initBackgroundState(params: {
   environment?: BackgroundState["environment"];
   autoLapEnabled?: boolean;
   autoLapDistanceKm?: number;
+  autoPauseEnabled?: boolean;
+  autoPauseSpeedBelowKmh?: number;
+  autoPauseStillForSeconds?: number;
+  autoPauseResumeAtOrAboveKmh?: number;
 }) {
   const startedAt = Date.now();
   const state: BackgroundState = {
@@ -771,6 +804,12 @@ export async function initBackgroundState(params: {
       powerSampleDurationSec: 0,
     }),
     laps: [],
+    autoPauseEnabled: params.autoPauseEnabled !== false,
+    autoPauseSpeedBelowKmh: params.autoPauseSpeedBelowKmh ?? 1.08,
+    autoPauseStillForSeconds: params.autoPauseStillForSeconds ?? 8,
+    autoPauseResumeAtOrAboveKmh: params.autoPauseResumeAtOrAboveKmh ?? 1.8,
+    autoPauseLowSpeedSec: 0,
+    backgroundAutoPaused: false,
   };
   await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   // 清空舊軌跡

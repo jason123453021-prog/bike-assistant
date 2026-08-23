@@ -2487,6 +2487,14 @@ export default function MapScreen() {
       sportType: state.sportType,
       autoLapEnabled: settings.lapEnabled,
       autoLapDistanceKm: settings.autoLapDistanceKm,
+      autoPauseEnabled: state.sportType !== "cycling" || settings.idleAutoPauseEnabled,
+      autoPauseSpeedBelowKmh: state.sportType === "cycling"
+        ? settings.autoPauseSpeedThresholdKmh
+        : getSportTrackingPolicy(state.sportType).autoPause.speedBelowKmh,
+      autoPauseStillForSeconds: getSportTrackingPolicy(state.sportType).autoPause.stillForSeconds,
+      autoPauseResumeAtOrAboveKmh: state.sportType === "cycling"
+        ? Math.max(AUTO_PAUSE_RESUME_THRESHOLD, settings.autoPauseSpeedThresholdKmh + 0.5)
+        : Math.max(AUTO_PAUSE_RESUME_THRESHOLD, getSportTrackingPolicy(state.sportType).autoPause.speedBelowKmh + 0.5),
       currentLat: lastPos?.coords.latitude ?? 0,
       currentLon: lastPos?.coords.longitude ?? 0,
       currentTimestamp: lastPos?.timestamp,
