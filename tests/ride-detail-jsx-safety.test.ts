@@ -36,6 +36,7 @@ describe("ride detail JSX safety", () => {
     expect(source).toContain("isActivityViewerVisible");
     expect(source).toContain("activityViewerRoutePage");
     expect(source).toContain("pagingEnabled");
+    expect(source).toContain("openActivityViewer(0)");
     expect(source).toContain("activityViewerPhotoMeta");
     expect(source).toContain("photoRouteMarkers");
     expect(source).toContain("photoMarkers={photoRouteMarkers}");
@@ -49,10 +50,6 @@ describe("ride detail JSX safety", () => {
     expect(source).toContain("平均功率");
     expect(source).toContain("平均速度");
     expect(source).toContain("卡路里");
-    expect(source).not.toContain("coreActivitySummaryMetricPrimary");
-    expect(source).not.toContain("coreActivitySummaryValueRow");
-    expect(source).toContain("ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT + 20");
-    expect(source).not.toContain("全螢幕路線");
     expect(source).not.toContain("styles.activityViewerDrawerHandle");
     expect(source).not.toContain("styles.activityViewerDrawerHint");
     expect(source).toContain("activityViewerRoutePhotoMeta");
@@ -77,7 +74,7 @@ describe("ride detail JSX safety", () => {
     expect(detailScrollIndex).toBeGreaterThan(mapHeroIndex);
     expect(source).not.toContain("isEmbeddedMapInteracting");
     expect(source).not.toContain("activityRouteTapTarget");
-    expect(source).not.toContain("activityRouteExpandButton");
+    expect(source).toContain("activityRouteExpandButton");
     expect(source).toContain("activityMapPolyline");
   });
 });

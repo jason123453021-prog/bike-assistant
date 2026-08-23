@@ -249,27 +249,6 @@ function renderLiveTrailSegments(segments) {
   });
 }
 
-function makeRouteStartIcon() {
-  return L.divIcon({
-    html: '<div style="width:20px;height:20px;border-radius:50%;background:#19B56B;border:3px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;"><div style="width:5px;height:5px;border-radius:50%;background:#fff;"></div></div>',
-    iconSize: [20, 20], iconAnchor: [10, 10], className: 'route-start-marker'
-  });
-}
-
-function makeRouteEndIcon() {
-  return L.divIcon({
-    html: '<div style="width:22px;height:22px;border-radius:4px;background:#E5484D;border:3px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;"><div style="width:8px;height:8px;background:#fff;"></div></div>',
-    iconSize: [22, 22], iconAnchor: [11, 11], className: 'route-end-marker'
-  });
-}
-
-function makeRouteDirectionIcon(bearing) {
-  return L.divIcon({
-    html: '<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #1D2730;filter:drop-shadow(0 1px 1px rgba(255,255,255,.82));transform:rotate(' + bearing + 'deg);"></div>',
-    iconSize: [10, 9], className: 'route-direction-arrow'
-  });
-}
-
 // 由 React Native 的「清除所有導航圖層」動作直接呼叫；避免等待 state 渲染期間殘留數字或折線。
 function clearNavigationGraphics() {
   clearRouteOverlays();
@@ -292,13 +271,13 @@ function renderRouteOverlays(layers) {
     routeOverlayPolylines.push(polyline);
 
     var start = L.marker(coords[0], {
-      icon: makeRouteStartIcon(),
+      icon: makeCircleIcon(color, 14, '#fff'),
       zIndexOffset: 500,
     }).addTo(map);
     routeOverlayEndpointMarkers.push(start);
     if (coords.length > 1) {
       var end = L.marker(coords[coords.length - 1], {
-        icon: makeRouteEndIcon(),
+        icon: makeCircleIcon(color, 14, '#fff'),
         zIndexOffset: 500,
       }).addTo(map);
       routeOverlayEndpointMarkers.push(end);
@@ -312,7 +291,11 @@ function renderRouteOverlays(layers) {
       var prev = coords[i - 1];
       var curr = coords[i];
       var bearing = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]) * 180 / Math.PI;
-      var arrowIcon = makeRouteDirectionIcon(bearing);
+      var arrowIcon = L.divIcon({
+        html: '<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid ' + color + ';transform:rotate(' + bearing + 'deg);"></div>',
+        iconSize: [10, 8],
+        className: 'route-direction-arrow'
+      });
       var arrow = L.marker(curr, { icon: arrowIcon, zIndexOffset: 100 }).addTo(map);
       routeOverlayArrowMarkers.push(arrow);
     }
