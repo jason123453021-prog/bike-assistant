@@ -297,7 +297,7 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
                 <View style={styles.lapsHeader}>
                   <View style={styles.lapsHeadingCopy}>
                     <Text style={[styles.panelTitle, { color: colors.foreground }]}>計圈（Laps）</Text>
-                    <Text style={[styles.nameHint, { color: colors.muted }]}>列出本次活動的手動與自動分圈；儲存後會與活動詳情及 FIT 匯出一致。</Text>
+                    <Text style={[styles.nameHint, { color: colors.muted }]}>列出本次活動依固定距離自動建立的分段；儲存後會與活動詳情及 FIT 匯出一致。</Text>
                   </View>
                   <Text style={[styles.lapsCount, { color: colors.accent }]}>{laps.length} 圈</Text>
                 </View>

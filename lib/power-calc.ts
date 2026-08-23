@@ -44,6 +44,8 @@ export interface PowerInput {
 const MAX_POWER_W = 900;
 // 坡度限制（GPS 高度誤差可能造成瞬間極端坡度）
 const MAX_GRADE_PCT = 28;
+// 手機 GPS 的瞬時速度不適合作為衝刺功率計；限制正向加速度，避免跳點主導整段平均功率。
+const MAX_VIRTUAL_POSITIVE_ACCELERATION_MS2 = 0.25;
 
 export function calculatePower(input: PowerInput): number {
   const {
@@ -81,7 +83,8 @@ export function calculatePower(input: PowerInput): number {
   // ── 4. 加速阻力功率（含旋轉質量修正）────────────────────────────────────
   let pAcc = 0;
   if (prevSpeedMs !== undefined && intervalSec > 0) {
-    const accel = (speedMs - prevSpeedMs) / intervalSec;
+    const rawAcceleration = (speedMs - prevSpeedMs) / intervalSec;
+    const accel = Math.min(MAX_VIRTUAL_POSITIVE_ACCELERATION_MS2, Math.max(-1, rawAcceleration));
     const mEff = totalMass * ROTATING_MASS_FACTOR;
     pAcc = mEff * accel * speedMs;
   }

@@ -293,12 +293,16 @@ type RideAction =
       isBackgroundRecovery?: boolean;
       powerSource?: ActivityPowerSource;
       caloriesSource?: ActivityCaloriesSource;
+      /** 經虛擬功率峰值品質閘門後才可寫入活動最大功率。 */
+      maxPowerCandidate?: number;
     }
   | { type: "SWEAT_UPDATE"; sweatLossMl: number; sweatRatePerHour: number; intensityLabel: string }
   | { type: "CONSUME_CALORIES" }
   | { type: "CONSUME_WATER" }
   | { type: "SUPPLY_CONFIRMED"; confirmation: SupplyConfirmation }
   | { type: "MARK_LAP" }
+  /** 以固定里程邊界工具產生的完整自動分圈覆寫同步；僅採用圈數不較少的來源。 */
+  | { type: "SYNC_AUTO_LAPS"; laps: RideLap[]; anchor?: Omit<RideLapAnchor, "routePointIndex"> }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
   | { type: "ADD_RECORD"; record: RideRecord }
   | { type: "SET_SPORT_TYPE"; sportType: SportType }
@@ -461,6 +465,7 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
         isBackgroundRecovery = false,
         powerSource = "unavailable",
         caloriesSource = "unavailable",
+        maxPowerCandidate,
       } = action;
       const newRoute = [...state.route, point];
 
@@ -533,7 +538,7 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
         avgSpeed: nextElapsed > 0 ? (state.distance + distance) / 1000 / (nextElapsed / 3600) : 0,
         currentPower: power,
         avgPower: Math.round(avgPower),
-        maxPower: Math.max(state.maxPower, power),
+        maxPower: Math.max(state.maxPower, Math.max(0, maxPowerCandidate ?? power)),
         powerWorkJ: newPowerWorkJ,
         powerSampleDurationSec: newPowerSampleDurationSec,
         powerSource: mergedPowerSource,
@@ -595,6 +600,18 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
         laps: [...state.laps, { ...lap, source: "auto" }],
         // 全程統計保留；僅切換下一圈的相對統計錨點。
         lapAnchor: createNextRideLapAnchor(state),
+      };
+    }
+
+    case "SYNC_AUTO_LAPS": {
+      // 前景與背景皆使用同一套固定里程工具；若背景快照較舊，不能覆蓋掉已封存的新圈。
+      if (action.laps.length < state.laps.length) return state;
+      return {
+        ...state,
+        laps: action.laps.map((lap, index) => ({ ...lap, index: index + 1, source: "auto" })),
+        lapAnchor: action.anchor
+          ? { ...action.anchor, routePointIndex: state.route.length }
+          : state.lapAnchor,
       };
     }
 

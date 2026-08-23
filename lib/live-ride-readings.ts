@@ -45,9 +45,10 @@ export function hasReliableRideMovement(sample: RideMovementSample): boolean {
   if (accuracyM > MAX_RIDE_STATISTICS_ACCURACY_M) return false;
   if (speedKmh >= MIN_CYCLING_MOVEMENT_SPEED_KMH) return true;
 
-  // 少數裝置會在剛起步或衛星切換時短暫回報 0 速度；僅在位移已明顯超過該點
-  // 精度誤差（且至少 1.5 m）時，才以位移作為保守回退，避免停止漂移被累加。
-  return distanceM >= Math.max(1.5, accuracyM);
+  // 少數裝置會在剛起步、低速爬坡或衛星切換時短暫回報 0 速度。既然此樣本已通過
+  // 30 m 精度閘門，只要存在至少 3 m 的連續位移即可作為低速回退；不再要求位移大於
+  // GPS 的整個誤差半徑，避免 15–30 m 精度下的真實慢速移動被誤判成暫停。
+  return distanceM >= Math.max(1.5, Math.min(3, accuracyM));
 }
 
 /**

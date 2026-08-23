@@ -129,6 +129,7 @@ import {
   updateBackgroundSmartSupplyCountdown,
   updateBackgroundSmartSupplyChannels,
   updateBackgroundAutoLapSettings,
+  syncBackgroundRideCheckpoint,
   setBackgroundSupplyReminderPending,
   setBackgroundSupplyReminderEnabled,
   clearBackgroundData,
@@ -153,6 +154,12 @@ import {
   filterTrackPointBatch,
   type TrackQualityPoint,
 } from "@/lib/track-point-quality";
+import {
+  advanceAutoLapMilestones,
+  createAutoLapAnchor,
+  type AutoLapMilestoneState,
+  type AutoLapTotals,
+} from "@/lib/auto-lap-milestones";
 import { SmartPowerSavingManager } from "@/lib/power-saving/smart-power-saving-system";
 import { getDueSupplyIntervals, type SupplyIntervalKind, type SupplyIntervalTracker } from "@/lib/supply-interval";
 import {
@@ -183,9 +190,9 @@ import {
   acceptLiveElevationDelta,
   clampVirtualPowerForRider,
   createLiveElevationFilterState,
+  isTrustworthyVirtualPowerPeak,
 } from "@/lib/live-elevation-filter";
 import { createRideSummarySnapshot, type RideSummarySnapshot } from "@/lib/ride-summary-snapshot";
-import { buildManualRideLap } from "@/lib/ride-lap";
 import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
 
@@ -302,6 +309,7 @@ export default function MapScreen() {
   const [followUser, setFollowUser] = useState(true);
   const [touchGuardEnabled, setTouchGuardEnabled] = useState(false);
   const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
+  const autoLapMilestoneStateRef = useRef<AutoLapMilestoneState | null>(null);
   const autoRecenterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const routePaddingBottomRef = useRef(PANEL_COLLAPSED_H);
 
@@ -500,6 +508,36 @@ export default function MapScreen() {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState.match(/inactive|background/) && stateRef.current.status === "active") {
+        const currentRide = stateRef.current;
+        const autoLap = autoLapMilestoneStateRef.current;
+        const lastLocation = lastLocationRef.current;
+        void syncBackgroundRideCheckpoint({
+          totalDistanceM: currentRide.distance,
+          movingTimeSec: currentRide.elapsed,
+          totalAscentM: currentRide.totalAscent,
+          totalDescentM: currentRide.totalDescent,
+          powerWorkJ: currentRide.powerWorkJ,
+          powerSampleDurationSec: currentRide.powerSampleDurationSec,
+          maxPowerW: currentRide.maxPower,
+          calories: currentRide.totalCalories,
+          sweatLossMl: currentRide.totalSweatMl,
+          autoLapAnchor: autoLap?.anchor,
+          previousAutoLapTotals: autoLap?.previousTotals,
+          nextAutoLapDistanceM: autoLap?.nextDistanceM,
+          laps: autoLap?.laps,
+          lastLocation: lastLocation
+            ? {
+              latitude: lastLocation.coords.latitude,
+              longitude: lastLocation.coords.longitude,
+              timestamp: lastLocation.timestamp,
+              accuracy: lastLocation.coords.accuracy,
+              altitude: lastLocation.coords.altitude,
+              speed: lastLocation.coords.speed,
+            }
+            : null,
+        });
+      }
       setIsAppForeground(nextState === "active");
       const shouldSuppressAudio = shouldSuppressRideAudioForSystemInterruption(nextState);
       setRideSpeechSuppressed(shouldSuppressAudio);
@@ -516,9 +554,6 @@ export default function MapScreen() {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryRecordId, setSummaryRecordId] = useState<string | null>(null);
   const [summarySnapshot, setSummarySnapshot] = useState<RideSummarySnapshot | null>(null);
-  const [stopConfirmVisible, setStopConfirmVisible] = useState(false);
-  const [stopConfirmHolding, setStopConfirmHolding] = useState(false);
-  const stopConfirmHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nextAutoLapDistanceMRef = useRef<number | null>(null);
   // 補給提醒分別管理（支援兩種同時顯示）
   const [calorieAlert, setCalorieAlert] = useState(false);
@@ -1604,6 +1639,23 @@ export default function MapScreen() {
         const restoredLapAnchor = backgroundState?.autoLapAnchor
           ? { ...backgroundState.autoLapAnchor, routePointIndex: recoveredRoute.length }
           : contextSnapshot?.lapAnchor;
+        if (backgroundState?.autoLapAnchor) {
+          autoLapMilestoneStateRef.current = {
+            enabled: backgroundState.autoLapEnabled === true,
+            intervalM: Math.max(0, backgroundState.autoLapDistanceKm ?? 0) * 1_000,
+            nextDistanceM: backgroundState.nextAutoLapDistanceM ?? null,
+            laps: restoredLaps,
+            anchor: backgroundState.autoLapAnchor,
+            previousTotals: backgroundState.previousAutoLapTotals ?? {
+              elapsedSec: backgroundState.movingTimeSec ?? 0,
+              distanceM: backgroundState.totalDistanceM,
+              ascentM: backgroundState.totalAscentM ?? 0,
+              descentM: backgroundState.totalDescentM ?? 0,
+              powerWorkJ: backgroundState.powerWorkJ ?? 0,
+              powerSampleDurationSec: backgroundState.powerSampleDurationSec ?? 0,
+            },
+          };
+        }
         lastAcceptedTrackPointRef.current = lastPoint
           ? {
             latitude: lastPoint.latitude,
@@ -2017,6 +2069,10 @@ export default function MapScreen() {
           const power = isCyclingSport
             ? Math.round(powerWindowRef.current.reduce((a, b) => a + b, 0) / Math.max(1, powerWindowRef.current.length))
             : 0;
+          const maxPowerCandidate = isCyclingSport && powerWindowRef.current.length >= 3
+            && isTrustworthyVirtualPowerPeak(power, estimateFtpW, distanceM, statisticsIntervalSec)
+            ? power
+            : 0;
           const calIncrement = isCyclingSport
             ? calculatePersonalizedCalories({
               powerW: power,
@@ -2060,6 +2116,7 @@ export default function MapScreen() {
             intervalSec: statisticsIntervalSec,
             powerSource: isCyclingSport ? "estimated" : "unavailable",
             caloriesSource: isCyclingSport ? "power-estimate" : "met-estimate",
+            maxPowerCandidate,
           });
 
           const sweatResult = calculateSweatLoss({
@@ -2311,6 +2368,23 @@ export default function MapScreen() {
     setRideLocationTrackingMode("full");
     pausedElapsedRef.current = 0;
     dispatch({ type: "START", hydrationThresholdMl });
+    const initialAutoLapTotals: AutoLapTotals = {
+      elapsedSec: 0,
+      distanceM: 0,
+      ascentM: 0,
+      descentM: 0,
+      powerWorkJ: 0,
+      powerSampleDurationSec: 0,
+    };
+    const initialAutoLapIntervalM = Math.max(0, settings.autoLapDistanceKm * 1_000);
+    autoLapMilestoneStateRef.current = {
+      enabled: settings.lapEnabled,
+      intervalM: initialAutoLapIntervalM,
+      nextDistanceM: settings.lapEnabled && initialAutoLapIntervalM > 0 ? initialAutoLapIntervalM : null,
+      laps: [],
+      anchor: createAutoLapAnchor(initialAutoLapTotals),
+      previousTotals: initialAutoLapTotals,
+    };
     calorieReminderSentRef.current = false;
     waterReminderSentRef.current = false;
     // 新騎乘必須立即建立本機倒數：首筆有效 GPS／速度樣本到來前，仍可用個人資料與
@@ -2480,21 +2554,6 @@ export default function MapScreen() {
     dispatch({ type: "RESUME" });
   }, [dispatch]);
 
-  const completeCurrentLap = useCallback(() => {
-    try {
-      const currentState = stateRef.current;
-      if (currentState.status !== "active") return false;
-      // 使用與 reducer 相同的快照函式，確保自動距離分圈、摘要、活動詳情與 FIT 匯出完全一致。
-      const completedLap = buildManualRideLap(currentState);
-      if (!completedLap) return false;
-      dispatch({ type: "MARK_LAP" });
-      return true;
-    } catch {
-      // 計圈失敗時保留進行中的騎乘與導航，不清空目前圈資料。
-      return false;
-    }
-  }, [dispatch]);
-
   const handleSelectSportType = useCallback((sportType: SportType) => {
     if (state.status === "active" || state.status === "paused") {
       Alert.alert("活動進行中", "請先結束目前活動，再選擇不同運動模式，以維持本次紀錄的統計一致。 ");
@@ -2509,23 +2568,63 @@ export default function MapScreen() {
   }, [setSportType, state.status, updateSettings]);
 
   useEffect(() => {
-    if (!settings.lapEnabled || state.status !== "active") {
+    if (state.status !== "active") {
+      autoLapMilestoneStateRef.current = null;
       nextAutoLapDistanceMRef.current = null;
       return;
     }
-    const intervalM = settings.autoLapDistanceKm * 1_000;
-    const currentDistanceM = state.distance;
-    const nextDistanceM = nextAutoLapDistanceMRef.current
-      ?? (Math.floor(currentDistanceM / intervalM) + 1) * intervalM;
-    if (currentDistanceM < nextDistanceM) {
-      nextAutoLapDistanceMRef.current = nextDistanceM;
-      return;
+    const intervalM = Math.max(0, settings.autoLapDistanceKm * 1_000);
+    const totals: AutoLapTotals = {
+      elapsedSec: state.elapsed,
+      distanceM: state.distance,
+      ascentM: state.totalAscent,
+      descentM: state.totalDescent,
+      powerWorkJ: state.powerWorkJ,
+      powerSampleDurationSec: state.powerSampleDurationSec,
+    };
+    const prior = autoLapMilestoneStateRef.current;
+    const configurationChanged = !prior
+      || prior.enabled !== settings.lapEnabled
+      || prior.intervalM !== intervalM;
+    const milestoneState: AutoLapMilestoneState = configurationChanged
+      ? {
+        enabled: settings.lapEnabled,
+        intervalM,
+        nextDistanceM: settings.lapEnabled && intervalM > 0
+          ? (Math.floor(totals.distanceM / intervalM) + 1) * intervalM
+          : null,
+        laps: prior?.laps ?? state.laps,
+        // 設定在活動途中變更時，從當前累計建立新錨點，不回填或重複舊分段。
+        anchor: createAutoLapAnchor(configurationChanged && prior ? totals : prior?.anchor ?? totals),
+        previousTotals: totals,
+      }
+      : prior;
+    const result = advanceAutoLapMilestones(totals, milestoneState);
+    autoLapMilestoneStateRef.current = {
+      enabled: settings.lapEnabled,
+      intervalM,
+      nextDistanceM: result.nextDistanceM,
+      laps: result.laps,
+      anchor: result.anchor,
+      previousTotals: result.previousTotals,
+    };
+    nextAutoLapDistanceMRef.current = result.nextDistanceM;
+
+    if (result.completedLaps.length > 0) {
+      dispatch({
+        type: "SYNC_AUTO_LAPS",
+        laps: result.laps,
+        anchor: {
+          elapsedSec: result.anchor.elapsedSec,
+          distanceM: result.anchor.distanceM,
+          ascentM: result.anchor.ascentM,
+          descentM: result.anchor.descentM,
+          powerWorkJ: result.anchor.powerWorkJ,
+          powerSampleDurationSec: result.anchor.powerSampleDurationSec,
+        },
+      });
     }
-    if (completeCurrentLap()) {
-      // 以整趟累計距離的固定倍數自動觸發，避免任何手動操作干擾導航。
-      nextAutoLapDistanceMRef.current = nextDistanceM + intervalM;
-    }
-  }, [completeCurrentLap, settings.autoLapDistanceKm, settings.lapEnabled, state.distance, state.status]);
+  }, [dispatch, settings.autoLapDistanceKm, settings.lapEnabled, state.distance, state.elapsed, state.laps, state.powerSampleDurationSec, state.powerWorkJ, state.status, state.totalAscent, state.totalDescent]);
 
   const finalizeStopRide = useCallback(async () => {
           // 在所有非同步儲存與後續畫面重設之前，封存這次騎乘完整統計。
@@ -2670,36 +2769,16 @@ export default function MapScreen() {
           }
   }, [clearIntervalSupplyRepeatTimer, clearSnapshot, clearSupplyRepeatTimer, dispatch, estimateFtpW, flushRecoverySnapshot, saveRecord, settings, syncSmartSupplyCountdown, updateSettings]);
 
-  const clearStopConfirmHold = useCallback(() => {
-    if (stopConfirmHoldTimerRef.current) clearTimeout(stopConfirmHoldTimerRef.current);
-    stopConfirmHoldTimerRef.current = null;
-    setStopConfirmHolding(false);
-  }, []);
-
   const handleStop = useCallback(() => {
-    clearStopConfirmHold();
-    setStopConfirmVisible(true);
-  }, [clearStopConfirmHold]);
-
-  const dismissStopConfirmation = useCallback(() => {
-    clearStopConfirmHold();
-    setStopConfirmVisible(false);
-  }, [clearStopConfirmHold]);
-
-  const startStopConfirmHold = useCallback(() => {
-    if (stopConfirmHoldTimerRef.current) return;
-    setStopConfirmHolding(true);
-    stopConfirmHoldTimerRef.current = setTimeout(() => {
-      stopConfirmHoldTimerRef.current = null;
-      setStopConfirmHolding(false);
-      setStopConfirmVisible(false);
-      void finalizeStopRide();
-    }, 1_200);
+    Alert.alert(
+      "確認結束騎乘",
+      "停止追蹤並儲存本次本機紀錄？",
+      [
+        { text: "繼續騎乘", style: "cancel" },
+        { text: "結束並儲存", style: "destructive", onPress: () => { void finalizeStopRide(); } },
+      ],
+    );
   }, [finalizeStopRide]);
-
-  useEffect(() => () => {
-    if (stopConfirmHoldTimerRef.current) clearTimeout(stopConfirmHoldTimerRef.current);
-  }, []);
 
   // ─── 回到定位 ────────────────────────────────────────────────────────────────
   const handleRecenter = useCallback(() => {
@@ -2727,6 +2806,35 @@ export default function MapScreen() {
           const bgTrack = await getBackgroundTrackPoints();
           if (bgState?.nextAutoLapDistanceM !== undefined) {
             nextAutoLapDistanceMRef.current = bgState.nextAutoLapDistanceM;
+          }
+          if (bgState?.laps && bgState.autoLapAnchor && bgState.laps.length >= stateRef.current.laps.length) {
+            autoLapMilestoneStateRef.current = {
+              enabled: bgState.autoLapEnabled === true,
+              intervalM: Math.max(0, bgState.autoLapDistanceKm ?? 0) * 1_000,
+              nextDistanceM: bgState.nextAutoLapDistanceM ?? null,
+              laps: bgState.laps,
+              anchor: bgState.autoLapAnchor,
+              previousTotals: bgState.previousAutoLapTotals ?? {
+                elapsedSec: bgState.movingTimeSec ?? 0,
+                distanceM: bgState.totalDistanceM,
+                ascentM: bgState.totalAscentM ?? 0,
+                descentM: bgState.totalDescentM ?? 0,
+                powerWorkJ: bgState.powerWorkJ ?? 0,
+                powerSampleDurationSec: bgState.powerSampleDurationSec ?? 0,
+              },
+            };
+            dispatch({
+              type: "SYNC_AUTO_LAPS",
+              laps: bgState.laps,
+              anchor: {
+                elapsedSec: bgState.autoLapAnchor.elapsedSec,
+                distanceM: bgState.autoLapAnchor.distanceM,
+                ascentM: bgState.autoLapAnchor.ascentM,
+                descentM: bgState.autoLapAnchor.descentM,
+                powerWorkJ: bgState.autoLapAnchor.powerWorkJ,
+                powerSampleDurationSec: bgState.autoLapAnchor.powerSampleDurationSec,
+              },
+            });
           }
           if (bgState?.trackingMode === "full" && rideLocationTrackingMode === "idle_monitor") {
             pausedAtRef.current = null;
@@ -2821,7 +2929,6 @@ export default function MapScreen() {
                   powerSource: point.powerW !== undefined ? "estimated" : "unavailable",
                   caloriesSource: point.caloriesKcal !== undefined ? "power-estimate" : "unavailable",
                 });
-                if (point.autoLapCompleted) dispatch({ type: "MARK_LAP" });
               }
               lastAcceptedTrackPointRef.current = newPoints.at(-1) ?? lastAcceptedTrackPointRef.current;
               // 更新最大同步時間戳
@@ -3598,33 +3705,6 @@ export default function MapScreen() {
           />
         </Pressable>
       </Animated.View>
-
-      <Modal
-        visible={stopConfirmVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={dismissStopConfirmation}
-      >
-        <View style={styles.stopConfirmBackdrop}>
-          <View style={styles.stopConfirmCard}>
-            <Text style={styles.stopConfirmTitle}>確認結束騎乘</Text>
-            <Text style={styles.stopConfirmBody}>為避免騎乘震動或誤觸，請持續按住下方按鈕 1.2 秒。完成後才會停止追蹤並儲存本次本機紀錄。</Text>
-            <Pressable
-              accessibilityLabel="長按確認結束騎乘"
-              accessibilityHint="持續按住一點二秒才會結束本次騎乘"
-              style={({ pressed }) => [styles.stopConfirmHoldButton, (pressed || stopConfirmHolding) && styles.stopConfirmHoldButtonActive]}
-              onPressIn={startStopConfirmHold}
-              onPressOut={clearStopConfirmHold}
-            >
-              <IconSymbol name="stop.fill" size={20} color="#FFFFFF" />
-              <Text style={styles.stopConfirmHoldText}>{stopConfirmHolding ? "請持續按住…" : "長按確認結束"}</Text>
-            </Pressable>
-            <Pressable accessibilityLabel="取消結束騎乘" style={styles.stopConfirmCancelButton} onPress={dismissStopConfirmation}>
-              <Text style={styles.stopConfirmCancelText}>繼續騎乘</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={sportPickerVisible}
@@ -4812,66 +4892,5 @@ const styles = StyleSheet.create({
     fontSize: 9,
     flex: 1,
     textAlign: "center",
-  },
-  stopConfirmBackdrop: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    backgroundColor: "rgba(0,0,0,0.68)",
-  },
-  stopConfirmCard: {
-    borderRadius: 20,
-    padding: 22,
-    backgroundColor: "#111418",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  stopConfirmTitle: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  stopConfirmBody: {
-    marginTop: 10,
-    color: "rgba(255,255,255,0.82)",
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: "center",
-  },
-  stopConfirmHoldButton: {
-    minHeight: 58,
-    marginTop: 22,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#C62828",
-    borderWidth: 2,
-    borderColor: "#FF8A80",
-  },
-  stopConfirmHoldButtonActive: {
-    backgroundColor: "#8E1B1B",
-    transform: [{ scale: 0.98 }],
-  },
-  stopConfirmHoldText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  stopConfirmCancelButton: {
-    minHeight: 48,
-    marginTop: 10,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
-  },
-  stopConfirmCancelText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
   },
 });

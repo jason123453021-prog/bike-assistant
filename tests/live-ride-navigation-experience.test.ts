@@ -97,7 +97,7 @@ describe("live ride navigation experience", () => {
       pauseThresholdKmh: 1.5,
       driftThresholdM: 8,
     })).toBe(false);
-    expect(hasReliableRideMovement({ speedKmh: 1, distanceM: 4, accuracyM: 18 })).toBe(false);
+    expect(hasReliableRideMovement({ speedKmh: 1, distanceM: 4, accuracyM: 18 })).toBe(true);
   });
 
   it("uses a 400 ms hold and schedules a 3 second safety relock only during an active guarded ride", () => {

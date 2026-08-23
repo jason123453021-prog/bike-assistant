@@ -1213,7 +1213,7 @@ export default function RideDetailScreen() {
             {(record.laps?.length ?? 0) > 0 && (
               <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
                 <Text style={[styles.panelTitle, { color: colors.foreground }]}>Lap 紀錄</Text>
-                <Text style={[styles.panelHint, { color: colors.muted }]}>顯示騎乘中由手動或自動計圈建立的分段。</Text>
+                <Text style={[styles.panelHint, { color: colors.muted }]}>顯示騎乘中依固定距離自動建立的分段。</Text>
                 {record.laps?.map((lap) => (
                   <View key={lap.index} style={[styles.segmentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>

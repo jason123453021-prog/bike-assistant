@@ -67,3 +67,23 @@ export function clampVirtualPowerForRider(powerW: number, ftpW: number): number 
   const ceiling = Math.min(650, Math.max(250, Math.round(Math.max(1, ftpW) * 2.5)));
   return Math.max(0, Math.min(ceiling, Math.round(Number.isFinite(powerW) ? powerW : 0)));
 }
+
+/**
+ * 估算功率撞上個人化模型上限時，通常代表 GPS 速度／坡度尖峰而非可驗證的騎士輸出。
+ * 即時瓦數仍可呈現平滑值，但活動「最大功率」只收錄未飽和且具有效移動區間的樣本。
+ */
+export function isTrustworthyVirtualPowerPeak(
+  powerW: number,
+  ftpW: number,
+  distanceM: number,
+  intervalSec: number,
+): boolean {
+  const ceiling = Math.min(650, Math.max(250, Math.round(Math.max(1, ftpW) * 2.5)));
+  return Number.isFinite(powerW)
+    && powerW > 0
+    && powerW < ceiling * 0.98
+    && Number.isFinite(distanceM)
+    && distanceM >= 0.5
+    && Number.isFinite(intervalSec)
+    && intervalSec >= 1;
+}

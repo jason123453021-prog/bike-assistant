@@ -20,6 +20,7 @@ describe("本機騎乘統計物理校正", () => {
     expect(MIN_CYCLING_MOVEMENT_SPEED_KMH).toBe(1.08);
     expect(hasReliableRideMovement({ speedKmh: 1.08, distanceM: 0.8, accuracyM: 30 })).toBe(true);
     expect(hasReliableRideMovement({ speedKmh: 1.07, distanceM: 1.5, accuracyM: 30 })).toBe(false);
+    expect(hasReliableRideMovement({ speedKmh: 1.07, distanceM: 3, accuracyM: 30 })).toBe(true);
     expect(hasReliableRideMovement({ speedKmh: 0, distanceM: 31, accuracyM: 30 })).toBe(true);
     expect(hasReliableRideMovement({ speedKmh: 1.08, distanceM: 2, accuracyM: 30.1 })).toBe(false);
   });
@@ -49,6 +50,18 @@ describe("本機騎乘統計物理校正", () => {
     expect(flatRoadPower).toBeGreaterThan(50);
     expect(gentleClimbPower).toBeGreaterThan(flatRoadPower + 70);
     expect(gentleClimbPower).toBeLessThan(250);
+  });
+
+  it("限制 GPS 速度跳點的正向加速項，避免單一樣本主導平均與最大虛擬功率", () => {
+    const gpsSpikePower = calculatePower({
+      speedMs: 8,
+      prevSpeedMs: 0,
+      intervalSec: 3,
+      gradePct: 0,
+      windSpeedMs: 0,
+      riderMassKg: 70,
+    });
+    expect(gpsSpikePower).toBeLessThan(350);
   });
 
   it("以 21% 機械效率將 105 W 一小時換算為約 430 kcal", () => {

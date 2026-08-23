@@ -29,12 +29,21 @@ import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import { evaluateTrackPoint, type TrackQualityPoint } from "@/lib/track-point-quality";
 import type { SupplyIntervalKind } from "@/lib/supply-interval";
 import { estimateSportCalories, type SportType } from "@/lib/sport-metrics";
-import { acceptLiveElevationDelta, clampVirtualPowerForRider } from "@/lib/live-elevation-filter";
+import {
+  acceptLiveElevationDelta,
+  clampVirtualPowerForRider,
+  isTrustworthyVirtualPowerPeak,
+} from "@/lib/live-elevation-filter";
 import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
 import { isSmartSupplyChannelEnabled, resolveSmartSupplyChannels } from "@/lib/smart-supply-channels";
 import { hasReliableRideMovement } from "@/lib/live-ride-readings";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
-import { advanceAutoLapMilestones, createAutoLapAnchor, type AutoLapAnchor } from "@/lib/auto-lap-milestones";
+import {
+  advanceAutoLapMilestones,
+  createAutoLapAnchor,
+  type AutoLapAnchor,
+  type AutoLapTotals,
+} from "@/lib/auto-lap-milestones";
 import type { RideLap } from "@/lib/ride-context";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
@@ -171,6 +180,8 @@ export interface BackgroundState {
   autoLapDistanceKm?: number;
   nextAutoLapDistanceM?: number | null;
   autoLapAnchor?: AutoLapAnchor;
+  /** 用於把 GPS 樣本插值到固定距離里程碑的上一筆累計統計。 */
+  previousAutoLapTotals?: AutoLapTotals;
   laps?: RideLap[];
 }
 
@@ -187,11 +198,14 @@ function bgHaversine(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 // 定義背景任務（必須在模組頂層，不能在函數內）
-TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, executionInfo }) => {
   if (error) {
     reportRecoverableIssue("[BackgroundLocation] Error", error.message);
     return;
   }
+  // 前景已有 watchPositionAsync 作為唯一統計來源；背景任務若同時收到相同位置，
+  // 不得再累加，否則距離、移動時間與自動分圈都會被重複計算。
+  if (executionInfo?.appState === "active") return;
   if (data) {
     const { locations } = data as { locations: Location.LocationObject[] };
     if (!locations || locations.length === 0) return;
@@ -434,7 +448,9 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
             state.calories += calorieResult.kcal;
             state.powerWorkJ = (state.powerWorkJ ?? 0) + power * statisticsIntervalSec;
             state.powerSampleDurationSec = (state.powerSampleDurationSec ?? 0) + statisticsIntervalSec;
-            state.maxPowerW = Math.max(state.maxPowerW ?? 0, power);
+            if (isTrustworthyVirtualPowerPeak(power, profile.ftpW, distanceM, statisticsIntervalSec)) {
+              state.maxPowerW = Math.max(state.maxPowerW ?? 0, power);
+            }
             acceptedLocation.powerW = power;
             acceptedLocation.caloriesKcal = calorieResult.kcal;
             state.sweatLossMl += hydrationResult.sweatLossMl;
@@ -486,11 +502,13 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               powerWorkJ: 0,
               powerSampleDurationSec: 0,
             }),
+            previousTotals: state.previousAutoLapTotals,
           },
         );
         state.laps = autoLapResult.laps;
         state.autoLapAnchor = autoLapResult.anchor;
         state.nextAutoLapDistanceM = autoLapResult.nextDistanceM;
+        state.previousAutoLapTotals = autoLapResult.previousTotals;
         acceptedLocation.autoLapCompleted = autoLapResult.completedLaps.length > 0;
 
         addTrackPoint(
@@ -544,9 +562,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               body: smartChannels.energy ? "請補給能量，完成後點選已補給以開始下一輪倒數。" : `建議補充約 ${latestSupplyPlan.energyRecommendationKcal} kcal（${latestSupplyPlan.carbohydrateRecommendationG} g 碳水）；${latestSupplyPlan.reason}`,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
+              channelId: "supply",
               data: { type: "supply_reminder", supplyKind: "calorie" },
               priority: Notifications.AndroidNotificationPriority.HIGH,
-            },
+            } as any,
             trigger: null,
           });
         }
@@ -562,9 +581,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               body: smartChannels.water ? "請補給水分，完成後點選已補給以開始下一輪倒數。" : `建議補充約 ${latestSupplyPlan.waterRecommendationMl} ml 水分；${latestSupplyPlan.reason}`,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
+              channelId: "supply",
               data: { type: "supply_reminder", supplyKind: "water" },
               priority: Notifications.AndroidNotificationPriority.HIGH,
-            },
+            } as any,
             trigger: null,
           });
         }
@@ -622,9 +642,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               body: rule.body,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
+              channelId: "supply",
               data: { type: "supply_reminder", supplyKind: `interval-${rule.kind}` },
               priority: Notifications.AndroidNotificationPriority.HIGH,
-            },
+            } as any,
             trigger: null,
           });
         }
@@ -836,6 +857,63 @@ export async function updateBackgroundAutoLapSettings(params: {
       powerSampleDurationSec: 0,
     });
     state.laps ??= [];
+    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+/**
+ * App 退到背景前，把前景已驗證的累計統計與固定里程分圈檢查點交接給背景任務。
+ * 後續鎖屏更新由相同累計基準續算，不會重新從零分圈或和前景雙重累加。
+ */
+export async function syncBackgroundRideCheckpoint(params: {
+  totalDistanceM: number;
+  movingTimeSec: number;
+  totalAscentM: number;
+  totalDescentM: number;
+  powerWorkJ: number;
+  powerSampleDurationSec: number;
+  maxPowerW: number;
+  calories: number;
+  sweatLossMl: number;
+  autoLapAnchor?: AutoLapAnchor;
+  previousAutoLapTotals?: AutoLapTotals;
+  nextAutoLapDistanceM?: number | null;
+  laps?: RideLap[];
+  lastLocation?: {
+    latitude: number;
+    longitude: number;
+    timestamp: number;
+    accuracy?: number | null;
+    altitude?: number | null;
+    speed?: number | null;
+  } | null;
+}) {
+  try {
+    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+    if (!stateStr) return;
+    const state: BackgroundState = JSON.parse(stateStr);
+    if (!state.isRiding) return;
+    state.totalDistanceM = Math.max(0, params.totalDistanceM);
+    state.movingTimeSec = Math.max(0, params.movingTimeSec);
+    state.totalAscentM = Math.max(0, params.totalAscentM);
+    state.totalDescentM = Math.max(0, params.totalDescentM);
+    state.powerWorkJ = Math.max(0, params.powerWorkJ);
+    state.powerSampleDurationSec = Math.max(0, params.powerSampleDurationSec);
+    state.maxPowerW = Math.max(0, params.maxPowerW);
+    state.calories = Math.max(0, params.calories);
+    state.sweatLossMl = Math.max(0, params.sweatLossMl);
+    if (params.autoLapAnchor) state.autoLapAnchor = params.autoLapAnchor;
+    if (params.previousAutoLapTotals) state.previousAutoLapTotals = params.previousAutoLapTotals;
+    if (params.nextAutoLapDistanceM !== undefined) state.nextAutoLapDistanceM = params.nextAutoLapDistanceM;
+    if (params.laps) state.laps = params.laps;
+    if (params.lastLocation) {
+      state.lastLat = params.lastLocation.latitude;
+      state.lastLon = params.lastLocation.longitude;
+      state.lastTimestamp = params.lastLocation.timestamp;
+      state.lastAccuracy = params.lastLocation.accuracy ?? undefined;
+      state.lastAltitude = params.lastLocation.altitude ?? undefined;
+      state.lastSpeedMs = params.lastLocation.speed ?? undefined;
+    }
     await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   } catch {}
 }

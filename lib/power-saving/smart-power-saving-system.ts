@@ -39,8 +39,10 @@ export class SmartPowerSavingManager {
   private settings: PowerSavingSettings = DEFAULT_SETTINGS;
   private inactivityTimer: ReturnType<typeof setTimeout> | null = null;
   private isInPowerSavingMode: boolean = false;
-  private originalBrightness: number = 0.8;
+  private originalBrightness = 1;
   private brightnessSession = 0;
+  /** 亮度覆寫僅限於實際開始或暫停中的騎乘活動。 */
+  private rideSessionActive = false;
   private brightnessHolds = new Set<string>();
   private listeners: Set<(isActive: boolean) => void> = new Set();
 
@@ -99,7 +101,7 @@ export class SmartPowerSavingManager {
       clearTimeout(this.inactivityTimer);
     }
 
-    if (!this.settings.enabled || this.brightnessHolds.size > 0) return;
+    if (!this.rideSessionActive || !this.settings.enabled || this.brightnessHolds.size > 0) return;
 
     this.inactivityTimer = setTimeout(() => {
       this.enterPowerSavingMode();
@@ -107,7 +109,7 @@ export class SmartPowerSavingManager {
   }
 
   private async enterPowerSavingMode() {
-    if (this.isInPowerSavingMode) return;
+    if (!this.rideSessionActive || this.isInPowerSavingMode) return;
     const session = ++this.brightnessSession;
     this.isInPowerSavingMode = true;
     try {
@@ -134,12 +136,14 @@ export class SmartPowerSavingManager {
   }
 
   async wakeUp() {
+    if (!this.rideSessionActive) return;
     await this.exitPowerSavingMode();
     this.resetInactivityTimer();
   }
 
   /** 保持亮屏並暫停調暗計時；多個流程可各自持有。 */
   async holdBrightness(key: string) {
+    if (!this.rideSessionActive) return;
     this.brightnessHolds.add(key);
     if (this.inactivityTimer) {
       clearTimeout(this.inactivityTimer);
@@ -151,7 +155,7 @@ export class SmartPowerSavingManager {
   /** 只有最後一個亮屏保持解除後，才重新開始調暗倒數。 */
   releaseBrightnessHold(key: string) {
     this.brightnessHolds.delete(key);
-    if (this.brightnessHolds.size === 0) this.resetInactivityTimer();
+    if (this.rideSessionActive && this.brightnessHolds.size === 0) this.resetInactivityTimer();
   }
 
   onUserInteraction() {
@@ -176,11 +180,13 @@ export class SmartPowerSavingManager {
   }
 
   start() {
+    this.rideSessionActive = true;
     if (!this.settings.enabled) return;
     this.resetInactivityTimer();
   }
 
   stop() {
+    this.rideSessionActive = false;
     if (this.inactivityTimer) {
       clearTimeout(this.inactivityTimer);
       this.inactivityTimer = null;

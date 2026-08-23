@@ -5,15 +5,15 @@ import { describe, expect, it } from "vitest";
 const projectRoot = resolve(__dirname, "..");
 
 describe("專業碼表導航安全與高頻渲染邊界", () => {
-  it("結束騎乘必須先進入長按二次確認，不保留單次 Alert 結束入口", () => {
+  it("結束騎乘使用標準二鍵確認，不保留長按 Modal 或延遲計時器", () => {
     const mapSource = readFileSync(resolve(projectRoot, "app/(tabs)/map.tsx"), "utf8");
 
-    expect(mapSource).toContain("const [stopConfirmVisible, setStopConfirmVisible] = useState(false);");
-    expect(mapSource).toContain("accessibilityLabel=\"長按確認結束騎乘\"");
-    expect(mapSource).toContain("onPressIn={startStopConfirmHold}");
-    expect(mapSource).toContain("onPressOut={clearStopConfirmHold}");
-    expect(mapSource).toContain("}, 1_200);");
-    expect(mapSource).not.toContain('Alert.alert("結束騎乘"');
+    expect(mapSource).toContain('Alert.alert(\n      "確認結束騎乘"');
+    expect(mapSource).toContain('text: "結束並儲存"');
+    expect(mapSource).toContain("void finalizeStopRide();");
+    expect(mapSource).not.toContain("stopConfirmVisible");
+    expect(mapSource).not.toContain("長按確認結束騎乘");
+    expect(mapSource).not.toContain("startStopConfirmHold");
   });
 
   it("保留 Leaflet WebView 局部訊息邊界，並 memo 化高頻儀表格", () => {

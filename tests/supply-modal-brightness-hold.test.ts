@@ -18,7 +18,7 @@ describe("supply modal brightness hold", () => {
 
   it("only restarts the dim timer after the final brightness hold is released", () => {
     expect(managerSource).toContain("releaseBrightnessHold(key: string)");
-    expect(managerSource).toContain("if (this.brightnessHolds.size === 0) this.resetInactivityTimer()");
+    expect(managerSource).toContain("if (this.rideSessionActive && this.brightnessHolds.size === 0) this.resetInactivityTimer()");
   });
 
   it("holds the screen for energy, water, custom, and interval supply confirmations", () => {

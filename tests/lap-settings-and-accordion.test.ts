@@ -34,10 +34,11 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
   });
 
   it("開啟時以全程里程倍數自動觸發，且不保留手動 Lap 控制", () => {
-    expect(mapSource).toContain("if (!settings.lapEnabled || state.status !== \"active\")");
+    expect(mapSource).toContain("advanceAutoLapMilestones");
+    expect(mapSource).toContain("autoLapMilestoneStateRef");
     expect(mapSource).toContain("nextAutoLapDistanceMRef");
-    expect(mapSource).toContain("nextAutoLapDistanceMRef.current = nextDistanceM + intervalM");
-    expect(mapSource).toContain("if (completeCurrentLap())");
+    expect(mapSource).toContain("nextAutoLapDistanceMRef.current = result.nextDistanceM");
+    expect(mapSource).toContain('type: "SYNC_AUTO_LAPS"');
     expect(mapSource).not.toContain("handleMarkLap");
     expect(mapSource).not.toContain("lapFloatingControlWrap");
     expect(mapSource).toContain("autoPauseSpeedThresholdKmh");
