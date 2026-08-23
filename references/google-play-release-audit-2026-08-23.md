@@ -38,6 +38,22 @@ GitHub 網頁帳號 `jason123453021-prog` 已確認可管理 `jason123453021-pro
 
 後續以新的 GitHub 官方 device authorization 成功完成 CLI 授權後，已在 `play-production` environment 設定 `PLAY_UPLOAD_KEYSTORE_BASE64`、`PLAY_UPLOAD_KEYSTORE_PASSWORD`、`PLAY_UPLOAD_KEY_ALIAS` 及 `PLAY_UPLOAD_KEY_PASSWORD` 四個加密 secret。僅透過 GitHub API 核對名稱與更新時間，未讀取或輸出任何 secret 值。
 
+## 正式簽署 AAB 驗證（2026-08-23）
+
+GitHub Actions run [32632772836](https://github.com/jason123453021-prog/bike-assistant/actions/runs/32632772836) 已成功完成 `Google Play 正式 AAB` workflow。品質守門、Android prebuild、受保護 upload keystore 還原、release signing patch、`bundleRelease` 與 artifact 上傳均成功。artifact `bike-assistant-google-play-aab` 未過期，GitHub API 回報大小為 37,053,977 bytes；下載後的 `app-release.aab` 大小為 37,530,966 bytes。
+
+使用 JDK `keytool` 驗證 AAB 的 JAR 簽署憑證 SHA-256 為 `B1:A5:FB:BA:CF:83:2A:92:7A:61:3F:6A:FE:C2:91:FC:10:50:D9:46:01:EC:02:93:76:5A:DF:EA:D5:C1:8F:C3`，與 Play Console 目前 upload key 憑證相符。再依 Android 開發人員官方 bundletool 文件，以 bundletool `dump manifest` 直接驗證 bundle package 為 `com.jason123453021.bikeassistant`、versionCode 為 `10090`、versionName 為 `1.0.90`。該 AAB 尚未上傳、建立測試版本或提交至 Google Play。
+
+帳號擁有者已確認將 AAB 上傳至正式版草稿。Play Console 已建立新的正式版草稿（prepare route 的 release id `7`），但尚未附加新 AAB。瀏覽器自動上傳第一次因檔案位於 `/tmp` 而被安全路徑限制拒絕；複製至 `/home/ubuntu/Downloads/google-play-aab/` 後，第二次因 Play Console 的動態檔案輸入欄位未被上傳介面定位而失敗。兩次皆未傳送任何檔案到 Google Play，草稿仍為空。
+
+後續已將作用中的 `.aab` input 暫時賦予受控瀏覽器可辨識的標籤，並成功從 `/home/ubuntu/Downloads/google-play-aab/bike-assistant-1.0.90-10090.aab` 上傳。Console 顯示檔案已完整傳送，狀態為「會經過最佳化處理再發布」，表示 Google Play 已接收 AAB 並在處理中；截至此紀錄，表格尚未顯示新的 versionCode，且未填入版本名稱、版本資訊、未儲存草稿、未進入預覽、未送交審查或推出。
+
+Google Play 完成處理後拒絕該 AAB，原因並非簽署或版本號錯誤，而是新 upload key 的重設尚未生效。Console 顯示原文：新上傳憑證「在世界標準時間 2026年8月25日 上午9:23:29之後」才可重新上傳。這表示 Play Console 的憑證頁雖已顯示新公開憑證，但新私鑰實際可用仍有延遲。已保留空白的正式版草稿，未填任何版本資料、未儲存為有效草稿、未送審或推出；必須在指定 UTC 時間後重新上傳同一個已驗證的 AAB。
+
+使用者選擇於生效時間後重新嘗試。已嘗試建立一次性自動重試排程，但目前為 collaboration session，平台拒絕建立排程。由於預設 sandbox 不保證跨工作階段持續執行，不能以本機等待程序替代可靠排程。待生效時間後，應由使用者在此對話重新通知或開啟續作，使用既有草稿與已保留 AAB 重試；在此之前不得聲稱將自動執行。
+
+正式版頁面仍列出舊版 `10089` 的三項技術品質訊息：expo-audio 的 `BOOT_COMPLETED` 前景服務限制、無邊框 API 淘汰提示與 Android 16 大螢幕方向／大小調整提示。新 1.0.90 AAB 的預先檢查、target SDK 36 與設定需在成功附加 bundle 後重新檢視；這些訊息本身尚未證明會阻擋草稿建立。
+
 ## 官方上架要求與對應行動
 
 | 要求 | 對本 App 的處理 |

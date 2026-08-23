@@ -2361,3 +2361,11 @@
 ## GitHub Actions secrets 存取修復（2026-08-23）
 - [x] 排除 GitHub 帳號不支援密碼登入的阻塞，改以帳號原有的 Google 或 Passkey 登入方式取得儲存庫 secrets 設定權限
 - [x] 在 `play-production` deployment environment 加密設定四個 `PLAY_UPLOAD_*` secrets，並驗證 workflow 可讀取其名稱但不揭露其值
+
+## Google Play 正式 AAB（2026-08-23）
+- [x] 建立並驗證新 upload key 簽署的 AAB：package `com.jason123453021.bikeassistant`、versionCode `10090`、versionName `1.0.90`，且 GitHub artifact 可用
+- [ ] 取得使用者確認後，將已驗證 AAB 上傳至 Google Play Console 的測試軌並完成上架資料與政策聲明
+
+## Google Play upload key 生效等待（2026-08-23）
+- [ ] 等待至 Google Play 指定的世界標準時間 2026-08-25 09:23:29 後，再重新上傳新 upload key 簽署的 1.0.90／10090 AAB，並確認正式版草稿接受版本
+- [ ] 建立一次性生效後檢查任務：重新確認 Play Console 接受新 upload key，然後在既有正式版草稿重新上傳已驗證 AAB；不送審、推出或發布
