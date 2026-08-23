@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildActivityStatistics, resolveStatisticsIntervalSec } from "../lib/activity-statistics";
+import { buildActivityStatistics, resolveStatisticsIntervalSec, resolveStatisticsSpeedMs } from "../lib/activity-statistics";
 
 describe("活動統計統一計算", () => {
   it("以移動時間計算平均速度，並讓活動總時間等於移動加暫停", () => {
@@ -75,7 +75,13 @@ describe("活動統計統一計算", () => {
 
   it("只接受合理且連續的定位樣本時間，避免背景中斷被當成持續功率輸出", () => {
     expect(resolveStatisticsIntervalSec(1_000, 4_500)).toBe(3.5);
+    expect(resolveStatisticsIntervalSec(1_000, 21_000)).toBe(20);
     expect(resolveStatisticsIntervalSec(1_000, 35_000)).toBe(0);
     expect(resolveStatisticsIntervalSec(5_000, 4_000)).toBe(0);
+  });
+
+  it("功率與卡路里優先使用已接受距離推導的區間速度，不採用飆高原始速度", () => {
+    expect(resolveStatisticsSpeedMs({ acceptedDistanceM: 150, intervalSec: 20, rawSpeedMs: 18 })).toBe(7.5);
+    expect(resolveStatisticsSpeedMs({ acceptedDistanceM: 0, intervalSec: 0, rawSpeedMs: 8 })).toBe(8);
   });
 });

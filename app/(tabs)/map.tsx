@@ -193,7 +193,7 @@ import {
   isTrustworthyVirtualPowerPeak,
 } from "@/lib/live-elevation-filter";
 import { createRideSummarySnapshot, type RideSummarySnapshot } from "@/lib/ride-summary-snapshot";
-import { resolveStatisticsIntervalSec } from "@/lib/activity-statistics";
+import { resolveStatisticsIntervalSec, resolveStatisticsSpeedMs } from "@/lib/activity-statistics";
 import { reportRecoverableIssue } from "@/lib/release-safe-log";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -1067,14 +1067,12 @@ export default function MapScreen() {
         calorieReminderSentRef.current = true;
         pendingCalorieRef.current = true;
         setCalorieAlert(true);
-        void setBackgroundSupplyReminderPending("calorie", true);
         return;
       }
       if (action.kind === "water") {
         waterReminderSentRef.current = true;
         pendingWaterRef.current = true;
         setWaterAlert(true);
-        void setBackgroundSupplyReminderPending("water", true);
         return;
       }
       if (action.kind === "custom-energy" || action.kind === "custom-water") {
@@ -2043,7 +2041,7 @@ export default function MapScreen() {
           let distanceM = 0;
           const previousLocation = lastLocationRef.current;
           const statisticsIntervalSec = !trackPointDecision.segmentStart
-            ? resolveStatisticsIntervalSec(previousLocation?.timestamp ?? null, loc.timestamp, 10)
+            ? resolveStatisticsIntervalSec(previousLocation?.timestamp ?? null, loc.timestamp)
             : 0;
           if (!trackPointDecision.segmentStart && lastLocationRef.current && statisticsIntervalSec > 0) {
             const candidateDistanceM = haversineDistance(
@@ -2079,9 +2077,14 @@ export default function MapScreen() {
             summary.latestWeatherCode = currentWeather.weatherCode;
             summary.hadLiveWeather = true;
           }
-          const currentSpeedMs = speed && speed > 0
-            ? speed
-            : statisticsIntervalSec > 0 && distanceM > 0 ? distanceM / statisticsIntervalSec : 0;
+          // 功率、卡路里與平均功率積分使用同一條已接受的距離／時間資料鏈，
+          // 不讓單筆 GPS 原始速度飆點將虛擬功率及消耗量放大。
+          const currentSpeedMs = resolveStatisticsSpeedMs({
+            acceptedDistanceM: distanceM,
+            intervalSec: statisticsIntervalSec,
+            rawSpeedMs: speed,
+          });
+          const statisticsSpeedKmh = currentSpeedMs * 3.6;
           const isCyclingSport = currentState.sportType === "cycling";
           const rawPower = isCyclingSport ? calculatePower({
             speedMs: currentSpeedMs,
@@ -2108,7 +2111,7 @@ export default function MapScreen() {
             ? calculatePersonalizedCalories({
               powerW: power,
               hasMeasuredPower: power > 0,
-              speedKmh,
+              speedKmh: statisticsSpeedKmh,
               gradePct: grade,
               riderWeightKg: settings.weight,
               ftpW: estimateFtpW,
@@ -2123,7 +2126,7 @@ export default function MapScreen() {
               sportType: currentState.sportType,
               weightKg: settings.weight,
               durationSec: statisticsIntervalSec,
-              speedKmh,
+              speedKmh: statisticsSpeedKmh,
               gradePct: grade,
               vamMPerHour: sportVam,
             });

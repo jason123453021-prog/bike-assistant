@@ -3,6 +3,8 @@
 - [x] 稽核背景補給／補水提醒的 Android 通知權限、前台服務、通知動作與回前景待確認彈窗流程；已確認 POST_NOTIFICATIONS、MAX supply 頻道、expo-location 前景服務與 Android 背景 Activity 合規界線
 - [x] 讓使用者點擊背景補給／補水通知後導向導航頁並立即顯示對應待確認彈窗，不以背景強制啟動 Activity 規避系統限制；點擊只恢復 pending Modal、不會誤確認或重設倒數
 - [x] 完成本輪背景提醒互動修復的 GitHub Actions Android APK artifact 建置與驗證（GitHub run 32619698257；workflow 成功、artifact `bike-assistant-preview-apk` 28,348,341 bytes，未過期）
+- [x] 依 2026-08-23 實測截圖追查並校正活動距離、移動時間、均速、爬升、平均功率與卡路里的統計對齊資料鏈；連續可信 GPS 統計區間上限統一為 30 秒，功率與卡路里使用已接受 Haversine 距離的區間速度，維持 30 m 精度與 110 km/h 異常跳點防護
+- [x] 修正背景補給／補水通知點擊回 App 後，按下「已補給／已補水」仍立即再次彈出同一提醒的狀態競爭問題；以序列化前景寫入、確認版號與背景舊快照合併保護，確認後保留新的倒數與 false pending 旗標
 - [x] 確認自動記圈與均速修正是否需要 Kotlin 服務，並記錄實際前景／背景執行層：前景 `map.tsx` 與背景 `background-location.ts` 共用 `auto-lap-milestones.ts`；未包含自訂 Kotlin 服務
 - [x] 依 Strava 公開統計原則全面稽核距離、移動時間、自動暫停、背景交接與活動摘要資料鏈；稽核結果保存於 `references/strava-statistics-execution-audit-2026-08-23.md`
 - [x] 統一前景／背景自動暫停的 0.3 m/s、8 秒防抖與恢復判定，避免鎖屏時移動時間或倒數過早凍結

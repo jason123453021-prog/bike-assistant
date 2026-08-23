@@ -43,6 +43,15 @@ describe("background supply reminder recovery", () => {
     expect(mapSource).toContain('setCalorieAlert(true);');
     expect(mapSource).toContain('setWaterAlert(true);');
     expect(mapSource).toContain('不得視為已補給');
+    expect(mapSource).not.toMatch(/action\.kind === "calorie"[\s\S]{0,220}setBackgroundSupplyReminderPending\("calorie", true\)/);
+    expect(mapSource).not.toMatch(/action\.kind === "water"[\s\S]{0,220}setBackgroundSupplyReminderPending\("water", true\)/);
+  });
+
+  it("以前景確認版號保護背景舊快照，避免已補給後再次彈出相同提醒", () => {
+    const backgroundSource = readFileSync(resolve(process.cwd(), "lib/background-location.ts"), "utf8");
+    expect(backgroundSource).toContain("mutateBackgroundSupplyState");
+    expect(backgroundSource).toContain("persistBackgroundStatePreservingSupplyMutations");
+    expect(backgroundSource).toContain("supplyReminderMutationVersion");
   });
 
   it("維持 Android 高優先級補給頻道、通知原生設定與定位前景服務", () => {

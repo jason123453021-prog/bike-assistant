@@ -46,6 +46,12 @@ export interface ActivityStatisticsSnapshot {
   caloriesSource: ActivityCaloriesSource;
 }
 
+/**
+ * 接受連續、可信 GPS 點之間最多 30 秒的區間。Android 可能合併交付定位，
+ * 10 秒上限會把正常騎乘的距離與功率樣本直接丟棄，造成移動時間偏短。
+ */
+export const MAX_CONTIGUOUS_GPS_STATISTICS_INTERVAL_SEC = 30;
+
 function nonNegative(value: number | undefined): number {
   return Number.isFinite(value) ? Math.max(0, Number(value)) : 0;
 }
@@ -94,8 +100,23 @@ export function buildActivityStatistics(input: ActivityStatisticsInput): Activit
 }
 
 /** 以定位點時間戳估算本次有效樣本的積分秒數，防止背景中斷被錯當成長時間持續輸出。 */
-export function resolveStatisticsIntervalSec(previousTimestampMs: number | null, currentTimestampMs: number, maximumSec = 30): number {
+export function resolveStatisticsIntervalSec(previousTimestampMs: number | null, currentTimestampMs: number, maximumSec = MAX_CONTIGUOUS_GPS_STATISTICS_INTERVAL_SEC): number {
   if (!Number.isFinite(previousTimestampMs) || !Number.isFinite(currentTimestampMs)) return 0;
   const seconds = (currentTimestampMs - Number(previousTimestampMs)) / 1000;
   return seconds > 0 && seconds <= maximumSec ? seconds : 0;
+}
+
+/**
+ * 統計用速度必須優先由已通過距離品質閘門的 Haversine 距離推導；
+ * 只有沒有可用區間時才安全回退到裝置瞬時速度。
+ */
+export function resolveStatisticsSpeedMs(input: {
+  acceptedDistanceM: number;
+  intervalSec: number;
+  rawSpeedMs?: number | null;
+}): number {
+  const acceptedDistanceM = nonNegative(input.acceptedDistanceM);
+  const intervalSec = nonNegative(input.intervalSec);
+  if (acceptedDistanceM > 0 && intervalSec > 0) return acceptedDistanceM / intervalSec;
+  return nonNegative(input.rawSpeedMs ?? undefined);
 }

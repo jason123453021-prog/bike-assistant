@@ -46,12 +46,18 @@ import {
 } from "@/lib/auto-lap-milestones";
 import { advanceBackgroundAutoPause } from "@/lib/background-auto-pause";
 import type { RideLap } from "@/lib/ride-context";
+import {
+  getSupplyReminderMutationVersion,
+  preserveLatestSupplyReminderMutation,
+} from "@/lib/background-supply-state-guard";
 
 export const BACKGROUND_LOCATION_TASK = "BIKE_BACKGROUND_LOCATION";
 const BG_TRACK_KEY = "@bike_bg_track_points";
 const BG_STATE_KEY = "@bike_bg_state";
 const BG_TRACK_FLUSH_INTERVAL_MS = 5_000;
 const BG_TRACK_MAX_POINTS = 10_000;
+
+let backgroundSupplyStateMutationQueue: Promise<void> = Promise.resolve();
 
 type BackgroundTrackPoint = {
   lat: number;
@@ -137,6 +143,8 @@ export interface BackgroundState {
   supplyCountdownPausedAtMs?: number;
   supplyCountdownPausedTotalMs?: number;
   rideStartedAt: number;
+  /** 前景確認／倒數調整的單調版號，供背景舊快照合併時保護最新確認結果。 */
+  supplyReminderMutationVersion?: number;
   supplyEnergyTimeIntervalEnabled: boolean;
   supplyEnergyTimeIntervalMinutes: number;
   supplyEnergyDistanceIntervalEnabled: boolean;
@@ -193,6 +201,35 @@ export interface BackgroundState {
   backgroundAutoPaused?: boolean;
 }
 
+async function persistBackgroundStatePreservingSupplyMutations(
+  state: BackgroundState,
+  batchSupplyReminderMutationVersion: number,
+): Promise<void> {
+  const latestStateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+  const latestState = latestStateStr ? (JSON.parse(latestStateStr) as BackgroundState) : null;
+  const safeState = latestState
+    ? preserveLatestSupplyReminderMutation(state, latestState, batchSupplyReminderMutationVersion)
+    : state;
+  await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(safeState));
+}
+
+async function mutateBackgroundSupplyState(
+  mutate: (state: BackgroundState) => boolean,
+): Promise<void> {
+  const operation = backgroundSupplyStateMutationQueue.then(async () => {
+    try {
+      const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
+      if (!stateStr) return;
+      const state = JSON.parse(stateStr) as BackgroundState;
+      if (!mutate(state)) return;
+      state.supplyReminderMutationVersion = getSupplyReminderMutationVersion(state) + 1;
+      await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+    } catch {}
+  });
+  backgroundSupplyStateMutationQueue = operation.catch(() => undefined);
+  await operation;
+}
+
 // Haversine 距離計算（背景任務中不能 import 其他模組的函數）
 function bgHaversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
@@ -224,6 +261,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
       if (!stateStr) return; // 未啟動騎乘，忽略
       const state: BackgroundState = JSON.parse(stateStr);
       if (!state.isRiding) return;
+      const batchSupplyReminderMutationVersion = getSupplyReminderMutationVersion(state);
       const smartChannels = resolveSmartSupplyChannels(state);
       const recoverySession = (await initializeRideSession()) ?? createNewRideSession();
 
@@ -324,7 +362,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
           ? bgHaversine(state.lastLat, state.lastLon, latitude, longitude)
           : 0;
         const rawStatisticsIntervalSec = !segmentStart
-          ? resolveStatisticsIntervalSec(state.lastTimestamp || null, timestamp, 10)
+          ? resolveStatisticsIntervalSec(state.lastTimestamp || null, timestamp)
           : 0;
         const hasReliableMovement = hasReliableRideMovement({
           speedKmh,
@@ -366,9 +404,9 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
           continue;
         }
 
-        // 只累計 10 秒內、Haversine 推導速度合理的連續 GPS 樣本。
+        // 只累計連續且 Haversine 推導速度合理的可信 GPS 樣本。
         const impliedSpeedKmh = statisticsIntervalSec > 0 ? (candidateDistanceM / statisticsIntervalSec) * 3.6 : 0;
-        if (!segmentStart && statisticsIntervalSec > 0 && candidateDistanceM < 250 && candidateDistanceM >= 0.5 && impliedSpeedKmh <= 110) {
+        if (!segmentStart && statisticsIntervalSec > 0 && candidateDistanceM >= 0.5 && impliedSpeedKmh <= 110) {
           state.totalDistanceM += candidateDistanceM;
           acceptedLocation.distanceM = candidateDistanceM;
         }
@@ -412,7 +450,9 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
               precipitationProb: 0,
             };
             const distanceM = acceptedLocation.distanceM ?? candidateDistanceM;
-            const effectiveSpeedMs = speedMs > 0 ? speedMs : distanceM / statisticsIntervalSec;
+            const effectiveSpeedMs = acceptedLocation.distanceM > 0
+              ? acceptedLocation.distanceM / statisticsIntervalSec
+              : speedMs;
             const effectiveSpeedKmh = effectiveSpeedMs * 3.6;
             const gradePct = calcGrade((loc.coords.altitude ?? 0) - (state.lastAltitude ?? loc.coords.altitude ?? 0), distanceM);
             const heading = loc.coords.heading ?? 0;
@@ -680,8 +720,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
         }
       }
 
-      // 保存背景狀態
-      await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+      // 保存背景狀態；若批次處理期間前景已確認補給，保留最新確認／倒數結果。
+      await persistBackgroundStatePreservingSupplyMutations(state, batchSupplyReminderMutationVersion);
 
       // 以記憶體快取合併軌跡批次，避免每次背景回呼讀取和重寫全部歷史軌跡。
       await appendBackgroundTrackBatch(acceptedLocations.filter((point) => !point.isStationary).map((point) => (
@@ -932,6 +972,7 @@ export async function syncBackgroundRideCheckpoint(params: {
     if (!stateStr) return;
     const state: BackgroundState = JSON.parse(stateStr);
     if (!state.isRiding) return;
+    const startedAtSupplyReminderMutationVersion = getSupplyReminderMutationVersion(state);
     state.totalDistanceM = Math.max(0, params.totalDistanceM);
     state.movingTimeSec = Math.max(0, params.movingTimeSec);
     state.totalAscentM = Math.max(0, params.totalAscentM);
@@ -953,7 +994,7 @@ export async function syncBackgroundRideCheckpoint(params: {
       state.lastAltitude = params.lastLocation.altitude ?? undefined;
       state.lastSpeedMs = params.lastLocation.speed ?? undefined;
     }
-    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
+    await persistBackgroundStatePreservingSupplyMutations(state, startedAtSupplyReminderMutationVersion);
   } catch {}
 }
 
@@ -986,28 +1027,22 @@ export async function updateBackgroundSmartSupplyCountdown(countdown: Pick<
   BackgroundState,
   "smartCalorieCountdownStartedElapsedSec" | "smartWaterCountdownStartedElapsedSec" | "smartCalorieCountdownDurationSec" | "smartWaterCountdownDurationSec"
 >) {
-  try {
-    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
-    if (!stateStr) return;
-    const state: BackgroundState = JSON.parse(stateStr);
+  await mutateBackgroundSupplyState((state) => {
     const channels = resolveSmartSupplyChannels(state);
-    if (!state.isRiding || (!channels.energy && !channels.water)) return;
+    if (!state.isRiding || (!channels.energy && !channels.water)) return false;
     Object.assign(state, countdown);
-    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
-  } catch {}
+    return true;
+  });
 }
 
 /** 前景到期或背景任務到期時，持久化待確認狀態供回到前景立即恢復彈窗。 */
 export async function setBackgroundSupplyReminderPending(kind: "calorie" | "water", pending: boolean) {
-  try {
-    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
-    if (!stateStr) return;
-    const state: BackgroundState = JSON.parse(stateStr);
-    if (!state.isRiding) return;
+  await mutateBackgroundSupplyState((state) => {
+    if (!state.isRiding) return false;
     if (kind === "calorie") state.calorieReminderSent = pending;
     else state.waterReminderSent = pending;
-    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
-  } catch {}
+    return true;
+  });
 }
 
 /**
@@ -1050,10 +1085,7 @@ export async function acknowledgeBackgroundSupplyInterval(kind: SupplyIntervalKi
 
 /** 在前台或通知按鈕確認卡路里／水分補給後，同步重置背景任務的對應計數。 */
 export async function acknowledgeBackgroundSupplyReminder(kind: "calorie" | "water") {
-  try {
-    const stateStr = await AsyncStorage.getItem(BG_STATE_KEY);
-    if (!stateStr) return;
-    const state: BackgroundState = JSON.parse(stateStr);
+  await mutateBackgroundSupplyState((state) => {
     if (kind === "calorie") {
       if (isSmartSupplyChannelEnabled(state, "calorie")) {
         state.smartCalorieCountdownStartedElapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
@@ -1069,8 +1101,8 @@ export async function acknowledgeBackgroundSupplyReminder(kind: "calorie" | "wat
       }
       state.waterReminderSent = false;
     }
-    await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
-  } catch {}
+    return true;
+  });
 }
 
 /**
