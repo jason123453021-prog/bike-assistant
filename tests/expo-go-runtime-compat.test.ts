@@ -7,9 +7,9 @@ const appConfigSource = readFileSync(resolve(process.cwd(), "app.config.ts"), "u
 describe("Expo Go runtime 相容性", () => {
   it("僅讓 production EAS AAB 固定 runtimeVersion，避免 Expo Go 開發 bundle 與已安裝 SDK runtime 不相容", () => {
     expect(appConfigSource).toContain('const isProductionEasBuild = process.env.EAS_BUILD_PROFILE === "production"');
-    expect(appConfigSource).toContain('version: "1.0.4"');
-    expect(appConfigSource).toContain("versionCode: 10088");
-    expect(appConfigSource).toContain('runtimeVersion: isProductionEasBuild ? "1.0.4" : undefined');
-    expect(appConfigSource).not.toContain('runtimeVersion: "1.0.4",');
+    expect(appConfigSource).toContain('version: "1.0.90"');
+    expect(appConfigSource).toContain("versionCode: 10090");
+    expect(appConfigSource).toContain('runtimeVersion: isProductionEasBuild ? "1.0.90" : undefined');
+    expect(appConfigSource).not.toContain('runtimeVersion: "1.0.90",');
   });
 });

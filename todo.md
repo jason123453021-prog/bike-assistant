@@ -6,6 +6,10 @@
 - [x] 依 2026-08-23 實測截圖追查並校正活動距離、移動時間、均速、爬升、平均功率與卡路里的統計對齊資料鏈；連續可信 GPS 統計區間上限統一為 30 秒，功率與卡路里使用已接受 Haversine 距離的區間速度，維持 30 m 精度與 110 km/h 異常跳點防護
 - [x] 修正背景補給／補水通知點擊回 App 後，按下「已補給／已補水」仍立即再次彈出同一提醒的狀態競爭問題；以序列化前景寫入、確認版號與背景舊快照合併保護，確認後保留新的倒數與 false pending 旗標
 - [x] 回復 GitHub Actions run 32625150741 對應版本後，只移除活動詳情的「全螢幕路線」控制，其他當時的功能與排版維持不變；TypeScript、Lint、114 個測試檔／382 項測試、Expo Doctor 與 Android Hermes 匯出均通過
+- [ ] 稽核 Google Play 上架需求、目前 Android 發行設定與缺少的商店資料
+- [ ] 建立並驗證可供 Google Play Console 上傳的正式簽署 Android App Bundle（AAB）
+- [ ] 提供 Google Play Console 建立版本、上傳 AAB、內容分級與送審的帳號端操作引導
+- [ ] 查找先前 Manus／Expo／GitHub 建置所使用的 Android upload key；若無法安全取得，改用 Google Play 官方 upload key reset 以維持既有正式版更新資格
 - [x] 確認自動記圈與均速修正是否需要 Kotlin 服務，並記錄實際前景／背景執行層：前景 `map.tsx` 與背景 `background-location.ts` 共用 `auto-lap-milestones.ts`；未包含自訂 Kotlin 服務
 - [x] 依 Strava 公開統計原則全面稽核距離、移動時間、自動暫停、背景交接與活動摘要資料鏈；稽核結果保存於 `references/strava-statistics-execution-audit-2026-08-23.md`
 - [x] 統一前景／背景自動暫停的 0.3 m/s、8 秒防抖與恢復判定，避免鎖屏時移動時間或倒數過早凍結
@@ -2343,3 +2347,13 @@
 - [x] 核對目前 Expo 專案擁有者、projectId、目標帳號成員權限與可移轉條件
 - [x] 說明移轉對既有 EAS projectId、憑證、Android 套件與雲端建置的影響，取得執行確認
 - [x] 執行所有權移轉、更新專案設定並驗證目標帳號可發起雲端建置
+
+## Google Play upload key reset 表單附檔（2026-08-23）
+- [x] 以不需使用者在本機與遠端環境間搬運檔案的方式，將新 upload key 的公開 PEM 正確附加至 Play Console 重設表單，並於送出前核對表單接受狀態與公開憑證 SHA-256 指紋
+- [ ] 等待並驗證 Google Play 已處理 upload key reset，確認新憑證生效後才配置受保護 CI 簽署憑證與建立 AAB
+
+## Google Play 簽署資料 Git 忽略防護（2026-08-23）
+- [x] 將受限的 `.play-signing-temp/` 全目錄納入 Git 忽略規則，避免公開 PEM、keystore 與任何密碼暫存檔被誤加入版本控制
+
+## Google Play 版本號守門測試（2026-08-23）
+- [x] 更新 Expo Go／正式 AAB 相容性測試的版本與 versionCode 預期，使其與準備上架的 1.0.90／10090 設定一致
