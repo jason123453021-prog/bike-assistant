@@ -29,7 +29,7 @@ describe("ride detail JSX safety", () => {
     expect(source).not.toContain("90m/*");
   });
 
-  it("uses a compact route hero with a unified route-and-photo horizontal viewer", () => {
+  it("uses one route hero with a unified route-and-photo horizontal viewer", () => {
     const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
     const source = fs.readFileSync(filePath, "utf8");
 
@@ -49,9 +49,9 @@ describe("ride detail JSX safety", () => {
     expect(source).toContain("平均功率");
     expect(source).toContain("平均速度");
     expect(source).toContain("卡路里");
-    expect(source).toContain("coreActivitySummaryMetricPrimary");
-    expect(source).toContain("coreActivitySummaryValueRow");
-    expect(source).toContain("ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = Math.min(320");
+    expect(source).not.toContain("coreActivitySummaryMetricPrimary");
+    expect(source).not.toContain("coreActivitySummaryValueRow");
+    expect(source).toContain("ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT + 20");
     expect(source).not.toContain("全螢幕路線");
     expect(source).not.toContain("styles.activityViewerDrawerHandle");
     expect(source).not.toContain("styles.activityViewerDrawerHint");

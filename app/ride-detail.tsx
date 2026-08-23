@@ -72,8 +72,7 @@ const ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT = Math.min(Math.round(SCREEN_H * 0
 const ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT = Math.min(Math.round(SCREEN_H * 0.78), 620);
 const ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT = SCREEN_H - ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT;
 const ACTIVITY_VIEWER_STAGE_EXPANDED_HEIGHT = SCREEN_H - ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT;
-// 活動詳情首屏以核心數據為主；地圖保留足夠辨識路線的高度，但不應把距離、移動時間與均速推到首屏之外。
-const ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = Math.min(320, Math.max(250, Math.round(SCREEN_H * 0.30)));
+const ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT + 20;
 
 function buildStoredActivityStatistics(record: RideRecord) {
   const movingTimeSec = record.movingTime ?? Math.max(0, record.duration - (record.totalPausedSec ?? 0));
@@ -1581,52 +1580,20 @@ function CoreActivitySummaryGrid({
   const pace = formatPaceFromKmh(averageSpeedKmh);
   const gap = formatPaceSeconds(calculateGapPaceSecPerKm(averageSpeedKmh > 0 ? 3600 / averageSpeedKmh : 0, averageGrade));
   const vam = movingDuration > 0 ? (ascentM / movingDuration) * 3600 : 0;
-  type SummaryMetric = { label: string; value: string; unit: string; primary?: boolean };
-  const entries: SummaryMetric[] = sportType === "running"
-    ? [
-        { label: "距離", value: distanceKm.toFixed(2), unit: "公里", primary: true },
-        { label: "移動時間", value: formatDuration(movingDuration), unit: "", primary: true },
-        { label: "平均速度", value: averageSpeedKmh.toFixed(1), unit: "公里/小時", primary: true },
-        { label: "總爬升", value: `${Math.round(ascentM)}`, unit: "公尺" },
-        { label: "平均配速", value: pace, unit: "/公里" },
-        { label: "卡路里", value: `${Math.round(calories)}`, unit: "卡" },
-      ]
+  const entries = sportType === "running"
+    ? [["距離", `${distanceKm.toFixed(2)} 公里`], ["總爬升", `${Math.round(ascentM)} 公尺`], ["移動時間", formatDuration(movingDuration)], ["平均配速", `${pace} /公里`], ["平均速度", `${averageSpeedKmh.toFixed(1)} 公里/小時`], ["卡路里", `${Math.round(calories)} 卡`]] as const
     : sportType === "hiking"
-      ? [
-          { label: "距離", value: distanceKm.toFixed(2), unit: "公里", primary: true },
-          { label: "移動時間", value: formatDuration(movingDuration), unit: "", primary: true },
-          { label: "爬升速度", value: `${Math.round(vam)}`, unit: "公尺/小時", primary: true },
-          { label: "總爬升", value: `${Math.round(ascentM)}`, unit: "公尺" },
-          { label: "最高海拔", value: `${Math.round(altitudeM)}`, unit: "公尺" },
-          { label: "卡路里", value: `${Math.round(calories)}`, unit: "卡" },
-        ]
+      ? [["距離", `${distanceKm.toFixed(2)} 公里`], ["總爬升", `${Math.round(ascentM)} 公尺`], ["移動時間", formatDuration(movingDuration)], ["爬升速度", `${Math.round(vam)} 公尺/小時`], ["最高海拔", `${Math.round(altitudeM)} 公尺`], ["卡路里", `${Math.round(calories)} 卡`]] as const
       : sportType === "trail_running"
-        ? [
-            { label: "距離", value: distanceKm.toFixed(2), unit: "公里", primary: true },
-            { label: "移動時間", value: formatDuration(movingDuration), unit: "", primary: true },
-            { label: "平均配速", value: pace, unit: "/公里", primary: true },
-            { label: "總爬升", value: `${Math.round(ascentM)}`, unit: "公尺" },
-            { label: "GAP", value: gap, unit: "/公里" },
-            { label: "卡路里", value: `${Math.round(calories)}`, unit: "卡" },
-          ]
-        : [
-            { label: "距離", value: distanceKm.toFixed(2), unit: "公里", primary: true },
-            { label: "移動時間", value: formatDuration(movingDuration), unit: "", primary: true },
-            { label: "平均速度", value: averageSpeedKmh.toFixed(1), unit: "公里/小時", primary: true },
-            { label: "爬升海拔", value: `${Math.round(ascentM).toLocaleString()}`, unit: "公尺" },
-            { label: "平均功率", value: `${Math.round(averagePowerW)}`, unit: "瓦" },
-            { label: "卡路里", value: `${Math.round(calories).toLocaleString()}`, unit: "卡" },
-          ];
+        ? [["距離", `${distanceKm.toFixed(2)} 公里`], ["總爬升", `${Math.round(ascentM)} 公尺`], ["移動時間", formatDuration(movingDuration)], ["平均配速", `${pace} /公里`], ["GAP", `${gap} /公里`], ["卡路里", `${Math.round(calories)} 卡`]] as const
+        : [["距離", `${distanceKm.toFixed(2)} 公里`], ["爬升海拔", `${Math.round(ascentM).toLocaleString()} 公尺`], ["移動時間", formatDuration(movingDuration)], ["平均功率", `${Math.round(averagePowerW)} 瓦`], ["平均速度", `${averageSpeedKmh.toFixed(1)} 公里/小時`], ["卡路里", `${Math.round(calories).toLocaleString()} 卡`]] as const;
 
   return (
     <View style={styles.coreActivitySummaryGrid}>
-      {entries.map(({ label, value, unit, primary }) => (
-        <View key={label} style={[styles.coreActivitySummaryMetric, primary && styles.coreActivitySummaryMetricPrimary]}>
+      {entries.map(([label, value]) => (
+        <View key={label} style={styles.coreActivitySummaryMetric}>
           <Text style={styles.coreActivitySummaryLabel}>{label}</Text>
-          <View style={styles.coreActivitySummaryValueRow}>
-            <Text style={styles.coreActivitySummaryValue}>{value}</Text>
-            {unit ? <Text style={styles.coreActivitySummaryUnit} numberOfLines={1}>{unit}</Text> : null}
-          </View>
+          <Text style={styles.coreActivitySummaryValue}>{value}</Text>
         </View>
       ))}
     </View>
@@ -1690,7 +1657,7 @@ const styles = StyleSheet.create({
   activityMetaRpeChip: { backgroundColor: "rgba(245,158,11,0.14)" },
   activityMetaRpeText: { color: "#FCD34D", fontSize: 11, fontWeight: "800" },
   activityEquipment: { color: "rgba(255,255,255,0.55)", fontSize: 11, flexShrink: 1 },
-  activityInitialSummary: { paddingTop: 18, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM },
+  activityInitialSummary: { paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM },
   activityDetailsAfterInitial: { paddingTop: 18 },
   summaryGrid: {
     flexDirection: "row",
@@ -2058,13 +2025,10 @@ const styles = StyleSheet.create({
   activityViewerRoutePage: { backgroundColor: "#08110D" },
   activityViewerRouteMap: { width: SCREEN_W, flex: 1 },
   activityViewerDrawer: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: ACTIVITY_SUMMARY_HORIZONTAL_PADDING, paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: "#101012", borderTopWidth: 1, borderColor: "rgba(255,255,255,0.13)", overflow: "hidden" },
-  coreActivitySummaryGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 16, rowGap: 10, columnGap: 0 },
-  coreActivitySummaryMetric: { width: "33.3333%", alignItems: "center", justifyContent: "center", minHeight: 84, paddingHorizontal: 4, paddingVertical: 10 },
-  coreActivitySummaryMetricPrimary: { backgroundColor: "rgba(0,230,118,0.10)", borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: "rgba(0,230,118,0.24)" },
-  coreActivitySummaryLabel: { color: "rgba(255,255,255,0.68)", fontSize: 11, fontWeight: "800", marginBottom: 6, textAlign: "center" },
-  coreActivitySummaryValueRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "center", minWidth: 0 },
-  coreActivitySummaryValue: { color: "#fff", fontSize: 22, fontWeight: "800", fontVariant: ["tabular-nums"], textAlign: "center", letterSpacing: -0.35 },
-  coreActivitySummaryUnit: { color: "rgba(255,255,255,0.68)", fontSize: 10, fontWeight: "700", marginLeft: 3, flexShrink: 1 },
+  coreActivitySummaryGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 22, rowGap: 24 },
+  coreActivitySummaryMetric: { width: "50%", alignItems: "center", paddingHorizontal: 6 },
+  coreActivitySummaryLabel: { color: "rgba(255,255,255,0.72)", fontSize: 13, fontWeight: "700", marginBottom: 5 },
+  coreActivitySummaryValue: { color: "#fff", fontSize: 23, fontWeight: "800", fontVariant: ["tabular-nums"], textAlign: "center" },
   activityViewerDrawerMetrics: { flexDirection: "row", marginTop: 15, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.06)", paddingVertical: 11 },
   activityViewerDrawerMetricsSecondary: { marginTop: 10 },
   activityViewerDrawerMetric: { flex: 1, alignItems: "center" },

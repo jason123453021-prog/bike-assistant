@@ -79,7 +79,7 @@ describe("activity media presentation", () => {
     expect(mediaHeaderIndex).toBeGreaterThan(mediaDrawerIndex);
     expect(mediaGridIndex).toBeGreaterThan(mediaHeaderIndex);
     expect(source).toContain("function ActivitySummaryHeader");
-    expect(source).toContain("activityInitialSummary: { paddingTop: 18, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM }");
+    expect(source).toContain("activityInitialSummary: { paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM }");
     expect(source).not.toContain("ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT");
     expect(source).not.toContain("activityInitialSummary: { minHeight:");
     expect(source).toContain("<Text style={styles.activityEyebrow}>活動詳情</Text>");
@@ -93,7 +93,7 @@ describe("activity media presentation", () => {
     expect(source).toContain("clampActivityViewerDrawerHeight");
     expect(source).toContain("CoreActivitySummaryGrid");
     expect(source).toContain("ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT");
-    expect(source).toContain("ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = Math.min(320, Math.max(250, Math.round(SCREEN_H * 0.30)))");
+    expect(source).toContain("ACTIVITY_DETAIL_MAIN_HERO_HEIGHT = ACTIVITY_VIEWER_STAGE_COLLAPSED_HEIGHT + 20");
     expect(source).toContain("mapHero: { height: ACTIVITY_DETAIL_MAIN_HERO_HEIGHT");
     expect(source).toContain("map: { width: SCREEN_W, height: ACTIVITY_DETAIL_MAIN_HERO_HEIGHT }");
     expect(source).toContain("activityViewerDrawerHeight.interpolate");
