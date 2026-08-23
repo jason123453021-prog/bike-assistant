@@ -16,7 +16,7 @@ Play Console 的路徑為「由 Google Play 保護 → Play 商店防護措施 �
 
 已在受限沙箱以 RSA 4096-bit 生成新的 upload key（alias `bike-assistant-upload`），有效至 2054-01-08。其公開憑證 SHA-256 為 `B1:A5:FB:BA:CF:83:2A:92:7A:61:3F:6A:FE:C2:91:FC:10:50:D9:46:01:EC:02:93:76:5A:DF:EA:D5:C1:8F:C3`，PEM 檔 SHA-256 為 `8591c8e85ed07f5e97520da1bf0fe744f53fec38f0821ecb4e2d6e453a8f4e2b`。
 
-在 Play Console 表單中已選取「我的上傳金鑰遺失了」。新 upload key 的公開 PEM `bike-assistant-upload.pem` 已由可見且作用中的表單欄位接受，畫面顯示該檔名與可用的移除控制，表示附檔已持久化至目前的重設申請草稿。帳號擁有者於 2026-08-23 明確確認後，已按下「申請」。Play Console 現顯示「尚未處理重設這個應用程式上傳金鑰的要求」與「取消要求」，表示申請已被接受為待處理狀態；尚未顯示新憑證生效，故在確認前不得使用新 upload key 建立或上傳 AAB。
+在 Play Console 表單中已選取「我的上傳金鑰遺失了」。新 upload key 的公開 PEM `bike-assistant-upload.pem` 已由可見且作用中的表單欄位接受，畫面顯示該檔名與可用的移除控制，表示附檔已持久化至目前的重設申請草稿。帳號擁有者於 2026-08-23 明確確認後，已按下「申請」。Console 的通知中心顯示「我們收到了重設上傳金鑰的要求」，並且「上傳金鑰憑證」區塊現已顯示新憑證 SHA-256 `B1:A5:FB:BA:CF:83:2A:92:7A:61:3F:6A:FE:C2:91:FC:10:50:D9:46:01:EC:02:93:76:5A:DF:EA:D5:C1:8F:C3`（取代原先 `61:AC:...:12:F2`）。因此，新 upload key 已在 Play Console 顯示為目前憑證，可進入受保護簽署 AAB 的憑證配置階段；仍不得把 keystore 或密碼加入 Git、訊息或任何公開欄位。
 
 ## 專案設定盤點
 
@@ -31,6 +31,12 @@ Play Console 的路徑為「由 Google Play 保護 → Play 商店防護措施 �
 已對 Expo 實際 prebuild 產生的 `android/app/build.gradle` 套用 release signing script，使用無效示範環境值驗證：release buildType 唯一指向 `signingConfigs.release`，其 keystore 路徑、alias 與密碼均由 `PLAY_UPLOAD_*` 環境變數取得；debug buildType 唯一維持 `signingConfigs.debug`。未使用 debug key 建立正式 AAB。
 
 新的 upload keystore、公開 PEM 與所有暫存密碼現由 `.play-signing-temp/` 全目錄 Git 忽略規則保護。GitHub CLI 可讀取儲存庫與 Actions workflow，但目前對 Actions secrets public-key API 回覆 `403 Resource not accessible by integration`；若此權限未由瀏覽器帳號補足，後續需改由 GitHub 網頁的 repository／environment secrets 介面安全設定四個 `PLAY_UPLOAD_*` secrets，絕不在訊息、原始碼或命令列揭露其值。
+
+GitHub 網頁帳號 `jason123453021-prog` 已確認可管理 `jason123453021-prog/bike-assistant`。已建立 deployment environment `play-production`，目前未啟用 reviewer、wait timer 或 branch restriction，且尚未含任何 environment secrets。此 environment 對應正式 AAB workflow 的 `environment: play-production`，後續只可在其加密 secrets 介面設定四個 `PLAY_UPLOAD_*` 值。
+
+嘗試以 GitHub 官方 device authorization 刷新本機 CLI 的 Actions secrets 權限時，因裝置碼輸入元件的分段格式未正確解析而回覆 not-found。未完成授權、未取得新權杖，亦未建立或修改任何 secret；後續若需 CLI 寫入 secrets，必須建立新的裝置授權請求並讓頁面使用正確的八碼分段格式，或改用已登入的 environment secrets 網頁介面。
+
+後續以新的 GitHub 官方 device authorization 成功完成 CLI 授權後，已在 `play-production` environment 設定 `PLAY_UPLOAD_KEYSTORE_BASE64`、`PLAY_UPLOAD_KEYSTORE_PASSWORD`、`PLAY_UPLOAD_KEY_ALIAS` 及 `PLAY_UPLOAD_KEY_PASSWORD` 四個加密 secret。僅透過 GitHub API 核對名稱與更新時間，未讀取或輸出任何 secret 值。
 
 ## 官方上架要求與對應行動
 

@@ -2350,10 +2350,14 @@
 
 ## Google Play upload key reset 表單附檔（2026-08-23）
 - [x] 以不需使用者在本機與遠端環境間搬運檔案的方式，將新 upload key 的公開 PEM 正確附加至 Play Console 重設表單，並於送出前核對表單接受狀態與公開憑證 SHA-256 指紋
-- [ ] 等待並驗證 Google Play 已處理 upload key reset，確認新憑證生效後才配置受保護 CI 簽署憑證與建立 AAB
+- [x] 等待並驗證 Google Play 已處理 upload key reset，確認新憑證生效後才配置受保護 CI 簽署憑證與建立 AAB
 
 ## Google Play 簽署資料 Git 忽略防護（2026-08-23）
 - [x] 將受限的 `.play-signing-temp/` 全目錄納入 Git 忽略規則，避免公開 PEM、keystore 與任何密碼暫存檔被誤加入版本控制
 
 ## Google Play 版本號守門測試（2026-08-23）
 - [x] 更新 Expo Go／正式 AAB 相容性測試的版本與 versionCode 預期，使其與準備上架的 1.0.90／10090 設定一致
+
+## GitHub Actions secrets 存取修復（2026-08-23）
+- [x] 排除 GitHub 帳號不支援密碼登入的阻塞，改以帳號原有的 Google 或 Passkey 登入方式取得儲存庫 secrets 設定權限
+- [x] 在 `play-production` deployment environment 加密設定四個 `PLAY_UPLOAD_*` secrets，並驗證 workflow 可讀取其名稱但不揭露其值
