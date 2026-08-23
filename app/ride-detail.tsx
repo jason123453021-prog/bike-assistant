@@ -763,17 +763,6 @@ export default function RideDetailScreen() {
           </View>
         </Pressable>
       ) : null}
-      {!coverPhotoUri && polylineCoords.length > 1 ? (
-        <Pressable
-          style={({ pressed }) => [styles.activityRouteExpandButton, { opacity: pressed ? 0.72 : 1 }]}
-          accessibilityRole="button"
-          accessibilityLabel="全螢幕檢視路線軌跡"
-          onPress={() => openActivityViewer(0)}
-        >
-          <Text style={styles.activityRouteExpandButtonText}>全螢幕路線</Text>
-        </Pressable>
-      ) : null}
-
       {/* ── 頂部導覽列 ── */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
         <Pressable
@@ -1784,9 +1773,6 @@ const styles = StyleSheet.create({
   activityCoverShade: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 32, paddingBottom: 18, backgroundColor: "rgba(0,0,0,0.42)" },
   activityCoverEyebrow: { color: "#00E676", fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
   activityCoverCopy: { color: "rgba(255,255,255,0.88)", fontSize: 12, marginTop: 4, fontWeight: "700" },
-  activityRouteExpandButton: { position: "absolute", right: 14, bottom: 14, zIndex: 3, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: "rgba(7,18,14,0.78)", borderWidth: 1, borderColor: "rgba(255,255,255,0.22)" },
-  activityRouteExpandButtonText: { color: "#fff", fontSize: 11, fontWeight: "800" },
-
   noTrailBadge: {
     position: "absolute",
     top: "40%",
