@@ -1,7 +1,12 @@
 # 智慧單車騎乘助手 TODO
+- [x] 執行並驗證自動記圈距離、跨里程碑與單圈均速的本地單元測試；12 項測試與 TypeScript 檢查均通過
+- [x] 稽核背景補給／補水提醒的 Android 通知權限、前台服務、通知動作與回前景待確認彈窗流程；已確認 POST_NOTIFICATIONS、MAX supply 頻道、expo-location 前景服務與 Android 背景 Activity 合規界線
+- [x] 讓使用者點擊背景補給／補水通知後導向導航頁並立即顯示對應待確認彈窗，不以背景強制啟動 Activity 規避系統限制；點擊只恢復 pending Modal、不會誤確認或重設倒數
+- [ ] 完成本輪背景提醒互動修復的 GitHub Actions Android APK artifact 建置與驗證
 - [x] 確認自動記圈與均速修正是否需要 Kotlin 服務，並記錄實際前景／背景執行層：前景 `map.tsx` 與背景 `background-location.ts` 共用 `auto-lap-milestones.ts`；未包含自訂 Kotlin 服務
 - [x] 依 Strava 公開統計原則全面稽核距離、移動時間、自動暫停、背景交接與活動摘要資料鏈；稽核結果保存於 `references/strava-statistics-execution-audit-2026-08-23.md`
 - [x] 統一前景／背景自動暫停的 0.3 m/s、8 秒防抖與恢復判定，避免鎖屏時移動時間或倒數過早凍結
+- [x] 完成自動記圈執行層與統計稽核版本的 GitHub Actions Android APK artifact 驗證（GitHub run 32618388408）
 - [x] 依實測活動與 Strava 公開計算原則校正距離、移動時間、平均速度、平均／最大功率與卡路里資料鏈；保留 30 m GPS 品質、低速連續位移、加速度抑制與虛擬峰值品質閘門
 - [x] 修正 1 km 自動記圈跨里程碑計算，避免超距、0 km 分圈、極端均速與遺漏多個里程碑；前景／背景採相同固定里程插值快照
 - [x] 補強背景騎乘的補給／補水到期本機通知、回到 App 的待確認彈窗與最大功率同步；背景通知使用高優先權補給頻道

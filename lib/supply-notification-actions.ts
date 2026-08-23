@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
 import { getLocalNotifications } from "@/lib/local-notifications";
 import {
@@ -44,6 +45,7 @@ export async function scheduleSupplySnooze(kind: SupplyNotificationKind): Promis
       sound: true,
       categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
       data: { type: "supply_reminder", supplyKind: kind },
+      ...(Platform.OS === "android" ? { channelId: "supply" } : {}),
     },
     trigger: { seconds: SUPPLY_SNOOZE_SECONDS } as never,
   }).catch(() => {});
@@ -73,7 +75,7 @@ export function subscribeToSupplyNotificationActions(listener: () => void): () =
 }
 
 /** 在根布局啟動；通知回應會先保存，待導航頁可用時再同步處理。 */
-export function startSupplyNotificationActionListener(): () => void {
+export function startSupplyNotificationActionListener(options?: { onOpen?: () => void }): () => void {
   let active = true;
   let subscription: { remove: () => void } | null = null;
 
@@ -84,7 +86,11 @@ export function startSupplyNotificationActionListener(): () => void {
 
     const handleResponse = (response: Parameters<typeof parseSupplyNotificationAction>[0]) => {
       const action = parseSupplyNotificationAction(response);
-      if (action) void queueSupplyNotificationAction(action);
+      if (!action) return;
+      void queueSupplyNotificationAction(action).then(() => {
+        // 只有使用者點擊通知本體時才透過 Router 導向騎乘頁；不從背景工作強制啟動 Activity。
+        if (active && action.action === "open") options?.onOpen?.();
+      });
     };
     const lastResponse = await Notifications.getLastNotificationResponseAsync().catch(() => null);
     if (lastResponse) {

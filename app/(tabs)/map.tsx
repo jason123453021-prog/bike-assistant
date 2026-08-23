@@ -1060,6 +1060,37 @@ export default function MapScreen() {
 
   const processSupplyNotificationAction = useCallback((action: SupplyNotificationAction) => {
     if (!settings.supplyReminderEnabled) return;
+    if (action.action === "open") {
+      // 使用者點擊通知時只回復待確認 UI；不得視為已補給、稍後提醒或重新開始倒數。
+      setTouchGuardEnabled(false);
+      if (action.kind === "calorie") {
+        calorieReminderSentRef.current = true;
+        pendingCalorieRef.current = true;
+        setCalorieAlert(true);
+        void setBackgroundSupplyReminderPending("calorie", true);
+        return;
+      }
+      if (action.kind === "water") {
+        waterReminderSentRef.current = true;
+        pendingWaterRef.current = true;
+        setWaterAlert(true);
+        void setBackgroundSupplyReminderPending("water", true);
+        return;
+      }
+      if (action.kind === "custom-energy" || action.kind === "custom-water") {
+        const item = settings.supplyItems.find((candidate) => candidate.id === action.customItemId);
+        if (!item) return;
+        customSupplyAlertsRef.current = { ...customSupplyAlertsRef.current, [item.id]: true };
+        setCustomSupplyAlerts(customSupplyAlertsRef.current);
+        setActiveSupplyAlerts((current) => current.includes(item.id) ? current : [...current, item.id]);
+        return;
+      }
+      const intervalKind = action.kind.replace("interval-", "") as SupplyIntervalKind;
+      const nextAlerts = { ...intervalSupplyAlertsRef.current, [intervalKind]: true };
+      intervalSupplyAlertsRef.current = nextAlerts;
+      setIntervalSupplyAlerts(nextAlerts);
+      return;
+    }
     if (action.action === "snooze") {
       handleSnoozeSupply(action.kind, action.customItemId);
       return;

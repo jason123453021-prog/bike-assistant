@@ -11,7 +11,10 @@ export type SupplyNotificationKind =
   | "interval-energy-distance"
   | "interval-water-time"
   | "interval-water-distance";
-export type SupplyNotificationActionType = "snooze" | "confirm";
+/**
+ * `open` 僅代表使用者點擊系統通知並要求查看提醒；它絕不確認、延後或重設補給倒數。
+ */
+export type SupplyNotificationActionType = "snooze" | "confirm" | "open";
 
 export interface SupplyNotificationAction {
   action: SupplyNotificationActionType;
@@ -45,5 +48,6 @@ export function parseSupplyNotificationAction(response: NotificationResponseLike
   const customItemId = typeof record.customItemId === "string" ? record.customItemId : undefined;
   if (response.actionIdentifier === SUPPLY_CONFIRM_ACTION) return { action: "confirm", kind: record.supplyKind, customItemId };
   if (response.actionIdentifier === SUPPLY_SNOOZE_ACTION) return { action: "snooze", kind: record.supplyKind, customItemId };
-  return null;
+  // Expo 將通知本體的預設點擊作為非自訂 action identifier 回傳；安全地轉為「開啟」而非「確認」。
+  return { action: "open", kind: record.supplyKind, customItemId };
 }

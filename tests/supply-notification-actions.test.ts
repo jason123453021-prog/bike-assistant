@@ -26,6 +26,13 @@ describe("parseSupplyNotificationAction", () => {
     });
   });
 
+  it("將使用者點擊通知本體安全轉為開啟待確認彈窗，而非直接確認補給", () => {
+    expect(parseSupplyNotificationAction(responseFor("expo.modules.notifications.actions.DEFAULT", "water"))).toEqual({
+      action: "open",
+      kind: "water",
+    });
+  });
+
   it("辨識使用者按下已補給的能量時間間隔提醒", () => {
     expect(parseSupplyNotificationAction(responseFor(SUPPLY_CONFIRM_ACTION, "interval-energy-time"))).toEqual({
       action: "confirm",

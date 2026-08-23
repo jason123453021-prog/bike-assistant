@@ -129,7 +129,10 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => startSupplyNotificationActionListener(), []);
+  useEffect(() => startSupplyNotificationActionListener({
+    // Android 允許使用者點擊通知所附的 PendingIntent 開啟 App；此處不會從背景強制切換 Activity。
+    onOpen: () => router.replace("/navigate"),
+  }), []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);

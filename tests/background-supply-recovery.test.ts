@@ -32,4 +32,29 @@ describe("background supply reminder recovery", () => {
     const mapSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"), "utf8");
     expect(mapSource.match(/void clearAllSupplyNotifications\(\);/g)?.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("將使用者點擊通知導回導航頁，並只恢復待確認彈窗而不把它當成已補給", () => {
+    const rootSource = readFileSync(resolve(process.cwd(), "app/_layout.tsx"), "utf8");
+    const mapSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"), "utf8");
+    const actionSource = readFileSync(resolve(process.cwd(), "lib/supply-notification-actions.ts"), "utf8");
+    expect(rootSource).toContain('onOpen: () => router.replace("/navigate")');
+    expect(actionSource).toContain('action.action === "open"');
+    expect(mapSource).toContain('if (action.action === "open")');
+    expect(mapSource).toContain('setCalorieAlert(true);');
+    expect(mapSource).toContain('setWaterAlert(true);');
+    expect(mapSource).toContain('不得視為已補給');
+  });
+
+  it("維持 Android 高優先級補給頻道、通知原生設定與定位前景服務", () => {
+    const feedbackSource = readFileSync(resolve(process.cwd(), "lib/feedback-service.ts"), "utf8");
+    const backgroundSource = readFileSync(resolve(process.cwd(), "lib/background-location.ts"), "utf8");
+    const configSource = readFileSync(resolve(process.cwd(), "app.config.ts"), "utf8");
+    expect(feedbackSource).toContain('setNotificationChannelAsync("supply"');
+    expect(feedbackSource).toContain("importance: Notifications.AndroidImportance.MAX");
+    expect(feedbackSource.match(/channelId: "supply"/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(backgroundSource).toContain("foregroundService:");
+    expect(backgroundSource).toContain("killServiceOnDestroy: false");
+    expect(configSource).toContain('"expo-notifications"');
+    expect(configSource).toContain("isAndroidForegroundServiceEnabled: true");
+  });
 });

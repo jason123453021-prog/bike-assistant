@@ -284,6 +284,7 @@ export async function showSupplyNotification(
         badge: 1,
         categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
         data: { type: "supply_reminder", supplyKind: type, customItemId },
+        ...(Platform.OS === "android" ? { channelId: "supply" } : {}),
       } as any,
       trigger: null,
     });

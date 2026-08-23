@@ -118,6 +118,14 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    [
+      "expo-notifications",
+      {
+        // 所有本機補給提醒會明確指定 supply；此處提供原生 fallback，避免未指定頻道時退回系統預設頻道。
+        defaultChannel: "supply",
+        enableBackgroundRemoteNotifications: false,
+      },
+    ],
     "expo-font",
     "expo-asset",
     [
