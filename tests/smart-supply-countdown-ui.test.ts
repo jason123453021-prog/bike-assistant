@@ -22,9 +22,11 @@ describe("smart supply countdown UI", () => {
   });
 
   it("initializes concrete smart countdowns at ride start without waiting for the first accepted GPS sample", () => {
-    expect(mapSource).toContain("const initialSupplyPlan = createSupplyPlan({");
-    expect(mapSource).toContain("elapsedSec: 0,");
-    expect(mapSource).toContain("weatherAvailable: false,");
+    expect(mapSource).toContain("getLastKnownPositionAsync({");
+    expect(mapSource).toContain("maxAge: 2 * 60 * 1000,");
+    expect(mapSource).toContain("const initialSupplyPlanInput = buildInitialSupplyPlanInput({");
+    expect(mapSource).toContain("const initialSupplyPlan = createSupplyPlan(initialSupplyPlanInput);");
+    expect(mapSource).toContain("resolveInitialWeather");
     expect(mapSource).toContain('lastBackgroundCountdownSnapshotRef.current = "";');
     expect(mapSource).toContain("syncSmartSupplyCountdown(createSmartSupplyCountdown(initialSupplyPlan, 0));");
   });

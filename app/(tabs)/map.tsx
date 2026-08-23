@@ -107,6 +107,7 @@ import {
   calculatePersonalizedCalories,
 } from "@/lib/personalized-ride-calculations";
 import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
+import { buildInitialSupplyPlanInput } from "@/lib/initial-supply-plan";
 import { resolveSmartSupplyChannels } from "@/lib/smart-supply-channels";
 import {
   createSmartSupplyCountdown,
@@ -1364,6 +1365,20 @@ export default function MapScreen() {
     }
   }, []);
 
+  const resolveInitialWeather = useCallback(async (latitude: number, longitude: number): Promise<WeatherData | null> => {
+    if (weatherRef.current) return weatherRef.current;
+    const weatherWithinStartBudget = await Promise.race<WeatherData | null>([
+      fetchWeather(latitude, longitude),
+      new Promise((resolve) => setTimeout(() => resolve(null), 900)),
+    ]);
+    if (!weatherWithinStartBudget) return null;
+    setWeather(weatherWithinStartBudget);
+    weatherRef.current = weatherWithinStartBudget;
+    windDataRef.current = { speed: weatherWithinStartBudget.windSpeed / 3.6, direction: weatherWithinStartBudget.windDirection };
+    airDensityRef.current = calcAirDensity(weatherWithinStartBudget.temperature, weatherWithinStartBudget.humidity);
+    return weatherWithinStartBudget;
+  }, []);
+
   const speakPlannedSupplyReminder = useCallback(
     (type: "calorie" | "water") => {
       if (!settings.ttsEnabled) return;
@@ -2395,6 +2410,13 @@ export default function MapScreen() {
       Alert.alert("無法確認定位狀態", "請確認定位服務與權限後再試一次。");
       return;
     }
+    const initialKnownLocation = await Location.getLastKnownPositionAsync({
+      maxAge: 2 * 60 * 1000,
+      requiredAccuracy: 100,
+    }).catch(() => null);
+    const initialWeather = initialKnownLocation
+      ? await resolveInitialWeather(initialKnownLocation.coords.latitude, initialKnownLocation.coords.longitude)
+      : weatherRef.current;
     if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
     idlePauseTimerRef.current = null;
     pausedAtRef.current = null;
@@ -2421,24 +2443,30 @@ export default function MapScreen() {
     };
     calorieReminderSentRef.current = false;
     waterReminderSentRef.current = false;
-    // 新騎乘必須立即建立本機倒數：首筆有效 GPS／速度樣本到來前，仍可用個人資料與
-    // 離線基準產生可解釋的時間；之後只更新建議量，不重設既有倒數。
-    const initialSupplyPlan = createSupplyPlan({
+    // 首輪直接使用可信快取位置、快取／短時限天氣與物理功率推導；資料不足時才回退離線基準。
+    // 後續 GPS／天氣僅更新建議量，不重設已建立的倒數。
+    const initialSupplyPlanInput = buildInitialSupplyPlanInput({
       mode: settings.supplyCalculationMode,
       sportType: state.sportType,
       calorieThresholdKcal: settings.calorieThreshold,
       waterThresholdMl: hydrationThresholdMl,
-      elapsedSec: 0,
       riderWeightKg: settings.weight,
+      riderHeightCm: settings.height,
+      riderAgeYears: estimateAgeYears ?? 32,
+      bikeWeightKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG,
       ftpW: estimateFtpW,
-      intensityFactor: 0.65,
-      sweatRatePerHour: 550,
-      environmentLoad: 0,
-      weatherAvailable: false,
+      sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
       energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
       energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
       energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+      snapshot: {
+        speedMs: initialKnownLocation?.coords.speed,
+        headingDeg: initialKnownLocation?.coords.heading,
+        gradePct: currentGrade,
+        weather: initialWeather,
+      },
     });
+    const initialSupplyPlan = createSupplyPlan(initialSupplyPlanInput);
     setActiveSupplyPlan(initialSupplyPlan);
     lastBackgroundCountdownSnapshotRef.current = "";
     syncSmartSupplyCountdown(null);
@@ -2510,7 +2538,7 @@ export default function MapScreen() {
     }
 
     // 初始化背景狀態（確保背景中能計算距離和觸發補給提醒）
-    const lastPos = await Location.getLastKnownPositionAsync();
+    const lastPos = initialKnownLocation ?? await Location.getLastKnownPositionAsync();
     await initBackgroundState({
       calorieThreshold: settings.calorieThreshold,
       waterThreshold: hydrationThresholdMl,
@@ -2571,13 +2599,13 @@ export default function MapScreen() {
       );
     }
 
-    const loc = await Location.getLastKnownPositionAsync();
+    const loc = initialKnownLocation ?? await Location.getLastKnownPositionAsync();
     if (loc) updateWeather(loc.coords.latitude, loc.coords.longitude);
     weatherTimerRef.current = setInterval(async () => {
       const l = await Location.getLastKnownPositionAsync();
       if (l) updateWeather(l.coords.latitude, l.coords.longitude);
     }, WEATHER_INTERVAL);
-  }, [clearIntervalSupplyRepeatTimer, currentPos, dispatch, estimateAgeYears, estimateFtpW, hydrationThresholdMl, gpxRoute, settings, smartEnergySupplyEnabled, smartWaterSupplyEnabled, state.sportType, syncSmartSupplyCountdown, updateWeather, calorieAnim, waterAnim]);
+  }, [clearIntervalSupplyRepeatTimer, currentGrade, currentPos, dispatch, estimateAgeYears, estimateFtpW, hydrationThresholdMl, gpxRoute, resolveInitialWeather, settings, smartEnergySupplyEnabled, smartWaterSupplyEnabled, state.sportType, syncSmartSupplyCountdown, updateWeather, calorieAnim, waterAnim]);
 
   useEffect(() => {
     if (!mapRideActive) return;
