@@ -1,0 +1,10 @@
+{
+  "common": { "systemDefault": "System Default", "language": "Language", "settings": "Settings", "cancel": "Cancel", "close": "Close", "save": "Save", "done": "Done" },
+  "tabs": { "navigation": "Navigation", "routes": "Routes", "history": "History", "settings": "Settings" },
+  "sports": { "cycling": "Cycling", "running": "Running", "hiking": "Hiking", "trailRunning": "Trail Running" },
+  "dashboard": { "speed": "Speed", "avgSpeed": "Avg Speed", "maxSpeed": "Max Speed", "distance": "Distance", "movingTime": "Moving Time", "elapsedTime": "Elapsed Time", "currentPace": "Current Pace", "avgPace": "Avg Pace", "altitude": "Altitude", "elevationGain": "Elevation Gain", "climbRate": "Climb Rate", "grade": "Grade", "power": "Power", "calories": "Calories" },
+  "navigation": { "courseNavigation": "Course Navigation", "turnLeft": "Turn left", "turnRight": "Turn right", "continueStraight": "Continue straight", "offCourse": "Off course", "approachingTurn": "Turn ahead" },
+  "summary": { "rideSummary": "Ride Summary", "movingTime": "Moving Time", "elapsedTime": "Elapsed Time", "elevationGain": "Elevation Gain", "avgSpeed": "Avg Speed", "maxSpeed": "Max Speed", "share": "Share", "saveAndFinish": "Save & Finish" },
+  "settings": { "displayAppearance": "Display & Appearance", "systemData": "System & Data", "languageTitle": "Language", "languageHint": "Choose an app language or follow your device setting. Changes apply immediately and stay on this device.", "followSystem": "System Default" },
+  "supply": { "smartSupply": "Smart Supply", "smartHydration": "Smart Hydration", "autoPause": "Auto Pause" }
+}

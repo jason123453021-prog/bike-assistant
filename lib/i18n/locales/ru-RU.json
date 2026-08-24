@@ -1,0 +1,10 @@
+{
+  "common": { "systemDefault": "Системный язык", "language": "Язык", "settings": "Настройки", "cancel": "Отмена", "close": "Закрыть", "save": "Сохранить", "done": "Готово" },
+  "tabs": { "navigation": "Навигация", "routes": "Маршруты", "history": "История", "settings": "Настройки" },
+  "sports": { "cycling": "Велоспорт", "running": "Бег", "hiking": "Поход", "trailRunning": "Трейлраннинг" },
+  "dashboard": { "speed": "Скорость", "avgSpeed": "Средняя скорость", "maxSpeed": "Максимальная скорость", "distance": "Расстояние", "movingTime": "Время в движении", "elapsedTime": "Прошедшее время", "currentPace": "Текущий темп", "avgPace": "Средний темп", "altitude": "Высота", "elevationGain": "Набор высоты", "climbRate": "Скорость подъёма", "grade": "Уклон", "power": "Мощность", "calories": "Калории" },
+  "navigation": { "courseNavigation": "Навигация по маршруту", "turnLeft": "Поверните налево", "turnRight": "Поверните направо", "continueStraight": "Двигайтесь прямо", "offCourse": "Вы вне маршрута", "approachingTurn": "Скоро поворот" },
+  "summary": { "rideSummary": "Сводка поездки", "movingTime": "Время в движении", "elapsedTime": "Прошедшее время", "elevationGain": "Набор высоты", "avgSpeed": "Средняя скорость", "maxSpeed": "Максимальная скорость", "share": "Поделиться", "saveAndFinish": "Сохранить и завершить" },
+  "settings": { "displayAppearance": "Экран и оформление", "systemData": "Система и данные", "languageTitle": "Язык", "languageHint": "Выберите язык приложения или используйте настройку устройства. Изменения применяются сразу и хранятся только на этом устройстве.", "followSystem": "Системный язык" },
+  "supply": { "smartSupply": "Умное питание", "smartHydration": "Умная гидратация", "autoPause": "Автопауза" }
+}

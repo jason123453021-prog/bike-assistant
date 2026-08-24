@@ -1,0 +1,10 @@
+{
+  "common": { "systemDefault": "Impostazione di sistema", "language": "Lingua", "settings": "Impostazioni", "cancel": "Annulla", "close": "Chiudi", "save": "Salva", "done": "Fine" },
+  "tabs": { "navigation": "Navigazione", "routes": "Percorsi", "history": "Cronologia", "settings": "Impostazioni" },
+  "sports": { "cycling": "Ciclismo", "running": "Corsa", "hiking": "Escursionismo", "trailRunning": "Trail running" },
+  "dashboard": { "speed": "Velocità", "avgSpeed": "Velocità media", "maxSpeed": "Velocità massima", "distance": "Distanza", "movingTime": "Tempo in movimento", "elapsedTime": "Tempo trascorso", "currentPace": "Passo attuale", "avgPace": "Passo medio", "altitude": "Altitudine", "elevationGain": "Dislivello positivo", "climbRate": "Velocità di salita", "grade": "Pendenza", "power": "Potenza", "calories": "Calorie" },
+  "navigation": { "courseNavigation": "Navigazione percorso", "turnLeft": "Svolta a sinistra", "turnRight": "Svolta a destra", "continueStraight": "Prosegui dritto", "offCourse": "Fuori percorso", "approachingTurn": "Svolta in arrivo" },
+  "summary": { "rideSummary": "Riepilogo attività", "movingTime": "Tempo in movimento", "elapsedTime": "Tempo trascorso", "elevationGain": "Dislivello positivo", "avgSpeed": "Velocità media", "maxSpeed": "Velocità massima", "share": "Condividi", "saveAndFinish": "Salva e termina" },
+  "settings": { "displayAppearance": "Display e aspetto", "systemData": "Sistema e dati", "languageTitle": "Lingua", "languageHint": "Scegli una lingua per l'app o segui l'impostazione del dispositivo. Le modifiche vengono applicate subito e salvate solo su questo dispositivo.", "followSystem": "Impostazione di sistema" },
+  "supply": { "smartSupply": "Rifornimento intelligente", "smartHydration": "Idratazione intelligente", "autoPause": "Pausa automatica" }
+}

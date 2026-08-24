@@ -12,6 +12,7 @@ import {
 } from "./live-ride-readings";
 import { DEFAULT_ROAD_BIKE_MASS_KG } from "./power-calc";
 import type { SportType } from "./sport-metrics";
+import { isLanguagePreference, type LanguagePreference } from "./i18n/types";
 
 export const MIN_BIKE_WEIGHT_KG = 3;
 export const MAX_BIKE_WEIGHT_KG = 35;
@@ -152,6 +153,8 @@ export interface AppSettings {
   defaultSportType: SportType;
   /** 跟隨系統、固定淺色或固定深色的全域外觀偏好。 */
   appearanceMode: AppearanceMode;
+  /** Local-First 語言偏好；system 會在 App 回前景時重新讀取裝置語系。 */
+  languagePreference: LanguagePreference;
   /** 預設使用本機歷史推定 FTP 與心率基準；關閉後才完全採用手動數值。 */
   autoPersonalMetricsEnabled: boolean;
   /** 騎乘完成後自動寫入 App 推定 RPE；使用者仍可於活動編輯手動覆寫。 */
@@ -271,6 +274,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoLapDistanceKm: 5,
   defaultSportType: "cycling",
   appearanceMode: "system",
+  languagePreference: "system",
   autoPersonalMetricsEnabled: true,
   autoRpeEnabled: true,
   maxHeartRate: 200,
@@ -474,6 +478,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           autoLapDistanceKm: normalizeAutoLapDistanceKm(saved.autoLapDistanceKm),
           defaultSportType: normalizeDefaultSportType(saved.defaultSportType),
           appearanceMode: saved.appearanceMode === "light" || saved.appearanceMode === "dark" ? saved.appearanceMode : "system",
+          languagePreference: isLanguagePreference(saved.languagePreference) ? saved.languagePreference : "system",
           energyServingCarbohydrateG: Math.min(100, Math.max(10, Number(saved.energyServingCarbohydrateG) || DEFAULT_SETTINGS.energyServingCarbohydrateG)),
           energyCarbohydrateHourlyLimitMode: saved.energyCarbohydrateHourlyLimitMode === "manual" ? "manual" : "science",
           energyCarbohydrateHourlyLimitG: Math.min(90, Math.max(20, Number(saved.energyCarbohydrateHourlyLimitG) || DEFAULT_SETTINGS.energyCarbohydrateHourlyLimitG)),
@@ -508,6 +513,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       appearanceMode: partial.appearanceMode === "light" || partial.appearanceMode === "dark" || partial.appearanceMode === "system"
         ? partial.appearanceMode
         : settings.appearanceMode,
+      languagePreference: isLanguagePreference(partial.languagePreference)
+        ? partial.languagePreference
+        : settings.languagePreference,
       age: calculateAgeFromBirthday(birthday) ?? settings.age,
       smartEnergySupplyEnabled: nextEnergySmartEnabled,
       smartWaterSupplyEnabled: nextWaterSmartEnabled,

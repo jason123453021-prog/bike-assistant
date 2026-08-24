@@ -1,0 +1,10 @@
+{
+  "common": { "systemDefault": "跟随系统", "language": "语言", "settings": "设置", "cancel": "取消", "close": "关闭", "save": "保存", "done": "完成" },
+  "tabs": { "navigation": "导航", "routes": "路线", "history": "记录", "settings": "设置" },
+  "sports": { "cycling": "骑行", "running": "跑步", "hiking": "徒步", "trailRunning": "越野跑" },
+  "dashboard": { "speed": "速度", "avgSpeed": "平均速度", "maxSpeed": "最高速度", "distance": "距离", "movingTime": "移动时间", "elapsedTime": "总时间", "currentPace": "当前配速", "avgPace": "平均配速", "altitude": "当前海拔", "elevationGain": "累计爬升", "climbRate": "爬升速度", "grade": "当前坡度", "power": "功率", "calories": "卡路里" },
+  "navigation": { "courseNavigation": "轨迹导航", "turnLeft": "左转", "turnRight": "右转", "continueStraight": "直行", "offCourse": "已偏离路线", "approachingTurn": "前方转弯" },
+  "summary": { "rideSummary": "骑行摘要", "movingTime": "移动时间", "elapsedTime": "总时间", "elevationGain": "累计爬升", "avgSpeed": "平均速度", "maxSpeed": "最高速度", "share": "分享", "saveAndFinish": "保存并完成" },
+  "settings": { "displayAppearance": "显示与外观", "systemData": "系统与数据管理", "languageTitle": "语言", "languageHint": "选择 App 语言或跟随设备设置；变更会立即生效并仅保留在此设备。", "followSystem": "跟随系统" },
+  "supply": { "smartSupply": "智能补给", "smartHydration": "智能补水", "autoPause": "自动暂停" }
+}

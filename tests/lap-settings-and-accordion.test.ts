@@ -50,7 +50,7 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
   it("設定頁預設只顯示四個高層分類，並保有動畫與主題選擇", () => {
     expect(settingsSource).toContain("騎乘與儀表板設定");
     expect(settingsSource).toContain("補給與提醒設定");
-    expect(settingsSource).toContain("顯示與外觀");
+    expect(settingsSource).toContain('title={t("settings.displayAppearance")}');
     expect(settingsSource).toContain("系統與資料管理");
     expect(settingsSource).toContain("LayoutAnimation.configureNext");
     expect(settingsSource).toContain("外觀主題");

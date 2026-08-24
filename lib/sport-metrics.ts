@@ -29,6 +29,12 @@ export interface SportDashboardMetric {
   unit: string;
 }
 
+export type SportMetricTranslator = (key: string) => string;
+
+function metricLabel(translate: SportMetricTranslator | undefined, key: string, fallback: string): string {
+  return translate?.(key) || fallback;
+}
+
 export const SPORT_META: Record<SportType, { label: string; icon: string; gpxType: string; accent: string }> = {
   cycling: { label: "單車", icon: "🚴", gpxType: "Cycling", accent: "#00C853" },
   running: { label: "跑步", icon: "🏃", gpxType: "Running", accent: "#FF6B00" },
@@ -161,39 +167,39 @@ export function buildSportDashboardMetrics(params: {
   gradePct: number;
   gapPaceSecPerKm?: number | null;
   vamMPerHour?: number;
-}): SportDashboardMetric[] {
+}, translate?: SportMetricTranslator): SportDashboardMetric[] {
   const distance = (Math.max(0, params.distanceM) / 1000).toFixed(2);
   const elapsed = `${Math.floor(params.elapsedSec / 3600).toString().padStart(2, "0")}:${Math.floor((params.elapsedSec % 3600) / 60).toString().padStart(2, "0")}`;
   if (params.sportType === "running") {
     return [
-      { label: "當前配速", value: formatPaceFromKmh(params.speedKmh), unit: "/km" },
-      { label: "平均配速", value: formatPaceFromKmh(params.averageSpeedKmh), unit: "/km" },
-      { label: "距離", value: distance, unit: "km" },
-      { label: "運動時間", value: elapsed, unit: "" },
+      { label: metricLabel(translate, "dashboard.currentPace", "當前配速"), value: formatPaceFromKmh(params.speedKmh), unit: "/km" },
+      { label: metricLabel(translate, "dashboard.avgPace", "平均配速"), value: formatPaceFromKmh(params.averageSpeedKmh), unit: "/km" },
+      { label: metricLabel(translate, "dashboard.distance", "距離"), value: distance, unit: "km" },
+      { label: metricLabel(translate, "dashboard.elapsedTime", "運動時間"), value: elapsed, unit: "" },
     ];
   }
   if (params.sportType === "hiking") {
     return [
-      { label: "目前海拔", value: Math.round(params.altitudeM).toString(), unit: "m" },
-      { label: "總爬升", value: Math.round(params.totalAscentM).toString(), unit: "m" },
-      { label: "爬升速度", value: Math.round(params.vamMPerHour ?? 0).toString(), unit: "m/h" },
-      { label: "目前坡度", value: params.gradePct.toFixed(1), unit: "%" },
-      { label: "距離", value: distance, unit: "km" },
+      { label: metricLabel(translate, "dashboard.altitude", "目前海拔"), value: Math.round(params.altitudeM).toString(), unit: "m" },
+      { label: metricLabel(translate, "dashboard.elevationGain", "總爬升"), value: Math.round(params.totalAscentM).toString(), unit: "m" },
+      { label: metricLabel(translate, "dashboard.climbRate", "爬升速度"), value: Math.round(params.vamMPerHour ?? 0).toString(), unit: "m/h" },
+      { label: metricLabel(translate, "dashboard.grade", "目前坡度"), value: params.gradePct.toFixed(1), unit: "%" },
+      { label: metricLabel(translate, "dashboard.distance", "距離"), value: distance, unit: "km" },
     ];
   }
   if (params.sportType === "trail_running") {
     return [
-      { label: "當前配速", value: formatPaceFromKmh(params.speedKmh), unit: "/km" },
+      { label: metricLabel(translate, "dashboard.currentPace", "當前配速"), value: formatPaceFromKmh(params.speedKmh), unit: "/km" },
       { label: "GAP", value: formatPaceSeconds(params.gapPaceSecPerKm ?? null), unit: "/km" },
-      { label: "總爬升", value: Math.round(params.totalAscentM).toString(), unit: "m" },
-      { label: "目前海拔", value: Math.round(params.altitudeM).toString(), unit: "m" },
-      { label: "距離", value: distance, unit: "km" },
+      { label: metricLabel(translate, "dashboard.elevationGain", "總爬升"), value: Math.round(params.totalAscentM).toString(), unit: "m" },
+      { label: metricLabel(translate, "dashboard.altitude", "目前海拔"), value: Math.round(params.altitudeM).toString(), unit: "m" },
+      { label: metricLabel(translate, "dashboard.distance", "距離"), value: distance, unit: "km" },
     ];
   }
   return [
-    { label: "速度", value: params.speedKmh > 0 ? params.speedKmh.toFixed(1) : "--", unit: "km/h" },
-    { label: "平均速度", value: params.averageSpeedKmh > 0 ? params.averageSpeedKmh.toFixed(1) : "--", unit: "km/h" },
-    { label: "距離", value: distance, unit: "km" },
-    { label: "運動時間", value: elapsed, unit: "" },
+    { label: metricLabel(translate, "dashboard.speed", "速度"), value: params.speedKmh > 0 ? params.speedKmh.toFixed(1) : "--", unit: "km/h" },
+    { label: metricLabel(translate, "dashboard.avgSpeed", "平均速度"), value: params.averageSpeedKmh > 0 ? params.averageSpeedKmh.toFixed(1) : "--", unit: "km/h" },
+    { label: metricLabel(translate, "dashboard.distance", "距離"), value: distance, unit: "km" },
+    { label: metricLabel(translate, "dashboard.elapsedTime", "運動時間"), value: elapsed, unit: "" },
   ];
 }

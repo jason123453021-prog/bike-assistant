@@ -46,6 +46,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import Svg, { Circle } from "react-native-svg";
+import { useTranslation } from "react-i18next";
 
 import { useRide } from "@/lib/ride-context";
 import {
@@ -92,6 +93,7 @@ import {
 } from "@/lib/power-calc";
 import { fetchWeather, getHeadwindMs, getRelativeWindInfo, type WeatherData } from "@/lib/weather-service";
 import { fetchBikeRoute, formatRouteDistance } from "@/lib/route-service";
+import { formatCourseNavigationPrompt } from "@/lib/i18n/course-navigation";
 import {
   formatNavigationDataFreshness,
   loadRecentAddressSearches,
@@ -246,6 +248,7 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 // ─── 主元件 ───────────────────────────────────────────────────────────────────
 
 export default function MapScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const dashboardColumnCount = fontScale >= 1.6 ? 2 : 3;
@@ -2626,9 +2629,8 @@ export default function MapScreen() {
         setTurnDirection('arrive');
         setTurnDistanceM(dEnd);
       } else if (nextTurn) {
-        const directionText = nextTurn.direction === "left" ? "左轉" : "右轉";
         const isNearTurn = nextTurn.distanceM <= TURN_SPEAK_DISTANCE_M;
-        const instruction = isNearTurn ? `前方${directionText}` : `${Math.round(nextTurn.distanceM)} 公尺後${directionText}`;
+        const instruction = formatCourseNavigationPrompt(t, nextTurn.direction, nextTurn.distanceM);
         if (shouldWakeForUpcomingTurn(nextTurn)) {
           powerSavingManagerRef.current.onTurnGuidance();
         }
@@ -2648,7 +2650,7 @@ export default function MapScreen() {
         setTurnDistanceM(0);
       }
     },
-    [gpxRoute, settings.ttsEnabled]
+    [gpxRoute, settings.ttsEnabled, t]
   );
 
   // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
@@ -3459,7 +3461,7 @@ export default function MapScreen() {
     gradePct: currentGrade,
     gapPaceSecPerKm: sportGapPace,
     vamMPerHour: sportVam,
-  }), [avgSpeed, currentGrade, sportGapPace, sportSpeedKmh, sportVam, state.currentAltitude, state.distance, state.elapsed, state.sportType, state.totalAscent]);
+  }, t), [avgSpeed, currentGrade, sportGapPace, sportSpeedKmh, sportVam, state.currentAltitude, state.distance, state.elapsed, state.sportType, state.totalAscent, t]);
 
   const calorieWidth = calorieAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"], extrapolate: "clamp" });
   const waterWidth = waterAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"], extrapolate: "clamp" });

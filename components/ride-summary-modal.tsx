@@ -24,6 +24,7 @@ import { buildActivityStatistics } from "@/lib/activity-statistics";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import type { RideSummarySnapshot } from "@/lib/ride-summary-snapshot";
 import { getLapPresentationMetrics } from "@/lib/lap-presentation";
+import { useTranslation } from "react-i18next";
 
 interface RideSummaryModalProps {
   visible: boolean;
@@ -80,6 +81,7 @@ function generateDefaultName(): string {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideSummaryModalProps) {
   const colors = useColors();
+  const { t } = useTranslation();
   const { state } = useRide();
 
   const [routeName, setRouteName] = useState("");
@@ -180,7 +182,7 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
         <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}>
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]}>騎乘摘要</Text>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>{t("summary.rideSummary")}</Text>
             <Pressable
               style={({ pressed }) => [styles.headerCloseButton, { opacity: pressed ? 0.6 : 1 }]}
               onPress={() => onClose()}
@@ -264,11 +266,11 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
             <View style={[styles.statsPanel, { borderColor: colors.border }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>核心數據</Text>
               <View style={styles.statsGrid}>
-                <StatCell label="距離" value={distKm} unit="km" colors={colors} />
-                <StatCell label="活動時間" value={formatDuration(activityStats.elapsedTimeSec)} unit="" colors={colors} />
-                <StatCell label="移動時間" value={formatDuration(activityStats.movingTimeSec)} unit="" colors={colors} />
-                <StatCell label="平均速度" value={activityStats.averageSpeedKmh.toFixed(1)} unit="km/h" colors={colors} />
-                <StatCell label="最高速度" value={activityStats.maxSpeedKmh.toFixed(1)} unit="km/h" colors={colors} />
+                <StatCell label={t("dashboard.distance")} value={distKm} unit="km" colors={colors} />
+                <StatCell label={t("summary.elapsedTime")} value={formatDuration(activityStats.elapsedTimeSec)} unit="" colors={colors} />
+                <StatCell label={t("summary.movingTime")} value={formatDuration(activityStats.movingTimeSec)} unit="" colors={colors} />
+                <StatCell label={t("summary.avgSpeed")} value={activityStats.averageSpeedKmh.toFixed(1)} unit="km/h" colors={colors} />
+                <StatCell label={t("summary.maxSpeed")} value={activityStats.maxSpeedKmh.toFixed(1)} unit="km/h" colors={colors} />
                 <StatCell label="消耗熱量" value={`${Math.round(activityStats.caloriesKcal)}`} unit="kcal（估算）" colors={colors} />
               </View>
             </View>
@@ -277,7 +279,7 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
             <View style={[styles.statsPanel, { borderColor: colors.border }]}>
               <Text style={[styles.panelTitle, { color: colors.foreground }]}>爬升與地形</Text>
               <View style={styles.statsGrid}>
-                <StatCell label="總爬升高度" value={`${Math.round(activityStats.totalAscentM)}`} unit="m" colors={colors} />
+                <StatCell label={t("summary.elevationGain")} value={`${Math.round(activityStats.totalAscentM)}`} unit="m" colors={colors} />
                 <StatCell label="總下降高度" value={`${Math.round(activityStats.totalDescentM)}`} unit="m" colors={colors} />
                 <StatCell label="最高海拔" value={activityStats.maxElevationM === undefined ? "--" : `${Math.round(activityStats.maxElevationM)}`} unit="m" colors={colors} />
                 <StatCell label="最低海拔" value={activityStats.minElevationM === undefined ? "--" : `${Math.round(activityStats.minElevationM)}`} unit="m" colors={colors} />
@@ -349,7 +351,7 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
               onPress={handleShare}
             >
               <IconSymbol name="square.and.arrow.up" size={18} color={colors.foreground} />
-              <Text style={[styles.shareBtnText, { color: colors.foreground }]}>分享騎乘記錄</Text>
+              <Text style={[styles.shareBtnText, { color: colors.foreground }]}>{t("summary.share")}</Text>
             </Pressable>
 
             {/* Save & Close Button */}
@@ -361,7 +363,7 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
               onPress={handleSave}
             >
               <IconSymbol name="checkmark.circle.fill" size={20} color={colors.onAccent} />
-              <Text style={[styles.saveBtnText, { color: colors.onAccent }]}>儲存並完成</Text>
+              <Text style={[styles.saveBtnText, { color: colors.onAccent }]}>{t("summary.saveAndFinish")}</Text>
             </Pressable>
           </ScrollView>
         </SafeAreaView>

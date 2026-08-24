@@ -32,6 +32,9 @@ import { calculateAgeFromBirthday, normalizeBirthday } from "@/lib/personal-prof
 import { RidePermissionReadiness } from "@/components/ride-permission-readiness";
 import { TOUCH_GUARD_UNLOCK_HOLD_PRESETS } from "@/lib/live-ride-readings";
 import { resolveCarbohydrateHourlyLimit } from "@/lib/smart-supply-plan";
+import { useTranslation } from "react-i18next";
+import { LANGUAGE_NATIVE_NAMES, SUPPORTED_LOCALES } from "@/lib/i18n/i18n";
+import { useLanguage } from "@/lib/i18n/language-provider";
 
 
 import Constants from "expo-constants";
@@ -44,6 +47,8 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function SettingsScreen() {
   const colors = useColors();
+  const { t } = useTranslation();
+  const { preference: languagePreference, activeLanguage, setLanguagePreference } = useLanguage();
   const { themePreference, setThemePreference } = useThemeContext();
   const { settings, updateSettings, resetAllSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
   const { state: rideState } = useRide();
@@ -69,6 +74,10 @@ export default function SettingsScreen() {
   const [powerSavingSettings, setPowerSavingSettings] = useState<PowerSavingSettings>(
     powerSavingManagerRef.current.getSettings(),
   );
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const selectedLanguageLabel = languagePreference === "system"
+    ? t("settings.followSystem")
+    : LANGUAGE_NATIVE_NAMES[languagePreference];
 
   useEffect(() => {
     let mounted = true;
@@ -936,7 +945,7 @@ export default function SettingsScreen() {
 
         <SettingsCategory
           icon="moon.fill"
-          title="顯示與外觀"
+          title={t("settings.displayAppearance")}
           subtitle="主題、螢幕常亮、省電與儀表版面"
           colors={colors}
           expanded={Boolean(openCategories.display)}
@@ -969,6 +978,26 @@ export default function SettingsScreen() {
               );
             })}
           </View>
+        </View>
+        <View style={[styles.appearanceCard, { borderColor: colors.border, backgroundColor: colors.surface, marginTop: 12 }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${t("settings.languageTitle")}：${selectedLanguageLabel}`}
+            onPress={() => setLanguageModalVisible(true)}
+            style={({ pressed }) => [styles.row, { paddingHorizontal: 0, opacity: pressed ? 0.72 : 1 }]}
+          >
+            <IconSymbol name="gearshape.fill" size={18} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>{t("settings.languageTitle")}</Text>
+              <Text style={[styles.rowHint, { color: colors.muted }]}>{t("settings.languageHint")}</Text>
+            </View>
+            <View style={{ alignItems: "flex-end", gap: 2 }}>
+              <Text style={{ color: colors.primary, fontSize: 14, fontWeight: "800" }}>{selectedLanguageLabel}</Text>
+              {languagePreference === "system" && (
+                <Text style={{ color: colors.muted, fontSize: 11 }}>{activeLanguage}</Text>
+              )}
+            </View>
+          </Pressable>
         </View>
         {/* ── 智慧省電模式 ── */}
         <SectionHeader title="智慧省電模式" colors={colors} onToggle={() => toggleSection("powerSaving")} collapsed={collapsedSections["powerSaving"]} />
@@ -1433,6 +1462,65 @@ export default function SettingsScreen() {
         </View>
         </SettingsCategory>
       </ScrollView>
+
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <SafeAreaView style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }]}>
+          <View style={[styles.editCard, { backgroundColor: colors.surface, borderColor: colors.border, width: "100%", maxWidth: 640, maxHeight: "86%", borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={[styles.editTitle, { color: colors.foreground }]}>{t("settings.languageTitle")}</Text>
+                <Text style={[styles.rowHint, { color: colors.muted }]}>{t("settings.languageHint")}</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("common.close")}
+                onPress={() => setLanguageModalVisible(false)}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
+              >
+                <IconSymbol name="xmark.circle.fill" size={24} color={colors.muted} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 8, paddingBottom: 8 }}>
+              {(["system", ...SUPPORTED_LOCALES] as const).map((option) => {
+                const selected = languagePreference === option;
+                const label = option === "system" ? t("settings.followSystem") : LANGUAGE_NATIVE_NAMES[option];
+                return (
+                  <Pressable
+                    key={option}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={label}
+                    onPress={() => {
+                      void setLanguagePreference(option).finally(() => setLanguageModalVisible(false));
+                    }}
+                    style={({ pressed }) => [{
+                      minHeight: 52,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingHorizontal: 14,
+                      borderRadius: 12,
+                      marginBottom: 6,
+                      backgroundColor: selected ? `${colors.accent}20` : colors.background,
+                      borderWidth: 1,
+                      borderColor: selected ? colors.accent : colors.border,
+                      opacity: pressed ? 0.72 : 1,
+                    }]}
+                  >
+                    <Text style={{ color: selected ? colors.accent : colors.foreground, fontSize: 16, fontWeight: selected ? "800" : "600" }}>{label}</Text>
+                    <Text style={{ color: selected ? colors.accent : colors.muted, fontSize: 16, fontWeight: "900" }}>{selected ? "✓" : ""}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       {/* Edit Modal */}
       <Modal

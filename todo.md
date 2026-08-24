@@ -2449,3 +2449,11 @@
 - [x] 建立靜態封版守門，禁止手動 Lap、日出日落提醒、Kalman Filter 與 FIT timer time 綁定錯誤回歸
 - [x] 建立 Android E2E 腳本及 CI 執行路徑，並明確區分可自動執行與受模擬器／原生環境限制的案例
 - [x] 執行全套測試、修正可重現失敗、產出 Pass／Fail 報告、checkpoint 與 GitHub artifact（Android E2E run 32753570646 成功；`bike-assistant-maestro-e2e` 335,773 bytes，JUnit 1 test／0 failures）
+
+## Local-First i18n 與語言切換（2026-08-25）
+- [x] 盤點設定儲存、全域 Provider、核心 UI 字串與既有測試，定義 12 種語言與系統回退策略
+- [x] 整合 i18next、react-i18next、expo-localization 與 AsyncStorage 語言偏好持久化
+- [x] 建立 12 種語系字典與單車專有術語，提供 missing-key 英文 fallback
+- [x] 在設定頁新增 Local-First 語言選擇 Modal，支援跟隨系統與即時全域切換
+- [x] 抽取核心儀表、導航提示與騎乘摘要字串，並新增日英切換與核心回歸測試
+- [ ] 完成完整品質檢查、GitHub Actions 建置與驗收連結

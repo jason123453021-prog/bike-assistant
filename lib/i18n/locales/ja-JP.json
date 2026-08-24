@@ -1,0 +1,10 @@
+{
+  "common": { "systemDefault": "システム設定", "language": "言語", "settings": "設定", "cancel": "キャンセル", "close": "閉じる", "save": "保存", "done": "完了" },
+  "tabs": { "navigation": "ナビ", "routes": "ルート", "history": "履歴", "settings": "設定" },
+  "sports": { "cycling": "サイクリング", "running": "ランニング", "hiking": "ハイキング", "trailRunning": "トレイルランニング" },
+  "dashboard": { "speed": "速度", "avgSpeed": "平均速度", "maxSpeed": "最高速度", "distance": "距離", "movingTime": "移動時間", "elapsedTime": "経過時間", "currentPace": "現在のペース", "avgPace": "平均ペース", "altitude": "現在の標高", "elevationGain": "獲得標高", "climbRate": "上昇速度", "grade": "勾配", "power": "パワー", "calories": "カロリー" },
+  "navigation": { "courseNavigation": "コースナビゲーション", "turnLeft": "左折", "turnRight": "右折", "continueStraight": "直進", "offCourse": "コースを外れています", "approachingTurn": "まもなく曲がります" },
+  "summary": { "rideSummary": "ライド概要", "movingTime": "移動時間", "elapsedTime": "経過時間", "elevationGain": "獲得標高", "avgSpeed": "平均速度", "maxSpeed": "最高速度", "share": "共有", "saveAndFinish": "保存して終了" },
+  "settings": { "displayAppearance": "表示と外観", "systemData": "システムとデータ", "languageTitle": "言語", "languageHint": "アプリの言語を選択するか、端末の設定に従います。変更は直ちに反映され、この端末に保存されます。", "followSystem": "システム設定" },
+  "supply": { "smartSupply": "スマート補給", "smartHydration": "スマート水分補給", "autoPause": "自動一時停止" }
+}

@@ -4,6 +4,7 @@ import { Platform, StyleSheet , Text } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { HapticTab } from "@/components/haptic-tab";
 import { useColors } from "@/hooks/use-colors";
+import { useTranslation } from "react-i18next";
 
 function TabLabel({ label, focused, color }: { label: string; focused: boolean; color: string }) {
   return (
@@ -15,6 +16,7 @@ function TabLabel({ label, focused, color }: { label: string; focused: boolean; 
 
 export default function TabLayout() {
   const colors = useColors();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   // 移除友誼查詢邏輯
 
@@ -51,12 +53,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="map"
         options={{
-          title: "導航",
+          title: t("tabs.navigation"),
           tabBarIcon: ({ color, size }) => (
             <IconSymbol size={size} name="location.fill" color={color} />
           ),
           tabBarLabel: ({ focused, color }) => (
-            <TabLabel label="導航" focused={focused} color={color} />
+            <TabLabel label={t("tabs.navigation")} focused={focused} color={color} />
           ),
         }}
       />
@@ -65,12 +67,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="navigate"
         options={{
-          title: "路線分析",
+          title: t("tabs.routes"),
           tabBarIcon: ({ color, size }) => (
             <IconSymbol size={size} name="map.fill" color={color} />
           ),
           tabBarLabel: ({ focused, color }) => (
-            <TabLabel label="路線" focused={focused} color={color} />
+            <TabLabel label={t("tabs.routes")} focused={focused} color={color} />
           ),
         }}
       />
@@ -79,12 +81,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: "記錄",
+          title: t("tabs.history"),
           tabBarIcon: ({ color, size }) => (
             <IconSymbol size={size} name="clock.fill" color={color} />
           ),
           tabBarLabel: ({ focused, color }) => (
-            <TabLabel label="記錄" focused={focused} color={color} />
+            <TabLabel label={t("tabs.history")} focused={focused} color={color} />
           ),
         }}
       />
@@ -95,12 +97,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "設定",
+          title: t("tabs.settings"),
           tabBarIcon: ({ color, size }) => (
             <IconSymbol size={size} name="gearshape.fill" color={color} />
           ),
           tabBarLabel: ({ focused, color }) => (
-            <TabLabel label="設定" focused={focused} color={color} />
+            <TabLabel label={t("tabs.settings")} focused={focused} color={color} />
           ),
         }}
       />

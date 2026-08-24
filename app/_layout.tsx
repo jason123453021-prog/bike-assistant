@@ -22,6 +22,7 @@ import { RideProvider } from "@/lib/ride-context";
 import { GpxProvider, useGpx } from "@/lib/gpx-context";
 import { isExternalGpxUri } from "@/lib/external-gpx-import";
 import { SettingsProvider } from "@/lib/settings-context";
+import { LanguageProvider } from "@/lib/i18n/language-provider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clearLegacyFavoritesCache } from "@/lib/legacy-favorites-cleanup";
 // 移除社群和友誼相關 Provider
@@ -178,14 +179,16 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={hideNativeSplashAfterFirstLayout}>
       <AppErrorBoundary>
         <SettingsProvider>
-          <GpxProvider>
-            <ExternalGpxReceiver />
-            <RideProvider>
-              <ThemeProvider>
-                <InnerLayout />
-              </ThemeProvider>
-            </RideProvider>
-          </GpxProvider>
+          <LanguageProvider>
+            <GpxProvider>
+              <ExternalGpxReceiver />
+              <RideProvider>
+                <ThemeProvider>
+                  <InnerLayout />
+                </ThemeProvider>
+              </RideProvider>
+            </GpxProvider>
+          </LanguageProvider>
         </SettingsProvider>
       </AppErrorBoundary>
     </GestureHandlerRootView>

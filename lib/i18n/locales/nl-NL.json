@@ -1,0 +1,10 @@
+{
+  "common": { "systemDefault": "Systeemstandaard", "language": "Taal", "settings": "Instellingen", "cancel": "Annuleren", "close": "Sluiten", "save": "Opslaan", "done": "Gereed" },
+  "tabs": { "navigation": "Navigatie", "routes": "Routes", "history": "Geschiedenis", "settings": "Instellingen" },
+  "sports": { "cycling": "Fietsen", "running": "Hardlopen", "hiking": "Wandelen", "trailRunning": "Trailrunning" },
+  "dashboard": { "speed": "Snelheid", "avgSpeed": "Gem. snelheid", "maxSpeed": "Max. snelheid", "distance": "Afstand", "movingTime": "Beweegtijd", "elapsedTime": "Verstreken tijd", "currentPace": "Huidig tempo", "avgPace": "Gemiddeld tempo", "altitude": "Hoogte", "elevationGain": "Hoogtemeters", "climbRate": "Klimsnelheid", "grade": "Helling", "power": "Vermogen", "calories": "Calorieën" },
+  "navigation": { "courseNavigation": "Cursusnavigatie", "turnLeft": "Sla linksaf", "turnRight": "Sla rechtsaf", "continueStraight": "Ga rechtdoor", "offCourse": "Buiten route", "approachingTurn": "Bocht nadert" },
+  "summary": { "rideSummary": "Activiteitsoverzicht", "movingTime": "Beweegtijd", "elapsedTime": "Verstreken tijd", "elevationGain": "Hoogtemeters", "avgSpeed": "Gem. snelheid", "maxSpeed": "Max. snelheid", "share": "Delen", "saveAndFinish": "Opslaan en afronden" },
+  "settings": { "displayAppearance": "Weergave en uiterlijk", "systemData": "Systeem en gegevens", "languageTitle": "Taal", "languageHint": "Kies een app-taal of volg de apparaatinstelling. Wijzigingen worden direct toegepast en alleen op dit apparaat bewaard.", "followSystem": "Systeemstandaard" },
+  "supply": { "smartSupply": "Slimme voeding", "smartHydration": "Slimme hydratatie", "autoPause": "Automatisch pauzeren" }
+}
