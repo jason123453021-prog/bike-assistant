@@ -25,6 +25,16 @@ const PENDING_ACTIONS_KEY = "@bike_pending_supply_notification_actions";
 
 const listeners = new Set<() => void>();
 
+export interface SupplyNotificationActionListenerOptions {
+  /** 只有點擊通知本體或完成確認後，才導向可呈現騎乘狀態的畫面。 */
+  onOpen?: () => void;
+  /**
+   * Android 可能在導航頁尚未掛載前交付「已補給」動作。
+   * 此回呼用於先將確認結果寫回背景快照，避免舊的待確認旗標重現彈窗。
+   */
+  onConfirm?: (action: SupplyNotificationAction) => Promise<void> | void;
+}
+
 export async function configureSupplyNotificationActions(): Promise<void> {
   const Notifications = await getLocalNotifications();
   if (!Notifications) return;
@@ -74,8 +84,8 @@ export function subscribeToSupplyNotificationActions(listener: () => void): () =
   return () => listeners.delete(listener);
 }
 
-/** 在根布局啟動；通知回應會先保存，待導航頁可用時再同步處理。 */
-export function startSupplyNotificationActionListener(options?: { onOpen?: () => void }): () => void {
+/** 在根布局啟動；通知回應會先安全持久化，再交由導航頁同步畫面與本機倒數。 */
+export function startSupplyNotificationActionListener(options?: SupplyNotificationActionListenerOptions): () => void {
   let active = true;
   let subscription: { remove: () => void } | null = null;
 
@@ -84,20 +94,22 @@ export function startSupplyNotificationActionListener(options?: { onOpen?: () =>
     if (!Notifications || !active) return;
     await configureSupplyNotificationActions();
 
-    const handleResponse = (response: Parameters<typeof parseSupplyNotificationAction>[0]) => {
+    const handleResponse = async (response: Parameters<typeof parseSupplyNotificationAction>[0]) => {
       const action = parseSupplyNotificationAction(response);
       if (!action) return;
-      void queueSupplyNotificationAction(action).then(() => {
-        // 只有使用者點擊通知本體時才透過 Router 導向騎乘頁；不從背景工作強制啟動 Activity。
-        if (active && action.action === "open") options?.onOpen?.();
-      });
+      if (action.action === "confirm") {
+        await Promise.resolve(options?.onConfirm?.(action)).catch(() => {});
+      }
+      await queueSupplyNotificationAction(action).catch(() => {});
+      // 通知本體只開啟待確認 UI；「已補給」則在上方先完成持久化確認，再開啟畫面同步下一輪倒數。
+      if (active && (action.action === "open" || action.action === "confirm")) options?.onOpen?.();
     };
     const lastResponse = await Notifications.getLastNotificationResponseAsync().catch(() => null);
     if (lastResponse) {
-      handleResponse(lastResponse);
+      void handleResponse(lastResponse);
       await Notifications.clearLastNotificationResponseAsync().catch(() => {});
     }
-    subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+    subscription = Notifications.addNotificationResponseReceivedListener((response) => { void handleResponse(response); });
   })();
 
   return () => {

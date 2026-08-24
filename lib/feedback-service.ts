@@ -193,7 +193,7 @@ export async function scheduleSmartSupplyDueNotification(type: "calorie" | "wate
       identifier: SMART_SUPPLY_NOTIFICATION_IDS[type],
       content: {
         title: type === "calorie" ? "補給提醒" : "補水提醒",
-        body: type === "calorie" ? "請補給能量，完成後在 App 內確認。" : "請補給水分，完成後在 App 內確認。",
+        body: type === "calorie" ? "請補給能量；按「已補給」會直接開始下一輪。" : "請補充水分；按「已補給」會直接開始下一輪。",
         sound: true,
         badge: 1,
         categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
@@ -270,10 +270,10 @@ export async function showSupplyNotification(
         ? `建議補充約 ${recommendation.waterMl} ml 水分${recommendation.reason ? `；${recommendation.reason}` : ""}`
         : "水分不足，請補充水分！"
       : type === "custom-energy"
-        ? "自訂能量補給已到期，請在 App 內確認。"
+        ? "自訂能量補給已到期，按「已補給」會直接開始下一輪。"
         : type === "custom-water"
-          ? "自訂補水已到期，請在 App 內確認。"
-          : "已達補給間隔，請在 App 內確認。";
+          ? "自訂補水已到期，按「已補給」會直接開始下一輪。"
+          : "已達補給間隔，按「已補給」會直接開始下一輪。";
   try {
     await configureSupplyNotificationActions();
     await Notifications.scheduleNotificationAsync({

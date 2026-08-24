@@ -3,11 +3,18 @@ import type { LocationPoint, RideActivityType, RideCalculationProfile, RideLap, 
 import { calculateCalories, calculateCaloriesMET, calculatePower, DEFAULT_ROAD_BIKE_MASS_KG } from "./power-calc";
 import { acceptLiveElevationDelta, clampVirtualPowerForRider, createLiveElevationFilterState } from "./live-elevation-filter";
 import { hasReliableRideMovement } from "./live-ride-readings";
+import { MAX_CONTIGUOUS_GPS_STATISTICS_INTERVAL_SEC } from "./activity-statistics";
 import { analyzeTraining } from "./tss-calc";
 
 const EARTH_RADIUS_M = 6_371_000;
 const MIN_SUSTAINED_GRADE_DISTANCE_M = 40;
 const MAX_SUSTAINED_GRADE_PCT = 25;
+const MAX_ROUTE_SPEED_KMH = 110;
+const ROUTE_POWER_GRADE_WINDOW_M = 90;
+const ROUTE_POWER_GRADE_MIN_DISTANCE_M = 30;
+const ROUTE_POWER_ALTITUDE_SMOOTHING_WINDOW = 11;
+const TERRAIN_RECONCILIATION_RELATIVE_DRIFT = 0.15;
+const MIN_RECONSTRUCTED_MOVING_TIME_SEC = 15;
 
 function finiteNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -75,9 +82,10 @@ export function calculateRouteDistance(route: LocationPoint[]): number {
     const segmentDistance = distanceBetween(previous, current);
     const elapsedMs = current.timestamp - previous.timestamp;
     if (!Number.isFinite(segmentDistance) || segmentDistance < 0.5) continue;
-    if (!Number.isFinite(elapsedMs) || elapsedMs <= 0 || elapsedMs > 10_000) continue;
+    if (!Number.isFinite(elapsedMs) || elapsedMs <= 0 || elapsedMs > MAX_CONTIGUOUS_GPS_STATISTICS_INTERVAL_SEC * 1_000) continue;
     const impliedSpeedKmh = (segmentDistance / (elapsedMs / 1_000)) * 3.6;
-    if (impliedSpeedKmh > 110) continue;
+    const reportedSpeedKmh = current.speed !== null && Number.isFinite(current.speed) ? current.speed * 3.6 : 0;
+    if (impliedSpeedKmh > MAX_ROUTE_SPEED_KMH && reportedSpeedKmh > MAX_ROUTE_SPEED_KMH) continue;
     distanceM += segmentDistance;
   }
   return distanceM;
@@ -95,11 +103,12 @@ export function calculateRouteMovingTime(route: LocationPoint[]): number {
     if (current.segmentStart) continue;
     const elapsedSec = (current.timestamp - previous.timestamp) / 1000;
     const distanceM = distanceBetween(previous, current);
-    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 10 || !Number.isFinite(distanceM) || distanceM > 250) continue;
+    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > MAX_CONTIGUOUS_GPS_STATISTICS_INTERVAL_SEC || !Number.isFinite(distanceM)) continue;
     const derivedSpeedKmh = (distanceM / elapsedSec) * 3.6;
     const speedKmh = current.speed !== null && Number.isFinite(current.speed)
       ? Math.max(0, current.speed * 3.6)
       : derivedSpeedKmh;
+    if (derivedSpeedKmh > MAX_ROUTE_SPEED_KMH && speedKmh > MAX_ROUTE_SPEED_KMH) continue;
     if (hasReliableRideMovement({ speedKmh, distanceM, accuracyM: 0 })) {
       movingSeconds += elapsedSec;
     }
@@ -116,11 +125,12 @@ export function calculateRouteMaxSpeed(route: LocationPoint[]): number | undefin
     if (current.segmentStart) continue;
     const elapsedSec = (current.timestamp - previous.timestamp) / 1_000;
     const distanceM = distanceBetween(previous, current);
-    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 10 || !Number.isFinite(distanceM) || distanceM > 250) continue;
+    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > MAX_CONTIGUOUS_GPS_STATISTICS_INTERVAL_SEC || !Number.isFinite(distanceM)) continue;
     const derivedSpeedKmh = (distanceM / elapsedSec) * 3.6;
     const speedKmh = current.speed !== null && Number.isFinite(current.speed) && current.speed > 0
       ? current.speed * 3.6
       : derivedSpeedKmh;
+    if (derivedSpeedKmh > MAX_ROUTE_SPEED_KMH && speedKmh > MAX_ROUTE_SPEED_KMH) continue;
     if (speedKmh > 0 && speedKmh <= 120 && hasReliableRideMovement({ speedKmh, distanceM, accuracyM: 0 })) {
       maxSpeedKmh = Math.max(maxSpeedKmh, speedKmh);
     }
@@ -192,6 +202,10 @@ function deriveEstimatedPowerHistory(route: LocationPoint[], profile: RideCalcul
   if (!profile || route.length < 2) return [];
   const samples: number[] = [];
   let previousSpeedMs: number | undefined;
+  let cumulativeDistanceM = 0;
+  const recentAltitudesM: number[] = [];
+  const gradeSamples: Array<{ distanceM: number; altitudeM: number }> = [];
+  const headwindMs = profile.environment?.averageHeadwindMs ?? 0;
   for (let index = 1; index < route.length; index += 1) {
     const previous = route[index - 1];
     const current = route[index];
@@ -201,20 +215,37 @@ function deriveEstimatedPowerHistory(route: LocationPoint[], profile: RideCalcul
     }
     const elapsedSec = (current.timestamp - previous.timestamp) / 1000;
     const distanceM = distanceBetween(previous, current);
-    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > 10 || !Number.isFinite(distanceM) || distanceM > 250) continue;
-    const speedMs = current.speed !== null && Number.isFinite(current.speed)
-      ? Math.max(0, current.speed)
+    if (!Number.isFinite(elapsedSec) || elapsedSec <= 0 || elapsedSec > MAX_CONTIGUOUS_GPS_STATISTICS_INTERVAL_SEC || !Number.isFinite(distanceM)) continue;
+    const derivedSpeedKmh = (distanceM / elapsedSec) * 3.6;
+    const reportedSpeedMs = current.speed !== null && Number.isFinite(current.speed) ? Math.max(0, current.speed) : 0;
+    if (derivedSpeedKmh > MAX_ROUTE_SPEED_KMH && reportedSpeedMs * 3.6 > MAX_ROUTE_SPEED_KMH) continue;
+    const speedMs = reportedSpeedMs > 0 && derivedSpeedKmh > MAX_ROUTE_SPEED_KMH
+      ? reportedSpeedMs
       : Math.max(0, distanceM / elapsedSec);
-    const rawGrade = previous.altitude !== null && current.altitude !== null && distanceM >= 3
-      ? ((current.altitude - previous.altitude) / distanceM) * 100
-      : 0;
-    const gradePct = Math.max(-MAX_SUSTAINED_GRADE_PCT, Math.min(MAX_SUSTAINED_GRADE_PCT, rawGrade));
+    cumulativeDistanceM += distanceM;
+
+    let gradePct = 0;
+    if (current.altitude !== null && Number.isFinite(current.altitude)) {
+      recentAltitudesM.push(current.altitude);
+      if (recentAltitudesM.length > ROUTE_POWER_ALTITUDE_SMOOTHING_WINDOW) recentAltitudesM.shift();
+      const smoothedAltitudeM = recentAltitudesM.reduce((total, value) => total + value, 0) / recentAltitudesM.length;
+      gradeSamples.push({ distanceM: cumulativeDistanceM, altitudeM: smoothedAltitudeM });
+      while (gradeSamples.length > 1 && cumulativeDistanceM - gradeSamples[0].distanceM > ROUTE_POWER_GRADE_WINDOW_M) gradeSamples.shift();
+      const gradeAnchor = gradeSamples[0];
+      const gradeDistanceM = cumulativeDistanceM - gradeAnchor.distanceM;
+      if (gradeDistanceM >= ROUTE_POWER_GRADE_MIN_DISTANCE_M) {
+        gradePct = Math.max(
+          -MAX_SUSTAINED_GRADE_PCT,
+          Math.min(MAX_SUSTAINED_GRADE_PCT, ((smoothedAltitudeM - gradeAnchor.altitudeM) / gradeDistanceM) * 100),
+        );
+      }
+    }
     const power = clampVirtualPowerForRider(calculatePower({
       speedMs,
       prevSpeedMs: previousSpeedMs,
       intervalSec: elapsedSec,
       gradePct,
-      windSpeedMs: 0,
+      windSpeedMs: headwindMs,
       riderMassKg: profile.riderWeightKg,
       bikeMassKg: profile.bikeWeightKg,
     }), profile.ftpW);
@@ -369,7 +400,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const reconstructedDistanceM = calculateRouteDistance(route);
   const routeMovingTime = calculateRouteMovingTime(route);
   const routeMaxSpeedKmh = calculateRouteMaxSpeed(route);
-  const routeTimingIsComparable = routeMovingTime >= 60
+  const routeTimingIsComparable = routeMovingTime >= MIN_RECONSTRUCTED_MOVING_TIME_SEC
     && declaredMovingTime > 0
     && routeMovingTime >= declaredMovingTime * 0.3
     && routeMovingTime <= declaredMovingTime * 1.35;
@@ -379,7 +410,11 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const routeDistanceIsComparable = reconstructedDistanceM >= 50
     && (storedDistanceM < 1 || (reconstructedDistanceM >= storedDistanceM * 0.7 && reconstructedDistanceM <= storedDistanceM * 1.35));
   // 僅以完整連續 GPS 路線補回明顯被過濾掉的距離，不以稀疏路線縮短既有活動。
-  const distanceWasCorrupted = routeDistanceIsComparable && (storedDistanceM <= 0 || reconstructedDistanceM > storedDistanceM * 1.01);
+  // 20 m 或 0.5% 以上的可信差異會影響均速、功率與熱量，應由同一資料流重建。
+  const distanceWasCorrupted = routeDistanceIsComparable && (
+    storedDistanceM <= 0
+    || reconstructedDistanceM - storedDistanceM > Math.max(20, storedDistanceM * 0.005)
+  );
   const distanceM = distanceWasCorrupted ? reconstructedDistanceM : storedDistanceM;
   const storedAscent = nonNegative(source.totalAscent);
   const storedDescent = nonNegative(source.totalDescent);
@@ -437,9 +472,9 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const recordId = typeof source.id === "string" && source.id.trim() ? source.id.trim() : fallbackId ?? `legacy-${date}`;
   const name = typeof source.name === "string" && source.name.trim() ? source.name.trim() : "匯入騎乘紀錄";
   const terrainDisagreesWithStoredAscent = terrain.totalAscent > 0
-    && (storedAscent === 0 || storedAscent > terrain.totalAscent * 1.45 || storedAscent < terrain.totalAscent * 0.45);
+    && (storedAscent === 0 || storedAscent > terrain.totalAscent * (1 + TERRAIN_RECONCILIATION_RELATIVE_DRIFT) || storedAscent < terrain.totalAscent * (1 - TERRAIN_RECONCILIATION_RELATIVE_DRIFT));
   const terrainDisagreesWithStoredDescent = terrain.totalDescent > 0
-    && (storedDescent === 0 || storedDescent > terrain.totalDescent * 1.45 || storedDescent < terrain.totalDescent * 0.45);
+    && (storedDescent === 0 || storedDescent > terrain.totalDescent * (1 + TERRAIN_RECONCILIATION_RELATIVE_DRIFT) || storedDescent < terrain.totalDescent * (1 - TERRAIN_RECONCILIATION_RELATIVE_DRIFT));
   const totalAscent = terrainDisagreesWithStoredAscent ? terrain.totalAscent : storedAscent;
   const totalDescent = terrainDisagreesWithStoredDescent ? terrain.totalDescent : storedDescent;
   const averageSpeedKmh = movingTime > 0 ? (distanceM / 1000) / (movingTime / 3600) : nonNegative(source.avgSpeed);

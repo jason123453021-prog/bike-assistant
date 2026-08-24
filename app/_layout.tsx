@@ -27,7 +27,10 @@ import { clearLegacyFavoritesCache } from "@/lib/legacy-favorites-cleanup";
 // 移除社群和友誼相關 Provider
 import { setupNotifications } from "@/lib/feedback-service";
 // 必須在頂層引入以確保 TaskManager 任務被定義
-import "@/lib/background-location";
+import {
+  acknowledgeBackgroundSupplyInterval,
+  acknowledgeBackgroundSupplyReminder,
+} from "@/lib/background-location";
 import { startSupplyNotificationActionListener } from "@/lib/supply-notification-actions";
 import { checkModelUpdateOnAppLaunch } from "@/lib/model-update-service";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
@@ -132,6 +135,20 @@ export default function RootLayout() {
   useEffect(() => startSupplyNotificationActionListener({
     // Android 允許使用者點擊通知所附的 PendingIntent 開啟 App；此處不會從背景強制切換 Activity。
     onOpen: () => router.replace("/navigate"),
+    // 「已補給」按鈕需在導航頁掛載前先寫入背景快照；Map 頁收到佇列動作後只同步 UI 與本機倒數。
+    onConfirm: async (action) => {
+      if (action.kind === "calorie" || action.kind === "water") {
+        await acknowledgeBackgroundSupplyReminder(action.kind);
+        return;
+      }
+      if (action.kind === "interval-energy-time" || action.kind === "interval-energy-distance") {
+        await acknowledgeBackgroundSupplyInterval(action.kind.replace("interval-", "") as "energy-time" | "energy-distance");
+        return;
+      }
+      if (action.kind === "interval-water-time" || action.kind === "interval-water-distance") {
+        await acknowledgeBackgroundSupplyInterval(action.kind.replace("interval-", "") as "water-time" | "water-distance");
+      }
+    },
   }), []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {

@@ -606,6 +606,8 @@ export default function MapScreen() {
   const pendingCalorieRef = useRef(false);
   const pendingWaterRef = useRef(false);
   const pendingSupplyPlansRef = useRef<Partial<Record<"calorie" | "water", SupplyPlan>>>({});
+  // 背景通知的「已補給」可能與 AppState 回前景快照同時到達；短暫抑制舊快照重開同一 Modal。
+  const backgroundNotificationConfirmationUntilRef = useRef<Record<"calorie" | "water", number>>({ calorie: 0, water: 0 });
   const supplySnoozedUntilRef = useRef<Record<"calorie" | "water", number>>({ calorie: 0, water: 0 });
   const rideStartLocationRef = useRef<{ lat: number; lon: number } | null>(null); // 記錄騎乘開始座標
   const lastTurnSpokenRef = useRef<number>(0); // 追蹤上次播報轉彎的時間
@@ -943,11 +945,35 @@ export default function MapScreen() {
     if (settings.vibrationEnabled) vibrateSuccess();
   }, [clearIntervalSupplyRepeatTimer, settings.vibrationEnabled]);
 
+  const resolveConfirmedSupplyPlan = useCallback((kind: "calorie" | "water"): SupplyPlan => {
+    const current = stateRef.current;
+    return pendingSupplyPlansRef.current[kind]
+      ?? supplyRecommendation
+      ?? activeSupplyPlan
+      ?? createSupplyPlan({
+        mode: settings.supplyCalculationMode,
+        sportType: current.sportType,
+        calorieThresholdKcal: settings.calorieThreshold,
+        waterThresholdMl: settings.waterThreshold > 0 ? settings.waterThreshold : DEFAULT_HYDRATION_THRESHOLD_ML,
+        elapsedSec: current.elapsed,
+        riderWeightKg: settings.weight,
+        ftpW: estimateFtpW,
+        intensityFactor: current.sportType === "cycling" ? Math.min(2, current.currentPower / Math.max(1, estimateFtpW)) : 1,
+        sweatRatePerHour: current.currentSweatRatePerHour,
+        environmentLoad: 0,
+        weatherAvailable: false,
+        isFirstWaterCountdown: false,
+        energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+        energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
+        energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+      });
+  }, [activeSupplyPlan, estimateFtpW, settings, supplyRecommendation]);
+
   const handleConfirmCalorieSupply = useCallback(() => {
     clearSupplyAutoDismissTimer("calorie");
     setCalorieAlert(false);
-    const confirmedPlan = pendingSupplyPlansRef.current.calorie ?? supplyRecommendation;
-    if (smartEnergySupplyEnabled && confirmedPlan && smartSupplyCountdownRef.current) {
+    const confirmedPlan = resolveConfirmedSupplyPlan("calorie");
+    if (smartEnergySupplyEnabled && smartSupplyCountdownRef.current) {
       syncSmartSupplyCountdown(
         restartSmartSupplyCountdown(
           smartSupplyCountdownRef.current,
@@ -982,7 +1008,7 @@ export default function MapScreen() {
     void clearAllSupplyNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!waterStillPending) clearSupplyRepeatTimer();
-  }, [calorieAnim, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, settings.vibrationEnabled, smartEnergySupplyEnabled, supplyRecommendation, syncSmartSupplyCountdown, waterAlert]);
+  }, [calorieAnim, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, resolveConfirmedSupplyPlan, settings.vibrationEnabled, smartEnergySupplyEnabled, syncSmartSupplyCountdown, waterAlert]);
 
   const refreshSmartWaterCountdown = useCallback(async (confirmedPlan: SupplyPlan, confirmedElapsedSec: number, previousWaterDurationSec?: number) => {
     const location = lastLocationRef.current;
@@ -1071,8 +1097,8 @@ export default function MapScreen() {
     clearSupplyAutoDismissTimer("water");
     setWaterAlert(false);
     setSupplyRecommendedMl(undefined);
-    const confirmedPlan = pendingSupplyPlansRef.current.water ?? supplyRecommendation;
-    if (smartWaterSupplyEnabled && confirmedPlan && smartSupplyCountdownRef.current) {
+    const confirmedPlan = resolveConfirmedSupplyPlan("water");
+    if (smartWaterSupplyEnabled && smartSupplyCountdownRef.current) {
       const previousWaterDurationSec = smartSupplyCountdownRef.current.waterDurationSec;
       syncSmartSupplyCountdown(
         restartSmartSupplyCountdown(
@@ -1112,7 +1138,7 @@ export default function MapScreen() {
     void clearAllSupplyNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!calorieStillPending) clearSupplyRepeatTimer();
-  }, [calorieAlert, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, refreshSmartWaterCountdown, settings.vibrationEnabled, smartWaterSupplyEnabled, supplyRecommendation, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
+  }, [calorieAlert, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, refreshSmartWaterCountdown, resolveConfirmedSupplyPlan, settings.vibrationEnabled, smartWaterSupplyEnabled, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
 
   const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind, customItemId?: string, notificationsAlreadyCleared = false) => {
     if ((kind === "calorie" && smartEnergySupplyEnabled) || (kind === "water" && smartWaterSupplyEnabled)) return;
@@ -1184,8 +1210,13 @@ export default function MapScreen() {
       handleSnoozeSupply(action.kind, action.customItemId);
       return;
     }
-    if (action.kind === "calorie") handleConfirmCalorieSupply();
-    else if (action.kind === "water") handleConfirmWaterSupply();
+    if (action.kind === "calorie") {
+      backgroundNotificationConfirmationUntilRef.current.calorie = Date.now() + 15_000;
+      handleConfirmCalorieSupply();
+    } else if (action.kind === "water") {
+      backgroundNotificationConfirmationUntilRef.current.water = Date.now() + 15_000;
+      handleConfirmWaterSupply();
+    }
     else if (action.kind === "custom-energy" || action.kind === "custom-water") {
       const item = settings.supplyItems.find((candidate) => candidate.id === action.customItemId);
       if (item) handleConfirmCustomSupply(item.id, item.triggerType);
@@ -1243,6 +1274,10 @@ export default function MapScreen() {
     touchGuardHoldStartedAtRef.current = null;
     setTouchGuardHoldProgress(0);
   }, []);
+
+  useEffect(() => {
+    if (!isAppForeground) resetTouchGuardHoldProgress();
+  }, [isAppForeground, resetTouchGuardHoldProgress]);
 
   const scheduleTouchGuardRelock = useCallback(() => {
     if (touchGuardRelockTimerRef.current) {
@@ -3015,9 +3050,11 @@ export default function MapScreen() {
             const smartWaterDue = backgroundSmartChannels.water
               && typeof bgState.smartWaterCountdownDurationSec === "number"
               && backgroundElapsedSec >= (bgState.smartWaterCountdownStartedElapsedSec ?? 0) + bgState.smartWaterCountdownDurationSec;
+            const shouldSkipCalorieReminderRestore = backgroundNotificationConfirmationUntilRef.current.calorie > Date.now();
+            const shouldSkipWaterReminderRestore = backgroundNotificationConfirmationUntilRef.current.water > Date.now();
             // 只有背景有尚未處理的新到期提醒時才重新開啟彈窗；前景已確認後的 ref
             // 不得成為重複彈窗來源，否則每次背景返回都會重新顯示。
-            if (shouldRestoreBackgroundSupplyReminder({
+            if (!shouldSkipCalorieReminderRestore && shouldRestoreBackgroundSupplyReminder({
               persistedPending: bgState.calorieReminderSent,
               countdownDue: smartCalorieDue,
               pendingInForeground: pendingCalorieRef.current,
@@ -3027,7 +3064,7 @@ export default function MapScreen() {
               setCalorieAlert(true);
               void setBackgroundSupplyReminderPending("calorie", true);
             }
-            if (shouldRestoreBackgroundSupplyReminder({
+            if (!shouldSkipWaterReminderRestore && shouldRestoreBackgroundSupplyReminder({
               persistedPending: bgState.waterReminderSent,
               countdownDue: smartWaterDue,
               pendingInForeground: pendingWaterRef.current,
@@ -3507,6 +3544,7 @@ export default function MapScreen() {
               if (touchGuardEnabled) beginTouchGuardHoldProgress();
             }}
             onPressOut={resetTouchGuardHoldProgress}
+            onResponderTerminate={resetTouchGuardHoldProgress}
             onLongPress={() => {
               completeTouchGuardUnlock();
             }}
