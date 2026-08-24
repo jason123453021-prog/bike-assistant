@@ -2456,4 +2456,4 @@
 - [x] 建立 12 種語系字典與單車專有術語，提供 missing-key 英文 fallback
 - [x] 在設定頁新增 Local-First 語言選擇 Modal，支援跟隨系統與即時全域切換
 - [x] 抽取核心儀表、導航提示與騎乘摘要字串，並新增日英切換與核心回歸測試
-- [ ] 完成完整品質檢查、GitHub Actions 建置與驗收連結
+- [x] 完成完整品質檢查、GitHub Actions 建置與驗收連結（Android E2E run 32758850473 成功；Maestro JUnit 1 test／0 failures／32.568 秒；artifact `bike-assistant-maestro-e2e` 已上傳）
