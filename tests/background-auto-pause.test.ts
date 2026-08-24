@@ -50,11 +50,13 @@ describe("背景自動暫停與前景一致性", () => {
     expect(result).toEqual({ paused: false, accumulatedLowSpeedSec: 0, movingTimeIncrementSec: 10 });
   });
 
-  it("背景任務以同一狀態機凍結距離與功率，僅在防抖期保留移動時間", () => {
+  it("背景任務以同一狀態機凍結距離與功率，但只緩存下一輪恢復權重而不凍結倒數", () => {
     const source = readFileSync(resolve(__dirname, "../lib/background-location.ts"), "utf8");
     expect(source).toContain("advanceBackgroundAutoPause");
     expect(source).toContain("if (!isReliablyMovingForSupply)");
     expect(source).toContain("state.movingTimeSec = (state.movingTimeSec ?? 0) + statisticsIntervalSec;");
-    expect(source).toContain("state.supplyCountdownPausedAtMs ??=");
+    expect(source).toContain("markBackgroundSmartSupplyPaused");
+    expect(source).toContain("settleBackgroundSmartSupplyPause");
+    expect(source).toContain("smartCalorieCountdownDueAtMs");
   });
 });

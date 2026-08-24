@@ -11,6 +11,14 @@ export interface BackgroundSupplyStateGuard {
   smartWaterCountdownStartedElapsedSec?: number;
   smartCalorieCountdownDurationSec?: number;
   smartWaterCountdownDurationSec?: number;
+  smartCalorieCountdownDueAtMs?: number;
+  smartWaterCountdownDueAtMs?: number;
+  smartCalorieCountdownPausedAtMs?: number;
+  smartWaterCountdownPausedAtMs?: number;
+  smartCalorieCountdownPausedTotalMs?: number;
+  smartWaterCountdownPausedTotalMs?: number;
+  supplyCountdownPausedAtMs?: number;
+  supplyCountdownPausedTotalMs?: number;
   calories: number;
   sweatLossMl: number;
   intervalLastEnergyTimeSec: number;
@@ -50,6 +58,14 @@ export function preserveLatestSupplyReminderMutation<T extends BackgroundSupplyS
     smartWaterCountdownStartedElapsedSec: latestPersistedState.smartWaterCountdownStartedElapsedSec,
     smartCalorieCountdownDurationSec: latestPersistedState.smartCalorieCountdownDurationSec,
     smartWaterCountdownDurationSec: latestPersistedState.smartWaterCountdownDurationSec,
+    smartCalorieCountdownDueAtMs: latestPersistedState.smartCalorieCountdownDueAtMs,
+    smartWaterCountdownDueAtMs: latestPersistedState.smartWaterCountdownDueAtMs,
+    smartCalorieCountdownPausedAtMs: latestPersistedState.smartCalorieCountdownPausedAtMs,
+    smartWaterCountdownPausedAtMs: latestPersistedState.smartWaterCountdownPausedAtMs,
+    smartCalorieCountdownPausedTotalMs: latestPersistedState.smartCalorieCountdownPausedTotalMs,
+    smartWaterCountdownPausedTotalMs: latestPersistedState.smartWaterCountdownPausedTotalMs,
+    supplyCountdownPausedAtMs: latestPersistedState.supplyCountdownPausedAtMs,
+    supplyCountdownPausedTotalMs: latestPersistedState.supplyCountdownPausedTotalMs,
     calories: latestPersistedState.calories,
     sweatLossMl: latestPersistedState.sweatLossMl,
     intervalLastEnergyTimeSec: latestPersistedState.intervalLastEnergyTimeSec,

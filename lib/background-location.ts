@@ -25,7 +25,7 @@ import {
 } from "@/lib/personalized-ride-calculations";
 import { calculateSweatLoss } from "@/lib/hydration-calc";
 import { getHeadwindMs } from "@/lib/weather-service";
-import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
+import { calculatePausedRecoveryExtensionSec, createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import { evaluateTrackPoint, type TrackQualityPoint } from "@/lib/track-point-quality";
 import type { SupplyIntervalKind } from "@/lib/supply-interval";
 import { estimateSportCalories, type SportType } from "@/lib/sport-metrics";
@@ -139,7 +139,15 @@ export interface BackgroundState {
   smartWaterCountdownStartedElapsedSec?: number;
   smartCalorieCountdownDurationSec?: number;
   smartWaterCountdownDurationSec?: number;
-  /** 靜止時凍結補給倒數，恢復移動後從原進度繼續。 */
+  /** 已鎖定的真實時間到期點；暫停騎乘碼表不會改變本輪到期時間。 */
+  smartCalorieCountdownDueAtMs?: number;
+  smartWaterCountdownDueAtMs?: number;
+  /** 各智慧通道本輪累計的低強度／暫停時長，僅供下一輪比例權重計算。 */
+  smartCalorieCountdownPausedAtMs?: number;
+  smartWaterCountdownPausedAtMs?: number;
+  smartCalorieCountdownPausedTotalMs?: number;
+  smartWaterCountdownPausedTotalMs?: number;
+  /** 舊版共享欄位僅保留已存在本機資料相容；新程式不再讀寫。 */
   supplyCountdownPausedAtMs?: number;
   supplyCountdownPausedTotalMs?: number;
   rideStartedAt: number;
@@ -228,6 +236,39 @@ async function mutateBackgroundSupplyState(
   });
   backgroundSupplyStateMutationQueue = operation.catch(() => undefined);
   await operation;
+}
+
+function markBackgroundSmartSupplyPaused(state: BackgroundState, nowMs: number): void {
+  state.smartCalorieCountdownPausedAtMs ??= nowMs;
+  state.smartWaterCountdownPausedAtMs ??= nowMs;
+}
+
+function settleBackgroundSmartSupplyPause(state: BackgroundState, nowMs: number): void {
+  if (state.smartCalorieCountdownPausedAtMs !== undefined) {
+    state.smartCalorieCountdownPausedTotalMs = (state.smartCalorieCountdownPausedTotalMs ?? 0)
+      + Math.max(0, nowMs - state.smartCalorieCountdownPausedAtMs);
+    state.smartCalorieCountdownPausedAtMs = undefined;
+  }
+  if (state.smartWaterCountdownPausedAtMs !== undefined) {
+    state.smartWaterCountdownPausedTotalMs = (state.smartWaterCountdownPausedTotalMs ?? 0)
+      + Math.max(0, nowMs - state.smartWaterCountdownPausedAtMs);
+    state.smartWaterCountdownPausedAtMs = undefined;
+  }
+}
+
+function consumeBackgroundSmartSupplyPauseSec(state: BackgroundState, kind: "calorie" | "water", nowMs: number): number {
+  const isCalorie = kind === "calorie";
+  const pausedAtMs = isCalorie ? state.smartCalorieCountdownPausedAtMs : state.smartWaterCountdownPausedAtMs;
+  const pausedTotalMs = (isCalorie ? state.smartCalorieCountdownPausedTotalMs : state.smartWaterCountdownPausedTotalMs) ?? 0;
+  const totalMs = pausedTotalMs + (pausedAtMs === undefined ? 0 : Math.max(0, nowMs - pausedAtMs));
+  if (isCalorie) {
+    state.smartCalorieCountdownPausedTotalMs = 0;
+    state.smartCalorieCountdownPausedAtMs = state.backgroundAutoPaused ? nowMs : undefined;
+  } else {
+    state.smartWaterCountdownPausedTotalMs = 0;
+    state.smartWaterCountdownPausedAtMs = state.backgroundAutoPaused ? nowMs : undefined;
+  }
+  return totalMs / 1_000;
 }
 
 // Haversine 距離計算（背景任務中不能 import 其他模組的函數）
@@ -342,10 +383,9 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
           state.lastLat = latitude;
           state.lastLon = longitude;
           state.lastTimestamp = timestamp;
-          state.supplyCountdownPausedAtMs ??= timestamp;
+          markBackgroundSmartSupplyPaused(state, timestamp);
           if (speedKmh >= 3 || movementM >= 18) {
-            state.supplyCountdownPausedTotalMs = (state.supplyCountdownPausedTotalMs ?? 0) + Math.max(0, timestamp - (state.supplyCountdownPausedAtMs ?? timestamp));
-            state.supplyCountdownPausedAtMs = undefined;
+            settleBackgroundSmartSupplyPause(state, timestamp);
             state.trackingMode = "full";
             const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
             if (isRegistered) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
@@ -388,7 +428,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
 
         // 低速且沒有可靠位移時，前景會在 8 秒防抖內仍由計時器保留移動時間，
         // 但不會把 GPS 漂移寫成距離、功率或熱量。背景採相同行為：只累積門檻
-        // 前的時間，真正進入暫停後才凍結補給倒數。
+        // 前的時間；真正進入暫停後只記錄恢復時長，補給倒數仍依絕對時間持續。
         if (!isReliablyMovingForSupply) {
           state.lastLat = latitude;
           state.lastLon = longitude;
@@ -397,7 +437,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
           state.lastSpeedMs = 0;
           state.movingTimeSec = (state.movingTimeSec ?? 0) + statisticsIntervalSec;
           if (autoPause.paused) {
-            state.supplyCountdownPausedAtMs ??= timestamp - Math.round((autoPause.pauseStartedBeforeSampleEndSec ?? 0) * 1_000);
+            markBackgroundSmartSupplyPaused(state, timestamp - Math.round((autoPause.pauseStartedBeforeSampleEndSec ?? 0) * 1_000));
           }
           acceptedLocation.intervalSec = statisticsIntervalSec;
           acceptedLocation.isStationary = true;
@@ -431,11 +471,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
         }
 
         if (autoPause.paused) {
-          state.supplyCountdownPausedAtMs ??= timestamp - Math.round((autoPause.pauseStartedBeforeSampleEndSec ?? 0) * 1_000);
+          markBackgroundSmartSupplyPaused(state, timestamp - Math.round((autoPause.pauseStartedBeforeSampleEndSec ?? 0) * 1_000));
           acceptedLocation.intervalSec = 0;
-        } else if (state.supplyCountdownPausedAtMs) {
-          state.supplyCountdownPausedTotalMs = (state.supplyCountdownPausedTotalMs ?? 0) + Math.max(0, timestamp - state.supplyCountdownPausedAtMs);
-          state.supplyCountdownPausedAtMs = undefined;
+        } else {
+          settleBackgroundSmartSupplyPause(state, timestamp);
         }
 
         // 鎖屏期間沿用前景的個人 FTP、體重與最近環境摘要；沒有天氣資料時安全回退為預設環境。
@@ -605,24 +644,27 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
       // 一個背景回呼可能包含多個位置點；只需保存該批次最新完整快照即可。
       await saveRideSessionSnapshot(recoverySession);
 
-      const activeElapsedMs = Math.max(0, Date.now() - (state.rideStartedAt || Date.now()) - (state.supplyCountdownPausedTotalMs ?? 0) - (state.supplyCountdownPausedAtMs ? Date.now() - state.supplyCountdownPausedAtMs : 0));
-      const elapsedSec = Math.floor(activeElapsedMs / 1000);
+      const supplyNowMs = Date.now();
+      const elapsedSec = Math.max(0, Math.floor((supplyNowMs - (state.rideStartedAt || supplyNowMs)) / 1_000));
       const supplyReminderEnabled = state.supplyReminderEnabled !== false;
-      const canAdvanceSupplyCountdown = !state.supplyCountdownPausedAtMs;
-      if (canAdvanceSupplyCountdown && supplyReminderEnabled) {
+      if (supplyReminderEnabled) {
         if (smartChannels.energy) {
           state.smartCalorieCountdownStartedElapsedSec ??= 0;
           state.smartCalorieCountdownDurationSec ??= latestSupplyPlan.energyCountdownSec;
+          state.smartCalorieCountdownDueAtMs ??= (state.rideStartedAt || supplyNowMs)
+            + ((state.smartCalorieCountdownStartedElapsedSec ?? 0) + state.smartCalorieCountdownDurationSec) * 1_000;
         }
         if (smartChannels.water) {
           state.smartWaterCountdownStartedElapsedSec ??= 0;
           state.smartWaterCountdownDurationSec ??= latestSupplyPlan.waterCountdownSec;
+          state.smartWaterCountdownDueAtMs ??= (state.rideStartedAt || supplyNowMs)
+            + ((state.smartWaterCountdownStartedElapsedSec ?? 0) + state.smartWaterCountdownDurationSec) * 1_000;
         }
       }
-      const calorieDue = canAdvanceSupplyCountdown && supplyReminderEnabled && smartChannels.energy
-        && elapsedSec >= (state.smartCalorieCountdownStartedElapsedSec ?? 0) + (state.smartCalorieCountdownDurationSec ?? latestSupplyPlan.energyCountdownSec);
-      const waterDue = canAdvanceSupplyCountdown && supplyReminderEnabled && smartChannels.water
-        && elapsedSec >= (state.smartWaterCountdownStartedElapsedSec ?? 0) + (state.smartWaterCountdownDurationSec ?? latestSupplyPlan.waterCountdownSec);
+      const calorieDue = supplyReminderEnabled && smartChannels.energy
+        && supplyNowMs >= (state.smartCalorieCountdownDueAtMs ?? supplyNowMs + latestSupplyPlan.energyCountdownSec * 1_000);
+      const waterDue = supplyReminderEnabled && smartChannels.water
+        && supplyNowMs >= (state.smartWaterCountdownDueAtMs ?? supplyNowMs + latestSupplyPlan.waterCountdownSec * 1_000);
 
       // 檢查補給提醒
       if (calorieDue && !state.calorieReminderSent) {
@@ -813,6 +855,8 @@ export async function initBackgroundState(params: {
     waterReminderSent: false,
     smartCalorieCountdownStartedElapsedSec: 0,
     smartWaterCountdownStartedElapsedSec: 0,
+    smartCalorieCountdownPausedTotalMs: 0,
+    smartWaterCountdownPausedTotalMs: 0,
     rideStartedAt: startedAt,
     supplyEnergyTimeIntervalEnabled: params.supplyEnergyTimeIntervalEnabled,
     supplyEnergyTimeIntervalMinutes: params.supplyEnergyTimeIntervalMinutes,
@@ -881,6 +925,8 @@ export async function setBackgroundSupplyReminderEnabled(enabled: boolean) {
     state.intervalLastWaterDistanceKm = distanceKm;
     state.smartCalorieCountdownStartedElapsedSec = elapsedSec;
     state.smartWaterCountdownStartedElapsedSec = elapsedSec;
+    state.smartCalorieCountdownDueAtMs = Date.now() + (state.smartCalorieCountdownDurationSec ?? 60 * 60) * 1_000;
+    state.smartWaterCountdownDueAtMs = Date.now() + (state.smartWaterCountdownDurationSec ?? 30 * 60) * 1_000;
     await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   } catch {}
 }
@@ -903,12 +949,14 @@ export async function updateBackgroundSmartSupplyChannels(params: {
       state.calorieReminderSent = false;
     } else {
       state.smartCalorieCountdownStartedElapsedSec = elapsedSec;
+      state.smartCalorieCountdownDueAtMs = Date.now() + (state.smartCalorieCountdownDurationSec ?? 60 * 60) * 1_000;
       state.calorieReminderSent = false;
     }
     if (!params.waterEnabled) {
       state.waterReminderSent = false;
     } else {
       state.smartWaterCountdownStartedElapsedSec = elapsedSec;
+      state.smartWaterCountdownDueAtMs = Date.now() + (state.smartWaterCountdownDurationSec ?? 30 * 60) * 1_000;
       state.waterReminderSent = false;
     }
     await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
@@ -1029,7 +1077,7 @@ export async function updateBackgroundEnvironment(environment: NonNullable<Backg
 /** 前景倒數變動時同步到背景任務，讓鎖定期間到期可持久化為待確認提醒。 */
 export async function updateBackgroundSmartSupplyCountdown(countdown: Pick<
   BackgroundState,
-  "smartCalorieCountdownStartedElapsedSec" | "smartWaterCountdownStartedElapsedSec" | "smartCalorieCountdownDurationSec" | "smartWaterCountdownDurationSec"
+  "smartCalorieCountdownStartedElapsedSec" | "smartWaterCountdownStartedElapsedSec" | "smartCalorieCountdownDurationSec" | "smartWaterCountdownDurationSec" | "smartCalorieCountdownDueAtMs" | "smartWaterCountdownDueAtMs" | "smartCalorieCountdownPausedAtMs" | "smartWaterCountdownPausedAtMs" | "smartCalorieCountdownPausedTotalMs" | "smartWaterCountdownPausedTotalMs"
 >) {
   await mutateBackgroundSupplyState((state) => {
     const channels = resolveSmartSupplyChannels(state);
@@ -1088,18 +1136,30 @@ export async function acknowledgeBackgroundSupplyInterval(kind: SupplyIntervalKi
 }
 
 /** 在前台或通知按鈕確認卡路里／水分補給後，同步重置背景任務的對應計數。 */
-export async function acknowledgeBackgroundSupplyReminder(kind: "calorie" | "water") {
+export async function acknowledgeBackgroundSupplyReminder(kind: "calorie" | "water", options?: { preserveForegroundCountdown?: boolean }) {
   await mutateBackgroundSupplyState((state) => {
+    const nowMs = Date.now();
+    if (options?.preserveForegroundCountdown) {
+      if (kind === "calorie") state.calorieReminderSent = false;
+      else state.waterReminderSent = false;
+      return true;
+    }
     if (kind === "calorie") {
       if (isSmartSupplyChannelEnabled(state, "calorie")) {
-        state.smartCalorieCountdownStartedElapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
+        state.smartCalorieCountdownStartedElapsedSec = Math.max(0, Math.floor((nowMs - (state.rideStartedAt || nowMs)) / 1000));
+        const extensionSec = calculatePausedRecoveryExtensionSec(consumeBackgroundSmartSupplyPauseSec(state, "calorie", nowMs));
+        state.smartCalorieCountdownDurationSec = Math.max(1, (state.smartCalorieCountdownDurationSec ?? 60 * 60) + extensionSec);
+        state.smartCalorieCountdownDueAtMs = nowMs + state.smartCalorieCountdownDurationSec * 1_000;
       } else {
         state.calories = 0;
       }
       state.calorieReminderSent = false;
     } else {
       if (isSmartSupplyChannelEnabled(state, "water")) {
-        state.smartWaterCountdownStartedElapsedSec = Math.max(0, Math.floor((Date.now() - (state.rideStartedAt || Date.now())) / 1000));
+        state.smartWaterCountdownStartedElapsedSec = Math.max(0, Math.floor((nowMs - (state.rideStartedAt || nowMs)) / 1000));
+        const extensionSec = calculatePausedRecoveryExtensionSec(consumeBackgroundSmartSupplyPauseSec(state, "water", nowMs));
+        state.smartWaterCountdownDurationSec = Math.max(1, (state.smartWaterCountdownDurationSec ?? 30 * 60) + extensionSec);
+        state.smartWaterCountdownDueAtMs = nowMs + state.smartWaterCountdownDurationSec * 1_000;
       } else {
         state.sweatLossMl = 0;
       }

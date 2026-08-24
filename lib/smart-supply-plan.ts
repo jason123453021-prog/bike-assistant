@@ -57,9 +57,47 @@ const MICRO_SIP_INTERVAL_MINUTES = 12.5;
 const SMART_WATER_COUNTDOWN_RANGE_SEC = { min: 10 * 60, max: 30 * 60 } as const;
 // 耐力活動超過一小時開始主動補碳水；以 30–60 g/h 的分次策略轉成不帶量化處方的提醒節奏。
 const SMART_ENERGY_COUNTDOWN_RANGE_SEC = { min: 30 * 60, max: 60 * 60 } as const;
+// 既有智慧推導在低／高碳水目標下實際允許 20–75 分鐘；恢復權重不得縮窄既有行為。
+const SMART_ENERGY_COUNTDOWN_ALLOWED_RANGE_SEC = { min: 20 * 60, max: 75 * 60 } as const;
+/** 暫停時肌肉主動產熱下降的保守恢復係數；10 分鐘休息約延長下一輪 4 分鐘。 */
+export const PAUSE_RECOVERY_COEFFICIENT = 0.4;
+const MAX_PAUSE_RECOVERY_EXTENSION_SEC = 5 * 60;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+/**
+ * 本輪的真實時間倒數不會因暫停而改變；僅在使用者確認補給後，
+ * 把本輪累計暫停秒數的恢復權重套用到下一輪建議間隔。
+ */
+export function applyPausedRecoveryToNextSupplyPlan(plan: SupplyPlan, pausedDuringRoundSec: number): SupplyPlan {
+  const pauseSec = Math.max(0, Math.round(pausedDuringRoundSec));
+  const extensionSec = calculatePausedRecoveryExtensionSec(pauseSec);
+  if (extensionSec <= 0) return plan;
+  return {
+    ...plan,
+    energyCountdownSec: Math.round(clamp(
+      plan.energyCountdownSec + extensionSec,
+      SMART_ENERGY_COUNTDOWN_ALLOWED_RANGE_SEC.min,
+      SMART_ENERGY_COUNTDOWN_ALLOWED_RANGE_SEC.max,
+    )),
+    waterCountdownSec: Math.round(clamp(
+      plan.waterCountdownSec + extensionSec,
+      SMART_WATER_COUNTDOWN_RANGE_SEC.min,
+      SMART_WATER_COUNTDOWN_RANGE_SEC.max,
+    )),
+    reason: `${plan.reason} 本輪累計暫停 ${Math.ceil(pauseSec / 60)} 分鐘，恢復權重僅於下一輪延長 ${Math.ceil(extensionSec / 60)} 分鐘。`,
+  };
+}
+
+/** 將本輪實際暫停時間轉為僅供下一輪使用的保守恢復延長秒數。 */
+export function calculatePausedRecoveryExtensionSec(pausedDuringRoundSec: number): number {
+  return Math.round(clamp(
+    Math.max(0, pausedDuringRoundSec) * PAUSE_RECOVERY_COEFFICIENT,
+    0,
+    MAX_PAUSE_RECOVERY_EXTENSION_SEC,
+ ));
 }
 
 function carbohydrateTargetGPerHour(elapsedSec: number, intensityFactor: number, environmentLoad: number): number {

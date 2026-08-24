@@ -106,7 +106,7 @@ import {
 import {
   calculatePersonalizedCalories,
 } from "@/lib/personalized-ride-calculations";
-import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
+import { applyPausedRecoveryToNextSupplyPlan, createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import { buildInitialSupplyPlanInput } from "@/lib/initial-supply-plan";
 import { awaitHydrationInputs, resolveWaterCountdownFallbackDuration, type HydrationSensorSnapshot } from "@/lib/hydration-recalculation";
 import { resolveSmartSupplyChannels } from "@/lib/smart-supply-channels";
@@ -564,6 +564,7 @@ export default function MapScreen() {
   const [supplyRecommendation, setSupplyRecommendation] = useState<SupplyPlan | undefined>(undefined);
   const [activeSupplyPlan, setActiveSupplyPlan] = useState<SupplyPlan | undefined>(undefined);
   const [smartSupplyCountdown, setSmartSupplyCountdown] = useState<SmartSupplyCountdown | null>(null);
+  const [smartSupplyCountdownNowMs, setSmartSupplyCountdownNowMs] = useState(() => Date.now());
   const smartSupplyCountdownRef = useRef<SmartSupplyCountdown | null>(null);
   const lastBackgroundCountdownSnapshotRef = useRef("");
 
@@ -572,10 +573,14 @@ export default function MapScreen() {
     setSmartSupplyCountdown(nextCountdown);
     if (!nextCountdown) return;
     const snapshot = [
-      nextCountdown.calorieStartedElapsedSec,
-      nextCountdown.waterStartedElapsedSec,
+      nextCountdown.calorieDueAtMs,
+      nextCountdown.waterDueAtMs,
       nextCountdown.calorieDurationSec,
       nextCountdown.waterDurationSec,
+      supplyRoundPauseRef.current.calorie.pausedAtMs,
+      supplyRoundPauseRef.current.calorie.pausedTotalSec,
+      supplyRoundPauseRef.current.water.pausedAtMs,
+      supplyRoundPauseRef.current.water.pausedTotalSec,
     ].join(":");
     if (snapshot !== lastBackgroundCountdownSnapshotRef.current) {
       lastBackgroundCountdownSnapshotRef.current = snapshot;
@@ -584,15 +589,20 @@ export default function MapScreen() {
         smartWaterCountdownStartedElapsedSec: nextCountdown.waterStartedElapsedSec,
         smartCalorieCountdownDurationSec: nextCountdown.calorieDurationSec,
         smartWaterCountdownDurationSec: nextCountdown.waterDurationSec,
+        smartCalorieCountdownDueAtMs: nextCountdown.calorieDueAtMs,
+        smartWaterCountdownDueAtMs: nextCountdown.waterDueAtMs,
+        smartCalorieCountdownPausedAtMs: supplyRoundPauseRef.current.calorie.pausedAtMs ?? undefined,
+        smartWaterCountdownPausedAtMs: supplyRoundPauseRef.current.water.pausedAtMs ?? undefined,
+        smartCalorieCountdownPausedTotalMs: Math.round(supplyRoundPauseRef.current.calorie.pausedTotalSec * 1_000),
+        smartWaterCountdownPausedTotalMs: Math.round(supplyRoundPauseRef.current.water.pausedTotalSec * 1_000),
       });
-      const currentElapsedSec = stateRef.current.elapsed;
       void scheduleSmartSupplyDueNotification(
         "calorie",
-        Date.now() + Math.max(1, nextCountdown.calorieDueElapsedSec - currentElapsedSec) * 1000,
+        nextCountdown.calorieDueAtMs,
       );
       void scheduleSmartSupplyDueNotification(
         "water",
-        Date.now() + Math.max(1, nextCountdown.waterDueElapsedSec - currentElapsedSec) * 1000,
+        nextCountdown.waterDueAtMs,
       );
     }
   }, []);
@@ -606,6 +616,10 @@ export default function MapScreen() {
   const pendingCalorieRef = useRef(false);
   const pendingWaterRef = useRef(false);
   const pendingSupplyPlansRef = useRef<Partial<Record<"calorie" | "water", SupplyPlan>>>({});
+  const supplyRoundPauseRef = useRef<Record<"calorie" | "water", { pausedAtMs: number | null; pausedTotalSec: number }>>({
+    calorie: { pausedAtMs: null, pausedTotalSec: 0 },
+    water: { pausedAtMs: null, pausedTotalSec: 0 },
+  });
   // 背景通知的「已補給」可能與 AppState 回前景快照同時到達；短暫抑制舊快照重開同一 Modal。
   const backgroundNotificationConfirmationUntilRef = useRef<Record<"calorie" | "water", number>>({ calorie: 0, water: 0 });
   const supplySnoozedUntilRef = useRef<Record<"calorie" | "water", number>>({ calorie: 0, water: 0 });
@@ -969,16 +983,29 @@ export default function MapScreen() {
       });
   }, [activeSupplyPlan, estimateFtpW, settings, supplyRecommendation]);
 
+  const consumePausedRecoveryForNextRound = useCallback((kind: "calorie" | "water") => {
+    const nowMs = Date.now();
+    const pauseState = supplyRoundPauseRef.current[kind];
+    if (pauseState.pausedAtMs !== null) {
+      pauseState.pausedTotalSec += Math.max(0, (nowMs - pauseState.pausedAtMs) / 1_000);
+    }
+    const pausedSec = pauseState.pausedTotalSec;
+    pauseState.pausedTotalSec = 0;
+    pauseState.pausedAtMs = stateRef.current.status === "paused" ? nowMs : null;
+    return pausedSec;
+  }, []);
+
   const handleConfirmCalorieSupply = useCallback(() => {
     clearSupplyAutoDismissTimer("calorie");
     setCalorieAlert(false);
     const confirmedPlan = resolveConfirmedSupplyPlan("calorie");
+    const nextPlan = applyPausedRecoveryToNextSupplyPlan(confirmedPlan, consumePausedRecoveryForNextRound("calorie"));
     if (smartEnergySupplyEnabled && smartSupplyCountdownRef.current) {
       syncSmartSupplyCountdown(
         restartSmartSupplyCountdown(
           smartSupplyCountdownRef.current,
           "calorie",
-          confirmedPlan,
+          nextPlan,
           stateRef.current.elapsed,
         ),
       );
@@ -1004,13 +1031,13 @@ export default function MapScreen() {
     const waterStillPending = pendingWaterRef.current || waterAlert;
     if (!waterStillPending) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.calorie = 0;
-    void acknowledgeBackgroundSupplyReminder("calorie");
+    void acknowledgeBackgroundSupplyReminder("calorie", { preserveForegroundCountdown: true });
     void clearAllSupplyNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!waterStillPending) clearSupplyRepeatTimer();
-  }, [calorieAnim, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, resolveConfirmedSupplyPlan, settings.vibrationEnabled, smartEnergySupplyEnabled, syncSmartSupplyCountdown, waterAlert]);
+  }, [calorieAnim, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, consumePausedRecoveryForNextRound, dispatch, resolveConfirmedSupplyPlan, settings.vibrationEnabled, smartEnergySupplyEnabled, syncSmartSupplyCountdown, waterAlert]);
 
-  const refreshSmartWaterCountdown = useCallback(async (confirmedPlan: SupplyPlan, confirmedElapsedSec: number, previousWaterDurationSec?: number) => {
+  const refreshSmartWaterCountdown = useCallback(async (confirmedPlan: SupplyPlan, previousWaterDurationSec?: number) => {
     const location = lastLocationRef.current;
     const currentHydrationThresholdMl = settings.waterThreshold > 0
       ? settings.waterThreshold
@@ -1030,17 +1057,11 @@ export default function MapScreen() {
     if (!countdown) return;
 
     if (input.status !== "complete") {
-      const fallbackDurationSec = resolveWaterCountdownFallbackDuration(previousWaterDurationSec);
-      syncSmartSupplyCountdown(restartSmartSupplyCountdown(
-        countdown,
-        "water",
-        {
-          ...confirmedPlan,
-          waterCountdownSec: fallbackDurationSec,
-          reason: `${confirmedPlan.reason}；資料逾時或不完整，沿用前一輪補水倒數。`,
-        },
-        confirmedElapsedSec,
-      ));
+      setSupplyRecommendation({
+        ...confirmedPlan,
+        waterCountdownSec: resolveWaterCountdownFallbackDuration(previousWaterDurationSec),
+        reason: `${confirmedPlan.reason}；資料逾時或不完整，將於下一輪沿用前一輪補水倒數。`,
+      });
       return;
     }
 
@@ -1090,29 +1111,31 @@ export default function MapScreen() {
       energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
     });
     setActiveSupplyPlan(nextPlan);
-    syncSmartSupplyCountdown(restartSmartSupplyCountdown(countdown, "water", nextPlan, confirmedElapsedSec));
-  }, [currentGrade, estimateAgeYears, estimateFtpW, settings, syncSmartSupplyCountdown]);
+    setSupplyRecommendation(nextPlan);
+  }, [currentGrade, estimateAgeYears, estimateFtpW, settings]);
 
   const handleConfirmWaterSupply = useCallback(() => {
     clearSupplyAutoDismissTimer("water");
     setWaterAlert(false);
     setSupplyRecommendedMl(undefined);
     const confirmedPlan = resolveConfirmedSupplyPlan("water");
+    const pausedRecoverySec = consumePausedRecoveryForNextRound("water");
     if (smartWaterSupplyEnabled && smartSupplyCountdownRef.current) {
       const previousWaterDurationSec = smartSupplyCountdownRef.current.waterDurationSec;
+      const nextPlan = applyPausedRecoveryToNextSupplyPlan({
+        ...confirmedPlan,
+        waterCountdownSec: resolveWaterCountdownFallbackDuration(previousWaterDurationSec),
+        reason: `${confirmedPlan.reason}；正在同步天氣與感測資料以校正後續輪次補水倒數。`,
+      }, pausedRecoverySec);
       syncSmartSupplyCountdown(
         restartSmartSupplyCountdown(
           smartSupplyCountdownRef.current,
           "water",
-          {
-            ...confirmedPlan,
-            waterCountdownSec: resolveWaterCountdownFallbackDuration(previousWaterDurationSec),
-            reason: `${confirmedPlan.reason}；正在同步天氣與感測資料以校正下一輪補水倒數。`,
-          },
+          nextPlan,
           stateRef.current.elapsed,
         ),
       );
-      void refreshSmartWaterCountdown(confirmedPlan, stateRef.current.elapsed, previousWaterDurationSec);
+      void refreshSmartWaterCountdown(confirmedPlan, previousWaterDurationSec);
     } else {
       dispatch({ type: "CONSUME_WATER" });
     }
@@ -1134,11 +1157,11 @@ export default function MapScreen() {
     const calorieStillPending = pendingCalorieRef.current || calorieAlert;
     if (!calorieStillPending) setSupplyRecommendation(undefined);
     supplySnoozedUntilRef.current.water = 0;
-    void acknowledgeBackgroundSupplyReminder("water");
+    void acknowledgeBackgroundSupplyReminder("water", { preserveForegroundCountdown: true });
     void clearAllSupplyNotifications();
     if (settings.vibrationEnabled) vibrateSuccess();
     if (!calorieStillPending) clearSupplyRepeatTimer();
-  }, [calorieAlert, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, dispatch, refreshSmartWaterCountdown, resolveConfirmedSupplyPlan, settings.vibrationEnabled, smartWaterSupplyEnabled, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
+  }, [calorieAlert, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, consumePausedRecoveryForNextRound, dispatch, refreshSmartWaterCountdown, resolveConfirmedSupplyPlan, settings.vibrationEnabled, smartWaterSupplyEnabled, supplyRecommendedMl, syncSmartSupplyCountdown, waterAnim]);
 
   const handleSnoozeSupply = useCallback((kind: SupplyNotificationKind, customItemId?: string, notificationsAlreadyCleared = false) => {
     if ((kind === "calorie" && smartEnergySupplyEnabled) || (kind === "water" && smartWaterSupplyEnabled)) return;
@@ -1248,6 +1271,34 @@ export default function MapScreen() {
   const isRiding = state.status === "active";
   const isPaused = state.status === "paused";
   const isActive = isRiding || isPaused;
+  useEffect(() => {
+    if (!isActive || !smartSupplyCountdown) return;
+    setSmartSupplyCountdownNowMs(Date.now());
+    const timer = setInterval(() => setSmartSupplyCountdownNowMs(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [isActive, smartSupplyCountdown]);
+  useEffect(() => {
+    const nowMs = Date.now();
+    if (isPaused) {
+      for (const kind of ["calorie", "water"] as const) {
+        supplyRoundPauseRef.current[kind].pausedAtMs ??= nowMs;
+      }
+      return;
+    }
+    for (const kind of ["calorie", "water"] as const) {
+      const pauseState = supplyRoundPauseRef.current[kind];
+      if (pauseState.pausedAtMs !== null) {
+        pauseState.pausedTotalSec += Math.max(0, (nowMs - pauseState.pausedAtMs) / 1_000);
+        pauseState.pausedAtMs = null;
+      }
+    }
+    void updateBackgroundSmartSupplyCountdown({
+      smartCalorieCountdownPausedAtMs: supplyRoundPauseRef.current.calorie.pausedAtMs ?? undefined,
+      smartWaterCountdownPausedAtMs: supplyRoundPauseRef.current.water.pausedAtMs ?? undefined,
+      smartCalorieCountdownPausedTotalMs: Math.round(supplyRoundPauseRef.current.calorie.pausedTotalSec * 1_000),
+      smartWaterCountdownPausedTotalMs: Math.round(supplyRoundPauseRef.current.water.pausedTotalSec * 1_000),
+    });
+  }, [isPaused]);
   const touchGuardHoldLabel = settings.touchGuardUnlockHoldMs >= 1000
     ? `${(settings.touchGuardUnlockHoldMs / 1000).toFixed(settings.touchGuardUnlockHoldMs % 1000 === 0 ? 0 : 1)} 秒`
     : `${settings.touchGuardUnlockHoldMs} 毫秒`;
@@ -1594,6 +1645,28 @@ export default function MapScreen() {
     },
     [settings, alertPlayer, clearSupplyAutoDismissTimer, clearSupplyRepeatTimer, smartEnergySupplyEnabled, smartWaterSupplyEnabled, speakPlannedSupplyReminder]
   );
+
+  // GPS 位置回呼可能在手動暫停、室內或訊號中斷時停止；此每秒檢查仍以鎖定的
+  // Date.now() 到期點觸發前景提醒，且由 sent／pending ref 防止與 GPS 回呼重複彈窗。
+  useEffect(() => {
+    const countdown = smartSupplyCountdownRef.current;
+    if (!isActive || !settings.supplyReminderEnabled || !countdown) return;
+    const recommendation = activeSupplyPlan ?? supplyRecommendation;
+    if (smartEnergySupplyEnabled
+      && isSmartSupplyCountdownDue(countdown, "calorie", smartSupplyCountdownNowMs)
+      && !calorieReminderSentRef.current
+      && !pendingCalorieRef.current) {
+      calorieReminderSentRef.current = true;
+      void triggerSupplyReminder("calorie", recommendation);
+    }
+    if (smartWaterSupplyEnabled
+      && isSmartSupplyCountdownDue(countdown, "water", smartSupplyCountdownNowMs)
+      && !waterReminderSentRef.current
+      && !pendingWaterRef.current) {
+      waterReminderSentRef.current = true;
+      void triggerSupplyReminder("water", recommendation);
+    }
+  }, [activeSupplyPlan, isActive, settings.supplyReminderEnabled, smartEnergySupplyEnabled, smartSupplyCountdownNowMs, smartWaterSupplyEnabled, supplyRecommendation, triggerSupplyReminder]);
 
   // ─── 自訂補給品觸發邏輯 ────────────────────────────────────────────────────────
   const triggerCustomSupplyReminder = useCallback(
@@ -2365,6 +2438,12 @@ export default function MapScreen() {
           const currentCountdown = smartSupplyCountdownRef.current;
           // 倒數建立後保持固定，不能隨環境、功率或天氣更新而延後／提前。
           // 只有使用者按下「已補給／已補水」時才會建立該類別的新一輪倒數。
+          if (hasSmartSupplyChannel && !currentCountdown) {
+            const nowMs = Date.now();
+            for (const kind of ["calorie", "water"] as const) {
+              supplyRoundPauseRef.current[kind] = { pausedAtMs: isPaused ? nowMs : null, pausedTotalSec: 0 };
+            }
+          }
           const nextCountdown = hasSmartSupplyChannel
             ? (currentCountdown ?? createSmartSupplyCountdown(supplyPlan, currentState.elapsed))
             : null;
@@ -2373,8 +2452,8 @@ export default function MapScreen() {
           }
           const newCalories = currentState.calories + calIncrement;
           const newSweatSince = currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
-          const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(nextCountdown, "calorie", currentState.elapsed);
-          const smartWaterRemainingSec = smartSupplyCountdownRemainingSec(nextCountdown, "water", currentState.elapsed);
+          const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(nextCountdown, "calorie");
+          const smartWaterRemainingSec = smartSupplyCountdownRemainingSec(nextCountdown, "water");
           const manualEnergyKind: SupplyIntervalKind | null = settings.supplyReminderEnabled && !isSmartEnergyMode
             ? (settings.supplyEnergyTimeIntervalEnabled ? "energy-time" : settings.supplyEnergyDistanceIntervalEnabled ? "energy-distance" : null)
             : null;
@@ -2407,14 +2486,14 @@ export default function MapScreen() {
 
           // 智慧模式改由倒數到期觸發；提醒不因坡度而被延後或抑制。
           const calorieDue = settings.supplyReminderEnabled && isSmartEnergyMode
-            && isSmartSupplyCountdownDue(nextCountdown, "calorie", currentState.elapsed);
+            && isSmartSupplyCountdownDue(nextCountdown, "calorie");
           if (calorieDue && !calorieReminderSentRef.current && !pendingCalorieRef.current) {
             calorieReminderSentRef.current = true;
             triggerSupplyReminder("calorie", supplyPlan);
           }
 
           const waterDue = settings.supplyReminderEnabled && isSmartWaterMode
-            && isSmartSupplyCountdownDue(nextCountdown, "water", currentState.elapsed);
+            && isSmartSupplyCountdownDue(nextCountdown, "water");
           if (waterDue && !waterReminderSentRef.current && !pendingWaterRef.current) {
             waterReminderSentRef.current = true;
             triggerSupplyReminder("water", supplyPlan);
@@ -2721,6 +2800,8 @@ export default function MapScreen() {
         }
         : undefined,
     });
+    lastBackgroundCountdownSnapshotRef.current = "";
+    syncSmartSupplyCountdown(smartSupplyCountdownRef.current);
     const backgroundTrackingStarted = await startBackgroundLocationTracking(settings.gpsAccuracy || "standard");
     if (!backgroundTrackingStarted) {
       Alert.alert(
@@ -3363,8 +3444,8 @@ export default function MapScreen() {
     : null;
   const waterProgress = sweatCurrent / sweatTarget;
   const waterBarColor = waterProgress < 0.5 ? "#4FC3F7" : waterProgress < 0.8 ? "#F59E0B" : "#EF4444";
-  const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(smartSupplyCountdown, "calorie", state.elapsed);
-  const smartWaterRemainingSec = smartSupplyCountdownRemainingSec(smartSupplyCountdown, "water", state.elapsed);
+  const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(smartSupplyCountdown, "calorie", smartSupplyCountdownNowMs);
+  const smartWaterRemainingSec = smartSupplyCountdownRemainingSec(smartSupplyCountdown, "water", smartSupplyCountdownNowMs);
   const smartCalorieStatus = pendingCalorieRef.current || calorieAlert
     ? "請補給能量"
     : smartCalorieRemainingSec === null ? "計算中" : `下次 ${formatDuration(smartCalorieRemainingSec)}`;

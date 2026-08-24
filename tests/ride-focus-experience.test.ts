@@ -26,11 +26,14 @@ describe("rider-focus experience guards", () => {
     expect(mapSource).toContain("settings.touchGuardAutoRelockSec * 1000");
   });
 
-  it("freezes supply countdowns while stationary and preserves a fixed due time until confirmation", () => {
-    expect(backgroundSource).toContain("supplyCountdownPausedAtMs");
+  it("keeps supply countdowns in real time while stationary and buffers pause recovery only for the next round", () => {
+    expect(backgroundSource).toContain("smartCalorieCountdownPausedTotalMs");
     expect(backgroundSource).toContain("isReliablyMovingForSupply");
-    expect(backgroundSource).toContain("canAdvanceSupplyCountdown");
+    expect(backgroundSource).toContain("supplyNowMs >= (state.smartCalorieCountdownDueAtMs");
+    expect(backgroundSource).toContain("calculatePausedRecoveryExtensionSec");
     expect(mapSource).toContain("currentCountdown ?? createSmartSupplyCountdown");
+    expect(mapSource).toContain("setInterval(() => setSmartSupplyCountdownNowMs(Date.now()), 1_000)");
+    expect(mapSource).toContain("applyPausedRecoveryToNextSupplyPlan");
     expect(mapSource).not.toContain("refreshSmartSupplyCountdown");
   });
 

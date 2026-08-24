@@ -22,6 +22,21 @@ describe("smart supply countdown UI", () => {
     expect(mapSource).not.toContain("refreshSmartSupplyCountdown");
   });
 
+  it("updates the paused dashboard once per second without moving the locked due point, and buffers pause recovery per channel", () => {
+    expect(mapSource).toContain("const [smartSupplyCountdownNowMs, setSmartSupplyCountdownNowMs]");
+    expect(mapSource).toContain("setInterval(() => setSmartSupplyCountdownNowMs(Date.now()), 1_000)");
+    expect(mapSource).toContain("smartSupplyCountdownRemainingSec(smartSupplyCountdown, \"calorie\", smartSupplyCountdownNowMs)");
+    expect(mapSource).toContain("smartSupplyCountdownRemainingSec(smartSupplyCountdown, \"water\", smartSupplyCountdownNowMs)");
+    expect(mapSource).toContain("const supplyRoundPauseRef = useRef<Record<\"calorie\" | \"water\"");
+    expect(mapSource).toContain("consumePausedRecoveryForNextRound(\"calorie\")");
+    expect(mapSource).toContain("consumePausedRecoveryForNextRound(\"water\")");
+    expect(mapSource).toContain("GPS 位置回呼可能在手動暫停、室內或訊號中斷時停止");
+    expect(mapSource).toContain("isSmartSupplyCountdownDue(countdown, \"calorie\", smartSupplyCountdownNowMs)");
+    expect(mapSource).toContain("isSmartSupplyCountdownDue(countdown, \"water\", smartSupplyCountdownNowMs)");
+    expect(backgroundSource).toContain("smartCalorieCountdownPausedTotalMs");
+    expect(backgroundSource).toContain("smartWaterCountdownPausedTotalMs");
+  });
+
   it("initializes concrete smart countdowns at ride start without waiting for the first accepted GPS sample", () => {
     expect(mapSource).toContain("getLastKnownPositionAsync({");
     expect(mapSource).toContain("maxAge: 2 * 60 * 1000,");
