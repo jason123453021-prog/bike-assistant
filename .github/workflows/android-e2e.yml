@@ -92,13 +92,14 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
+          working-directory: ${{ github.workspace }}
           script: |
-            APK_PATH="$(find android -type f -name '*.apk' ! -name '*unaligned*' -print -quit)"
+            APK_PATH="$(find "$GITHUB_WORKSPACE/android" -type f -name '*.apk' ! -name '*unaligned*' -print -quit)"
             test -n "$APK_PATH"
             adb install -r "$APK_PATH"
             curl -fsSL https://get.maestro.mobile.dev | bash
             export PATH="$HOME/.maestro/bin:$PATH"
-            maestro test --format junit --output build/maestro-report.xml --test-output-dir build/maestro-results e2e/maestro
+            maestro test --format junit --output "$GITHUB_WORKSPACE/build/maestro-report.xml" --test-output-dir "$GITHUB_WORKSPACE/build/maestro-results" "$GITHUB_WORKSPACE/e2e/maestro"
 
       - name: 上傳 Maestro 報告與診斷 artifact
         if: always()
