@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { advanceBackgroundAutoPause } from "../lib/background-auto-pause";
+import {
+  advanceBackgroundAutoPause,
+  normalizeAutoPauseSpeedKmh,
+  resolveAutoPauseResumeThresholdKmh,
+} from "../lib/background-auto-pause";
 
 describe("背景自動暫停與前景一致性", () => {
   const base = {
@@ -43,6 +47,40 @@ describe("背景自動暫停與前景一致性", () => {
       intervalSec: 4,
     });
     expect(resumes).toMatchObject({ paused: false, accumulatedLowSpeedSec: 0, movingTimeIncrementSec: 4 });
+  });
+
+  it("將 null、undefined、NaN 與負數速度安全視為 0，首輪距離為 0 仍在 8 秒後暫停", () => {
+    expect(normalizeAutoPauseSpeedKmh(null)).toBe(0);
+    expect(normalizeAutoPauseSpeedKmh(undefined)).toBe(0);
+    expect(normalizeAutoPauseSpeedKmh(Number.NaN)).toBe(0);
+    expect(normalizeAutoPauseSpeedKmh(-2)).toBe(0);
+
+    const waitingForGps = advanceBackgroundAutoPause({ ...base, speedKmh: Number.NaN, intervalSec: 8 });
+    expect(waitingForGps).toMatchObject({ paused: true, accumulatedLowSpeedSec: 8, movingTimeIncrementSec: 8 });
+  });
+
+  it("保留 0.5 km/h 恢復遲滯：1.5 km/h 飄移不清除防抖，1.6 km/h 立即恢復", () => {
+    expect(resolveAutoPauseResumeThresholdKmh(1.1, 0)).toBe(1.6);
+    const jitter = advanceBackgroundAutoPause({
+      ...base,
+      pauseBelowKmh: 1.1,
+      resumeAtOrAboveKmh: 1.6,
+      accumulatedLowSpeedSec: 5,
+      speedKmh: 1.5,
+      intervalSec: 1,
+    });
+    expect(jitter).toMatchObject({ paused: false, accumulatedLowSpeedSec: 5, movingTimeIncrementSec: 1 });
+
+    const resumes = advanceBackgroundAutoPause({
+      ...base,
+      pauseBelowKmh: 1.1,
+      resumeAtOrAboveKmh: 1.6,
+      paused: true,
+      accumulatedLowSpeedSec: 8,
+      speedKmh: 1.6,
+      intervalSec: 1,
+    });
+    expect(resumes).toMatchObject({ paused: false, accumulatedLowSpeedSec: 0, movingTimeIncrementSec: 1 });
   });
 
   it("關閉單車自動暫停時，背景不會凍結移動時間", () => {

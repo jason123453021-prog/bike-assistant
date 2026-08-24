@@ -19,6 +19,18 @@ export interface BackgroundAutoPauseResult {
   pauseStartedBeforeSampleEndSec?: number;
 }
 
+/** 將定位供應商可能回傳的 null、undefined、NaN 或負速度安全視為靜止。 */
+export function normalizeAutoPauseSpeedKmh(speedKmh: unknown): number {
+  const value = Number(speedKmh);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+/** 恢復採用高於暫停門檻 0.5 km/h 的遲滯，避免短暫 GPS 飄移來回切換。 */
+export function resolveAutoPauseResumeThresholdKmh(pauseBelowKmh: unknown, fallbackKmh: number): number {
+  const pauseThreshold = normalizeAutoPauseSpeedKmh(pauseBelowKmh);
+  return Math.max(fallbackKmh, pauseThreshold + 0.5);
+}
+
 /**
  * Background Task 沒有前景的每秒計時器與裝置動作感測資料，因此把每批 GPS 的有效
  * 間隔拆成「仍在防抖」與「已自動暫停」兩段，確保鎖屏與前景同樣保留低速停車前的
@@ -28,22 +40,31 @@ export function advanceBackgroundAutoPause(input: BackgroundAutoPauseInput): Bac
   const intervalSec = Math.max(0, Number.isFinite(input.intervalSec) ? input.intervalSec : 0);
   const lowSpeedSec = Math.max(0, Number.isFinite(input.accumulatedLowSpeedSec) ? input.accumulatedLowSpeedSec : 0);
   const pauseAfterSec = Math.max(0, Number.isFinite(input.pauseAfterSec) ? input.pauseAfterSec : 0);
-  const speedKmh = Math.max(0, Number.isFinite(input.speedKmh) ? input.speedKmh : 0);
+  const speedKmh = normalizeAutoPauseSpeedKmh(input.speedKmh);
+  const pauseBelowKmh = normalizeAutoPauseSpeedKmh(input.pauseBelowKmh);
+  const resumeAtOrAboveKmh = normalizeAutoPauseSpeedKmh(input.resumeAtOrAboveKmh);
 
   if (!input.enabled) {
     return { paused: false, accumulatedLowSpeedSec: 0, movingTimeIncrementSec: intervalSec };
   }
 
   if (input.paused) {
-    if (input.hasReliableMovement && speedKmh >= input.resumeAtOrAboveKmh) {
+    if (speedKmh >= resumeAtOrAboveKmh) {
       return { paused: false, accumulatedLowSpeedSec: 0, movingTimeIncrementSec: intervalSec };
     }
     return { paused: true, accumulatedLowSpeedSec: lowSpeedSec, movingTimeIncrementSec: 0 };
   }
 
-  const isLowAndUnreliable = !input.hasReliableMovement && speedKmh < input.pauseBelowKmh;
+  const isLowAndUnreliable = !input.hasReliableMovement && speedKmh < pauseBelowKmh;
   if (!isLowAndUnreliable) {
-    return { paused: false, accumulatedLowSpeedSec: 0, movingTimeIncrementSec: intervalSec };
+    // 速度落在暫停門檻與恢復門檻之間時保留已累積的防抖秒數；這段遲滯區可吸收
+    // 單次 GPS 飄移（例如 1.5 km/h），只有真正跨過恢復門檻才取消靜止倒數。
+    const crossedResumeThreshold = speedKmh >= resumeAtOrAboveKmh;
+    return {
+      paused: false,
+      accumulatedLowSpeedSec: crossedResumeThreshold ? 0 : lowSpeedSec,
+      movingTimeIncrementSec: intervalSec,
+    };
   }
 
   const nextLowSpeedSec = lowSpeedSec + intervalSec;

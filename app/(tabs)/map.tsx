@@ -119,6 +119,7 @@ import {
 } from "@/lib/smart-supply-countdown";
 import { deriveAutomaticSweatCalibration } from "@/lib/supply-calibration";
 import { shouldRestoreBackgroundSupplyReminder } from "@/lib/background-supply-recovery";
+import { normalizeAutoPauseSpeedKmh, resolveAutoPauseResumeThresholdKmh } from "@/lib/background-auto-pause";
 import {
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
@@ -380,6 +381,8 @@ export default function MapScreen() {
 
   // 累積連續低速秒數，避免依定位回呼次數而在不同裝置提早暫停。
   const lowSpeedCountRef = useRef(0);
+  // 無法取得 GPS 速度時以牆鐘時間推進自動暫停，避免 Android 靜止時不送定位回呼。
+  const lastForegroundLocationSampleAtRef = useRef(0);
   // 速度平滑窗口（用於過濾 GPS 速度抖動）
   const speedWindowRef = useRef<number[]>([]);
   const lastValidSpeedRef = useRef<number>(0);
@@ -2098,7 +2101,8 @@ export default function MapScreen() {
             setRelativeWindInfo(getRelativeWindInfo(hdg, wd.direction, wd.speed * 3.6));
           }
 
-          const speedKmh = (speed ?? 0) * 3.6;
+          lastForegroundLocationSampleAtRef.current = Date.now();
+          const speedKmh = normalizeAutoPauseSpeedKmh(Number(speed) * 3.6);
           const currentState = stateRef.current;
 
           // ── 自動暫停/恢復（改進版本）──────────────────────────────────────────────
@@ -2157,9 +2161,14 @@ export default function MapScreen() {
           
           // 自動暫停/恢復邏輯
           const autoPauseEnabledForSport = currentState.sportType !== "cycling" || settings.idleAutoPauseEnabled;
+          const autoPauseResumeThresholdKmh = resolveAutoPauseResumeThresholdKmh(
+            autoPausePolicy.speedBelowKmh,
+            AUTO_PAUSE_RESUME_THRESHOLD,
+          );
           if (currentState.status === "active") {
             const satisfiesStillness = !autoPausePolicy.requiresStillness || motionStillRef.current;
-            if (autoPauseEnabledForSport && autoPausePolicy.mode === "automatic" && !hasReliableMovement && avgSpeed < autoPausePolicy.speedBelowKmh && satisfiesStillness) {
+            const isBelowPauseThreshold = speedKmh < autoPausePolicy.speedBelowKmh;
+            if (autoPauseEnabledForSport && autoPausePolicy.mode === "automatic" && !hasReliableMovement && isBelowPauseThreshold && satisfiesStillness) {
               lowSpeedCountRef.current += autoPauseSampleSec;
               if (lowSpeedCountRef.current >= autoPausePolicy.stillForSeconds) {
                 lowSpeedCountRef.current = 0;
@@ -2176,11 +2185,11 @@ export default function MapScreen() {
                 hikingPauseSuggestedRef.current = true;
                 Alert.alert("登山停留提示", "已偵測到長時間低速停留。登山模式不會自動暫停；若正在休息，可手動暫停以保持移動時間精確。");
               }
-            } else {
+            } else if (speedKmh >= autoPauseResumeThresholdKmh) {
               lowSpeedCountRef.current = 0;
               hikingPauseSuggestedRef.current = false;
             }
-          } else if (currentState.status === "paused" && autoPauseEnabledForSport && autoPausePolicy.mode === "automatic" && hasReliableMovement && avgSpeed >= Math.max(AUTO_PAUSE_RESUME_THRESHOLD, autoPausePolicy.speedBelowKmh + 0.5)) {
+          } else if (currentState.status === "paused" && autoPauseEnabledForSport && autoPausePolicy.mode === "automatic" && speedKmh >= autoPauseResumeThresholdKmh) {
             lowSpeedCountRef.current = 0;
             dispatch({ type: "RESUME" });
             return;
@@ -2526,6 +2535,27 @@ export default function MapScreen() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [followUser, mapRideActive, isNavigating, gpxRoute, rideLocationTrackingMode, settings]);
+
+  // Android 在室內、靜止或尚未鎖定 GPS 時可能完全不送出 speed 樣本。無樣本滿足既有
+  // 靜止時間後，直接以 0 km/h 進入自動暫停；不依賴距離大於 0 或下一次定位回呼。
+  useEffect(() => {
+    if (!mapRideActive) return;
+    lastForegroundLocationSampleAtRef.current = Date.now();
+    const watchdog = setInterval(() => {
+      const current = stateRef.current;
+      const policy = getSportTrackingPolicy(current.sportType).autoPause;
+      const autoPauseEnabledForSport = current.sportType !== "cycling" || settings.idleAutoPauseEnabled;
+      if (current.status !== "active" || !autoPauseEnabledForSport || policy.mode !== "automatic") return;
+      if (Date.now() - lastForegroundLocationSampleAtRef.current < policy.stillForSeconds * 1_000) return;
+
+      lowSpeedCountRef.current = 0;
+      pausedElapsedRef.current = current.elapsed;
+      dispatch({ type: "PAUSE" });
+      dispatch({ type: "LIVE_READINGS_STATIONARY" });
+      if (settings.vibrationEnabled) vibrateMedium();
+    }, 1_000);
+    return () => clearInterval(watchdog);
+  }, [dispatch, mapRideActive, settings.idleAutoPauseEnabled, settings.vibrationEnabled]);
 
   // ─── GPX 導航邏輯 ────────────────────────────────────────────────────────────
   const handleNavigation = useCallback(

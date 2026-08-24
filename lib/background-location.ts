@@ -372,7 +372,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
         const { loc, segmentStart } = acceptedLocation;
         const { latitude, longitude, speed } = loc.coords;
         const timestamp = loc.timestamp;
-        const speedMs = speed ?? 0;
+        const reportedSpeedMs = Number(speed);
+        const speedMs = Number.isFinite(reportedSpeedMs) ? Math.max(0, reportedSpeedMs) : 0;
         const speedKmh = speedMs * 3.6;
 
         // 省電監測期間只低頻確認是否重新移動，不寫入騎乘軌跡與統計。
