@@ -19,6 +19,7 @@
 | Expo SDK | 18/18 checks passed | `npx expo-doctor` | 通過 |
 | 正式設定 | App `單車助手`、1.0.90、Android package 已解析 | `npx expo config --type public --json` | 通過 |
 | Android Hermes | 1 個 Android HBC bundle、26 項 assets、共 28 檔 | `EAS_BUILD_PROFILE=production npx expo export --platform android` | 通過 |
+| GitHub Android APK | workflow run 32736347306 成功；artifact 未過期 | `bike-assistant-preview-apk`，28,358,260 bytes | 通過 |
 | 開發伺服器 | 最近 Metro bundle 成功；歷史 ELIFECYCLE 後已重啟 | `.manus-logs/devserver.log` | 通過（附註） |
 
 ## 2. 功能地圖對應驗證
@@ -37,6 +38,8 @@
 正式公開設定成功解析出版本 **1.0.90**、Android `versionCode` **10090** 與套件名稱 `com.jason123453021.bikeassistant`。定位、背景定位、前景定位服務、通知、震動、Wake Lock、音訊與相片選取權限均在解析後設定中存在；OTA 更新維持停用，正式 JavaScript 引擎為 Hermes。
 
 Android export 成功建立一個約 **5.88 MB** 的 Hermes HBC bundle、**26** 項資產及 metadata。此動作驗證 JavaScript bundle 與 Metro 資產層，不等同於已在實體裝置安裝或完成 Google Play 簽署／上傳。
+
+GitHub Actions 亦已完成可安裝的 Android APK 驗收建置：[workflow run 32736347306](https://github.com/jason123453021-prog/bike-assistant/actions/runs/32736347306) 成功，artifact `bike-assistant-preview-apk` 為 **28,358,260 bytes**，有效至 **2026-09-07 14:19:56 UTC**。workflow 顯示第三方 action 的 Node.js 20 棄用提醒，但 action 已被 GitHub runner 強制升至 Node.js 24，工作流程、品質守門、Gradle 建置與 artifact 上傳皆成功；本輪將其列為非阻擋的依賴維護提醒。
 
 ## 4. 警告、限制與實機驗收邊界
 

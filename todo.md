@@ -2441,4 +2441,4 @@
 - [x] 依 FEATURE_MAP_PRD 建立核心紀錄、導航、補給、活動、匯出、設定與系統防護的自動化 QC 矩陣
 - [x] 執行 TypeScript、Lint、完整 Vitest 與針對 GPS／COG／補給／匯出的資料鏈回歸，記錄通過、警告與阻擋項
 - [x] 執行 Expo Doctor、Android Hermes 匯出與設定解析，確認封版相容性
-- [ ] 產出可追溯 Markdown QC 報告、保存版本、同步 GitHub Actions APK artifact 並交付實機驗收邊界
+- [x] 產出可追溯 Markdown QC 報告、保存版本、同步 GitHub Actions APK artifact 並交付實機驗收邊界（run 32736347306，artifact 28,358,260 bytes，未過期）
