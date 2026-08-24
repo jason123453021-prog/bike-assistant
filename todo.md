@@ -2436,3 +2436,9 @@
 - [x] 按核心紀錄、導航地圖、運動補給、介面分享、系統防護分類，記錄實際觸發條件與資料語意
 - [x] 交叉驗證手動 Lap、日出日落提醒與其他已移除／未實作項目不會被列入已實作功能
 - [x] 產出可閱讀 Markdown PRD／Feature Map 並校閱後交付
+
+## 完整功能地圖全自動 QC（2026-08-24）
+- [x] 依 FEATURE_MAP_PRD 建立核心紀錄、導航、補給、活動、匯出、設定與系統防護的自動化 QC 矩陣
+- [x] 執行 TypeScript、Lint、完整 Vitest 與針對 GPS／COG／補給／匯出的資料鏈回歸，記錄通過、警告與阻擋項
+- [x] 執行 Expo Doctor、Android Hermes 匯出與設定解析，確認封版相容性
+- [ ] 產出可追溯 Markdown QC 報告、保存版本、同步 GitHub Actions APK artifact 並交付實機驗收邊界
