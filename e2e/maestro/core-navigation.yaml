@@ -7,6 +7,9 @@ name: Android 封版核心導覽
       android.permission.ACCESS_FINE_LOCATION: allow
       android.permission.ACCESS_COARSE_LOCATION: allow
       android.permission.POST_NOTIFICATIONS: allow
+- tapOn:
+    text: "Wait"
+    optional: true
 - assertVisible: "Navigation"
 - assertVisible: "Routes"
 - assertVisible: "History"
