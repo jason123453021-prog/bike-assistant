@@ -93,7 +93,7 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
-            APK_PATH="$(find android/app/build/outputs/apk/release -name '*.apk' -print -quit)"
+            APK_PATH="$(find android -type f -name '*.apk' ! -name '*unaligned*' -print -quit)"
             test -n "$APK_PATH"
             adb install -r "$APK_PATH"
             curl -fsSL https://get.maestro.mobile.dev | bash
