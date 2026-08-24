@@ -2448,4 +2448,4 @@
 - [x] 建立 Jest 核心 GPS、自動暫停、時間隔離、自動計圈、COG、轉彎、補給倒數、補償與 Timeout 降級回歸測試
 - [x] 建立靜態封版守門，禁止手動 Lap、日出日落提醒、Kalman Filter 與 FIT timer time 綁定錯誤回歸
 - [x] 建立 Android E2E 腳本及 CI 執行路徑，並明確區分可自動執行與受模擬器／原生環境限制的案例
-- [ ] 執行全套測試、修正可重現失敗、產出 Pass／Fail 報告、checkpoint 與 GitHub APK artifact
+- [x] 執行全套測試、修正可重現失敗、產出 Pass／Fail 報告、checkpoint 與 GitHub artifact（Android E2E run 32753570646 成功；`bike-assistant-maestro-e2e` 335,773 bytes，JUnit 1 test／0 failures）
