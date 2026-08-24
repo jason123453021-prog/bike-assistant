@@ -36,6 +36,10 @@ describe("local ride share card", () => {
     expect(svg).toContain("45.20");
     expect(svg).toContain("晨騎 &lt;測試&gt;");
     expect(svg).toContain("活動摘要");
+    expect(svg).toContain("移動時間");
+    expect(svg).toContain("GPS 移動");
+    expect(svg).toContain("爬升");
+    expect(svg.indexOf("距離")).toBeLessThan(svg.indexOf("平均速度"));
   });
 
   it("creates a safe local SVG filename", () => {
@@ -67,6 +71,16 @@ describe("local ride share card", () => {
     const source = readFileSync("lib/ride-share-card-svg.ts", "utf8");
     expect(svg).not.toContain("Infinity");
     expect(svg).toContain("資料不足");
-    expect(source).toContain("const drawScale = Math.min(896 / lonSpan, 560 / latSpan);");
+    expect(source).toContain("const drawScale = Math.min(900 / lonSpan, 570 / latSpan);");
+  });
+
+  it("GPS 軌跡不足時顯示明確空狀態，且分享預覽直接使用輸出 SVG", () => {
+    const svg = createRideShareCardSvg({ ...record, route: [] });
+    const modalSource = readFileSync("components/share-card-modal.tsx", "utf8");
+    expect(svg).toContain("此活動沒有可繪製的 GPS 軌跡");
+    expect(svg).not.toContain('<polyline points=""');
+    expect(modalSource).toContain("shareCardPreviewHtml");
+    expect(modalSource).toContain("預覽與實際匯出的 PNG 使用同一張 SVG");
+    expect(modalSource).not.toContain('backgroundColor: "#667eea"');
   });
 });

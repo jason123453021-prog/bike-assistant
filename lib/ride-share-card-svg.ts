@@ -3,6 +3,7 @@ import { buildActivityStatistics } from "./activity-statistics";
 
 const CARD_WIDTH = 1080;
 const CARD_HEIGHT = 1920;
+const FONT_STACK = "Arial, Noto Sans TC, sans-serif";
 
 function escapeXml(value: string): string {
   return value
@@ -26,6 +27,20 @@ function formatDuration(seconds: number): string {
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${String(remain).padStart(2, "0")}` : `${minutes}:${String(remain).padStart(2, "0")}`;
 }
 
+function truncateTitle(value: string, maximum = 18): string {
+  return value.length > maximum ? `${value.slice(0, maximum - 1)}…` : value;
+}
+
+function sportLabel(record: RideRecord): string {
+  switch (record.sportType) {
+    case "running": return "跑步";
+    case "trail_running": return "越野跑";
+    case "hiking": return "健行";
+    default: return "自行車";
+  }
+}
+
+/** 將 GPS 軌跡以中緯度校正並等比例 fit 至地圖安全範圍。 */
 function routePoints(record: RideRecord): string {
   if (record.route.length < 2) return "";
   const lats = record.route.map((point) => point.latitude);
@@ -36,68 +51,121 @@ function routePoints(record: RideRecord): string {
   const maxLon = Math.max(...lons);
   const centerLat = (minLat + maxLat) / 2;
   const centerLon = (minLon + maxLon) / 2;
-  // 以中緯度修正經度長度並等比例 fit bounds，避免路線被 XY 個別伸縮而變形。
   const lonScale = Math.max(0.1, Math.cos((centerLat * Math.PI) / 180));
   const latSpan = Math.max(maxLat - minLat, 0.0001);
   const lonSpan = Math.max((maxLon - minLon) * lonScale, 0.0001);
-  const drawScale = Math.min(896 / lonSpan, 560 / latSpan);
+  const drawScale = Math.min(900 / lonSpan, 570 / latSpan);
   return record.route.map((point) => {
     const x = 540 + (point.longitude - centerLon) * lonScale * drawScale;
-    const y = 370 - (point.latitude - centerLat) * drawScale;
+    const y = 450 - (point.latitude - centerLat) * drawScale;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
 }
 
-function metric(x: number, y: number, label: string, value: string, unit: string): string {
-  return `<text x="${x}" y="${y}" fill="#A4ADB9" font-size="28" font-family="sans-serif" text-anchor="middle">${escapeXml(label)}</text>
-    <text x="${x}" y="${y + 58}" fill="#FFFFFF" font-size="49" font-weight="700" font-family="sans-serif" text-anchor="middle">${escapeXml(value)}</text>
-    <text x="${x}" y="${y + 90}" fill="#A4ADB9" font-size="22" font-family="sans-serif" text-anchor="middle">${escapeXml(unit)}</text>`;
+function metricCell({
+  x,
+  y,
+  label,
+  value,
+  unit,
+  primary = false,
+  unavailable = false,
+}: {
+  x: number;
+  y: number;
+  label: string;
+  value: string;
+  unit: string;
+  primary?: boolean;
+  unavailable?: boolean;
+}): string {
+  const valueColor = unavailable ? "#7E8B99" : "#F8FBFD";
+  const valueSize = primary ? 62 : 50;
+  return `<text x="${x}" y="${y}" fill="#93A2B2" font-size="24" font-weight="700" font-family="${FONT_STACK}" text-anchor="middle" letter-spacing="1">${escapeXml(label)}</text>
+    <text x="${x}" y="${y + 66}" fill="${valueColor}" font-size="${valueSize}" font-weight="800" font-family="${FONT_STACK}" text-anchor="middle">${escapeXml(value)}</text>
+    <text x="${x}" y="${y + 102}" fill="#93A2B2" font-size="21" font-family="${FONT_STACK}" text-anchor="middle">${escapeXml(unit)}</text>`;
 }
 
 export function createRideShareCardSvg(record: RideRecord): string {
-  const hasPhotos = record.mediaItems && record.mediaItems.length > 0;
-  const photoUri = hasPhotos ? record.mediaItems![0] : "";
-  const hasPreviewPhoto = hasPhotos && !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(photoUri);
   const points = routePoints(record);
-  const hasPowerEvidence = record.powerSource !== "unavailable" && (record.avgPower > 0 || record.maxPower > 0 || (record.powerHistory?.some((power) => power > 0) ?? false));
+  const hasPowerEvidence = record.powerSource !== "unavailable" && (
+    record.avgPower > 0 || record.maxPower > 0 || (record.powerHistory?.some((power) => power > 0) ?? false)
+  );
+  const movingTimeSec = record.movingTime ?? Math.max(0, record.duration - (record.totalPausedSec ?? 0));
   const stats = buildActivityStatistics({
     distanceM: record.distance,
-    movingTimeSec: record.movingTime ?? Math.max(0, record.duration - (record.totalPausedSec ?? 0)),
+    movingTimeSec,
     pausedTimeSec: record.totalPausedSec ?? 0,
     totalAscentM: record.totalAscent,
     totalDescentM: record.totalDescent ?? 0,
     maxSpeedKmh: record.maxSpeed,
     maxPowerW: record.maxPower,
     powerWorkJ: (record.totalWorkKj ?? 0) * 1000,
-    powerSampleDurationSec: hasPowerEvidence ? (record.movingTime ?? Math.max(0, record.duration - (record.totalPausedSec ?? 0))) : 0,
+    powerSampleDurationSec: hasPowerEvidence ? movingTimeSec : 0,
     caloriesKcal: record.calories,
     powerSource: record.powerSource ?? "unavailable",
     caloriesSource: record.caloriesSource ?? "unavailable",
   });
-  const movingTime = stats.movingTimeSec;
-  const movingSpeed = stats.averageSpeedKmh;
-  const bests = record.personalBests?.map((best) => best.label).join("、") ?? "";
-  const routeName = escapeXml(record.name || "未命名騎乘");
-  const splitPoints = points.split(" ");
-  const firstPoint = splitPoints[0]?.split(",");
-  const lastPoint = splitPoints.at(-1)?.split(",");
+  const routeName = truncateTitle(record.name?.trim() || "未命名騎乘");
+  const routeTokens = points ? points.split(" ") : [];
+  const firstPoint = routeTokens[0]?.split(",");
+  const middlePoint = routeTokens[Math.floor(routeTokens.length / 2)]?.split(",");
+  const lastPoint = routeTokens.at(-1)?.split(",");
+  const averagePowerAvailable = stats.averagePowerW !== undefined;
   const routeGraphic = points
-    ? `<polyline points="${points}" fill="none" stroke="#FF6A22" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
-       <circle cx="${firstPoint?.[0]}" cy="${firstPoint?.[1]}" r="18" fill="#21E58B" stroke="#FFFFFF" stroke-width="7"/>
-       <circle cx="${lastPoint?.[0]}" cy="${lastPoint?.[1]}" r="18" fill="#FF5B5B" stroke="#FFFFFF" stroke-width="7"/>`
-    : `<text x="540" y="380" fill="#A4ADB9" font-size="30" font-family="sans-serif" text-anchor="middle">此記錄沒有可繪製的 GPS 軌跡</text>`;
+    ? `<polyline points="${points}" fill="none" stroke="#06251F" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+       <polyline points="${points}" fill="none" stroke="#24E28C" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+       <circle cx="${middlePoint?.[0]}" cy="${middlePoint?.[1]}" r="10" fill="#D7FFE9" stroke="#24E28C" stroke-width="6"/>
+       <circle cx="${firstPoint?.[0]}" cy="${firstPoint?.[1]}" r="20" fill="#21D57D" stroke="#F7FFFB" stroke-width="8"/>
+       <circle cx="${lastPoint?.[0]}" cy="${lastPoint?.[1]}" r="20" fill="#FF7849" stroke="#FFF7F2" stroke-width="8"/>`
+    : `<g><circle cx="540" cy="415" r="64" fill="#14212A" stroke="#2C4352" stroke-width="2"/>
+       <path d="M540 372 L564 420 L540 408 L516 420 Z" fill="#6B7F8D"/>
+       <text x="540" y="525" fill="#B3C0CB" font-size="28" font-family="${FONT_STACK}" text-anchor="middle">此活動沒有可繪製的 GPS 軌跡</text></g>`;
+
+  const primaryMetrics = [
+    metricCell({ x: 180, y: 1234, label: "距離", value: (stats.distanceM / 1000).toFixed(2), unit: "公里", primary: true }),
+    metricCell({ x: 540, y: 1234, label: "移動時間", value: formatDuration(stats.movingTimeSec), unit: "GPS 移動", primary: true }),
+    metricCell({ x: 900, y: 1234, label: "爬升", value: `${Math.round(stats.totalAscentM)}`, unit: "公尺", primary: true }),
+  ].join("");
+  const secondaryMetrics = [
+    metricCell({ x: 180, y: 1512, label: "平均速度", value: stats.averageSpeedKmh.toFixed(1), unit: "公里／小時" }),
+    metricCell({ x: 540, y: 1512, label: "平均功率", value: averagePowerAvailable ? `${Math.round(stats.averagePowerW!)}` : "--", unit: averagePowerAvailable ? "瓦" : "資料不足", unavailable: !averagePowerAvailable }),
+    metricCell({ x: 900, y: 1512, label: "卡路里", value: Math.round(stats.caloriesKcal).toLocaleString("en-US"), unit: "大卡" }),
+  ].join("");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="0 0 ${CARD_WIDTH} ${CARD_HEIGHT}">
-  <defs><linearGradient id="hero" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#102F32"/><stop offset="100%" stop-color="#07151A"/></linearGradient><pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse"><path d="M 64 0 L 0 0 0 64" fill="none" stroke="#6B8790" stroke-opacity="0.17" stroke-width="1"/></pattern><clipPath id="mediaClip"><rect x="88" y="886" width="238" height="168" rx="14"/></clipPath></defs>
-  <rect width="1080" height="1920" fill="#101114"/><rect width="1080" height="700" fill="url(#hero)"/><rect width="1080" height="700" fill="url(#grid)"/>
-  <text x="72" y="78" fill="#D9FFEC" font-size="26" font-weight="700" font-family="sans-serif">單車助手 · 騎乘動態</text>${routeGraphic}
-  <rect x="0" y="650" width="1080" height="1270" rx="42" fill="#101114"/>
-  <text x="70" y="724" fill="#00E676" font-size="24" font-weight="700" font-family="sans-serif">活動摘要</text><text x="70" y="792" fill="#FFFFFF" font-size="50" font-weight="800" font-family="sans-serif">${routeName}</text><text x="70" y="836" fill="#A4ADB9" font-size="24" font-family="sans-serif">${formatDate(record.date)}</text>
-  ${hasPhotos ? `<rect x="70" y="865" width="940" height="210" rx="20" fill="#1E222A"/>${hasPreviewPhoto ? `<image href="${escapeXml(photoUri)}" x="88" y="886" width="238" height="168" preserveAspectRatio="xMidYMid slice" clip-path="url(#mediaClip)"/>` : `<rect x="88" y="886" width="238" height="168" rx="14" fill="#123126"/><text x="207" y="965" fill="#9CFFB5" font-size="40" font-family="sans-serif" text-anchor="middle">▶</text><text x="207" y="1007" fill="#D9FFEC" font-size="18" font-family="sans-serif" text-anchor="middle">活動影片</text>`}<text x="360" y="915" fill="#00E676" font-size="20" font-weight="700" font-family="sans-serif">活動媒體</text><text x="360" y="960" fill="#FFFFFF" font-size="28" font-weight="700" font-family="sans-serif">${hasPreviewPhoto ? "首張活動照片" : "已附加本機影片"}</text><text x="360" y="1002" fill="#A4ADB9" font-size="21" font-family="sans-serif">共 ${record.mediaItems!.length} 項本機媒體</text>` : ""}
-  ${metric(260, hasPhotos ? 1140 : 960, "距離", (stats.distanceM / 1000).toFixed(2), "公里")}${metric(820, hasPhotos ? 1140 : 960, "爬升海拔", `${Math.round(stats.totalAscentM)}`, "公尺")}${metric(260, hasPhotos ? 1320 : 1140, "移動時間", formatDuration(movingTime), "")}${metric(820, hasPhotos ? 1320 : 1140, "平均功率", stats.averagePowerW === undefined ? "--" : `${Math.round(stats.averagePowerW)}`, stats.averagePowerW === undefined ? "資料不足" : "瓦")}${metric(260, hasPhotos ? 1500 : 1320, "平均速度", movingSpeed.toFixed(1), "公里／小時")}${metric(820, hasPhotos ? 1500 : 1320, "卡路里", `${Math.round(stats.caloriesKcal)}`, "卡")}
-  <line x1="540" y1="${hasPhotos ? 1100 : 920}" x2="540" y2="${hasPhotos ? 1550 : 1370}" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/><line x1="120" y1="${hasPhotos ? 1230 : 1050}" x2="960" y2="${hasPhotos ? 1230 : 1050}" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/><line x1="120" y1="${hasPhotos ? 1410 : 1230}" x2="960" y2="${hasPhotos ? 1410 : 1230}" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/>
-  <text x="540" y="1815" fill="#6E7783" font-size="22" font-family="sans-serif" text-anchor="middle">由單車助手在此裝置離線產生</text>
+  <defs>
+    <linearGradient id="mapSurface" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#112D34"/><stop offset="100%" stop-color="#08141C"/></linearGradient>
+    <linearGradient id="panelSurface" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#131E28"/><stop offset="100%" stop-color="#0B121A"/></linearGradient>
+    <pattern id="mapGrid" width="72" height="72" patternUnits="userSpaceOnUse"><path d="M72 0H0V72" fill="none" stroke="#9BD5D1" stroke-opacity="0.12" stroke-width="1"/></pattern>
+    <filter id="routeGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="10"/></filter>
+  </defs>
+  <rect width="1080" height="1920" fill="#0A1118"/>
+  <rect x="0" y="0" width="1080" height="980" fill="url(#mapSurface)"/>
+  <rect x="0" y="0" width="1080" height="980" fill="url(#mapGrid)"/>
+  <rect x="64" y="54" width="310" height="50" rx="25" fill="#10232A" stroke="#2A4A50" stroke-width="2"/>
+  <text x="94" y="87" fill="#BFFFE0" font-size="22" font-weight="800" font-family="${FONT_STACK}" letter-spacing="2">BIKE ASSISTANT</text>
+  <text x="1012" y="84" fill="#C2CDD6" font-size="22" font-weight="700" font-family="${FONT_STACK}" text-anchor="end">${escapeXml(sportLabel(record))} · GPS 記錄</text>
+  ${points ? `<polyline points="${points}" fill="none" stroke="#20D984" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" opacity="0.16" filter="url(#routeGlow)"/>` : ""}
+  ${routeGraphic}
+  <rect x="0" y="906" width="1080" height="1014" rx="48" fill="url(#panelSurface)"/>
+  <rect x="64" y="952" width="116" height="38" rx="19" fill="#123C30"/>
+  <text x="122" y="978" fill="#63F5AA" font-size="19" font-weight="800" font-family="${FONT_STACK}" text-anchor="middle" letter-spacing="1">活動摘要</text>
+  <text x="64" y="1066" fill="#F8FBFD" font-size="56" font-weight="800" font-family="${FONT_STACK}">${escapeXml(routeName)}</text>
+  <text x="64" y="1112" fill="#93A2B2" font-size="25" font-family="${FONT_STACK}">${formatDate(record.date)}</text>
+  <line x1="64" y1="1164" x2="1016" y2="1164" stroke="#DCE8EE" stroke-opacity="0.14" stroke-width="2"/>
+  ${primaryMetrics}
+  <line x1="360" y1="1210" x2="360" y2="1366" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
+  <line x1="720" y1="1210" x2="720" y2="1366" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
+  <line x1="64" y1="1412" x2="1016" y2="1412" stroke="#DCE8EE" stroke-opacity="0.14" stroke-width="2"/>
+  ${secondaryMetrics}
+  <line x1="360" y1="1488" x2="360" y2="1644" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
+  <line x1="720" y1="1488" x2="720" y2="1644" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
+  <rect x="64" y="1748" width="952" height="96" rx="24" fill="#0E1A22" stroke="#203642" stroke-width="2"/>
+  <circle cx="112" cy="1796" r="10" fill="#26E38C"/>
+  <text x="140" y="1804" fill="#C9D6DE" font-size="22" font-family="${FONT_STACK}">移動時間依可信 GPS 位置、距離與速度計算</text>
+  <text x="540" y="1890" fill="#6D7D8A" font-size="20" font-family="${FONT_STACK}" text-anchor="middle">由單車助手在此裝置離線產生</text>
 </svg>`;
 }
 

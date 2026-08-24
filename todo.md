@@ -2424,3 +2424,9 @@
 - [x] 以 GPS course-over-ground（COG）取代硬體羅盤依賴，提供平滑的自由騎乘與路線 on-track／off-track 地圖轉向
 - [x] 以 GPX 軌跡向量建立左右轉提示、接近路口的 TTS／螢幕喚醒與通過後省電恢復策略
 - [x] 對齊活動詳情、分享文字、社群圖卡與標準化匯出資料呈現，新增回歸測試並完成完整 QC、Android Hermes 匯出；checkpoint 後同步 GitHub Actions APK artifact 與實機驗收建議
+
+## Strava 公開活動語意分享圖卡重構（2026-08-24）
+- [x] 盤點目前本機分享圖卡與 Strava 公開活動摘要的資料層級、格式與無資料語意
+- [x] 重構上半部路線視覺、活動標題與關鍵摘要，提供不失真的等比例軌跡與清楚起終點
+- [x] 重構距離、移動時間、平均速度、爬升、功率與卡路里的高對比統計網格，保留安全防爆與資料來源語意
+- [x] 新增分享圖卡版面／資料情境測試並完成 QC、Android 匯出；checkpoint 後同步 GitHub Actions APK artifact 與實機驗收建議

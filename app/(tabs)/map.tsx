@@ -64,7 +64,7 @@ import { calculateAgeFromBirthday } from "@/lib/personal-profile";
 import { useSettings, DEFAULT_FIELD_ORDER, type NormalFieldKey } from "@/lib/settings-context";
 import { useGpx } from "@/lib/gpx-context";
 
-import { type GpxPoint, type GpxRoute } from "@/lib/gpx-parser";
+import { type GpxRoute } from "@/lib/gpx-parser";
 import { calculateKilometerMarkers } from "@/lib/kilometer-markers";
 import {
   vibrateLight,
@@ -214,8 +214,6 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 // ─── 常數 ─────────────────────────────────────────────────────────────────────
 const ARRIVAL_THRESHOLD_M = 30;
-const TURN_LOOKAHEAD_M = 150;
-const TURN_ANGLE_DEG = 30;
 const AUTO_PAUSE_RESUME_THRESHOLD = 1.8; // 0.5 m/s，與單車低速移動門檻一致
 const WEATHER_INTERVAL = 10 * 60 * 1000;
 const LOCATION_INTERVAL_SEC = 3;
@@ -243,27 +241,6 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
     Math.cos((lat2 * Math.PI) / 180) *
     Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function bearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const y = Math.sin(dLon) * Math.cos((lat2 * Math.PI) / 180);
-  const x =
-    Math.cos((lat1 * Math.PI) / 180) * Math.sin((lat2 * Math.PI) / 180) -
-    Math.sin((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.cos(dLon);
-  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-}
-
-function findNearestPointIndex(lat: number, lon: number, points: GpxPoint[]): number {
-  let minDist = Infinity;
-  let minIdx = 0;
-  for (let i = 0; i < points.length; i++) {
-    const d = haversine(lat, lon, points[i].lat, points[i].lon);
-    if (d < minDist) { minDist = d; minIdx = i; }
-  }
-  return minIdx;
 }
 
 // ─── 主元件 ───────────────────────────────────────────────────────────────────
@@ -2023,7 +2000,7 @@ export default function MapScreen() {
         },
         (loc) => {
           if (!active) return;
-          const { latitude, longitude, altitude, heading, speed } = loc.coords;
+          const { latitude, longitude, altitude, speed } = loc.coords;
           const speedKmhRaw = (speed ?? 0) * 3.6;
 
           const trackPointDecision = mapRideActive
