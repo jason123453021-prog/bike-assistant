@@ -74,11 +74,11 @@ jobs:
           pnpm test:jest
           pnpm test
 
-      - name: 產生 Android 原生專案與 E2E APK
+      - name: 產生 Android 原生專案與 E2E release APK
         run: |
           npx expo prebuild --platform android --clean --no-install
-          (cd android && ./gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64 --no-daemon --stacktrace)
-          APK_PATH="$(find android/app/build/outputs/apk/debug -type f -name '*.apk' -print -quit)"
+          (cd android && ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon --stacktrace)
+          APK_PATH="$(find android/app/build/outputs/apk/release -type f -name '*.apk' ! -name '*unaligned*' -print -quit)"
           test -s "$APK_PATH"
           mkdir -p build
           cp "$APK_PATH" build/e2e-under-test.apk
