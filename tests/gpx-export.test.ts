@@ -31,4 +31,25 @@ describe("createGpxContent", () => {
     const gpx = createGpxContent({ ...record, sportType: "trail_running" });
     expect(gpx).toContain("<type>Trail Running</type>");
   });
+
+  it("完整保留已接受的暫停期間 GPS 點及原始時間戳，不以自動暫停過濾輸出", () => {
+    const pausedTimestamp = 1_725_000_300_000;
+    const gpx = createGpxContent({
+      ...record,
+      route: [
+        record.route[0],
+        {
+          latitude: 25.015,
+          longitude: 121.505,
+          altitude: 12,
+          speed: 0,
+          timestamp: pausedTimestamp,
+          recordedDuringPause: true,
+        },
+        record.route[1],
+      ],
+    });
+    expect(gpx).toContain('<trkpt lat="25.0150000" lon="121.5050000">');
+    expect(gpx).toContain(`<time>${new Date(pausedTimestamp).toISOString()}</time>`);
+  });
 });

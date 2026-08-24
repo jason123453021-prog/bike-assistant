@@ -180,6 +180,28 @@ describe("ride record normalizer", () => {
     expect(record?.totalPausedSec).toBe(120);
   });
 
+  it("repairs an auto-pause-corrupted moving time from a timestamp-complete raw GPS route", () => {
+    const route = Array.from({ length: 8 }, (_, index) => ({
+      latitude: 25 + index * 0.0005,
+      longitude: 121,
+      altitude: 100,
+      speed: 4,
+      timestamp: 1_000 + index * 10_000,
+    }));
+    const record = normalizeRideRecord({
+      id: "auto-pause-corrupted-moving-time",
+      distance: 390,
+      duration: 70,
+      // 舊版自動暫停錯把 51 秒當成暫停，導致 19 秒移動時間與不合理均速。
+      totalPausedSec: 51,
+      route,
+    });
+
+    expect(record?.movingTime).toBe(70);
+    expect(record?.totalPausedSec).toBe(0);
+    expect(record?.avgSpeed).toBeLessThan(30);
+  });
+
   it("clamps impossible virtual-power spikes to the rider FTP ceiling while retaining measured power provenance", () => {
     const estimated = normalizeRideRecord({
       id: "virtual-power-spike",

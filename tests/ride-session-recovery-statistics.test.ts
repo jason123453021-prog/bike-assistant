@@ -27,4 +27,24 @@ describe("騎乘復原會話統計", () => {
     expect(session.stats.totalTime).toBe(3_000);
     expect(session.stats.totalElevationGain).toBe(0);
   });
+
+  it("保留暫停期間的已接受原始點，但不累積距離、移動時間或海拔", () => {
+    const session = createNewRideSession();
+    const start = 1_700_000_000_000;
+    addTrackPoint(session, { timestamp: start, latitude: 25, longitude: 121, altitude: 100, speed: 4 });
+    addTrackPoint(session, {
+      timestamp: start + 3_000,
+      latitude: 25.0002,
+      longitude: 121,
+      altitude: 120,
+      speed: 0,
+      recordedDuringPause: true,
+    }, session.trackPoints.at(-1));
+
+    expect(session.trackPoints).toHaveLength(2);
+    expect(session.trackPoints.at(-1)?.recordedDuringPause).toBe(true);
+    expect(session.stats.totalDistance).toBe(0);
+    expect(session.stats.totalTime).toBe(0);
+    expect(session.stats.totalElevationGain).toBe(0);
+  });
 });

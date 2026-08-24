@@ -64,4 +64,29 @@ describe("createFitBytes", () => {
   it("以安全檔名輸出 .fit 副檔名", () => {
     expect(fitFilename(ride)).toMatch(/\.fit$/);
   });
+
+  it("保留暫停中的原始 GPS record，且 session 仍分別使用總經過與移動計時", () => {
+    const pausedTimestamp = Date.UTC(2026, 0, 2, 3, 4, 30);
+    const bytes = createFitBytes({
+      ...ride,
+      route: [
+        ride.route[0],
+        {
+          latitude: 25.035,
+          longitude: 121.567,
+          altitude: 13,
+          speed: 0,
+          timestamp: pausedTimestamp,
+          recordedDuringPause: true,
+        },
+        ride.route[1],
+      ],
+    });
+    const decoder = new Decoder(Stream.fromByteArray(Array.from(bytes!)));
+    const { messages, errors } = decoder.read();
+    expect(errors).toEqual([]);
+    expect(messages.recordMesgs).toHaveLength(3);
+    expect(messages.sessionMesgs?.[0]?.totalElapsedTime).toBe(120);
+    expect(messages.sessionMesgs?.[0]?.totalTimerTime).toBe(110);
+  });
 });

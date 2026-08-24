@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { createRideShareCardFilename, createRideShareCardSvg } from "../lib/ride-share-card-svg";
 import type { RideRecord } from "../lib/ride-context";
@@ -52,5 +53,20 @@ describe("local ride share card", () => {
 
     expect(svg).toContain("資料不足");
     expect(svg).toContain(">--<");
+  });
+
+  it("移動時間為零時維持安全統計，且路線採用等比例 fit bounds 不拉伸", () => {
+    const svg = createRideShareCardSvg({
+      ...record,
+      movingTime: 0,
+      totalPausedSec: record.duration,
+      avgPower: 9999,
+      maxPower: 9999,
+      powerSource: "estimated",
+    });
+    const source = readFileSync("lib/ride-share-card-svg.ts", "utf8");
+    expect(svg).not.toContain("Infinity");
+    expect(svg).toContain("資料不足");
+    expect(source).toContain("const drawScale = Math.min(896 / lonSpan, 560 / latSpan);");
   });
 });

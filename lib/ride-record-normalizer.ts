@@ -116,6 +116,15 @@ export function calculateRouteMovingTime(route: LocationPoint[]): number {
   return Math.round(movingSeconds);
 }
 
+/** 原始 GPS 時間戳覆蓋活動的程度；用來避免稀疏片段覆寫完整裝置紀錄。 */
+function calculateRouteTimestampSpanSec(route: LocationPoint[]): number {
+  if (route.length < 2) return 0;
+  const firstTimestamp = route[0]?.timestamp;
+  const lastTimestamp = route.at(-1)?.timestamp;
+  if (!Number.isFinite(firstTimestamp) || !Number.isFinite(lastTimestamp)) return 0;
+  return Math.max(0, (Number(lastTimestamp) - Number(firstTimestamp)) / 1_000);
+}
+
 /** 依已保存的速度或相鄰 GPS 位移重建最高可靠速度，跳過漂移與不合理尖峰。 */
 export function calculateRouteMaxSpeed(route: LocationPoint[]): number | undefined {
   let maxSpeedKmh = 0;
@@ -399,13 +408,18 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
   const terrain = calculateTerrainMetrics(route);
   const reconstructedDistanceM = calculateRouteDistance(route);
   const routeMovingTime = calculateRouteMovingTime(route);
+  const routeTimestampSpanSec = calculateRouteTimestampSpanSec(route);
   const routeMaxSpeedKmh = calculateRouteMaxSpeed(route);
+  // Raw Data First：若原始軌跡的時間戳已覆蓋活動大半，逐段可信 GPS 位移比受
+  // 前景 timer／自動暫停影響的 declared moving time 更可靠；稀疏片段仍保留裝置值。
   const routeTimingIsComparable = routeMovingTime >= MIN_RECONSTRUCTED_MOVING_TIME_SEC
-    && declaredMovingTime > 0
-    && routeMovingTime >= declaredMovingTime * 0.3
-    && routeMovingTime <= declaredMovingTime * 1.35;
+    && duration > 0
+    && routeTimestampSpanSec >= duration * 0.5
+    && routeTimestampSpanSec <= duration * 1.2;
   const movingTime = routeTimingIsComparable ? routeMovingTime : declaredMovingTime;
-  const totalPausedSec = Math.max(declaredPausedSec, Math.max(0, duration - movingTime));
+  const totalPausedSec = routeTimingIsComparable
+    ? Math.max(0, duration - movingTime)
+    : Math.max(declaredPausedSec, Math.max(0, duration - movingTime));
   const autoPausedSec = Math.min(totalPausedSec, nonNegative(source.autoPausedSec));
   const storedDistanceM = nonNegative(source.distance);
   const routeDistanceIsComparable = reconstructedDistanceM >= 50

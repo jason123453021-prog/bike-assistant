@@ -72,6 +72,7 @@ import {
   vibrateWarning,
   vibrateSuccess,
   speakSupplyReminder,
+  speakNavigationGuidance,
   scheduleSmartSupplyDueNotification,
   clearAllSmartSupplyDueNotifications,
   clearAllSupplyNotifications,
@@ -120,6 +121,16 @@ import {
 import { deriveAutomaticSweatCalibration } from "@/lib/supply-calibration";
 import { shouldRestoreBackgroundSupplyReminder } from "@/lib/background-supply-recovery";
 import { normalizeAutoPauseSpeedKmh, resolveAutoPauseResumeThresholdKmh } from "@/lib/background-auto-pause";
+import {
+  calculateCourseOverGround,
+  findNextRouteTurn,
+  findNearestRoutePoint,
+  resolveNavigationCog,
+  smoothCogHeading,
+  shouldWakeForUpcomingTurn,
+  TURN_SPEAK_DISTANCE_M,
+  type CogPoint,
+} from "@/lib/cog-navigation";
 import {
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
@@ -410,6 +421,7 @@ export default function MapScreen() {
   const [nearestIdx, setNearestIdx] = useState(0);
   const [navInstruction, setNavInstruction] = useState<string>("");
   const [distToEnd, setDistToEnd] = useState<number | null>(null);
+  const [isOffRoute, setIsOffRoute] = useState(false);
   const arrivedRef = useRef(false);
   // 路線服務會比較自行車道優先與一般道路候選路徑，避免不合理繞路。
   const preferCycleway = true;
@@ -470,10 +482,8 @@ export default function MapScreen() {
   });
   const prevSpeedMsRef = useRef<number>(0); // 用於計算加速阻力
   const headingRef = useRef<number>(0);
-  // GPS 航向自適應循環平均：只用於位置箭頭與風向計算，不控制地圖角度。
-  const headingWindowRef = useRef<number[]>([]);
-  // 上一個 GPS 位置（用於低速時計算方位角）
-  const prevGpsForBearingRef = useRef<{ lat: number; lon: number } | null>(null);
+  // 僅保留最近數秒的可信 GPS 點，以 course-over-ground（COG）計算方向；不使用羅盤。
+  const cogSamplesRef = useRef<CogPoint[]>([]);
   const lastFollowCameraCenterRef = useRef<{ lat: number; lon: number } | null>(null);
 
   // 騎乘狀態與背景監聽
@@ -1051,7 +1061,7 @@ export default function MapScreen() {
       powerW: stateRef.current.currentPower,
       speedKmh: stateRef.current.currentSpeed,
       sweatRatePerHour: stateRef.current.currentSweatRatePerHour,
-      headingDeg: location?.coords.heading,
+      headingDeg: headingRef.current,
     });
     const weatherPromise = location
       ? fetchWeather(location.coords.latitude, location.coords.longitude)
@@ -2049,40 +2059,35 @@ export default function MapScreen() {
             return;
           }
 
-          // ── 車頭朝前精度改善（融合電子羅盤 + GPS）──────────────────────────────────────────────────────
-          // 策略：
-          //   1. 地圖只採用可信 GPS 行進方向，避免手機羅盤在固定座上的微動使整張地圖打轉。
-          //   2. 羅盤僅保留為資料來源，不直接驅動地圖；低速或低精度時維持上次穩定航向。
-          //   3. GPS 精度、速度或角度變化不足時，不更新地圖旋轉。
-          let rawHdg = heading ?? -1;
+          // ── 純 GPS COG 航向 ───────────────────────────────────────────────────
+          // 最近三秒的連續軌跡向量是唯一方向來源；低速／無位移時維持上一次穩定航向，
+          // 絕不混入任何硬體方位或羅盤資料。
           const locationAccuracyM = loc.coords.accuracy;
-          const gpsHeadingValid = rawHdg >= 0 && speedKmhRaw >= 7 && locationAccuracyM !== null && locationAccuracyM !== undefined && locationAccuracyM <= 35;
-          if (!gpsHeadingValid) {
-            // 低速或低精度時，以可靠的連續 GPS 位置估算箭頭航向。
-            const prev = prevGpsForBearingRef.current;
-            if (prev) {
-              const d = haversine(prev.lat, prev.lon, latitude, longitude);
-              if (d >= 5) {
-                rawHdg = bearing(prev.lat, prev.lon, latitude, longitude);
-              } else {
-                rawHdg = headingRef.current;
-              }
-            } else {
-              rawHdg = headingRef.current;
-            }
+          if (locationAccuracyM !== null && locationAccuracyM !== undefined && locationAccuracyM <= 35) {
+            cogSamplesRef.current.push({ lat: latitude, lon: longitude, timestamp: loc.timestamp, accuracyM: locationAccuracyM });
+            cogSamplesRef.current = cogSamplesRef.current.filter((sample) => sample.timestamp >= loc.timestamp - 10_000);
           }
-          // 更新 GPS 位置參考點
-          prevGpsForBearingRef.current = { lat: latitude, lon: longitude };
-          // 自適應循環平均：只平滑箭頭航向，不改變地圖方向。
-          const windowSize = speedKmhRaw >= 20 ? 3 : speedKmhRaw >= 12 ? 4 : 5;
-          headingWindowRef.current.push(rawHdg);
-          if (headingWindowRef.current.length > windowSize) headingWindowRef.current.shift();
-          // 角度平均：轉換為向量再平均，避免 350°/10° 平均出 180° 的問題
-          const sinSum = headingWindowRef.current.reduce((s, h) => s + Math.sin((h * Math.PI) / 180), 0);
-          const cosSum = headingWindowRef.current.reduce((s, h) => s + Math.cos((h * Math.PI) / 180), 0);
-          const hdg = ((Math.atan2(sinSum, cosSum) * 180) / Math.PI + 360) % 360;
+          const freeRideCog = calculateCourseOverGround(cogSamplesRef.current);
+          const routeCog = isNavigating && gpxRoute
+            ? resolveNavigationCog({
+              position: { lat: latitude, lon: longitude },
+              route: gpxRoute.points,
+              fallbackCog: freeRideCog,
+            })
+            : { heading: freeRideCog, onTrack: false, nearestIndex: null };
+          if (isNavigating && gpxRoute) setIsOffRoute(!routeCog.onTrack);
+          const candidateHeading = routeCog.heading;
+          const hdg = candidateHeading === null
+            ? headingRef.current
+            : smoothCogHeading(headingRef.current, candidateHeading);
           headingRef.current = hdg;
           setCurrentPos({ lat: latitude, lon: longitude, heading: hdg });
+          if (followUser && candidateHeading !== null) {
+            requestAnimationFrame(() => {
+              // Leaflet bearing 為地圖旋轉角，與行進 COG 方向相反才能保持車頭朝上。
+              mapRef.current?.setBearing((360 - hdg) % 360, true);
+            });
+          }
           if (followUser && (locationAccuracyM ?? Number.POSITIVE_INFINITY) <= 35) {
             const previousCenter = lastFollowCameraCenterRef.current;
             const movementSinceCamera = previousCenter
@@ -2159,6 +2164,7 @@ export default function MapScreen() {
           const avgSpeed = speedWindowRef.current.reduce((a, b) => a + b, 0) / speedWindowRef.current.length;
           
           // 自動暫停/恢復邏輯
+          let resumedFromAutomaticPause = false;
           const autoPauseEnabledForSport = currentState.sportType !== "cycling" || settings.idleAutoPauseEnabled;
           const autoPauseResumeThresholdKmh = resolveAutoPauseResumeThresholdKmh(
             autoPausePolicy.speedBelowKmh,
@@ -2173,7 +2179,35 @@ export default function MapScreen() {
                 lowSpeedCountRef.current = 0;
                 pausedElapsedRef.current = currentState.elapsed;
                 dispatch({ type: "PAUSE", source: "automatic" });
-                // 暫停時僅歸零即時讀數；定位漂移不得額外寫入軌跡或統計。
+                // 暫停不刪除已通過品質檢核的原始 GPS 點；僅禁止其進入移動統計。
+                dispatch({
+                  type: "LOCATION_UPDATE",
+                  point: {
+                    latitude,
+                    longitude,
+                    altitude: altitude ?? 0,
+                    speed: speed ?? 0,
+                    timestamp: loc.timestamp,
+                    recordedDuringPause: true,
+                  },
+                  power: 0,
+                  calories: 0,
+                  ascent: 0,
+                });
+                const pausedRecoverySession = recoverySessionRef.current;
+                if (pausedRecoverySession) {
+                  addTrackPoint(pausedRecoverySession, {
+                    timestamp: loc.timestamp,
+                    latitude,
+                    longitude,
+                    altitude: altitude ?? undefined,
+                    speed: speed ?? undefined,
+                    accuracy: loc.coords.accuracy ?? undefined,
+                    heading: hdg,
+                    recordedDuringPause: true,
+                  }, pausedRecoverySession.trackPoints.at(-1));
+                  queueRecoverySnapshot(pausedRecoverySession);
+                }
                 dispatch({ type: "LIVE_READINGS_STATIONARY" });
                 if (settings.vibrationEnabled) vibrateMedium();
                 return;
@@ -2191,7 +2225,9 @@ export default function MapScreen() {
           } else if (currentState.status === "paused" && autoPauseEnabledForSport && autoPausePolicy.mode === "automatic" && hasReliableMovement && speedKmh >= autoPauseResumeThresholdKmh) {
             lowSpeedCountRef.current = 0;
             dispatch({ type: "RESUME" });
-            return;
+            // reducer 狀態在此回呼內尚未更新；必須讓本次可信點繼續進入統計，
+            // 不能因恢復而遺失第一個有效移動 GPS 區間。
+            resumedFromAutomaticPause = true;
           }
 
           if (shouldZeroReadings) {
@@ -2249,12 +2285,33 @@ export default function MapScreen() {
           }
 
           // 軌跡點始終記錄，其他數據僅在 active 狀態下更新
-          if (currentState.status !== "active") {
+          if (currentState.status !== "active" && !resumedFromAutomaticPause) {
             dispatch({
               type: "LOCATION_UPDATE",
-              point: { latitude, longitude, altitude: altitude ?? 0, speed: speed ?? 0, timestamp: Date.now() },
+              point: {
+                latitude,
+                longitude,
+                altitude: altitude ?? 0,
+                speed: speed ?? 0,
+                timestamp: loc.timestamp,
+                recordedDuringPause: true,
+              },
               power: 0, calories: 0, ascent: 0,
             });
+            const pausedRecoverySession = recoverySessionRef.current;
+            if (pausedRecoverySession) {
+              addTrackPoint(pausedRecoverySession, {
+                timestamp: loc.timestamp,
+                latitude,
+                longitude,
+                altitude: altitude ?? undefined,
+                speed: speed ?? undefined,
+                accuracy: loc.coords.accuracy ?? undefined,
+                heading: hdg,
+                recordedDuringPause: true,
+              }, pausedRecoverySession.trackPoints.at(-1));
+              queueRecoverySnapshot(pausedRecoverySession);
+            }
             return;
           }
 
@@ -2307,11 +2364,17 @@ export default function MapScreen() {
             rawSpeedMs: speed,
           });
           const statisticsSpeedKmh = currentSpeedMs * 3.6;
+          // 只有同時通過 GPS 位移／精度與速度門檻的區間才能進入移動時間、距離、
+          // 功率及熱量統計。原始點仍保留到 route，以供 GPX/FIT 匯出與後續重算。
+          const countMovingTime = statisticsIntervalSec > 0
+            && hasReliableMovement
+            && statisticsSpeedKmh >= autoPausePolicy.speedBelowKmh;
+          const movingStatisticsIntervalSec = countMovingTime ? statisticsIntervalSec : 0;
           const isCyclingSport = currentState.sportType === "cycling";
           const rawPower = isCyclingSport ? calculatePower({
             speedMs: currentSpeedMs,
             prevSpeedMs: prevSpeedMsRef.current,
-            intervalSec: statisticsIntervalSec,
+            intervalSec: movingStatisticsIntervalSec,
             gradePct: grade,
             windSpeedMs: headwindMs,
             riderMassKg: settings.weight,
@@ -2337,7 +2400,7 @@ export default function MapScreen() {
               gradePct: grade,
               riderWeightKg: settings.weight,
               ftpW: estimateFtpW,
-              intervalSec: statisticsIntervalSec,
+              intervalSec: movingStatisticsIntervalSec,
               temperatureC: currentWeather?.temperature,
               humidityPct: currentWeather?.humidity,
               weatherCode: currentWeather?.weatherCode,
@@ -2347,7 +2410,7 @@ export default function MapScreen() {
             : estimateSportCalories({
               sportType: currentState.sportType,
               weightKg: settings.weight,
-              durationSec: statisticsIntervalSec,
+              durationSec: movingStatisticsIntervalSec,
               speedKmh: statisticsSpeedKmh,
               gradePct: grade,
               vamMPerHour: sportVam,
@@ -2370,6 +2433,7 @@ export default function MapScreen() {
             acceptedElevationM: elevationDelta.acceptedAltitudeM,
             distanceM,
             intervalSec: statisticsIntervalSec,
+            countMovingTime,
             powerSource: isCyclingSport ? "estimated" : "unavailable",
             caloriesSource: isCyclingSport ? "power-estimate" : "met-estimate",
             maxPowerCandidate,
@@ -2382,7 +2446,7 @@ export default function MapScreen() {
             speedKmh,
             ascentPerInterval: ascent,
             gradePct: grade,
-            intervalSec: statisticsIntervalSec,
+            intervalSec: movingStatisticsIntervalSec,
             temperatureC: currentWeather?.temperature ?? 20,
             humidityPct: currentWeather?.humidity ?? 60,
             weatherCode: currentWeather?.weatherCode ?? 3,
@@ -2561,7 +2625,8 @@ export default function MapScreen() {
     (lat: number, lon: number, speedMs: number) => {
       if (!gpxRoute) return;
       const pts = gpxRoute.points;
-      const idx = findNearestPointIndex(lat, lon, pts);
+      const nearest = findNearestRoutePoint({ lat, lon }, pts);
+      const idx = nearest?.index ?? 0;
       setNearestIdx(idx);
 
       const endPt = pts[pts.length - 1];
@@ -2575,38 +2640,7 @@ export default function MapScreen() {
         return;
       }
 
-      let lookaheadDist = 0;
-      let turnInstruction = "";
-      let detectedTurnDir: 'left' | 'right' | null = null;
-      let detectedTurnDist = 0;
-      for (let i = idx + 1; i < pts.length - 1; i++) {
-        lookaheadDist += haversine(pts[i - 1].lat, pts[i - 1].lon, pts[i].lat, pts[i].lon);
-        if (lookaheadDist > TURN_LOOKAHEAD_M) break;
-        const b1 = bearing(pts[i - 1].lat, pts[i - 1].lon, pts[i].lat, pts[i].lon);
-        const b2 = bearing(pts[i].lat, pts[i].lon, pts[i + 1].lat, pts[i + 1].lon);
-        let diff = b2 - b1;
-        if (diff > 180) diff -= 360;
-        if (diff < -180) diff += 360;
-        if (Math.abs(diff) >= TURN_ANGLE_DEG) {
-          const distToTurn = lookaheadDist;
-          detectedTurnDir = diff > 0 ? 'right' : 'left';
-          detectedTurnDist = distToTurn;
-          if (distToTurn < 50) {
-            // 只在路口時播報（避免重複播報）
-            const now = Date.now();
-            if (now - lastTurnSpokenRef.current > 10000) {
-              turnInstruction = diff > 0 ? "右轉" : "左轉";
-              lastTurnSpokenRef.current = now;
-            } else {
-              turnInstruction = diff > 0 ? "右轉" : "左轉";
-            }
-          } else {
-            const distStr = distToTurn < 100 ? "前方" : `${Math.round(distToTurn)} 公尺後`;
-            turnInstruction = diff > 0 ? `${distStr}右轉` : `${distStr}左轉`;
-          }
-          break;
-        }
-      }
+      const nextTurn = findNextRouteTurn(pts, idx);
 
       if (dEnd < 500 && !arrivedRef.current) {
         powerSavingManagerRef.current.onTurnGuidance();
@@ -2614,18 +2648,30 @@ export default function MapScreen() {
         setNavInstruction(`${distStr}到達終點`);
         setTurnDirection('arrive');
         setTurnDistanceM(dEnd);
-      } else if (turnInstruction) {
-        powerSavingManagerRef.current.onTurnGuidance();
-        setNavInstruction(turnInstruction);
-        setTurnDirection(detectedTurnDir);
-        setTurnDistanceM(detectedTurnDist);
+      } else if (nextTurn) {
+        const directionText = nextTurn.direction === "left" ? "左轉" : "右轉";
+        const isNearTurn = nextTurn.distanceM <= TURN_SPEAK_DISTANCE_M;
+        const instruction = isNearTurn ? `前方${directionText}` : `${Math.round(nextTurn.distanceM)} 公尺後${directionText}`;
+        if (shouldWakeForUpcomingTurn(nextTurn)) {
+          powerSavingManagerRef.current.onTurnGuidance();
+        }
+        if (isNearTurn) {
+          const now = Date.now();
+          if (now - lastTurnSpokenRef.current > 10_000) {
+            lastTurnSpokenRef.current = now;
+            void speakNavigationGuidance(instruction, settings.ttsEnabled);
+          }
+        }
+        setNavInstruction(instruction);
+        setTurnDirection(nextTurn.direction);
+        setTurnDistanceM(nextTurn.distanceM);
       } else {
         setNavInstruction("沿路線前進");
         setTurnDirection(null);
         setTurnDistanceM(0);
       }
     },
-    [gpxRoute]
+    [gpxRoute, settings.ttsEnabled]
   );
 
   // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
@@ -2699,7 +2745,7 @@ export default function MapScreen() {
       energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
         snapshot: {
         speedMs: initialKnownLocation?.coords.speed,
-        headingDeg: initialKnownLocation?.coords.heading,
+        headingDeg: headingRef.current,
         gradePct: currentGrade,
           weather: initialWeather,
         },
@@ -3057,7 +3103,7 @@ export default function MapScreen() {
             prevAltRef.current = null;
             prevPosRef.current = null;
             liveElevationFilterRef.current = createLiveElevationFilterState();
-            prevGpsForBearingRef.current = null;
+            cogSamplesRef.current = [];
             lastLocationRef.current = null;
             lastAcceptedTrackPointRef.current = null;
             speedWindowRef.current = [];
@@ -3559,7 +3605,7 @@ export default function MapScreen() {
         passedPolyline={passedPolyline}
         liveTrail={liveTrail}
         returnPolyline={[]}
-        isOffRoute={false}
+        isOffRoute={isOffRoute}
         centerPinLocation={pinSelectMode ? centerPinLocation : null}
         onMapCenterChanged={(lat, lon) => {
           if (pinSelectMode) {

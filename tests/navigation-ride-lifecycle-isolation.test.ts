@@ -40,9 +40,10 @@ describe("導航與 GPX 的騎乘累計隔離", () => {
     expect(clearGraphics).not.toContain("trailLayers.forEach");
   });
 
-  it("定位計算明確只在 active 騎乘後進入，避免 GPX 導航定位污染累計", () => {
+  it("定位計算只在 active 騎乘或剛恢復的可信點後進入，避免 GPX 導航污染累計", () => {
     const locationSection = sourceBetween("// 軌跡點始終記錄", "// ─── 騎乘計算");
-    expect(locationSection).toContain('if (currentState.status !== "active")');
+    expect(locationSection).toContain('currentState.status !== "active" && !resumedFromAutomaticPause');
+    expect(mapSource).toContain("resumedFromAutomaticPause = true;");
     expect(locationSection).toContain('type: "LOCATION_UPDATE"');
   });
 });

@@ -60,6 +60,8 @@ export interface LocationPoint {
   slope?: number;        // 坡度 (%)
   /** 背景定位長時間中斷後的下一個可靠點，不與前一段以直線相連。 */
   segmentStart?: boolean;
+  /** 暫停中仍通過品質檢核的原始 GPS 點；GPX／FIT 匯出時不得因抽樣而遺失。 */
+  recordedDuringPause?: boolean;
 }
 
 // 路線統計資料
@@ -214,6 +216,8 @@ export interface RideRecord {
 export interface RideState {
   status: RideStatus;
   startTime: number | null;
+  /** 實際停止時間；完成活動後固定，避免詳情頁停留時間污染 elapsed time。 */
+  endTime: number | null;
   elapsed: number;          // seconds
   distance: number;         // meters
   currentSpeed: number;     // km/h
@@ -303,7 +307,9 @@ type RideAction =
       acceptedElevationM?: number;
       distanceM?: number;
       intervalSec?: number;
-      /** 僅背景回補樣本使用；前景移動時間由每秒計時器維護。 */
+      /** 已通過可信 GPS 位移／速度品質閘門，才計入移動時間及衍生統計。 */
+      countMovingTime?: boolean;
+      /** 舊背景回補樣本的相容預設；若未明示 countMovingTime，仍採其已判定區間。 */
       isBackgroundRecovery?: boolean;
       powerSource?: ActivityPowerSource;
       caloriesSource?: ActivityCaloriesSource;
@@ -339,6 +345,7 @@ function getPowerZone(watts: number): number {
 const initialState: RideState = {
   status: "idle",
   startTime: null,
+  endTime: null,
   elapsed: 0,
   distance: 0,
   currentSpeed: 0,
@@ -403,6 +410,7 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
         records: state.records,
         status: "active",
         startTime: Date.now(),
+        endTime: null,
         hydrationThresholdMl: action.hydrationThresholdMl,
       };
 
@@ -470,6 +478,7 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
       return {
         ...state,
         status: "finished",
+        endTime: nowMs,
         totalPausedSec,
         autoPausedSec,
         pauseStartTime: null,
@@ -487,9 +496,9 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
         : state;
 
     case "TICK":
-      return shouldAccumulateRideStatistics(state.status)
-        ? { ...state, elapsed: action.elapsed }
-        : state;
+      // 移動時間唯一由 LOCATION_UPDATE 的可信 GPS 時間差積分；保留 action 只為相容
+      // 既有呼叫端，不能再用牆鐘 timer 覆寫或重複累積它。
+      return state;
 
     case "PAUSE_TICK": {
       // elapsed 是移動時間；暫停時間以絕對時間戳重算，背景回來後不會漏算或雙算。
@@ -529,6 +538,7 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
         acceptedElevationM,
         distanceM,
         intervalSec = 0,
+        countMovingTime,
         isBackgroundRecovery = false,
         powerSource = "unavailable",
         caloriesSource = "unavailable",
@@ -551,9 +561,14 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
       const speedKmh = (point.speed ?? 0) * 3.6;
       const newPowerHistory = [...state.powerHistory, power];
       const effectiveIntervalSec = Math.max(0, Number.isFinite(intervalSec) ? intervalSec : 0);
-      const nextElapsed = state.elapsed + (isBackgroundRecovery ? effectiveIntervalSec : 0);
-      const newPowerWorkJ = state.powerWorkJ + Math.max(0, power) * effectiveIntervalSec;
-      const newPowerSampleDurationSec = state.powerSampleDurationSec + effectiveIntervalSec;
+      // 前景與背景都由相同的、已通過品質閘門的 GPS 區間累積移動時間。
+      // 這消除 timer tick 與自動暫停狀態競爭造成的短移動時間與衍生數值暴衝。
+      const shouldCountMovingTime = countMovingTime ?? isBackgroundRecovery;
+      const movingIntervalSec = shouldCountMovingTime ? effectiveIntervalSec : 0;
+      const countedDistanceM = shouldCountMovingTime ? Math.max(0, distanceM ?? 0) : 0;
+      const nextElapsed = state.elapsed + movingIntervalSec;
+      const newPowerWorkJ = state.powerWorkJ + Math.max(0, power) * movingIntervalSec;
+      const newPowerSampleDurationSec = state.powerSampleDurationSec + movingIntervalSec;
       const avgPower = newPowerSampleDurationSec > 0 ? newPowerWorkJ / newPowerSampleDurationSec : 0;
       const zone = getPowerZone(power);
       const newZones = [...state.powerZones];
@@ -581,7 +596,7 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
       const newGradeDistribution = [...state.gradeDistribution];
       const newGradeAscentDistribution = [...state.gradeAscentDistribution];
       // 優先使用傳入的真實距離，其次使用速度推算
-      const distance = distanceM ?? (point.speed ?? 0) * 3; // 米
+      const distance = countedDistanceM;
       let gradeIndex = 0; // 預設為 1-5%（平坦路段）
       if (distance > 0 && ascent > 0) {
         const grade = (ascent / distance) * 100;
@@ -610,15 +625,15 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
         powerSampleDurationSec: newPowerSampleDurationSec,
         powerSource: mergedPowerSource,
         caloriesSource: mergedCaloriesSource,
-        totalAscent: state.totalAscent + ascent,
-        totalDescent: state.totalDescent + descent,
+        totalAscent: state.totalAscent + (shouldCountMovingTime ? ascent : 0),
+        totalDescent: state.totalDescent + (shouldCountMovingTime ? descent : 0),
         currentAltitude: point.altitude ?? state.currentAltitude,
         minElevation: nextMinElevation,
         maxElevation: nextMaxElevation,
-        calories: newCalories,
-        totalCalories: newTotalCalories,
+        calories: shouldCountMovingTime ? newCalories : state.calories,
+        totalCalories: shouldCountMovingTime ? newTotalCalories : state.totalCalories,
         distance: state.distance + distance,
-        powerHistory: newPowerHistory,
+        powerHistory: shouldCountMovingTime ? newPowerHistory : state.powerHistory,
         powerZones: newZones,
         gradeDistribution: newGradeDistribution,
         gradeAscentDistribution: newGradeAscentDistribution,
@@ -754,7 +769,10 @@ const RideContext = createContext<RideContextValue | null>(null);
 const STORAGE_KEY = "@bike_records";
 const SPORT_TYPE_STORAGE_KEY = "@bike_selected_sport";
 
-/** GPS 點抽樣：每隔 N 點保留一個，減少儲存大小 */
+/**
+ * GPS 點抽樣：減少一般連續移動路段的儲存量，但不捨棄已接受的暫停期間原始點，
+ * 以保留 GPX／FIT 可重建的時間戳資料鏈。
+ */
 function decimateRoute(route: LocationPoint[], maxPoints = 500): LocationPoint[] {
   if (route.length <= maxPoints) return route;
   const step = Math.ceil(route.length / maxPoints);
@@ -762,6 +780,10 @@ function decimateRoute(route: LocationPoint[], maxPoints = 500): LocationPoint[]
   for (let i = 0; i < route.length; i += step) {
     result.push(route[i]);
   }
+  for (const point of route) {
+    if (point.recordedDuringPause && !result.includes(point)) result.push(point);
+  }
+  result.sort((a, b) => a.timestamp - b.timestamp);
   // 確保最後一點保留
   if (result[result.length - 1] !== route[route.length - 1]) {
     result.push(route[route.length - 1]);
@@ -809,7 +831,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       calculationProfile?.ftpW
         ?? estimateFTP(calculationProfile?.riderWeightKg ?? 70, "intermediate"),
     );
-    const timeTotals = buildRideTimeTotals(state.elapsed, state.totalPausedSec);
+    const elapsedDurationSec = state.startTime
+      ? Math.max(0, Math.round(((state.endTime ?? now) - state.startTime) / 1000))
+      : state.elapsed + state.totalPausedSec;
+    const pausedForActivitySec = Math.max(0, elapsedDurationSec - state.elapsed);
+    const timeTotals = buildRideTimeTotals(state.elapsed, pausedForActivitySec);
     const movingTime = timeTotals.movingTime;
     const activityStats = buildActivityStatistics({
       distanceM: state.distance,

@@ -6,10 +6,12 @@ const mapScreenSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"
 const leafletSource = readFileSync(resolve(process.cwd(), "components/leaflet-map.tsx"), "utf8");
 
 describe("導航頁使用者地圖方向守門", () => {
-  it("只以 GPS 航向更新位置箭頭與風向，不再旋轉地圖", () => {
-    expect(mapScreenSource).toContain("speedKmhRaw >= 7");
-    expect(mapScreenSource).toContain("locationAccuracyM <= 35");
-    expect(mapScreenSource).toContain("只平滑箭頭航向，不改變地圖方向");
+  it("僅以最近 GPS COG 與 GPX 前視航向平滑地圖朝前，不使用硬體羅盤", () => {
+    expect(mapScreenSource).toContain("calculateCourseOverGround");
+    expect(mapScreenSource).toContain("resolveNavigationCog");
+    expect(mapScreenSource).toContain("smoothCogHeading");
+    expect(mapScreenSource).toContain("mapRef.current?.setBearing((360 - hdg) % 360, true)");
+    expect(mapScreenSource).not.toContain("coords.heading");
     expect(mapScreenSource).not.toContain("stabilizeMapHeading(");
   });
 
@@ -19,8 +21,10 @@ describe("導航頁使用者地圖方向守門", () => {
     expect(leafletSource).not.toContain('d="M16 2 L28 28 L16 22 L4 28 Z"');
   });
 
-  it("不允許定位或羅盤回呼覆寫使用者手動旋轉方向", () => {
+  it("手動旋轉期間停止 GPS 地圖跟隨，回歸中心後才恢復 COG 朝前", () => {
     expect(mapScreenSource).toContain("onMapRotateEnd={() => scheduleAutoRecenter()}");
+    expect(mapScreenSource).toContain("setFollowUser(false);");
+    expect(mapScreenSource).toContain("setFollowUser(true);");
     expect(mapScreenSource).not.toContain("applyResponsiveMapBearing(");
     expect(mapScreenSource).not.toContain("watchHeadingAsync");
     expect(leafletSource).toContain("map.on('rotateend'");

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { reportRecoverableIssue } from '../release-safe-log';
 import { acceptLiveElevationDelta, createLiveElevationFilterState } from '../live-elevation-filter';
+import { hasReliableRideMovement } from '../live-ride-readings';
 
 /**
  * 騎乘會話恢復系統
@@ -17,6 +18,8 @@ export interface RideTrackPoint {
   heading?: number;
   /** 背景定位長時間中斷後的下一段安全軌跡起點。 */
   segmentStart?: boolean;
+  /** 暫停中仍接受的原始 GPS 點，只供匯出與恢復，不能累加騎乘統計。 */
+  recordedDuringPause?: boolean;
 }
 
 export interface RideStats {
@@ -149,15 +152,22 @@ export function addTrackPoint(
       point.latitude,
       point.longitude
     );
-    session.stats.totalDistance += distanceM;
+    const canAccumulateStatistics = !point.recordedDuringPause && !previousPoint.recordedDuringPause;
+    if (canAccumulateStatistics) session.stats.totalDistance += distanceM;
     const intervalMs = point.timestamp - previousPoint.timestamp;
-    if (intervalMs > 0 && intervalMs <= 30_000) {
-      session.stats.totalTime += intervalMs;
+    if (canAccumulateStatistics && intervalMs > 0 && intervalMs <= 30_000) {
+      const intervalSec = intervalMs / 1_000;
+      const derivedSpeedKmh = intervalSec > 0 ? (distanceM / intervalSec) * 3.6 : 0;
+      const speedKmh = Number.isFinite(point.speed) ? Math.max(0, Number(point.speed) * 3.6) : derivedSpeedKmh;
+      // 原始點永遠保留；session 統計只以與前景／背景共用的可信移動區間累積。
+      if (hasReliableRideMovement({ speedKmh, distanceM, accuracyM: point.accuracy })) {
+        session.stats.totalTime += intervalMs;
+      }
     }
   }
 
   // 更新高度數據
-  if (point.altitude !== undefined) {
+  if (point.altitude !== undefined && !point.recordedDuringPause) {
     session.stats.maxAltitude = Math.max(session.stats.maxAltitude, point.altitude);
     session.stats.minAltitude = Math.min(session.stats.minAltitude, point.altitude);
 
@@ -171,7 +181,7 @@ export function addTrackPoint(
   }
 
   // 更新速度數據
-  if (point.speed !== undefined) {
+  if (point.speed !== undefined && !point.recordedDuringPause) {
     session.stats.maxSpeed = Math.max(session.stats.maxSpeed, point.speed);
   }
 

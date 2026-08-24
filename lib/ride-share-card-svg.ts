@@ -34,11 +34,16 @@ function routePoints(record: RideRecord): string {
   const maxLat = Math.max(...lats);
   const minLon = Math.min(...lons);
   const maxLon = Math.max(...lons);
-  const latRange = Math.max(maxLat - minLat, 0.0001);
-  const lonRange = Math.max(maxLon - minLon, 0.0001);
+  const centerLat = (minLat + maxLat) / 2;
+  const centerLon = (minLon + maxLon) / 2;
+  // 以中緯度修正經度長度並等比例 fit bounds，避免路線被 XY 個別伸縮而變形。
+  const lonScale = Math.max(0.1, Math.cos((centerLat * Math.PI) / 180));
+  const latSpan = Math.max(maxLat - minLat, 0.0001);
+  const lonSpan = Math.max((maxLon - minLon) * lonScale, 0.0001);
+  const drawScale = Math.min(896 / lonSpan, 560 / latSpan);
   return record.route.map((point) => {
-    const x = 92 + ((point.longitude - minLon) / lonRange) * 896;
-    const y = 90 + (1 - (point.latitude - minLat) / latRange) * 560;
+    const x = 540 + (point.longitude - centerLon) * lonScale * drawScale;
+    const y = 370 - (point.latitude - centerLat) * drawScale;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
 }

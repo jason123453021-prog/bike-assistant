@@ -92,6 +92,11 @@ export async function speakSupplyReminder(type: "calorie" | "water", enabled: bo
   await speak(msg, enabled);
 }
 
+/** 由本機 GPX 幾何判定的簡短轉彎提示；共用通話抑制與中斷處理。 */
+export async function speakNavigationGuidance(text: string, enabled: boolean) {
+  await speak(text, enabled);
+}
+
 /**
  * 依目前智慧補給計畫組合可直接聽懂的提醒內容。這項計算完全在本機完成，
  * 因此不依賴網路或雲端語音服務。
