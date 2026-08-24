@@ -387,6 +387,8 @@ export default function SettingsScreen() {
           ? Math.min(90, Math.max(20, Math.round(num)))
           : editModal.key === "autoPauseSpeedThresholdKmh"
             ? Math.min(5, Math.max(0.5, Math.round(num * 10) / 10))
+            : editModal.key === "autoPauseDelaySec"
+              ? Math.min(120, Math.max(3, Math.round(num)))
           : editModal.key === "bikeWeight"
             ? Math.min(35, Math.max(3, Math.round(num * 10) / 10))
         : num;
@@ -485,9 +487,20 @@ export default function SettingsScreen() {
             value={settings.autoPauseSpeedThresholdKmh}
             unit="km/h"
             colors={colors}
-            hint="單車低於此速度且持續 8 秒才暫停；高於此門檻 0.5 km/h 即恢復"
+            hint={`單車低於此速度且持續 ${settings.autoPauseDelaySec} 秒才暫停；高於此門檻 0.5 km/h 即恢復`}
             disabled={!settings.idleAutoPauseEnabled}
             onPress={() => openEdit("autoPauseSpeedThresholdKmh", "自動暫停速度門檻", settings.autoPauseSpeedThresholdKmh, "km/h")}
+          />
+          <Divider colors={colors} />
+          <NumberRow
+            icon="clock"
+            label="自動暫停延遲時間"
+            value={settings.autoPauseDelaySec}
+            unit="秒"
+            colors={colors}
+            hint="低於速度門檻須持續此時間才暫停；可設定 3–120 秒，預設 8 秒"
+            disabled={!settings.idleAutoPauseEnabled}
+            onPress={() => openEdit("autoPauseDelaySec", "自動暫停延遲時間", settings.autoPauseDelaySec, "秒")}
           />
         </View>
 

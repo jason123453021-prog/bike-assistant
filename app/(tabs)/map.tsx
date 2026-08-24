@@ -2117,8 +2117,8 @@ export default function MapScreen() {
           const driftFilterM = sportTrackingPolicy.stationaryDriftThresholdM;
           const governedAutoPausePolicy = getSportTrackingPolicy(currentState.sportType).autoPause;
           const autoPausePolicy = currentState.sportType === "cycling"
-            ? { ...governedAutoPausePolicy, speedBelowKmh: settings.autoPauseSpeedThresholdKmh }
-            : governedAutoPausePolicy;
+            ? { ...governedAutoPausePolicy, speedBelowKmh: settings.autoPauseSpeedThresholdKmh, stillForSeconds: settings.autoPauseDelaySec }
+            : { ...governedAutoPausePolicy, stillForSeconds: settings.autoPauseDelaySec };
           const shouldZeroReadings = mapRideActive && shouldZeroLiveRideReadings({
             rawSpeedKmh: speedKmh,
             displacementM,
@@ -2546,7 +2546,7 @@ export default function MapScreen() {
       const policy = getSportTrackingPolicy(current.sportType).autoPause;
       const autoPauseEnabledForSport = current.sportType !== "cycling" || settings.idleAutoPauseEnabled;
       if (current.status !== "active" || !autoPauseEnabledForSport || policy.mode !== "automatic") return;
-      if (Date.now() - lastForegroundLocationSampleAtRef.current < policy.stillForSeconds * 1_000) return;
+      if (Date.now() - lastForegroundLocationSampleAtRef.current < settings.autoPauseDelaySec * 1_000) return;
 
       lowSpeedCountRef.current = 0;
       pausedElapsedRef.current = current.elapsed;
@@ -2555,7 +2555,7 @@ export default function MapScreen() {
       if (settings.vibrationEnabled) vibrateMedium();
     }, 1_000);
     return () => clearInterval(watchdog);
-  }, [dispatch, mapRideActive, settings.idleAutoPauseEnabled, settings.vibrationEnabled]);
+  }, [dispatch, mapRideActive, settings.autoPauseDelaySec, settings.idleAutoPauseEnabled, settings.vibrationEnabled]);
 
   // ─── GPX 導航邏輯 ────────────────────────────────────────────────────────────
   const handleNavigation = useCallback(
@@ -2792,7 +2792,7 @@ export default function MapScreen() {
       autoPauseSpeedBelowKmh: state.sportType === "cycling"
         ? settings.autoPauseSpeedThresholdKmh
         : getSportTrackingPolicy(state.sportType).autoPause.speedBelowKmh,
-      autoPauseStillForSeconds: getSportTrackingPolicy(state.sportType).autoPause.stillForSeconds,
+      autoPauseStillForSeconds: settings.autoPauseDelaySec,
       autoPauseResumeAtOrAboveKmh: state.sportType === "cycling"
         ? Math.max(AUTO_PAUSE_RESUME_THRESHOLD, settings.autoPauseSpeedThresholdKmh + 0.5)
         : Math.max(AUTO_PAUSE_RESUME_THRESHOLD, getSportTrackingPolicy(state.sportType).autoPause.speedBelowKmh + 0.5),

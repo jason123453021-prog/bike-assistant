@@ -152,6 +152,8 @@ export interface AppSettings {
   defaultSportType: SportType;
   /** 單車模式的自動暫停速度閾值（km/h）；仍須通過模型治理的連續低速防抖。 */
   autoPauseSpeedThresholdKmh: number;
+  /** 自動暫停需持續低速的秒數；套用至前景、無 GPS 看門狗與背景定位。 */
+  autoPauseDelaySec: number;
   /** 跟隨系統、固定淺色或固定深色的全域外觀偏好。 */
   appearanceMode: AppearanceMode;
   /** 預設使用本機歷史推定 FTP 與心率基準；關閉後才完全採用手動數值。 */
@@ -273,6 +275,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoLapDistanceKm: 5,
   defaultSportType: "cycling",
   autoPauseSpeedThresholdKmh: 1.1,
+  autoPauseDelaySec: 8,
   appearanceMode: "system",
   autoPersonalMetricsEnabled: true,
   autoRpeEnabled: true,
@@ -348,6 +351,13 @@ export function migrateTouchGuardUnlockHoldMs(value: unknown, schemaVersion?: un
   return TOUCH_GUARD_UNLOCK_HOLD_PRESETS.reduce((nearest, preset) => (
     Math.abs(preset - normalized) < Math.abs(nearest - normalized) ? preset : nearest
   ));
+}
+
+/** 自動暫停延遲採 3–120 秒，資料缺失或無效時維持安全的 8 秒預設。 */
+export function normalizeAutoPauseDelaySec(value: unknown): number {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) return DEFAULT_SETTINGS.autoPauseDelaySec;
+  return Math.min(120, Math.max(3, Math.round(normalized)));
 }
 
 interface SettingsContextValue {
@@ -475,6 +485,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           autoLapDistanceKm: normalizeAutoLapDistanceKm(saved.autoLapDistanceKm),
           defaultSportType: normalizeDefaultSportType(saved.defaultSportType),
           autoPauseSpeedThresholdKmh: Math.min(5, Math.max(0.5, Number.isFinite(Number(saved.autoPauseSpeedThresholdKmh)) ? Number(saved.autoPauseSpeedThresholdKmh) : 1.1)),
+          autoPauseDelaySec: normalizeAutoPauseDelaySec(saved.autoPauseDelaySec),
           appearanceMode: saved.appearanceMode === "light" || saved.appearanceMode === "dark" ? saved.appearanceMode : "system",
           energyServingCarbohydrateG: Math.min(100, Math.max(10, Number(saved.energyServingCarbohydrateG) || DEFAULT_SETTINGS.energyServingCarbohydrateG)),
           energyCarbohydrateHourlyLimitMode: saved.energyCarbohydrateHourlyLimitMode === "manual" ? "manual" : "science",
@@ -508,6 +519,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       autoLapDistanceKm: normalizeAutoLapDistanceKm(partial.autoLapDistanceKm ?? settings.autoLapDistanceKm),
       defaultSportType: normalizeDefaultSportType(partial.defaultSportType ?? settings.defaultSportType),
       autoPauseSpeedThresholdKmh: Math.min(5, Math.max(0.5, Number.isFinite(Number(partial.autoPauseSpeedThresholdKmh)) ? Number(partial.autoPauseSpeedThresholdKmh) : settings.autoPauseSpeedThresholdKmh)),
+      autoPauseDelaySec: normalizeAutoPauseDelaySec(partial.autoPauseDelaySec ?? settings.autoPauseDelaySec),
       appearanceMode: partial.appearanceMode === "light" || partial.appearanceMode === "dark" || partial.appearanceMode === "system"
         ? partial.appearanceMode
         : settings.appearanceMode,
