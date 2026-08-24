@@ -77,6 +77,7 @@ describe("背景自動暫停與前景一致性", () => {
       resumeAtOrAboveKmh: 1.6,
       paused: true,
       accumulatedLowSpeedSec: 8,
+      hasReliableMovement: true,
       speedKmh: 1.6,
       intervalSec: 1,
     });

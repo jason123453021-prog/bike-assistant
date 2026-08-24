@@ -52,11 +52,11 @@ describe("rider-focus experience guards", () => {
     expect(powerSavingSource).toContain("session !== this.brightnessSession");
   });
 
-  it("normalizes missing GPS speed for automatic pause, keeps the 8-second watchdog, and resumes at threshold plus 0.5 km/h", () => {
+  it("normalizes missing GPS speed, applies the governed 10-second watchdog, and resumes only with credible movement", () => {
     expect(mapSource).toContain("normalizeAutoPauseSpeedKmh(Number(speed) * 3.6)");
     expect(mapSource).toContain("lastForegroundLocationSampleAtRef");
-    expect(mapSource).toContain("settings.autoPauseDelaySec * 1_000");
+    expect(mapSource).toContain("policy.stillForSeconds * 1_000");
     expect(mapSource).toContain("resolveAutoPauseResumeThresholdKmh(");
-    expect(mapSource).toContain("speedKmh >= autoPauseResumeThresholdKmh");
+    expect(mapSource).toContain("hasReliableMovement && speedKmh >= autoPauseResumeThresholdKmh");
   });
 });

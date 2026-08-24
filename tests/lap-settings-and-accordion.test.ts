@@ -30,7 +30,9 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     expect(settingsSource).not.toContain("計圈模式");
     expect(settingsSource).not.toContain("手動介入");
     expect(settingsSource).toContain("預設運動模式");
-    expect(settingsSource).toContain("自動暫停速度門檻");
+    expect(settingsSource).toContain("自動判定規則");
+    expect(settingsSource).not.toContain("自動暫停速度門檻");
+    expect(settingsSource).not.toContain("自動暫停延遲時間");
   });
 
   it("開啟時以全程里程倍數自動觸發，且不保留手動 Lap 控制", () => {
@@ -41,7 +43,7 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     expect(mapSource).toContain('type: "SYNC_AUTO_LAPS"');
     expect(mapSource).not.toContain("handleMarkLap");
     expect(mapSource).not.toContain("lapFloatingControlWrap");
-    expect(mapSource).toContain("autoPauseSpeedThresholdKmh");
+    expect(mapSource).toContain("autoPauseStillForSeconds: getSportTrackingPolicy(state.sportType).autoPause.stillForSeconds");
     expect(mapSource).toContain("autoPauseEnabledForSport");
   });
 

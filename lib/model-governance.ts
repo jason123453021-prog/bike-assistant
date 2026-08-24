@@ -24,7 +24,7 @@ export interface SportModelProfile {
 }
 
 export const MODEL_GOVERNANCE = {
-  version: "2026.08.22-r2",
+  version: "2026.08.24-r3",
   updatePolicy: "離線內建資料；僅在來源審核、版本號更新與回歸測試同時通過後更新。",
   sources: [
     {
@@ -57,13 +57,19 @@ export const MODEL_GOVERNANCE = {
       url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC10054587/",
       role: "耐力運動碳水補給節奏的保守範圍",
     },
+    {
+      id: "strava-auto-pause-public-principles",
+      title: "Strava Engineering: Improving Auto-Pause for Everyone",
+      url: "https://medium.com/strava-engineering/improving-auto-pause-for-everyone-13f253c66f9e",
+      role: "僅用於單車 GPS 自動暫停的公開行為對齊；非專有程式碼來源",
+    },
   ],
 } as const;
 
 export const SPORT_MODEL_PROFILES: Record<GovernedSportType, SportModelProfile> = {
   cycling: {
     label: "單車",
-    tracking: { gpsDistanceIntervalM: 3, stationaryDriftThresholdM: 1.5, autoPauseMode: "automatic", autoPauseSpeedBelowKmh: 1.08, autoPauseStillForSeconds: 8, requiresStillness: false },
+    tracking: { gpsDistanceIntervalM: 3, stationaryDriftThresholdM: 1.5, autoPauseMode: "automatic", autoPauseSpeedBelowKmh: 1.08, autoPauseStillForSeconds: 10, requiresStillness: false },
     calorieMetMultiplier: 1,
     supply: { carbohydrateRateMultiplier: 1, hydrationRateMultiplier: 1 },
   },

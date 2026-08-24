@@ -385,10 +385,6 @@ export default function SettingsScreen() {
         ? Math.min(100, Math.max(10, Math.round(num)))
         : editModal.key === "energyCarbohydrateHourlyLimitG"
           ? Math.min(90, Math.max(20, Math.round(num)))
-          : editModal.key === "autoPauseSpeedThresholdKmh"
-            ? Math.min(5, Math.max(0.5, Math.round(num * 10) / 10))
-            : editModal.key === "autoPauseDelaySec"
-              ? Math.min(120, Math.max(3, Math.round(num)))
           : editModal.key === "bikeWeight"
             ? Math.min(35, Math.max(3, Math.round(num * 10) / 10))
         : num;
@@ -481,27 +477,10 @@ export default function SettingsScreen() {
             onToggle={(enabled) => updateSettings({ idleAutoPauseEnabled: enabled })}
           />
           <Divider colors={colors} />
-          <NumberRow
-            icon="speedometer"
-            label="自動暫停速度門檻"
-            value={settings.autoPauseSpeedThresholdKmh}
-            unit="km/h"
-            colors={colors}
-            hint={`單車低於此速度且持續 ${settings.autoPauseDelaySec} 秒才暫停；高於此門檻 0.5 km/h 即恢復`}
-            disabled={!settings.idleAutoPauseEnabled}
-            onPress={() => openEdit("autoPauseSpeedThresholdKmh", "自動暫停速度門檻", settings.autoPauseSpeedThresholdKmh, "km/h")}
-          />
-          <Divider colors={colors} />
-          <NumberRow
-            icon="clock"
-            label="自動暫停延遲時間"
-            value={settings.autoPauseDelaySec}
-            unit="秒"
-            colors={colors}
-            hint="低於速度門檻須持續此時間才暫停；可設定 3–120 秒，預設 8 秒"
-            disabled={!settings.idleAutoPauseEnabled}
-            onPress={() => openEdit("autoPauseDelaySec", "自動暫停延遲時間", settings.autoPauseDelaySec, "秒")}
-          />
+          <View style={styles.lapSettingContent}>
+            <Text style={[styles.rowLabel, { color: colors.foreground }]}>自動判定規則</Text>
+            <Text style={[styles.rowHint, { color: colors.muted }]}>單車依 GPS 移動與約 10 秒無正速度定位自動暫停，恢復時採可靠速度與位移；跑步使用動作感測，登山保留停留提示。規則由 App 自動套用，不需調整門檻。</Text>
+          </View>
         </View>
 
         {/* ── 個人資料 ── */}

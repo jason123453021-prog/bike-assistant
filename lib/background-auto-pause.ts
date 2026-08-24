@@ -49,7 +49,7 @@ export function advanceBackgroundAutoPause(input: BackgroundAutoPauseInput): Bac
   }
 
   if (input.paused) {
-    if (speedKmh >= resumeAtOrAboveKmh) {
+    if (input.hasReliableMovement && speedKmh >= resumeAtOrAboveKmh) {
       return { paused: false, accumulatedLowSpeedSec: 0, movingTimeIncrementSec: intervalSec };
     }
     return { paused: true, accumulatedLowSpeedSec: lowSpeedSec, movingTimeIncrementSec: 0 };
