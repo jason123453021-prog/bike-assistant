@@ -6,6 +6,11 @@ import { normalizeRideRecord, normalizeRideRecords } from "./ride-record-normali
 import { estimateAutomaticRpe } from "@/lib/automatic-rpe";
 import { buildRideTimeTotals, calculatePausedSeconds } from "@/lib/ride-time-accounting";
 import {
+  calculateAutoPausedSeconds,
+  mergeAutoPausedSeconds,
+  type AutoPauseSource,
+} from "@/lib/auto-pause-statistics";
+import {
   buildActivityStatistics,
   type ActivityCaloriesSource,
   type ActivityPowerSource,
@@ -27,6 +32,7 @@ export type { SportType } from "./sport-metrics";
 
 export type RideStatus = "idle" | "active" | "paused" | "finished";
 export type RideActivityType = "road" | "gravel" | "mountain" | "commute" | "indoor" | "other";
+export type RidePauseSource = Exclude<AutoPauseSource, null>;
 
 export interface RideActivityUpdate {
   name?: string;
@@ -160,6 +166,8 @@ export interface RideRecord {
   totalSweatMl: number;   // 總汗液流失量 ml
   refillCount: number;    // 補水次數
   totalPausedSec: number; // 總暂停時間（秒）
+  /** 自動暫停的總時間（秒）；舊活動安全回退為 0，不以總暫停時間臆測來源。 */
+  autoPausedSec?: number;
   avgHeartRate?: number;  // 平均心率 bpm（感測器）
   maxHeartRate?: number;  // 最高心率 bpm（感測器）
   avgCadence?: number;    // 平均踏頻 rpm（感測器）
@@ -250,10 +258,16 @@ export interface RideState {
   records: RideRecord[];
   /** 總暫停時間（秒） */
   totalPausedSec: number;
+  /** 本次活動由 GPS／動作判定自動暫停的累計時間（秒）。 */
+  autoPausedSec: number;
   /** 暫停開始時間戳（ms），用於計算本次暫停時間 */
   pauseStartTime: number | null;
   /** 本次暫停開始前已累積的暫停秒數，避免前景計時與恢復時計算重複相加。 */
   pauseStartPausedSec: number | null;
+  /** 目前暫停來源；只有 automatic 才計入 autoPausedSec。 */
+  pauseSource: RidePauseSource | null;
+  autoPauseStartTime: number | null;
+  autoPauseStartPausedSec: number | null;
 
   // 坡度區間統計
   /** 坡度區間距離統計 [1-5%, 6-10%, 11-15%, 16-20%, 21-25%, 26%+] */
@@ -271,7 +285,7 @@ export interface RideState {
 
 type RideAction =
   | { type: "START"; hydrationThresholdMl: number }
-  | { type: "PAUSE" }
+  | { type: "PAUSE"; source?: RidePauseSource }
   | { type: "RESUME" }
   | { type: "STOP" }
   | { type: "RESET" }
@@ -305,6 +319,7 @@ type RideAction =
   | { type: "SYNC_AUTO_LAPS"; laps: RideLap[]; anchor?: Omit<RideLapAnchor, "routePointIndex"> }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
   | { type: "ADD_RECORD"; record: RideRecord }
+  | { type: "SET_AUTO_PAUSED_SECONDS"; totalSec: number }
   | { type: "SET_SPORT_TYPE"; sportType: SportType }
   | { type: "UPDATE_RECORD_NAME"; id: string; name: string }
   | { type: "RESTORE"; snapshot: Partial<RideState> };
@@ -355,8 +370,12 @@ const initialState: RideState = {
   powerZones: [0, 0, 0, 0, 0],
   records: [],
   totalPausedSec: 0,
+  autoPausedSec: 0,
   pauseStartTime: null,
   pauseStartPausedSec: null,
+  pauseSource: null,
+  autoPauseStartTime: null,
+  autoPauseStartPausedSec: null,
   totalCalories: 0,
   gradeDistribution: [0, 0, 0, 0, 0, 0],
   gradeAscentDistribution: [0, 0, 0, 0, 0, 0],
@@ -389,14 +408,21 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
 
     case "PAUSE":
       if (!canPauseRide(state.status)) return state;
+      {
+        const pausedAtMs = Date.now();
+        const pauseSource = action.source ?? "manual";
       return {
         ...state,
         status: "paused",
         currentSpeed: 0,   // 暫停時速度歸零
         currentPower: 0,   // 暫停時瓦數歸零
-        pauseStartTime: Date.now(),
+        pauseStartTime: pausedAtMs,
         pauseStartPausedSec: state.totalPausedSec,
+        pauseSource,
+        autoPauseStartTime: pauseSource === "automatic" ? pausedAtMs : null,
+        autoPauseStartPausedSec: pauseSource === "automatic" ? state.autoPausedSec : null,
       };
+      }
 
     case "RESUME": {
       if (!canResumeRide(state.status)) return state;
@@ -409,16 +435,50 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
           currentTotalPausedSec: state.totalPausedSec,
           nowMs: Date.now(),
         }),
+        autoPausedSec: calculateAutoPausedSeconds({
+          source: state.pauseSource,
+          autoPauseStartedAtMs: state.autoPauseStartTime,
+          autoPauseStartedTotalSec: state.autoPauseStartPausedSec,
+          currentAutoPausedSec: state.autoPausedSec,
+          nowMs: Date.now(),
+        }),
         pauseStartTime: null,
         pauseStartPausedSec: null,
+        pauseSource: null,
+        autoPauseStartTime: null,
+        autoPauseStartPausedSec: null,
       };
     }
 
-    case "STOP":
+    case "STOP": {
       // 僅可由實際進行中的騎乘結束；其他狀態維持原樣。
-      return canStopRide(state.status)
-        ? { ...state, status: "finished" }
-        : state;
+      if (!canStopRide(state.status)) return state;
+      const nowMs = Date.now();
+      const totalPausedSec = calculatePausedSeconds({
+        pauseStartedAtMs: state.pauseStartTime,
+        pauseStartedTotalSec: state.pauseStartPausedSec,
+        currentTotalPausedSec: state.totalPausedSec,
+        nowMs,
+      });
+      const autoPausedSec = calculateAutoPausedSeconds({
+        source: state.pauseSource,
+        autoPauseStartedAtMs: state.autoPauseStartTime,
+        autoPauseStartedTotalSec: state.autoPauseStartPausedSec,
+        currentAutoPausedSec: state.autoPausedSec,
+        nowMs,
+      });
+      return {
+        ...state,
+        status: "finished",
+        totalPausedSec,
+        autoPausedSec,
+        pauseStartTime: null,
+        pauseStartPausedSec: null,
+        pauseSource: null,
+        autoPauseStartTime: null,
+        autoPauseStartPausedSec: null,
+      };
+    }
 
     case "RESET":
       // 累計只會在 STOP 後進入 finished 的明確完成流程中重置。
@@ -440,6 +500,13 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
           pauseStartedAtMs: state.pauseStartTime,
           pauseStartedTotalSec: state.pauseStartPausedSec,
           currentTotalPausedSec: state.totalPausedSec,
+          nowMs: Date.now(),
+        }),
+        autoPausedSec: calculateAutoPausedSeconds({
+          source: state.pauseSource,
+          autoPauseStartedAtMs: state.autoPauseStartTime,
+          autoPauseStartedTotalSec: state.autoPauseStartPausedSec,
+          currentAutoPausedSec: state.autoPausedSec,
           nowMs: Date.now(),
         }),
       };
@@ -621,6 +688,15 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
     case "ADD_RECORD":
       return { ...state, records: [action.record, ...state.records] };
 
+    case "SET_AUTO_PAUSED_SECONDS":
+      {
+        const merged = mergeAutoPausedSeconds(state.totalPausedSec, state.autoPausedSec, Math.round(action.totalSec));
+        return {
+          ...state,
+          ...merged,
+        };
+      }
+
     case "SET_SPORT_TYPE":
       // 活動進行或暫停時不可變更運動類型，避免同一筆統計混入兩種運動模型；
       // 已完成但尚未關閉摘要的狀態仍可預先選擇下一次活動的運動類型。
@@ -795,6 +871,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       totalSweatMl: Math.round(state.totalSweatMl),
       refillCount: state.refillCount,
       totalPausedSec: timeTotals.totalPausedSec,
+      autoPausedSec: Math.min(timeTotals.totalPausedSec, Math.max(0, state.autoPausedSec)),
       movingTime,
       // 坡度分布數據
       gradeDistribution: state.gradeDistribution,
@@ -923,6 +1000,13 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         powerZones: state.powerZones,
         sportType: state.sportType,
         supplyConfirmations: state.supplyConfirmations,
+        totalPausedSec: state.totalPausedSec,
+        autoPausedSec: state.autoPausedSec,
+        pauseStartTime: state.pauseStartTime,
+        pauseStartPausedSec: state.pauseStartPausedSec,
+        pauseSource: state.pauseSource,
+        autoPauseStartTime: state.autoPauseStartTime,
+        autoPauseStartPausedSec: state.autoPauseStartPausedSec,
         laps: state.laps,
         lapAnchor: state.lapAnchor,
         savedAt: Date.now(),

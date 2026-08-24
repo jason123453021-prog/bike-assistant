@@ -207,6 +207,8 @@ export interface BackgroundState {
   autoPauseResumeAtOrAboveKmh?: number;
   autoPauseLowSpeedSec?: number;
   backgroundAutoPaused?: boolean;
+  /** 鎖屏期間由背景 GPS 狀態機判定的自動暫停累計秒數。 */
+  autoPausedSec?: number;
 }
 
 async function persistBackgroundStatePreservingSupplyMutations(
@@ -411,8 +413,9 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
           accuracyM: loc.coords.accuracy,
         });
 
+        const wasBackgroundAutoPaused = state.backgroundAutoPaused === true;
         const autoPause = advanceBackgroundAutoPause({
-          paused: state.backgroundAutoPaused === true,
+          paused: wasBackgroundAutoPaused,
           accumulatedLowSpeedSec: state.autoPauseLowSpeedSec ?? 0,
           hasReliableMovement,
           speedKmh,
@@ -424,6 +427,12 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
         });
         state.backgroundAutoPaused = autoPause.paused;
         state.autoPauseLowSpeedSec = autoPause.accumulatedLowSpeedSec;
+        if (autoPause.paused) {
+          const autoPausedIncrementSec = wasBackgroundAutoPaused
+            ? rawStatisticsIntervalSec
+            : Math.max(0, autoPause.pauseStartedBeforeSampleEndSec ?? 0);
+          state.autoPausedSec = (state.autoPausedSec ?? 0) + autoPausedIncrementSec;
+        }
         const statisticsIntervalSec = autoPause.movingTimeIncrementSec;
         const isReliablyMovingForSupply = hasReliableMovement && !autoPause.paused;
 
@@ -899,6 +908,7 @@ export async function initBackgroundState(params: {
     autoPauseResumeAtOrAboveKmh: params.autoPauseResumeAtOrAboveKmh ?? 1.8,
     autoPauseLowSpeedSec: 0,
     backgroundAutoPaused: false,
+    autoPausedSec: 0,
   };
   await AsyncStorage.setItem(BG_STATE_KEY, JSON.stringify(state));
   // 清空舊軌跡
@@ -1007,6 +1017,7 @@ export async function syncBackgroundRideCheckpoint(params: {
   maxPowerW: number;
   calories: number;
   sweatLossMl: number;
+  autoPausedSec?: number;
   autoLapAnchor?: AutoLapAnchor;
   previousAutoLapTotals?: AutoLapTotals;
   nextAutoLapDistanceM?: number | null;
@@ -1035,6 +1046,7 @@ export async function syncBackgroundRideCheckpoint(params: {
     state.maxPowerW = Math.max(0, params.maxPowerW);
     state.calories = Math.max(0, params.calories);
     state.sweatLossMl = Math.max(0, params.sweatLossMl);
+    state.autoPausedSec = Math.max(state.autoPausedSec ?? 0, Math.max(0, params.autoPausedSec ?? 0));
     if (params.autoLapAnchor) state.autoLapAnchor = params.autoLapAnchor;
     if (params.previousAutoLapTotals) state.previousAutoLapTotals = params.previousAutoLapTotals;
     if (params.nextAutoLapDistanceM !== undefined) state.nextAutoLapDistanceM = params.nextAutoLapDistanceM;

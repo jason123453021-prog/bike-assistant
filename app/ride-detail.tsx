@@ -639,6 +639,7 @@ export default function RideDetailScreen() {
       `活動時間：${formatDuration(activityStats.elapsedTimeSec)}`,
       `移動時間：${formatDuration(activityStats.movingTimeSec)}`,
       `暫停時間：${formatDuration(activityStats.pausedTimeSec)}`,
+      `自動暫停時間：${formatDuration(record.autoPausedSec ?? 0)}`,
       ``,
       `⚡ 速度與功率`,
       `均速：${activityStats.averageSpeedKmh.toFixed(1)} km/h`,
@@ -1127,6 +1128,7 @@ export default function RideDetailScreen() {
                 <DetailCell label="最高速度" value={`${activityStats.maxSpeedKmh.toFixed(1)}`} unit="km/h" />
                 <DetailCell label="消耗熱量" value={activityStats.caloriesSource === "unavailable" ? "--" : `${Math.round(activityStats.caloriesKcal)}`} unit={caloriesUnit} />
                 <DetailCell label="暫停時間" value={formatDuration(activityStats.pausedTimeSec)} unit="" />
+                <DetailCell label="自動暫停總時間" value={formatDuration(record.autoPausedSec ?? 0)} unit="" />
               </View>
             </View>
 

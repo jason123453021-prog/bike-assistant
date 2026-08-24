@@ -406,6 +406,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
     && routeMovingTime <= declaredMovingTime * 1.35;
   const movingTime = routeTimingIsComparable ? routeMovingTime : declaredMovingTime;
   const totalPausedSec = Math.max(declaredPausedSec, Math.max(0, duration - movingTime));
+  const autoPausedSec = Math.min(totalPausedSec, nonNegative(source.autoPausedSec));
   const storedDistanceM = nonNegative(source.distance);
   const routeDistanceIsComparable = reconstructedDistanceM >= 50
     && (storedDistanceM < 1 || (reconstructedDistanceM >= storedDistanceM * 0.7 && reconstructedDistanceM <= storedDistanceM * 1.35));
@@ -537,6 +538,7 @@ export function normalizeRideRecord(value: unknown, fallbackId?: string): RideRe
       supplyConfirmations?.filter((confirmation) => confirmation.type === "water").length ?? 0,
     ),
     totalPausedSec,
+    autoPausedSec,
     avgHeartRate: normalizedOptional(source.avgHeartRate),
     maxHeartRate: normalizedOptional(source.maxHeartRate),
     avgCadence: normalizedOptional(source.avgCadence),

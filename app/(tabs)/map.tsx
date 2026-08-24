@@ -513,7 +513,7 @@ export default function MapScreen() {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState.match(/inactive|background/) && stateRef.current.status === "active") {
+      if (nextState.match(/inactive|background/) && (stateRef.current.status === "active" || stateRef.current.status === "paused")) {
         const currentRide = stateRef.current;
         const autoLap = autoLapMilestoneStateRef.current;
         const lastLocation = lastLocationRef.current;
@@ -527,6 +527,7 @@ export default function MapScreen() {
           maxPowerW: currentRide.maxPower,
           calories: currentRide.totalCalories,
           sweatLossMl: currentRide.totalSweatMl,
+          autoPausedSec: currentRide.autoPausedSec,
           autoLapAnchor: autoLap?.anchor,
           previousAutoLapTotals: autoLap?.previousTotals,
           nextAutoLapDistanceM: autoLap?.nextDistanceM,
@@ -2171,7 +2172,7 @@ export default function MapScreen() {
               if (lowSpeedCountRef.current >= autoPausePolicy.stillForSeconds) {
                 lowSpeedCountRef.current = 0;
                 pausedElapsedRef.current = currentState.elapsed;
-                dispatch({ type: "PAUSE" });
+                dispatch({ type: "PAUSE", source: "automatic" });
                 // 暫停時僅歸零即時讀數；定位漂移不得額外寫入軌跡或統計。
                 dispatch({ type: "LIVE_READINGS_STATIONARY" });
                 if (settings.vibrationEnabled) vibrateMedium();
@@ -2548,7 +2549,7 @@ export default function MapScreen() {
 
       lowSpeedCountRef.current = 0;
       pausedElapsedRef.current = current.elapsed;
-      dispatch({ type: "PAUSE" });
+      dispatch({ type: "PAUSE", source: "automatic" });
       dispatch({ type: "LIVE_READINGS_STATIONARY" });
       if (settings.vibrationEnabled) vibrateMedium();
     }, 1_000);
@@ -3109,6 +3110,9 @@ export default function MapScreen() {
         try {
           const bgState = await getBackgroundState();
           const bgTrack = await getBackgroundTrackPoints();
+          if (bgState?.autoPausedSec !== undefined) {
+            dispatch({ type: "SET_AUTO_PAUSED_SECONDS", totalSec: bgState.autoPausedSec });
+          }
           if (bgState?.nextAutoLapDistanceM !== undefined) {
             nextAutoLapDistanceMRef.current = bgState.nextAutoLapDistanceM;
           }
