@@ -2442,3 +2442,10 @@
 - [x] 執行 TypeScript、Lint、完整 Vitest 與針對 GPS／COG／補給／匯出的資料鏈回歸，記錄通過、警告與阻擋項
 - [x] 執行 Expo Doctor、Android Hermes 匯出與設定解析，確認封版相容性
 - [x] 產出可追溯 Markdown QC 報告、保存版本、同步 GitHub Actions APK artifact 並交付實機驗收邊界（run 32736347306，artifact 28,358,260 bytes，未過期）
+
+## 規格書驅動的 Jest 與 Android E2E 自動測試（2026-08-24）
+- [x] 盤點現有 Vitest、GitHub Actions 與 Android 模擬器／Detox／Maestro 可用性，建立不需人工介入的執行矩陣
+- [x] 建立 Jest 核心 GPS、自動暫停、時間隔離、自動計圈、COG、轉彎、補給倒數、補償與 Timeout 降級回歸測試
+- [x] 建立靜態封版守門，禁止手動 Lap、日出日落提醒、Kalman Filter 與 FIT timer time 綁定錯誤回歸
+- [x] 建立 Android E2E 腳本及 CI 執行路徑，並明確區分可自動執行與受模擬器／原生環境限制的案例
+- [ ] 執行全套測試、修正可重現失敗、產出 Pass／Fail 報告、checkpoint 與 GitHub APK artifact

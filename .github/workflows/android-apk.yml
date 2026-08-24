@@ -61,6 +61,7 @@ jobs:
         run: |
           pnpm check
           pnpm lint
+          pnpm test:jest
           pnpm test
 
       - name: 產生 Android 原生專案

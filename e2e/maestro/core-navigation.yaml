@@ -1,0 +1,21 @@
+appId: com.jason123453021.bikeassistant
+name: Android 封版核心導覽
+---
+- launchApp:
+    clearState: true
+    permissions:
+      android.permission.ACCESS_FINE_LOCATION: allow
+      android.permission.ACCESS_COARSE_LOCATION: allow
+      android.permission.POST_NOTIFICATIONS: allow
+- assertVisible: "導航"
+- assertVisible: "路線"
+- assertVisible: "記錄"
+- assertVisible: "設定"
+- tapOn: "設定"
+- assertVisible: "顯示與外觀"
+- tapOn: "路線"
+- assertVisible: "路線"
+- tapOn: "記錄"
+- assertVisible: "記錄"
+- tapOn: "導航"
+- takeScreenshot: "core-navigation-tabs"

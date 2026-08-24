@@ -23,7 +23,6 @@ import {
   canStopRide,
   shouldAccumulateRideStatistics,
 } from "./ride-lifecycle-guard";
-import { buildManualRideLap, createNextRideLapAnchor } from "./ride-lap";
 import type { SportType } from "./sport-metrics";
 
 export type { SportType } from "./sport-metrics";
@@ -320,7 +319,6 @@ type RideAction =
   | { type: "CONSUME_CALORIES" }
   | { type: "CONSUME_WATER" }
   | { type: "SUPPLY_CONFIRMED"; confirmation: SupplyConfirmation }
-  | { type: "MARK_LAP" }
   /** 以固定里程邊界工具產生的完整自動分圈覆寫同步；僅採用圈數不較少的來源。 */
   | { type: "SYNC_AUTO_LAPS"; laps: RideLap[]; anchor?: Omit<RideLapAnchor, "routePointIndex"> }
   | { type: "LOAD_RECORDS"; records: RideRecord[] }
@@ -670,20 +668,6 @@ export function rideReducer(state: RideState, action: RideAction): RideState {
         ...state,
         supplyConfirmations: [...state.supplyConfirmations, action.confirmation].slice(-100),
       };
-
-    case "MARK_LAP": {
-      // 分圈僅能在真正騎乘中建立，避免暫停或地圖操作產生空白分段。
-      if (state.status !== "active") return state;
-      const lap = buildManualRideLap(state);
-      if (!lap) return state;
-      return {
-        ...state,
-        // 使用 reducer 的不可變更新累加全部分圈；單次活動不設圈數上限。
-        laps: [...state.laps, { ...lap, source: "auto" }],
-        // 全程統計保留；僅切換下一圈的相對統計錨點。
-        lapAnchor: createNextRideLapAnchor(state),
-      };
-    }
 
     case "SYNC_AUTO_LAPS": {
       // 前景與背景皆使用同一套固定里程工具；若背景快照較舊，不能覆蓋掉已封存的新圈。

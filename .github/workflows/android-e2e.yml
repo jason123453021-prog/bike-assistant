@@ -1,0 +1,106 @@
+name: Android 原生 E2E
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "e2e/**"
+      - "tests/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "app.config.ts"
+      - ".github/workflows/android-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "e2e/**"
+      - "tests/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "app.config.ts"
+      - ".github/workflows/android-e2e.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-e2e:
+    name: Android Maestro E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      CI: true
+      EXPO_NO_DOCTOR: "1"
+      EAS_BUILD_PROFILE: preview
+    steps:
+      - name: 取得原始碼
+        uses: actions/checkout@v4
+
+      - name: 設定 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: 設定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 設定 Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: 安裝鎖定版本的依賴
+        run: pnpm install --frozen-lockfile
+
+      - name: 執行單元與靜態守門
+        run: |
+          pnpm check
+          pnpm lint
+          pnpm test:jest
+          pnpm test
+
+      - name: 產生 Android 原生專案與驗收 APK
+        run: |
+          npx expo prebuild --platform android --clean --no-install
+          (cd android && ./gradlew assembleRelease --no-daemon --stacktrace)
+
+      - name: 啟動 Android Emulator 並執行 Maestro E2E
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: |
+            APK_PATH="$(find android/app/build/outputs/apk/release -name '*.apk' -print -quit)"
+            test -n "$APK_PATH"
+            adb install -r "$APK_PATH"
+            curl -fsSL https://get.maestro.mobile.dev | bash
+            export PATH="$HOME/.maestro/bin:$PATH"
+            maestro test --format junit --output build/maestro-report.xml --test-output-dir build/maestro-results e2e/maestro
+
+      - name: 上傳 Maestro 報告與診斷 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bike-assistant-maestro-e2e
+          path: |
+            build/maestro-report.xml
+            build/maestro-results
+          if-no-files-found: warn
+          retention-days: 14

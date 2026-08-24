@@ -85,9 +85,9 @@ export function createFitBytes(record: RideRecord): Uint8Array | null {
     totalCalories: Math.round(record.calories),
     sport: "cycling",
   };
-  const manualLaps = record.laps ?? [];
-  const lapPayloads = manualLaps.length > 0
-    ? manualLaps.map((lap, index) => ({
+  const recordedLaps = record.laps ?? [];
+  const lapPayloads = recordedLaps.length > 0
+    ? recordedLaps.map((lap, index) => ({
         timestamp: new Date(startTime.getTime() + lap.endedAtElapsedSec * 1_000),
         startTime: new Date(startTime.getTime() + lap.startedAtElapsedSec * 1_000),
         totalElapsedTime: lap.movingTimeSec,
