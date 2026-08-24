@@ -74,10 +74,15 @@ jobs:
           pnpm test:jest
           pnpm test
 
-      - name: 產生 Android 原生專案與驗收 APK
+      - name: 產生 Android 原生專案與 E2E APK
         run: |
           npx expo prebuild --platform android --clean --no-install
-          (cd android && ./gradlew assembleRelease --no-daemon --stacktrace)
+          (cd android && ./gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64 --no-daemon --stacktrace)
+          APK_PATH="$(find android/app/build/outputs/apk/debug -type f -name '*.apk' -print -quit)"
+          test -s "$APK_PATH"
+          mkdir -p build
+          cp "$APK_PATH" build/e2e-under-test.apk
+          ls -lh build/e2e-under-test.apk
 
       - name: 啟用 Android Emulator KVM
         run: |
@@ -94,12 +99,11 @@ jobs:
           disable-animations: true
           working-directory: ${{ github.workspace }}
           script: |
-            APK_PATH="$(find "$GITHUB_WORKSPACE/android" -type f -name '*.apk' ! -name '*unaligned*' -print -quit)"
-            test -n "$APK_PATH"
-            adb install -r "$APK_PATH"
+            test -s build/e2e-under-test.apk
+            adb install -r build/e2e-under-test.apk
             curl -fsSL https://get.maestro.mobile.dev | bash
             export PATH="$HOME/.maestro/bin:$PATH"
-            maestro test --format junit --output "$GITHUB_WORKSPACE/build/maestro-report.xml" --test-output-dir "$GITHUB_WORKSPACE/build/maestro-results" "$GITHUB_WORKSPACE/e2e/maestro"
+            maestro test --format junit --output build/maestro-report.xml --test-output-dir build/maestro-results e2e/maestro
 
       - name: 上傳 Maestro 報告與診斷 artifact
         if: always()
