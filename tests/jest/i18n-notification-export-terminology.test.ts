@@ -33,11 +33,13 @@ describe("通知、匯出檔名與單車術語 i18n 守門", () => {
   it("活動通知、供給 action 與三種輸出器均透過語系化服務取得文案或檔名", () => {
     const feedback = fs.readFileSync(path.join(rootDir, "lib/feedback-service.ts"), "utf8");
     const actions = fs.readFileSync(path.join(rootDir, "lib/supply-notification-actions.ts"), "utf8");
+    const background = fs.readFileSync(path.join(rootDir, "lib/background-location.ts"), "utf8");
     const gpx = fs.readFileSync(path.join(rootDir, "lib/gpx-export.ts"), "utf8");
     const fit = fs.readFileSync(path.join(rootDir, "lib/fit-export.ts"), "utf8");
     const svg = fs.readFileSync(path.join(rootDir, "lib/ride-share-card-svg.ts"), "utf8");
-    expect(feedback).toContain('exportTranslation("notifications.supplyTitle")');
+    expect(feedback).toContain("createLocalizedSupplyNotificationContent");
     expect(actions).toContain('exportTranslation("notifications.confirm")');
+    expect(background).toContain("createLocalizedSupplyNotificationContent");
     for (const source of [gpx, fit, svg]) expect(source).toContain("createLocalizedExportFilename");
   });
 });

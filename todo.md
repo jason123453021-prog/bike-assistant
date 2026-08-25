@@ -2478,3 +2478,10 @@
 - [x] 校對 13 種語系的單車專有術語與核心運動指標翻譯
 - [x] 新增通知、匯出檔名、術語完整性與 locale 切換自動化守門
 - [x] 完成完整品質檢查、GitHub Android E2E 與驗收連結（Android E2E run 32804100697，head `6f194bd`；Maestro JUnit 1 test／0 failures／38.069 秒；artifact `bike-assistant-maestro-e2e` 已下載核實）
+
+## 通知語言重排、實機驗收與活動詳情次要文案（2026-08-25）
+- [x] 語言變更後取消並以新語言重排既有本機補給／補水通知，保留當前倒數與待確認狀態
+- [x] 建立 Android 實機可執行的通知 action／背景回前景驗收流程與對應自動化守門
+- [x] 擴充活動詳情優先次要資訊、分析、匯出與操作文案的多國語系支援，維持 fallback 與 RTL 版面韌性
+- [ ] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact
+- [ ] 由 Android 實機依 `references/android-notification-device-validation-2026-08-25.md` 驗證通知 action、背景回前景與語言重排

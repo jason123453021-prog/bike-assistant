@@ -6,6 +6,7 @@ import i18n, { resolveLanguagePreference, type LanguagePreference, type Supporte
 import { LANGUAGE_PREFERENCE_STORAGE_KEY, isLanguagePreference } from "./types";
 import { useSettings } from "../settings-context";
 import { getLayoutDirection, type LayoutDirection } from "./layout-direction";
+import { rescheduleLocalizedSupplyNotifications } from "../feedback-service";
 
 interface LanguageContextValue { preference: LanguagePreference; activeLanguage: SupportedLocale; isReady: boolean; isSwitching: boolean; layoutDirection: LayoutDirection; isRTL: boolean; setLanguagePreference: (preference: LanguagePreference) => Promise<void>; }
 const LanguageContext = createContext<LanguageContextValue | null>(null);
@@ -37,6 +38,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
     await i18n.changeLanguage(nextLanguage);
     setPreference(nextPreference); setActiveLanguage(nextLanguage);
+    if (languageChanged) await rescheduleLocalizedSupplyNotifications(nextLanguage);
     if (options.persist) await AsyncStorage.setItem(LANGUAGE_PREFERENCE_STORAGE_KEY, nextPreference);
     if (options.syncSettings && settings.languagePreference !== nextPreference) { lastSettingsPreference.current = nextPreference; await updateSettings({ languagePreference: nextPreference }); }
     if (languageChanged) {

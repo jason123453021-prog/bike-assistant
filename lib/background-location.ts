@@ -12,7 +12,9 @@ import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getLocalNotifications } from "@/lib/local-notifications";
-import { SUPPLY_NOTIFICATION_CATEGORY } from "@/lib/supply-notification-actions";
+import { SUPPLY_NOTIFICATION_CATEGORY, type SupplyNotificationKind } from "@/lib/supply-notification-actions";
+import { createLocalizedSupplyNotificationContent } from "@/lib/supply-notification-localization";
+import type { SupportedLocale } from "@/lib/i18n/types";
 import {
   addTrackPoint,
   createNewRideSession,
@@ -125,6 +127,8 @@ export interface BackgroundState {
   lastTimestamp: number;
   lastAccuracy?: number;
   isRiding: boolean;
+  /** 由前景語言 Provider 保存，讓背景 JS 重啟後仍可建立正確語系通知。 */
+  notificationLocale?: SupportedLocale;
   calorieThreshold: number;
   waterThreshold: number;
   supplyCalculationMode?: "smart" | "custom";
@@ -681,10 +685,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
         state.calorieReminderSent = true;
         const Notifications = await getLocalNotifications();
         if (Notifications) {
+          const content = createLocalizedSupplyNotificationContent("calorie", undefined, state.notificationLocale);
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: "🍌 補給提醒",
-              body: smartChannels.energy ? "請補給能量，完成後點選已補給以開始下一輪倒數。" : `建議補充約 ${latestSupplyPlan.energyRecommendationKcal} kcal（${latestSupplyPlan.carbohydrateRecommendationG} g 碳水）；${latestSupplyPlan.reason}`,
+              ...content,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
               channelId: "supply",
@@ -700,10 +704,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
         state.waterReminderSent = true;
         const Notifications = await getLocalNotifications();
         if (Notifications) {
+          const content = createLocalizedSupplyNotificationContent("water", undefined, state.notificationLocale);
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: "💧 補水提醒",
-              body: smartChannels.water ? "請補給水分，完成後點選已補給以開始下一輪倒數。" : `建議補充約 ${latestSupplyPlan.waterRecommendationMl} ml 水分；${latestSupplyPlan.reason}`,
+              ...content,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
               channelId: "supply",
@@ -723,36 +727,30 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
         since: number;
         sent: boolean;
         markSent: () => void;
-        title: string;
-        body: string;
       }> = [
         {
           kind: "energy-time", enabled: supplyReminderEnabled && !smartChannels.energy && state.supplyEnergyTimeIntervalEnabled,
           interval: state.supplyEnergyTimeIntervalMinutes * 60, since: state.intervalLastEnergyTimeSec,
           sent: state.intervalEnergyTimeReminderSent,
           markSent: () => { state.intervalEnergyTimeReminderSent = true; },
-          title: "能量補給提醒", body: `已騎乘 ${state.supplyEnergyTimeIntervalMinutes} 分鐘，請補給能量`,
         },
         {
           kind: "energy-distance", enabled: supplyReminderEnabled && !smartChannels.energy && state.supplyEnergyDistanceIntervalEnabled,
           interval: state.supplyEnergyDistanceIntervalKm, since: state.intervalLastEnergyDistanceKm,
           sent: state.intervalEnergyDistanceReminderSent,
           markSent: () => { state.intervalEnergyDistanceReminderSent = true; },
-          title: "能量補給提醒", body: `已累積騎乘 ${state.supplyEnergyDistanceIntervalKm} km，請補給能量`,
         },
         {
           kind: "water-time", enabled: supplyReminderEnabled && !smartChannels.water && state.supplyWaterTimeIntervalEnabled,
           interval: state.supplyWaterTimeIntervalMinutes * 60, since: state.intervalLastWaterTimeSec,
           sent: state.intervalWaterTimeReminderSent,
           markSent: () => { state.intervalWaterTimeReminderSent = true; },
-          title: "補水提醒", body: `已騎乘 ${state.supplyWaterTimeIntervalMinutes} 分鐘，請補給水分`,
         },
         {
           kind: "water-distance", enabled: supplyReminderEnabled && !smartChannels.water && state.supplyWaterDistanceIntervalEnabled,
           interval: state.supplyWaterDistanceIntervalKm, since: state.intervalLastWaterDistanceKm,
           sent: state.intervalWaterDistanceReminderSent,
           markSent: () => { state.intervalWaterDistanceReminderSent = true; },
-          title: "補水提醒", body: `已累積騎乘 ${state.supplyWaterDistanceIntervalKm} km，請補給水分`,
         },
       ];
       for (const rule of intervalRules) {
@@ -761,10 +759,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error, execution
         rule.markSent();
         const Notifications = await getLocalNotifications();
         if (Notifications) {
+          const content = createLocalizedSupplyNotificationContent(`interval-${rule.kind}` as SupplyNotificationKind, { intervalValue: rule.interval }, state.notificationLocale);
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: rule.title,
-              body: rule.body,
+              ...content,
               sound: true,
               categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
               channelId: "supply",
@@ -812,6 +810,7 @@ export async function initBackgroundState(params: {
   calorieThreshold: number;
   waterThreshold: number;
   supplyCalculationMode?: "smart" | "custom";
+  notificationLocale?: SupportedLocale;
   smartEnergySupplyEnabled?: boolean;
   smartWaterSupplyEnabled?: boolean;
   supplyReminderEnabled?: boolean;
@@ -857,6 +856,7 @@ export async function initBackgroundState(params: {
     calorieThreshold: params.calorieThreshold,
     waterThreshold: params.waterThreshold,
     supplyCalculationMode: params.supplyCalculationMode ?? "custom",
+    notificationLocale: params.notificationLocale,
     smartEnergySupplyEnabled: params.smartEnergySupplyEnabled ?? params.supplyCalculationMode === "smart",
     smartWaterSupplyEnabled: params.smartWaterSupplyEnabled ?? params.supplyCalculationMode === "smart",
     supplyReminderEnabled: params.supplyReminderEnabled !== false,
@@ -1096,6 +1096,15 @@ export async function updateBackgroundSmartSupplyCountdown(countdown: Pick<
     const channels = resolveSmartSupplyChannels(state);
     if (!state.isRiding || (!channels.energy && !channels.water)) return false;
     Object.assign(state, countdown);
+    return true;
+  });
+}
+
+/** 前景切換語言時保存目前 locale，並保留所有倒數與待確認狀態。 */
+export async function updateBackgroundNotificationLocale(notificationLocale: SupportedLocale) {
+  await mutateBackgroundSupplyState((state) => {
+    if (!state.isRiding) return false;
+    state.notificationLocale = notificationLocale;
     return true;
   });
 }

@@ -13,6 +13,10 @@ import { exportTranslation } from "@/lib/i18n/export-localization";
 import { getLocalNotifications } from "@/lib/local-notifications";
 import { configureSupplyNotificationActions, SUPPLY_NOTIFICATION_CATEGORY, type SupplyNotificationKind } from "@/lib/supply-notification-actions";
 import type { SupplyPlan } from "@/lib/smart-supply-plan";
+import { getBackgroundState, updateBackgroundNotificationLocale } from "@/lib/background-location";
+import { createLocalizedSupplyNotificationContent } from "@/lib/supply-notification-localization";
+import { buildSupplyNotificationRefreshPlan } from "@/lib/supply-notification-reschedule";
+import type { SupportedLocale } from "@/lib/i18n/types";
 
 let rideSpeechSuppressed = false;
 
@@ -261,29 +265,12 @@ export async function showSupplyNotification(
 ) {
   const Notifications = await getLocalNotifications();
   if (!Notifications) return;
-
-  const isEnergy = type === "calorie" || type === "custom-energy";
-  const isWater = type === "water" || type === "custom-water";
-  const title = isEnergy ? `🍌 ${exportTranslation("notifications.supplyTitle")}` : isWater ? `💧 ${exportTranslation("notifications.waterTitle")}` : exportTranslation("notifications.supplyTitle");
-  const body = type === "calorie"
-    ? recommendation?.energyKcal
-      ? `建議補充約 ${recommendation.energyKcal} kcal${recommendation.carbohydrateG ? `（${recommendation.carbohydrateG} g 碳水）` : ""}${recommendation.reason ? `；${recommendation.reason}` : ""}`
-      : exportTranslation("notifications.energyDue")
-    : type === "water"
-      ? recommendation?.waterMl
-        ? `建議補充約 ${recommendation.waterMl} ml 水分${recommendation.reason ? `；${recommendation.reason}` : ""}`
-        : exportTranslation("notifications.waterDue")
-      : type === "custom-energy"
-        ? exportTranslation("notifications.energyDue")
-        : type === "custom-water"
-          ? exportTranslation("notifications.waterDue")
-          : exportTranslation("notifications.energyDue");
+  const content = createLocalizedSupplyNotificationContent(type, recommendation);
   try {
     await configureSupplyNotificationActions();
     await Notifications.scheduleNotificationAsync({
       content: {
-        title,
-        body,
+        ...content,
         sound: true,
         badge: 1,
         categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
@@ -297,6 +284,40 @@ export async function showSupplyNotification(
       // 通知頻道已在 setupNotifications 中設定為 MAX 優先級
     }
   } catch {}
+}
+
+function isLanguageRefreshManagedSupplyKind(value: unknown): value is SupplyNotificationKind {
+  return value === "calorie" || value === "water" || value === "interval-energy-time" || value === "interval-energy-distance" || value === "interval-water-time" || value === "interval-water-distance";
+}
+
+/**
+ * 語言切換後取消並以最新語言重建本輪既有提醒。這個流程只讀取背景快照，
+ * 不會重設 dueAt、pending 或確認旗標，因此倒數與回前景確認行為保持不變。
+ */
+export async function rescheduleLocalizedSupplyNotifications(locale: SupportedLocale) {
+  await updateBackgroundNotificationLocale(locale);
+  const Notifications = await getLocalNotifications();
+  const state = await getBackgroundState();
+  const plan = buildSupplyNotificationRefreshPlan(state);
+  if (!Notifications || !state?.isRiding) return plan;
+  try {
+    await configureSupplyNotificationActions();
+    const [presented, scheduled] = await Promise.all([
+      Notifications.getPresentedNotificationsAsync(),
+      Notifications.getAllScheduledNotificationsAsync(),
+    ]);
+    await Promise.all([
+      ...presented
+        .filter((notification) => isLanguageRefreshManagedSupplyKind(notification.request.content.data?.supplyKind))
+        .map((notification) => Notifications.dismissNotificationAsync(notification.request.identifier).catch(() => {})),
+      ...scheduled
+        .filter((notification) => isLanguageRefreshManagedSupplyKind(notification.content.data?.supplyKind))
+        .map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier).catch(() => {})),
+    ]);
+    await Promise.all(plan.scheduled.map(({ kind, dueAtMs }) => scheduleSmartSupplyDueNotification(kind, dueAtMs)));
+    await Promise.all(plan.immediate.map((kind) => showSupplyNotification(kind)));
+  } catch {}
+  return plan;
 }
 
 const RIDING_NOTIFICATION_ID = "bike-assistant-riding-status";

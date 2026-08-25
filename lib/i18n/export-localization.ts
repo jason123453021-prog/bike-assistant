@@ -32,7 +32,7 @@ export function createLocalizedExportFilename(record: RideRecord, extension: "gp
   return `${prefix}-${activityName}-${date}.${extension}`;
 }
 
-export function exportTranslation(key: string, options?: Record<string, unknown>): string {
-  const locale = (i18n.resolvedLanguage ?? "en-US") as SupportedLocale;
-  return LOCALIZED_TERMS[locale]?.[key] ?? i18n.t(key, options);
+export function exportTranslation(key: string, options?: Record<string, unknown>, requestedLocale?: SupportedLocale): string {
+  const locale = requestedLocale ?? (i18n.resolvedLanguage ?? "en-US") as SupportedLocale;
+  return LOCALIZED_TERMS[locale]?.[key] ?? i18n.getFixedT(locale)(key, options);
 }

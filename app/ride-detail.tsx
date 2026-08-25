@@ -579,47 +579,47 @@ export default function RideDetailScreen() {
     try {
       const backup = await writeLocalGpxBackup(record);
       if (!backup) {
-        Alert.alert("錯誤", "沒有軌跡數據，無法匯出");
+        Alert.alert(t("detail.exportUnavailableTitle"), t("detail.exportGpxUnavailable"));
         return;
       }
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(backup.uri, {
           mimeType: "application/gpx+xml",
-          dialogTitle: "儲存或分享 GPX 備份",
+          dialogTitle: t("detail.shareGpxBackup"),
           UTI: "com.topografix.gpx",
         });
       } else {
-        Alert.alert("已建立本機備份", `${backup.filename}\n已保存至 App 的本機備份資料夾。`);
+        Alert.alert(t("detail.backupCreated"), t("detail.gpxBackupCreated", { filename: backup.filename }));
       }
     } catch (err) {
       reportRecoverableIssue("[RideDetail] GPX export error", err);
-      Alert.alert("匯出失敗", "無法建立 GPX 本機備份，請確認此記錄包含至少兩個有效 GPS 軌跡點。");
+      Alert.alert(t("detail.exportFailed"), t("detail.exportGpxFailed"));
     }
-  }, [record]);
+  }, [record, t]);
 
   const handleExportFit = useCallback(async () => {
     if (!record) return;
     try {
       const backup = await writeLocalFitBackup(record);
       if (!backup) {
-        Alert.alert("無法匯出 FIT", "此記錄至少需要兩個有效 GPS 軌跡點才能建立標準 FIT 活動檔。");
+        Alert.alert(t("detail.exportUnavailableTitle"), t("detail.exportFitUnavailable"));
         return;
       }
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(backup.uri, {
           mimeType: "application/octet-stream",
-          dialogTitle: "儲存或分享 FIT 活動檔",
+          dialogTitle: t("detail.shareFitBackup"),
         });
       } else {
-        Alert.alert("已建立本機 FIT", `${backup.filename}\n已保存至 App 本機快取資料夾。`);
+        Alert.alert(t("detail.backupCreated"), t("detail.fitBackupCreated", { filename: backup.filename }));
       }
     } catch (error) {
       reportRecoverableIssue("[RideDetail] FIT export error", error);
-      Alert.alert("FIT 匯出失敗", "無法建立本機 FIT 檔，請確認記錄中的 GPS 軌跡完整。");
+      Alert.alert(t("detail.exportFailed"), t("detail.exportFitFailed"));
     }
-  }, [record]);
+  }, [record, t]);
 
   const handleShare = useCallback(async () => {
     if (!record) return;
@@ -891,8 +891,8 @@ export default function RideDetailScreen() {
         )}
 
         <View style={styles.activityAnalysisCard}>
-          <Text style={styles.activityAnalysisTitle}>活動分析</Text>
-          <Text style={styles.activityAnalysisHint}>拖曳曲線查看位置讀值；僅使用本次騎乘收集的資料</Text>
+          <Text style={styles.activityAnalysisTitle}>{t("detail.activityAnalysis")}</Text>
+          <Text style={styles.activityAnalysisHint}>{t("detail.activityAnalysisHint")}</Text>
           {speedCurveData.length > 1 ? (
             <SpeedCurveChart
               data={speedCurveData}
@@ -902,11 +902,11 @@ export default function RideDetailScreen() {
               confidence={activitySensorAnalysis?.confidence}
               confidenceFactors={activitySensorAnalysis?.factors}
             />
-          ) : <Text style={styles.activityAnalysisEmpty}>此活動沒有足夠的 GPS 取樣資料可繪製速度曲線。</Text>}
+          ) : <Text style={styles.activityAnalysisEmpty}>{t("detail.speedCurveUnavailable")}</Text>}
           <ActivityElevationChart route={record.route} />
           {bestPowerEfforts.length > 0 && (
             <View style={styles.bestPowerBlock}>
-              <Text style={styles.bestPowerTitle}>最佳平均功率</Text>
+              <Text style={styles.bestPowerTitle}>{t("detail.bestAveragePower")}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestPowerRow}>
                 {bestPowerEfforts.map((effort) => (
                   <View key={effort.seconds} style={styles.bestPowerChip}>
@@ -923,14 +923,14 @@ export default function RideDetailScreen() {
           <View style={styles.localInsightCard}>
             <IconSymbol name="flame.fill" size={20} color="#F59E0B" />
             <View style={styles.localInsightText}>
-              <Text style={styles.localInsightTitle}>本機個人紀錄</Text>
-              <Text style={styles.localInsightCopy}>本次騎乘刷新 {record.personalBests?.map((best) => best.label).join("、")}</Text>
+              <Text style={styles.localInsightTitle}>{t("detail.localPersonalRecord")}</Text>
+              <Text style={styles.localInsightCopy}>{t("detail.personalRecordImproved", { records: record.personalBests?.map((best) => best.label).join("、") })}</Text>
             </View>
           </View>
         )}
 
-        <Text style={styles.moreDataHeading}>完整騎乘數據</Text>
-        <Text style={styles.moreDataHint}>繼續上滑查看地形、訓練與補給詳情</Text>
+        <Text style={styles.moreDataHeading}>{t("detail.completeRideData")}</Text>
+        <Text style={styles.moreDataHint}>{t("detail.completeRideDataHint")}</Text>
 
         <View style={styles.expandedContent}>
 
@@ -938,7 +938,7 @@ export default function RideDetailScreen() {
             {/* 功率分布 */}
             {totalZones > 0 && (
               <View style={styles.zoneSection}>
-                <Text style={styles.sectionTitle}>功率分布</Text>
+                <Text style={styles.sectionTitle}>{t("detail.powerDistribution")}</Text>
                 <View style={styles.zoneRow}>
                   {renderPie()}
                   <View style={styles.zoneLegend}>
@@ -957,15 +957,15 @@ export default function RideDetailScreen() {
             {/* 坡度分布詳細統計 */}
             {record && (record.gradeDistribution || [0, 0, 0, 0, 0, 0]).reduce((a: number, b: number) => a + b, 0) > 0 && (
               <View style={styles.gradeDistributionSection}>
-                <Text style={styles.sectionTitle}>坡度分布統計</Text>
+                <Text style={styles.sectionTitle}>{t("detail.gradeDistribution")}</Text>
                 
                 {/* 距離分布表 */}
                 <View style={styles.tableContainer}>
-                  <Text style={styles.tableTitle}>距離分布</Text>
+                  <Text style={styles.tableTitle}>{t("detail.distanceDistribution")}</Text>
                   <View style={styles.tableHeader}>
-                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>坡度</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>距離</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>百分比</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>{t("detail.grade")}</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>{t("share.distance")}</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>{t("detail.percentage")}</Text>
                   </View>
                   {['1-5%', '6-10%', '11-15%', '16-20%', '21-25%', '26%+'].map((label, idx) => {
                     const dist = (record.gradeDistribution?.[idx] || 0) / 1000;
@@ -986,11 +986,11 @@ export default function RideDetailScreen() {
                 
                 {/* 爬升分布表 */}
                 <View style={styles.tableContainer}>
-                  <Text style={styles.tableTitle}>爬升分布</Text>
+                  <Text style={styles.tableTitle}>{t("detail.ascentDistribution")}</Text>
                   <View style={styles.tableHeader}>
-                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>坡度</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>爬升</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>百分比</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>{t("detail.grade")}</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>{t("share.elevation")}</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>{t("detail.percentage")}</Text>
                   </View>
                   {['1-5%', '6-10%', '11-15%', '16-20%', '21-25%', '26%+'].map((label, idx) => {
                     const ascent = (record.gradeAscentDistribution?.[idx] || 0);
@@ -1013,14 +1013,14 @@ export default function RideDetailScreen() {
 
             {rideSplits.length > 0 && (
               <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-                <Text style={[styles.panelTitle, { color: colors.foreground }]}>每公里分段</Text>
-                <Text style={[styles.panelHint, { color: colors.muted }]}>依已保存 GPS 軌跡重建；最後一段可能不足 1 km。</Text>
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>{t("detail.perKilometerSplits")}</Text>
+                <Text style={[styles.panelHint, { color: colors.muted }]}>{t("detail.splitsHint")}</Text>
                 <View style={styles.splitHeader}>
-                  <Text style={styles.splitHeaderText}>段</Text>
-                  <Text style={styles.splitHeaderText}>時間</Text>
-                  <Text style={styles.splitHeaderText}>{sportType === "running" || sportType === "trail_running" ? "配速" : "均速"}</Text>
-                  <Text style={styles.splitHeaderText}>爬／降</Text>
-                  <Text style={styles.splitHeaderText}>{sportType === "trail_running" ? "GAP" : sportType === "hiking" ? "VAM" : "功率"}</Text>
+                  <Text style={styles.splitHeaderText}>{t("detail.split")}</Text>
+                  <Text style={styles.splitHeaderText}>{t("detail.time")}</Text>
+                  <Text style={styles.splitHeaderText}>{sportType === "running" || sportType === "trail_running" ? t("detail.pace") : t("dashboard.avgSpeed")}</Text>
+                  <Text style={styles.splitHeaderText}>{t("detail.ascentDescent")}</Text>
+                  <Text style={styles.splitHeaderText}>{sportType === "trail_running" ? "GAP" : sportType === "hiking" ? "VAM" : t("dashboard.power")}</Text>
                 </View>
                 {rideSplits.map((split) => (
                   <View key={split.index} style={styles.splitRow}>
@@ -1036,13 +1036,13 @@ export default function RideDetailScreen() {
 
             {elevationBands.length > 0 && (
               <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}> 
-                <Text style={[styles.panelTitle, { color: colors.foreground }]}>海拔區間分布</Text>
-                <Text style={[styles.panelHint, { color: colors.muted }]}>依本次儲存的 GPS 海拔與軌跡距離建立，不使用外部地形資料。</Text>
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>{t("detail.elevationBandDistribution")}</Text>
+                <Text style={[styles.panelHint, { color: colors.muted }]}>{t("detail.elevationBandsHint")}</Text>
                 <View style={styles.splitHeader}>
-                  <Text style={styles.splitHeaderText}>海拔</Text>
-                  <Text style={styles.splitHeaderText}>距離</Text>
-                  <Text style={styles.splitHeaderText}>停留</Text>
-                  <Text style={styles.splitHeaderText}>爬升</Text>
+                  <Text style={styles.splitHeaderText}>{t("dashboard.altitude")}</Text>
+                  <Text style={styles.splitHeaderText}>{t("share.distance")}</Text>
+                  <Text style={styles.splitHeaderText}>{t("detail.timeInBand")}</Text>
+                  <Text style={styles.splitHeaderText}>{t("share.elevation")}</Text>
                 </View>
                 {elevationBands.map((band) => (
                   <View key={band.label} style={styles.splitRow}>
@@ -1060,7 +1060,7 @@ export default function RideDetailScreen() {
             {/* 心率區間分布 */}
             {heartRateZones && heartRateZones.reduce((a, b) => a + b, 0) > 0 && (
               <View style={styles.zoneSection}>
-                <Text style={styles.sectionTitle}>心率區間分布</Text>
+                <Text style={styles.sectionTitle}>{t("detail.heartRateDistribution")}</Text>
                 <View style={styles.zoneRow}>
                   {renderHeartRatePie()}
                   <View style={styles.zoneLegend}>
@@ -1086,7 +1086,7 @@ export default function RideDetailScreen() {
               onPress={handleShare}
             >
               <IconSymbol name="square.and.arrow.up" size={16} color="#fff" />
-              <Text style={styles.shareBtnText}>分享記錄</Text>
+              <Text style={styles.shareBtnText}>{t("detail.shareRecord")}</Text>
             </Pressable>
 
             {/* GPX 匯出按鈕 */}
@@ -1095,7 +1095,7 @@ export default function RideDetailScreen() {
               onPress={handleExportGpx}
             >
               <IconSymbol name="arrow.down.doc" size={16} color="#fff" />
-              <Text style={styles.shareBtnText}>離線備份 GPX</Text>
+              <Text style={styles.shareBtnText}>{t("detail.offlineGpxBackup")}</Text>
             </Pressable>
 
             <Pressable
@@ -1103,7 +1103,7 @@ export default function RideDetailScreen() {
               onPress={handleExportFit}
             >
               <IconSymbol name="arrow.down.doc" size={16} color="#fff" />
-              <Text style={styles.shareBtnText}>匯出標準 FIT</Text>
+              <Text style={styles.shareBtnText}>{t("detail.exportStandardFit")}</Text>
             </Pressable>
 
             {/* 分享卡片按鈕 */}
@@ -1112,12 +1112,12 @@ export default function RideDetailScreen() {
               onPress={() => setShareCardVisible(true)}
             >
               <IconSymbol name="paperplane.fill" size={16} color="#fff" />
-              <Text style={styles.shareBtnText}>分享卡片</Text>
+              <Text style={styles.shareBtnText}>{t("detail.shareCard")}</Text>
             </Pressable>
 
             {/* 核心數據面板 */}
             <View style={[styles.statsPanel, { borderColor: colors.border }]}>
-              <Text style={[styles.panelTitle, { color: colors.foreground }]}>核心數據</Text>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>{t("detail.coreData")}</Text>
               <View style={styles.statsGrid}>
                 <DetailCell label="距離" value={`${(activityStats.distanceM / 1000).toFixed(2)}`} unit="km" />
                 <DetailCell label="活動時間" value={formatDuration(activityStats.elapsedTimeSec)} unit="" />
@@ -1132,7 +1132,7 @@ export default function RideDetailScreen() {
 
             {/* 爬升與地形數據面板 */}
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-              <Text style={[styles.panelTitle, { color: colors.foreground }]}>爬升與地形</Text>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>{t("detail.elevationTerrain")}</Text>
               <View style={styles.statsGrid}>
                 <DetailCell label="總爬升高度" value={`${Math.round(activityStats.totalAscentM)}`} unit="m" color="#F59E0B" />
                 <DetailCell label="總下降高度" value={`${Math.round(activityStats.totalDescentM)}`} unit="m" color="#4FC3F7" />
@@ -1145,7 +1145,7 @@ export default function RideDetailScreen() {
 
             {/* 進階訓練數據面板 */}
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-              <Text style={[styles.panelTitle, { color: colors.foreground }]}>進階訓練數據</Text>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>{t("detail.advancedTraining")}</Text>
               <View style={styles.statsGrid}>
                 <DetailCell label="平均心率" value={record.avgHeartRate ? `${record.avgHeartRate}` : "--"} unit="bpm" color="#EF4444" />
                 <DetailCell label="最大心率" value={record.maxHeartRate ? `${record.maxHeartRate}` : "--"} unit="bpm" color="#EF4444" />
@@ -1160,7 +1160,7 @@ export default function RideDetailScreen() {
 
             {/* 表現指標面板 */}
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}> 
-              <Text style={[styles.panelTitle, { color: colors.foreground }]}>表現指標</Text>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>{t("detail.performanceMetrics")}</Text>
               <View style={styles.statsGrid}>
                 <DetailCell label="訓練壓力分數" value={displayedTraining === undefined ? "--" : `${(record.tss ?? displayedTraining.tss).toFixed(1)}`} unit={displayedTraining === undefined ? "資料不足" : "TSS"} color="#9C27B0" />
                 <DetailCell label="強度係數" value={displayedTraining === undefined ? "--" : `${(record.intensityFactor ?? displayedTraining.intensityFactor).toFixed(2)}`} unit={displayedTraining === undefined ? "資料不足" : "IF"} />
@@ -1172,8 +1172,8 @@ export default function RideDetailScreen() {
             {/* 僅比較此裝置歷史資料的個人最佳紀錄 */}
             {(record.personalBests?.length ?? 0) > 0 && (
               <View style={[styles.statsPanel, { borderColor: "#F59E0B66", marginTop: 12 }]}> 
-                <Text style={[styles.panelTitle, { color: "#F59E0B" }]}>本機個人最佳</Text>
-                <Text style={[styles.personalBestHint, { color: colors.muted }]}>僅與此裝置已儲存的歷史騎乘比較，不含雲端或排行榜資料。</Text>
+                <Text style={[styles.panelTitle, { color: "#F59E0B" }]}>{t("detail.localPersonalBest")}</Text>
+                <Text style={[styles.personalBestHint, { color: colors.muted }]}>{t("detail.localPersonalBestHint")}</Text>
                 <View style={styles.statsGrid}>
                   {record.personalBests?.map((best) => (
                     <DetailCell
@@ -1191,7 +1191,7 @@ export default function RideDetailScreen() {
             {/* 訓練負荷與恢復建議面板 */}
             {record.tss !== undefined && record.tss > 0 && (
               <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-                <Text style={[styles.panelTitle, { color: colors.foreground }]}>訓練負荷與恢復</Text>
+                <Text style={[styles.panelTitle, { color: colors.foreground }]}>{t("detail.trainingLoadRecovery")}</Text>
                 <View style={styles.statsGrid}>
                   <DetailCell label="訓練負荷" value={`${Math.round(record.tss * 1.5)}`} unit="" color="#FF6F00" />
                   <DetailCell label="負荷等級" value={record.tss > 300 ? "高" : record.tss > 150 ? "中" : "低"} unit="" />
@@ -1202,7 +1202,7 @@ export default function RideDetailScreen() {
 
             {/* 補給品記錄面板 */}
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-              <Text style={[styles.panelTitle, { color: colors.foreground }]}>補給品記錄</Text>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>{t("detail.supplyRecords")}</Text>
               <View style={styles.statsGrid}>
                 <DetailCell label="水分流失" value={`${Math.round(record.totalSweatMl)}`} unit="ml" color="#4FC3F7" />
                 <DetailCell label="補水次數" value={`${record.refillCount}`} unit="次" />
@@ -1210,12 +1210,12 @@ export default function RideDetailScreen() {
             </View>
 
             <View style={[styles.statsPanel, { borderColor: colors.border, marginTop: 12 }]}>
-            <Text style={[styles.panelTitle, { color: colors.foreground }]}>本次環境與智慧補給</Text>
+            <Text style={[styles.panelTitle, { color: colors.foreground }]}>{t("detail.environmentSmartSupply")}</Text>
               <View style={styles.statsGrid}>
                 <DetailCell label="平均溫度" value={record.calculationProfile?.environment?.averageTemperatureC === undefined ? "--" : record.calculationProfile.environment.averageTemperatureC.toFixed(1)} unit="°C" color="#F97316" />
                 <DetailCell label="平均濕度" value={record.calculationProfile?.environment?.averageHumidityPct === undefined ? "--" : record.calculationProfile.environment.averageHumidityPct.toFixed(0)} unit="%" color="#60A5FA" />
                 <DetailCell label="平均風速" value={record.calculationProfile?.environment?.averageWindSpeedKmh === undefined ? "--" : record.calculationProfile.environment.averageWindSpeedKmh.toFixed(1)} unit="km/h" />
-                <DetailCell label="計算來源" value={record.calculationProfile?.environment?.source === "live-weather" ? "當日天氣" : "本機環境基準"} unit="" />
+                <DetailCell label="計算來源" value={record.calculationProfile?.environment?.source === "live-weather" ? t("routes.currentWeather") : t("routes.offlineFallback")} unit="" />
               </View>
               {(record.supplyConfirmations?.length ?? 0) > 0 ? (
                   <View style={styles.confirmationList}>
@@ -1249,7 +1249,7 @@ export default function RideDetailScreen() {
                   {photoTimeline.map((photo) => (
                     <View key={photo.id} style={styles.photoCard}>
                       <Image source={{ uri: photo.uri }} style={styles.photoImage} />
-                      <Text style={[styles.photoTime, { color: colors.muted }]}>{new Date(photo.capturedAt ?? photo.selectedAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</Text>
+                      <Text style={[styles.photoTime, { color: colors.muted }]}>{new Date(photo.capturedAt ?? photo.selectedAt).toLocaleString(activeLanguage, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</Text>
                       <Pressable style={styles.photoRemoveButton} onPress={() => void handleRemoveRidePhoto(photo.id)}>
                         <Text style={styles.photoRemoveText}>移除</Text>
                       </Pressable>
@@ -1332,7 +1332,7 @@ export default function RideDetailScreen() {
           <Animated.View style={[styles.activityViewerDrawer, { height: activityViewerDrawerHeight }]} {...activityViewerDrawerResponder.panHandlers}>
             <ActivitySummaryHeader
               title={record.name}
-              subtitle={`${dateStr} · ${SPORT_META[record.sportType ?? "cycling"].label}`}
+              subtitle={`${dateStr} · ${t(`sports.${record.sportType === "trail_running" ? "trailRunning" : record.sportType ?? "cycling"}`)}`}
             />
 
             <CoreActivitySummaryGrid
@@ -1354,7 +1354,7 @@ export default function RideDetailScreen() {
       <Modal visible={isEditModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>編輯活動</Text>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("detail.edit")}</Text>
             <ScrollView style={{ maxHeight: 400 }} contentContainerStyle={{ gap: 12 }}>
               <View>
                 <Text style={[styles.label, { color: colors.muted }]}>{t("detail.activityName")}</Text>
@@ -1470,13 +1470,13 @@ export default function RideDetailScreen() {
                 onPress={() => setIsEditModalVisible(false)}
                 style={[styles.modalBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
               >
-                <Text style={{ color: colors.foreground, fontWeight: "600" }}>取消</Text>
+                <Text style={{ color: colors.foreground, fontWeight: "600" }}>{t("common.cancel")}</Text>
               </Pressable>
               <Pressable
                 onPress={handleSaveActivityEdit}
                 style={[styles.modalBtn, { backgroundColor: colors.primary }]}
               >
-                <Text style={{ color: colors.onAccent, fontWeight: "600" }}>儲存活動</Text>
+                <Text style={{ color: colors.onAccent, fontWeight: "600" }}>{t("common.save")}</Text>
               </Pressable>
             </View>
           </View>
@@ -1489,7 +1489,7 @@ export default function RideDetailScreen() {
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
 const DETAIL_LABEL_KEYS: Record<string, string> = {
-  "距離": "share.distance", "總爬升": "share.elevation", "爬升海拔": "share.elevation", "移動時間": "share.movingTime", "平均速度": "share.averageSpeed", "平均功率": "share.averagePower", "卡路里": "share.calories", "最高速度": "share.maxSpeed", "最高功率": "detail.maxPower", "活動時間": "detail.elapsedTime", "暫停時間": "detail.pausedTime", "平均踏頻": "detail.avgCadence", "最大踏頻": "detail.maxCadence", "最高海拔": "detail.maxAltitude", "水分流失": "detail.sweatLoss", "補水次數": "detail.refillCount", "平均配速": "detail.avgPace", "爬升速度": "detail.climbRate",
+  "距離": "share.distance", "總爬升": "share.elevation", "爬升海拔": "share.elevation", "移動時間": "share.movingTime", "平均速度": "share.averageSpeed", "平均功率": "share.averagePower", "卡路里": "share.calories", "最高速度": "share.maxSpeed", "最高功率": "detail.maxPower", "活動時間": "detail.elapsedTime", "暫停時間": "detail.pausedTime", "平均踏頻": "detail.avgCadence", "最大踏頻": "detail.maxCadence", "最高海拔": "detail.maxAltitude", "水分流失": "detail.sweatLoss", "補水次數": "detail.refillCount", "平均配速": "detail.avgPace", "爬升速度": "detail.climbRate", "自動暫停總時間": "detail.autoPausedTime", "總爬升高度": "detail.totalAscent", "總下降高度": "detail.totalDescent", "最小海拔": "detail.minElevation", "平均坡度": "detail.averageGrade", "最高持續坡度": "detail.maxSustainedGrade", "平均心率": "detail.avgHeartRate", "最大心率": "detail.maxHeartRate", "機械工作量": "detail.mechanicalWork", "標準化功率": "detail.normalizedPower", "訓練壓力分數": "detail.trainingStressScore", "強度係數": "detail.intensityFactor", "訓練效果": "detail.trainingEffect", "訓練負荷": "detail.trainingLoad", "負荷等級": "detail.loadLevel", "建議恢復": "detail.recommendedRecovery", "平均溫度": "detail.averageTemperature", "平均濕度": "detail.averageHumidity", "平均風速": "detail.averageWindSpeed", "計算來源": "detail.calculationSource",
 };
 
 function translatedDetailLabel(t: (key: string) => string, label: string): string {

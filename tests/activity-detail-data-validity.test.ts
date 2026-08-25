@@ -14,11 +14,11 @@ describe("活動詳情資料有效性守門", () => {
 
   it("保留每公里分段與智慧補給核心資訊，同時移除重複的環境樣本、比較、Lap 與功率面板", () => {
     const source = readFileSync(resolve(projectRoot, "app/ride-detail.tsx"), "utf8");
-    expect(source).toContain("此活動沒有足夠的 GPS 取樣資料");
-    expect(source).toContain("每公里分段");
+    expect(source).toContain('t("detail.speedCurveUnavailable")');
+    expect(source).toContain('t("detail.perKilometerSplits")');
     expect(source).toContain('split.averagePowerW === undefined ? "--"');
     expect(source).toContain('averageTemperatureC === undefined ? "--"');
-    expect(source).toContain("本次環境與智慧補給");
+    expect(source).toContain('t("detail.environmentSmartSupply")');
     expect(source).not.toContain('label="環境樣本"');
     expect(source).not.toContain("本機 1 km 個人最佳比較");
     expect(source).not.toContain("Lap 紀錄");

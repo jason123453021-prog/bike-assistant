@@ -47,6 +47,7 @@ import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import Svg, { Circle } from "react-native-svg";
 import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/lib/i18n/language-provider";
 
 import { useRide } from "@/lib/ride-context";
 import {
@@ -249,6 +250,7 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 
 export default function MapScreen() {
   const { t } = useTranslation();
+  const { activeLanguage } = useLanguage();
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const dashboardColumnCount = fontScale >= 1.6 ? 2 : 3;
@@ -2809,6 +2811,7 @@ export default function MapScreen() {
       smartEnergySupplyEnabled,
       smartWaterSupplyEnabled,
       supplyReminderEnabled: settings.supplyReminderEnabled,
+      notificationLocale: activeLanguage,
       sportType: state.sportType,
       autoLapEnabled: settings.lapEnabled,
       autoLapDistanceKm: settings.autoLapDistanceKm,
