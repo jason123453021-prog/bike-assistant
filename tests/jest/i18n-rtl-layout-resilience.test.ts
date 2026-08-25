@@ -143,6 +143,10 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
       'takeScreenshot: "font-scale-settings-ar"',
     );
     expect(maestroFontScaleGermanSource).toContain('text: "Language.*"');
+    expect(settingsSource).toContain("testID={`language-option-${option}`}");
+    expect(maestroFontScaleGermanSource).toContain(
+      "scroll-language-option.yaml",
+    );
     expect(workflowSource).toContain("for SCALE in 1.3 2.0");
     expect(workflowSource).toContain(
       "adb shell settings put system font_scale",

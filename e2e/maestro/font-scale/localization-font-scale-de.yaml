@@ -26,10 +26,10 @@ name: 德文字體大小表單截圖
     direction: DOWN
     timeout: 30000
 - tapOn: "Language.*"
-- scrollUntilVisible:
-    element:
-      text: "Deutsch"
-    direction: DOWN
-    timeout: 30000
-- tapOn: "Deutsch"
+- runFlow:
+    file: scroll-language-option.yaml
+    env:
+      TARGET_ID: ".*language-option-de-DE"
+- tapOn:
+    id: ".*language-option-de-DE"
 - takeScreenshot: "font-scale-settings-de"

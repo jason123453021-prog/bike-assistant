@@ -26,10 +26,10 @@ name: 俄文字體大小表單截圖
     direction: DOWN
     timeout: 30000
 - tapOn: "Language.*"
-- scrollUntilVisible:
-    element:
-      text: "Русский"
-    direction: DOWN
-    timeout: 30000
-- tapOn: "Русский"
+- runFlow:
+    file: scroll-language-option.yaml
+    env:
+      TARGET_ID: ".*language-option-ru-RU"
+- tapOn:
+    id: ".*language-option-ru-RU"
 - takeScreenshot: "font-scale-settings-ru"

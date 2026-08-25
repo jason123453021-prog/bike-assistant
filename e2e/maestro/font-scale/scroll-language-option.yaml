@@ -1,0 +1,20 @@
+- evalScript: ${output.languageOptionFound = 0}
+- runFlow:
+    when:
+      visible:
+        id: "${TARGET_ID}"
+    commands:
+      - evalScript: ${output.languageOptionFound = 1}
+- repeat:
+    while:
+      true: ${output.languageOptionFound == 0}
+    commands:
+      - swipe:
+          start: 50%, 85%
+          end: 50%, 60%
+      - runFlow:
+          when:
+            visible:
+              id: "${TARGET_ID}"
+          commands:
+            - evalScript: ${output.languageOptionFound = 1}

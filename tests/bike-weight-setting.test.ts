@@ -10,11 +10,26 @@ import {
 import { calculatePower, DEFAULT_ROAD_BIKE_MASS_KG } from "../lib/power-calc";
 
 const projectRoot = resolve(process.cwd());
-const settingsSource = readFileSync(resolve(projectRoot, "app/(tabs)/settings.tsx"), "utf8");
-const mapSource = readFileSync(resolve(projectRoot, "app/(tabs)/map.tsx"), "utf8");
-const navigateSource = readFileSync(resolve(projectRoot, "app/(tabs)/navigate.tsx"), "utf8");
-const backgroundSource = readFileSync(resolve(projectRoot, "lib/background-location.ts"), "utf8");
-const routeTimeSource = readFileSync(resolve(projectRoot, "lib/route-time-estimator.ts"), "utf8");
+const settingsSource = readFileSync(
+  resolve(projectRoot, "app/(tabs)/settings.tsx"),
+  "utf8",
+);
+const mapSource = readFileSync(
+  resolve(projectRoot, "app/(tabs)/map.tsx"),
+  "utf8",
+);
+const navigateSource = readFileSync(
+  resolve(projectRoot, "app/(tabs)/navigate.tsx"),
+  "utf8",
+);
+const backgroundSource = readFileSync(
+  resolve(projectRoot, "lib/background-location.ts"),
+  "utf8",
+);
+const routeTimeSource = readFileSync(
+  resolve(projectRoot, "lib/route-time-estimator.ts"),
+  "utf8",
+);
 
 describe("自行車重量設定", () => {
   it("以 9 kg 作為本機預設，並安全收斂使用者輸入至 3–35 kg", () => {
@@ -45,11 +60,21 @@ describe("自行車重量設定", () => {
   it("在設定頁顯示輸入入口，並將值傳入即時、背景與 GPX 路線資料鏈", () => {
     expect(settingsSource).toContain("自行車重量");
     expect(settingsSource).toContain("可設定 3–35 kg");
-    expect(settingsSource).toContain('openEdit("bikeWeight"');
-    expect(mapSource).toContain("bikeMassKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG");
-    expect(mapSource).toContain("bikeWeightKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG");
-    expect(navigateSource).toContain("const bikeKg = settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG");
-    expect(backgroundSource).toContain("bikeWeightKg: DEFAULT_ROAD_BIKE_MASS_KG");
-    expect(routeTimeSource).toContain("input.bikeWeightKg ?? DEFAULT_ROAD_BIKE_MASS_KG");
+    expect(settingsSource).toMatch(/openEdit\(\s*"bikeWeight"/);
+    expect(mapSource).toContain(
+      "bikeMassKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG",
+    );
+    expect(mapSource).toContain(
+      "bikeWeightKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG",
+    );
+    expect(navigateSource).toContain(
+      "const bikeKg = settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG",
+    );
+    expect(backgroundSource).toContain(
+      "bikeWeightKg: DEFAULT_ROAD_BIKE_MASS_KG",
+    );
+    expect(routeTimeSource).toContain(
+      "input.bikeWeightKg ?? DEFAULT_ROAD_BIKE_MASS_KG",
+    );
   });
 });

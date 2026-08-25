@@ -26,10 +26,10 @@ name: 阿拉伯文字體大小與 RTL 表單截圖
     direction: DOWN
     timeout: 30000
 - tapOn: "Language.*"
-- scrollUntilVisible:
-    element:
-      text: "العربية"
-    direction: DOWN
-    timeout: 30000
-- tapOn: "العربية"
+- runFlow:
+    file: scroll-language-option.yaml
+    env:
+      TARGET_ID: ".*language-option-ar-SA"
+- tapOn:
+    id: ".*language-option-ar-SA"
 - takeScreenshot: "font-scale-settings-ar"
