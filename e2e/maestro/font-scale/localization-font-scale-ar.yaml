@@ -27,7 +27,7 @@ name: 阿拉伯文字體大小與 RTL 表單截圖
     timeout: 30000
 - tapOn: "Language.*"
 - runFlow:
-    file: scroll-language-option.yaml
+    file: ../scroll-language-option.yaml
     env:
       TARGET_ID: ".*language-option-ar-SA"
 - tapOn:

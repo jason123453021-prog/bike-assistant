@@ -27,7 +27,7 @@ name: 俄文字體大小表單截圖
     timeout: 30000
 - tapOn: "Language.*"
 - runFlow:
-    file: scroll-language-option.yaml
+    file: ../scroll-language-option.yaml
     env:
       TARGET_ID: ".*language-option-ru-RU"
 - tapOn:
