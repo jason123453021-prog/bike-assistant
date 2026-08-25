@@ -22,10 +22,10 @@ name: 德文字體大小表單截圖
 - tapOn: "Display & Appearance"
 - scrollUntilVisible:
     element:
-      text: "Language"
+      text: "Language.*"
     direction: DOWN
     timeout: 30000
-- tapOn: "Language"
+- tapOn: "Language.*"
 - scrollUntilVisible:
     element:
       text: "Deutsch"
