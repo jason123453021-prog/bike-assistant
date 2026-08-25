@@ -37,15 +37,15 @@ name: 多語系字體大小與 RTL 表單截圖
     timeout: 30000
 - tapOn: "Deutsch"
 - extendedWaitUntil:
-    visible: "Darstellung & Erscheinungsbild"
+    visible: "Language"
     timeout: 10000
 - takeScreenshot: "font-scale-settings-de"
 - scrollUntilVisible:
     element:
-      text: "Sprache"
+      text: "Language"
     direction: DOWN
     timeout: 30000
-- tapOn: "Sprache"
+- tapOn: "Language"
 - scrollUntilVisible:
     element:
       text: "Русский"
@@ -53,15 +53,15 @@ name: 多語系字體大小與 RTL 表單截圖
     timeout: 30000
 - tapOn: "Русский"
 - extendedWaitUntil:
-    visible: "Отображение и оформление"
+    visible: "Language"
     timeout: 10000
 - takeScreenshot: "font-scale-settings-ru"
 - scrollUntilVisible:
     element:
-      text: "Язык"
+      text: "Language"
     direction: DOWN
     timeout: 30000
-- tapOn: "Язык"
+- tapOn: "Language"
 - scrollUntilVisible:
     element:
       text: "العربية"
