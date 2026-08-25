@@ -101,6 +101,7 @@ jobs:
           script: |
             test -s build/e2e-under-test.apk
             adb install -r build/e2e-under-test.apk
+            adb shell pm grant com.jason123453021.bikeassistant android.permission.POST_NOTIFICATIONS || true
             curl -fsSL https://get.maestro.mobile.dev | bash
             "$HOME/.maestro/bin/maestro" test --format junit --output build/maestro-report.xml --test-output-dir build/maestro-results e2e/maestro/core-navigation.yaml
             bash -lc 'set -e; adb shell am force-stop com.jason123453021.bikeassistant; adb shell am start -W -a android.intent.action.VIEW -d "manus20260617://e2e-notification" com.jason123453021.bikeassistant; sleep 3; "$HOME/.maestro/bin/maestro" test --format junit --output build/maestro-notification-schedule.xml --test-output-dir build/maestro-results/notification-schedule e2e/maestro/notification-harness-schedule.yaml; adb shell input keyevent KEYCODE_HOME; sleep 7; adb shell cmd statusbar expand-notifications; sleep 2; "$HOME/.maestro/bin/maestro" test --format junit --output build/maestro-notification-open.xml --test-output-dir build/maestro-results/notification-open e2e/maestro/notification-harness-open.yaml'

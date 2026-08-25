@@ -5,6 +5,10 @@ import { Redirect } from "expo-router";
 
 import { AdaptiveFormText } from "@/components/adaptive-form-text";
 import { ScreenContainer } from "@/components/screen-container";
+import {
+  requestNotificationPermission,
+  setupNotifications,
+} from "@/lib/feedback-service";
 import { getLocalNotifications } from "@/lib/local-notifications";
 import {
   configureSupplyNotificationActions,
@@ -22,30 +26,44 @@ export default function E2ENotificationScreen() {
   if (!E2E_NOTIFICATION_HARNESS_ENABLED) return <Redirect href="/navigate" />;
 
   const scheduleNotification = async () => {
-    const Notifications = await getLocalNotifications();
-    if (!Notifications) {
-      setStatus("Native local notifications are unavailable in this runtime.");
-      return;
+    try {
+      const Notifications = await getLocalNotifications();
+      if (!Notifications) {
+        setStatus(
+          "Native local notifications are unavailable in this runtime.",
+        );
+        return;
+      }
+      await setupNotifications();
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        setStatus("Notification permission is required for this validation.");
+        return;
+      }
+      await configureSupplyNotificationActions();
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "E2E Fuel reminder",
+          body: "Tap this notification to restore the pending fuel confirmation.",
+          categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
+          data: {
+            type: "supply_reminder",
+            supplyKind: "calorie",
+            e2eValidation: true,
+          },
+          sound: false,
+          channelId: "supply",
+        } as never,
+        trigger: { seconds: 5 } as never,
+      });
+      setStatus(
+        "Notification scheduled. The test will background the app and tap it after five seconds.",
+      );
+    } catch (error) {
+      setStatus(
+        `Notification scheduling failed: ${error instanceof Error ? error.message : "unknown error"}`,
+      );
     }
-    await configureSupplyNotificationActions();
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "E2E Fuel reminder",
-        body: "Tap this notification to restore the pending fuel confirmation.",
-        categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
-        data: {
-          type: "supply_reminder",
-          supplyKind: "calorie",
-          e2eValidation: true,
-        },
-        sound: false,
-        channelId: "supply",
-      } as never,
-      trigger: { seconds: 5 } as never,
-    });
-    setStatus(
-      "Notification scheduled. The test will background the app and tap it after five seconds.",
-    );
   };
 
   return (
