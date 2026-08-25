@@ -100,4 +100,11 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
       'title={t("settings.displayAppearance")}\n          subtitle="主題、螢幕常亮、省電與儀表版面"\n          colors={colors}\n          expanded={Boolean(openCategories.display)}\n          onPress={() => toggleCategory("display")}\n        >\n          <View\n            style={[\n              styles.appearanceCard,\n              {\n                borderColor: colors.border,\n                backgroundColor: colors.surface,\n                marginTop: 12,\n              },\n            ]}\n          >\n            <Pressable\n              accessibilityRole="button"\n              accessibilityLabel={`${t("settings.languageTitle")}：${selectedLanguageLabel}`}',
     );
   });
+
+  it("提供可本機保存的閒置歸位時間，並套用到手動地圖操作後的自動置中計時", () => {
+    expect(settingsSource).toContain("閒置歸位時間");
+    expect(settingsSource).toContain('testID="idle-recenter-time-slider"');
+    expect(settingsSource).toContain("updateSettings({ autoRecenterSec");
+    expect(mapSource).toContain("settings.autoRecenterSec * 1000");
+  });
 });

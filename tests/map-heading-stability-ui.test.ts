@@ -19,7 +19,7 @@ describe("導航頁使用者地圖方向守門", () => {
   it("僅以最近 GPS COG 與 GPX 前視航向平滑地圖朝前，不使用硬體羅盤", () => {
     expect(mapScreenSource).toContain("calculateCourseOverGround");
     expect(mapScreenSource).toContain("resolveNavigationCog");
-    expect(mapScreenSource).toContain("smoothCogHeading");
+    expect(mapScreenSource).toContain("stabilizeCogHeading");
     expect(mapScreenSource).toContain(
       "shouldApplyCogRotation(locationCameraModeRef.current)",
     );

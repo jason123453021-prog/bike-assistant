@@ -150,7 +150,7 @@ import {
   calculateCourseOverGround,
   findNearestRoutePoint,
   resolveNavigationCog,
-  smoothCogHeading,
+  stabilizeCogHeading,
   type CogPoint,
 } from "@/lib/cog-navigation";
 import {
@@ -2872,7 +2872,7 @@ export default function MapScreen() {
           const hdg =
             candidateHeading === null
               ? headingRef.current
-              : smoothCogHeading(headingRef.current, candidateHeading);
+              : stabilizeCogHeading(headingRef.current, candidateHeading);
           headingRef.current = hdg;
           setCurrentPos({ lat: latitude, lon: longitude, heading: hdg });
           if (

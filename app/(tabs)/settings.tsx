@@ -1944,7 +1944,7 @@ export default function SettingsScreen() {
                 >
                   <View style={{ flex: 1, paddingRight: 12 }}>
                     <Text style={{ fontSize: 15, color: colors.foreground }}>
-                      回歸目前位置時間
+                      閒置歸位時間
                     </Text>
                     <Text
                       style={{
@@ -1953,7 +1953,7 @@ export default function SettingsScreen() {
                         marginTop: 3,
                       }}
                     >
-                      拖動或雙指旋轉地圖後，等待此時間才自動置中；會保留你選擇的地圖方向。
+                      拖動或雙指旋轉地圖後，等待此時間才自動置中。設定會保存在本機，並依目前定位模式保留朝前、自由或正北方向。
                     </Text>
                   </View>
                   <Text
@@ -1967,6 +1967,7 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
                 <Slider
+                  testID="idle-recenter-time-slider"
                   style={{ width: "100%", height: 36 }}
                   minimumValue={3}
                   maximumValue={60}
