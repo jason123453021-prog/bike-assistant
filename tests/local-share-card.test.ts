@@ -43,7 +43,7 @@ describe("local ride share card", () => {
   });
 
   it("creates a safe local SVG filename", () => {
-    expect(createRideShareCardFilename(record)).toBe("bike-ride-晨騎-測試-share-001.svg");
+    expect(createRideShareCardFilename(record)).toMatch(/^(?:share-card|分享卡片)-晨騎-測試-\d{4}-\d{2}-\d{2}\.svg$/);
   });
 
   it("marks unavailable power as insufficient data instead of presenting an invented 0 W", () => {

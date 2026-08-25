@@ -1,5 +1,6 @@
 import type { RideRecord } from "@/lib/ride-context";
 import { SPORT_META, type SportType } from "./sport-metrics";
+import { createLocalizedExportFilename, exportTranslation } from "./i18n/export-localization";
 
 const GPX_EPOCH_THRESHOLD = 946_684_800_000;
 
@@ -19,14 +20,7 @@ function pointTime(record: RideRecord, timestamp: number, index: number, pointCo
 }
 
 export function createGpxFilename(record: RideRecord): string {
-  const safeName = (record.name || "騎乘紀錄")
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60) || "騎乘紀錄";
-  return `${safeName}-${new Date(record.date).toISOString().slice(0, 10)}.gpx`;
+  return createLocalizedExportFilename(record, "gpx");
 }
 
 /** 建立標準 GPX 1.1，並用命名空間保存可用的心率、踏頻、功率與速度資訊。 */
@@ -36,10 +30,10 @@ export function createGpxContent(record: RideRecord): string | null {
 
   const latitudes = points.map((point) => point.latitude);
   const longitudes = points.map((point) => point.longitude);
-  const routeName = escapeXml(record.name?.trim() || "騎乘紀錄");
+  const routeName = escapeXml(record.name?.trim() || exportTranslation("share.untitledRide"));
   const sportType: SportType = record.sportType ?? "cycling";
   const sport = SPORT_META[sportType];
-  const description = escapeXml(`${sport.label}記錄：${(record.distance / 1000).toFixed(2)} km，${Math.round(record.totalAscent)} m 爬升`);
+  const description = escapeXml(exportTranslation("export.gpxDescription", { sport: sport.label, distance: (record.distance / 1000).toFixed(2), ascent: Math.round(record.totalAscent) }));
 
   const trackPoints = points.map((point, index) => {
     const extensions = [

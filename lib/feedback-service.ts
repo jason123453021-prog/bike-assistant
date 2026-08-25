@@ -9,6 +9,7 @@
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { Platform } from "react-native";
+import { exportTranslation } from "@/lib/i18n/export-localization";
 import { getLocalNotifications } from "@/lib/local-notifications";
 import { configureSupplyNotificationActions, SUPPLY_NOTIFICATION_CATEGORY, type SupplyNotificationKind } from "@/lib/supply-notification-actions";
 import type { SupplyPlan } from "@/lib/smart-supply-plan";
@@ -86,9 +87,7 @@ export async function stopSpeech() {
 
 export async function speakSupplyReminder(type: "calorie" | "water", enabled: boolean) {
   if (!enabled) return;
-  const msg = type === "calorie"
-    ? "請補給能量"
-    : "請補給水分";
+  const msg = exportTranslation(type === "calorie" ? "notifications.energyVoice" : "notifications.waterVoice");
   await speak(msg, enabled);
 }
 
@@ -103,7 +102,7 @@ export async function speakNavigationGuidance(text: string, enabled: boolean) {
  */
 export function formatSmartSupplyReminder(type: "calorie" | "water", plan: SupplyPlan): string {
   void plan;
-  return type === "calorie" ? "請補給能量" : "請補給水分";
+  return exportTranslation(type === "calorie" ? "notifications.energyVoice" : "notifications.waterVoice");
 }
 
 /** 在智慧補給模式下播報本輪的具體建議補給量與計算原因。 */
@@ -126,14 +125,14 @@ export async function setupNotifications() {
     try {
       // 設定本地通知頻道（禁止遠端推播）
       await Notifications.setNotificationChannelAsync("ride", {
-        name: "騎乘通知",
+        name: exportTranslation("notifications.rideChannel"),
         importance: Notifications.AndroidImportance.MIN,
         vibrationPattern: [],
         sound: null,
         lightColor: "#00C896",
       });
       await Notifications.setNotificationChannelAsync("supply", {
-        name: "補給提醒",
+        name: exportTranslation("notifications.supplyChannel"),
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 500, 200, 500],
         lightColor: "#FF9500",
@@ -197,8 +196,8 @@ export async function scheduleSmartSupplyDueNotification(type: "calorie" | "wate
     await Notifications.scheduleNotificationAsync({
       identifier: SMART_SUPPLY_NOTIFICATION_IDS[type],
       content: {
-        title: type === "calorie" ? "補給提醒" : "補水提醒",
-        body: type === "calorie" ? "請補給能量；按「已補給」會直接開始下一輪。" : "請補充水分；按「已補給」會直接開始下一輪。",
+        title: exportTranslation(type === "calorie" ? "notifications.supplyTitle" : "notifications.waterTitle"),
+        body: exportTranslation(type === "calorie" ? "notifications.energyDue" : "notifications.waterDue"),
         sound: true,
         badge: 1,
         categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
@@ -265,20 +264,20 @@ export async function showSupplyNotification(
 
   const isEnergy = type === "calorie" || type === "custom-energy";
   const isWater = type === "water" || type === "custom-water";
-  const title = isEnergy ? "🍌 補給提醒" : isWater ? "💧 補水提醒" : "補給提醒";
+  const title = isEnergy ? `🍌 ${exportTranslation("notifications.supplyTitle")}` : isWater ? `💧 ${exportTranslation("notifications.waterTitle")}` : exportTranslation("notifications.supplyTitle");
   const body = type === "calorie"
     ? recommendation?.energyKcal
       ? `建議補充約 ${recommendation.energyKcal} kcal${recommendation.carbohydrateG ? `（${recommendation.carbohydrateG} g 碳水）` : ""}${recommendation.reason ? `；${recommendation.reason}` : ""}`
-      : "已消耗大量卡路里，請補充能量！"
+      : exportTranslation("notifications.energyDue")
     : type === "water"
       ? recommendation?.waterMl
         ? `建議補充約 ${recommendation.waterMl} ml 水分${recommendation.reason ? `；${recommendation.reason}` : ""}`
-        : "水分不足，請補充水分！"
+        : exportTranslation("notifications.waterDue")
       : type === "custom-energy"
-        ? "自訂能量補給已到期，按「已補給」會直接開始下一輪。"
+        ? exportTranslation("notifications.energyDue")
         : type === "custom-water"
-          ? "自訂補水已到期，按「已補給」會直接開始下一輪。"
-          : "已達補給間隔，按「已補給」會直接開始下一輪。";
+          ? exportTranslation("notifications.waterDue")
+          : exportTranslation("notifications.energyDue");
   try {
     await configureSupplyNotificationActions();
     await Notifications.scheduleNotificationAsync({

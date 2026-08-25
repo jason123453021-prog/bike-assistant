@@ -24,7 +24,7 @@ describe("createGpxContent", () => {
 
   it("在軌跡不足時拒絕匯出，並產生安全檔名", () => {
     expect(createGpxContent({ ...record, route: [record.route[0]] })).toBeNull();
-    expect(createGpxFilename(record)).toMatch(/^河濱-晨騎-\d{4}-\d{2}-\d{2}\.gpx$/);
+    expect(createGpxFilename(record)).toMatch(/^(?:activity|活動)-河濱-晨騎-\d{4}-\d{2}-\d{2}\.gpx$/);
   });
 
   it("依多運動類型寫入 metadata 與 track type", () => {

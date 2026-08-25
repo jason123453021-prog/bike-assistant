@@ -10,8 +10,8 @@ describe("smart supply speech reminders", () => {
     expect(feedbackSource).toContain("speakSupplyReminder");
     expect(mapSource).not.toContain("speakSmartSupplyReminder");
     expect(mapSource).toContain("void speakSupplyReminder(type, true)");
-    expect(feedbackSource).toContain('? "請補給能量"');
-    expect(feedbackSource).toContain(': "請補給水分"');
+    expect(feedbackSource).toContain('"notifications.energyVoice"');
+    expect(feedbackSource).toContain('"notifications.waterVoice"');
     expect(feedbackSource).not.toContain("補給提醒，請補充能量棒或食物");
     expect(feedbackSource).not.toContain("補給提醒，請補充水分");
   });
@@ -40,6 +40,6 @@ describe("smart supply speech reminders", () => {
     expect(mapSource).toContain('speakPlannedSupplyReminder("calorie")');
     expect(mapSource).not.toContain("speak(`請補給 ${supplyItem.name}`)");
     expect(mapSource).not.toContain('speak("已確認補給")');
-    expect(feedbackSource).toContain('return type === "calorie" ? "請補給能量" : "請補給水分"');
+    expect(feedbackSource).toContain('return exportTranslation(type === "calorie" ? "notifications.energyVoice" : "notifications.waterVoice")');
   });
 });

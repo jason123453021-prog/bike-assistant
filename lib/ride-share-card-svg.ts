@@ -1,4 +1,5 @@
-import type { RideRecord } from "./ride-context";
+import type { RideRecord } from "@/lib/ride-context";
+import { createLocalizedExportFilename } from "./i18n/export-localization";
 import { buildActivityStatistics } from "./activity-statistics";
 
 const CARD_WIDTH = 1080;
@@ -174,6 +175,5 @@ export function createRideShareCardSvg(record: RideRecord, options?: { t?: (key:
 }
 
 export function createRideShareCardFilename(record: RideRecord): string {
-  const safeName = (record.name || "ride").replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]+/g, "-").replace(/^-+|-+$/g, "");
-  return `bike-ride-${safeName || "ride"}-${record.id}.svg`;
+  return createLocalizedExportFilename(record, "svg");
 }

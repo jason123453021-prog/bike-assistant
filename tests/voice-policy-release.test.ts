@@ -15,8 +15,8 @@ describe("release voice policy", () => {
 
   it("keeps the production reminder vocabulary limited to the two supply prompts", () => {
     expect(feedbackSource).toContain('type === "calorie"');
-    expect(feedbackSource).toContain('"請補給能量"');
-    expect(feedbackSource).toContain('"請補給水分"');
+    expect(feedbackSource).toContain('"notifications.energyVoice"');
+    expect(feedbackSource).toContain('"notifications.waterVoice"');
     expect(feedbackSource).not.toContain("export async function speak(");
     expect(feedbackSource).not.toContain("speakRideUpdate");
     expect(feedbackSource).not.toContain("speakAutoPause");

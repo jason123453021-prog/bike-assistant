@@ -1,5 +1,6 @@
 import { Encoder, Profile } from "@garmin/fitsdk";
 import type { LocationPoint, RideRecord } from "./ride-context";
+import { createLocalizedExportFilename } from "./i18n/export-localization";
 
 function safeDate(timestamp: number, fallback: number): Date {
   const value = Number.isFinite(timestamp) && timestamp > 0 ? timestamp : fallback;
@@ -118,8 +119,5 @@ export function createFitBytes(record: RideRecord): Uint8Array | null {
 }
 
 export function fitFilename(record: RideRecord): string {
-  const date = new Date(record.date);
-  const safeName = (record.name || "bike-ride").replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]+/g, "-").replace(/^-+|-+$/g, "") || "bike-ride";
-  const stamp = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}-${String(date.getHours()).padStart(2, "0")}${String(date.getMinutes()).padStart(2, "0")}`;
-  return `${safeName}-${stamp}.fit`;
+  return createLocalizedExportFilename(record, "fit");
 }

@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import { exportTranslation } from "@/lib/i18n/export-localization";
 
 import { getLocalNotifications } from "@/lib/local-notifications";
 import {
@@ -39,8 +40,8 @@ export async function configureSupplyNotificationActions(): Promise<void> {
   const Notifications = await getLocalNotifications();
   if (!Notifications) return;
   await Notifications.setNotificationCategoryAsync(SUPPLY_NOTIFICATION_CATEGORY, [
-    { identifier: SUPPLY_SNOOZE_ACTION, buttonTitle: "稍後提醒" },
-    { identifier: SUPPLY_CONFIRM_ACTION, buttonTitle: "已補給" },
+    { identifier: SUPPLY_SNOOZE_ACTION, buttonTitle: exportTranslation("notifications.snooze") },
+    { identifier: SUPPLY_CONFIRM_ACTION, buttonTitle: exportTranslation("notifications.confirm") },
   ]).catch(() => {});
 }
 
@@ -50,8 +51,8 @@ export async function scheduleSupplySnooze(kind: SupplyNotificationKind): Promis
   await configureSupplyNotificationActions();
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: "補給提醒",
-      body: "稍後提醒時間已到，請依騎乘狀況補充能量與水分。",
+      title: exportTranslation("notifications.snoozedTitle"),
+      body: exportTranslation("notifications.snoozedBody"),
       sound: true,
       categoryIdentifier: SUPPLY_NOTIFICATION_CATEGORY,
       data: { type: "supply_reminder", supplyKind: kind },
