@@ -12,11 +12,11 @@ describe("Expo Go runtime 相容性", () => {
     expect(appConfigSource).toContain(
       'const isProductionEasBuild = process.env.EAS_BUILD_PROFILE === "production"',
     );
-    expect(appConfigSource).toContain('version: "1.0.91"');
-    expect(appConfigSource).toContain("versionCode: 10091");
+    expect(appConfigSource).toContain('version: "1.0.92"');
+    expect(appConfigSource).toContain("versionCode: 10092");
     expect(appConfigSource).toContain(
-      'runtimeVersion: isProductionEasBuild ? "1.0.91" : undefined',
+      'runtimeVersion: isProductionEasBuild ? "1.0.92" : undefined',
     );
-    expect(appConfigSource).not.toContain('runtimeVersion: "1.0.91",');
+    expect(appConfigSource).not.toContain('runtimeVersion: "1.0.92",');
   });
 });
