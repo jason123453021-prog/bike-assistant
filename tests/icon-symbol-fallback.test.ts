@@ -6,7 +6,7 @@ const iconSource = readFileSync(resolve(process.cwd(), "components/ui/icon-symbo
 
 describe("icon symbol fallbacks", () => {
   it("maps the ride summary add action and never falls back to a question icon", () => {
-    expect(iconSource).toContain('"plus":                                "add"');
+    expect(iconSource).toMatch(/"plus":\s*"add"/);
     expect(iconSource).toContain('?? "more-horiz"');
     expect(iconSource).not.toContain('?? "help-outline"');
   });

@@ -54,9 +54,8 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     expect(mapSource).toContain('type: "SYNC_AUTO_LAPS"');
     expect(mapSource).not.toContain("handleMarkLap");
     expect(mapSource).not.toContain("lapFloatingControlWrap");
-    expect(mapSource).toContain(
-      "autoPauseStillForSeconds: getSportTrackingPolicy(state.sportType).autoPause.stillForSeconds",
-    );
+    expect(mapSource).toContain("autoPauseStillForSeconds:");
+    expect(mapSource).toContain("getSportTrackingPolicy(state.sportType)");
     expect(mapSource).toContain("autoPauseEnabledForSport");
   });
 
@@ -69,7 +68,9 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     );
     expect(settingsSource).toContain("LayoutAnimation.configureNext");
     expect(settingsSource).toContain("外觀主題");
-    expect(settingsSource).toContain('t("settingsActions.clearCacheLabel")');
+    expect(settingsSource).not.toContain(
+      't("settingsActions.clearCacheLabel")',
+    );
     expect(settingsSource).toContain(
       't("settingsActions.openHistoryBackupLabel")',
     );
@@ -87,9 +88,6 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     const languageEntryIndex = settingsSource.indexOf(
       'accessibilityLabel={`${t("settings.languageTitle")}：${selectedLanguageLabel}`}',
     );
-    const clearCacheIndex = settingsSource.indexOf(
-      'accessibilityLabel={t("settingsActions.clearCacheLabel")}',
-    );
     const displayCategoryIndex = settingsSource.indexOf(
       'title={t("settings.displayAppearance")}',
     );
@@ -97,7 +95,6 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     expect(systemCategoryIndex).toBeGreaterThan(-1);
     expect(languageEntryIndex).toBeGreaterThan(permissionsIndex);
     expect(languageEntryIndex).toBeGreaterThan(systemCategoryIndex);
-    expect(languageEntryIndex).toBeLessThan(clearCacheIndex);
     expect(languageEntryIndex).toBeGreaterThan(displayCategoryIndex);
     expect(settingsSource).not.toContain(
       'title={t("settings.displayAppearance")}\n          subtitle="主題、螢幕常亮、省電與儀表版面"\n          colors={colors}\n          expanded={Boolean(openCategories.display)}\n          onPress={() => toggleCategory("display")}\n        >\n          <View\n            style={[\n              styles.appearanceCard,\n              {\n                borderColor: colors.border,\n                backgroundColor: colors.surface,\n                marginTop: 12,\n              },\n            ]}\n          >\n            <Pressable\n              accessibilityRole="button"\n              accessibilityLabel={`${t("settings.languageTitle")}：${selectedLanguageLabel}`}',

@@ -112,7 +112,9 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
     expect(settingsSource).toContain("editInlineError");
     expect(settingsSource).toContain("supplyNameError");
     expect(settingsSource).toContain("supplyTimeError");
-    expect(settingsSource).toContain('t("settingsActions.clearCacheLabel")');
+    expect(settingsSource).not.toContain(
+      't("settingsActions.clearCacheLabel")',
+    );
     expect(settingsSource).toContain('t("settingsActions.resetBody")');
     expect(settingsSource).toContain("flexShrink: 1");
   });

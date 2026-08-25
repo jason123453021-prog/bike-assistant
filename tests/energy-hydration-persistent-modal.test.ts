@@ -9,7 +9,7 @@ const modalSource = readFileSync(
 const mapSource = readFileSync(
   resolve(process.cwd(), "app/(tabs)/map.tsx"),
   "utf8",
-);
+).replace(/\s+/g, " ");
 
 describe("energy and hydration persistent reminders", () => {
   it("renders one focused modal that supports independent energy, water, and simultaneous alerts", () => {

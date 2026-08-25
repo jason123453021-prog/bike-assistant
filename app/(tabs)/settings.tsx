@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Slider from "@react-native-community/slider";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { AdaptiveFormText } from "@/components/adaptive-form-text";
@@ -129,45 +128,6 @@ export default function SettingsScreen() {
     const next = { ...powerSavingSettings, ...patch };
     setPowerSavingSettings(next);
     await powerSavingManagerRef.current.saveSettings(patch);
-  };
-
-  const handleClearMapCache = () => {
-    if (rideState.status === "active" || rideState.status === "paused") {
-      Alert.alert(
-        t("settingsActions.rideActiveTitle"),
-        t("settingsActions.rideActiveBody"),
-      );
-      return;
-    }
-    Alert.alert(
-      t("settingsActions.clearCacheTitle"),
-      t("settingsActions.clearCacheBody"),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("settingsActions.clear"),
-          style: "destructive",
-          onPress: () => {
-            void AsyncStorage.multiRemove([
-              "@bike_bg_track_points",
-              "@bike_bg_state",
-            ])
-              .then(() =>
-                Alert.alert(
-                  t("settingsActions.cacheClearedTitle"),
-                  t("settingsActions.cacheClearedBody"),
-                ),
-              )
-              .catch(() =>
-                Alert.alert(
-                  t("settingsActions.cacheClearFailedTitle"),
-                  t("settingsActions.cacheClearFailedBody"),
-                ),
-              );
-          },
-        },
-      ],
-    );
   };
 
   const [editModal, setEditModal] = useState<{
@@ -2421,45 +2381,6 @@ export default function SettingsScreen() {
               { borderColor: colors.border, marginTop: 14 },
             ]}
           >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("settingsActions.clearCacheLabel")}
-              onPress={handleClearMapCache}
-              style={({ pressed }) => [
-                styles.row,
-                { opacity: pressed ? 0.68 : 1 },
-              ]}
-            >
-              <IconSymbol name="trash.fill" size={18} color={colors.error} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <AdaptiveFormText
-                  baseFontSize={15}
-                  style={[
-                    styles.rowLabel,
-                    {
-                      color: colors.foreground,
-                      textAlign: isRtl ? "right" : "left",
-                    },
-                  ]}
-                >
-                  {t("settingsActions.clearCacheLabel")}
-                </AdaptiveFormText>
-                <AdaptiveFormText
-                  baseFontSize={12}
-                  style={[
-                    styles.rowHint,
-                    {
-                      color: colors.muted,
-                      textAlign: isRtl ? "right" : "left",
-                    },
-                  ]}
-                >
-                  {t("settingsActions.clearCacheHint")}
-                </AdaptiveFormText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-            </Pressable>
-            <Divider colors={colors} />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("settingsActions.openHistoryBackupLabel")}

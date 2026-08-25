@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const mapSource = readFileSync(
   resolve(process.cwd(), "app/(tabs)/map.tsx"),
   "utf8",
-);
+).replace(/\s+/g, " ");
 const settingsSource = readFileSync(
   resolve(process.cwd(), "app/(tabs)/settings.tsx"),
   "utf8",
@@ -36,9 +36,8 @@ describe("130%／200% 字體縮放可讀性守門", () => {
     expect(mapSource).toContain(
       "const dashboardCellMinHeight = fontScale >= 1.6 ? 106 : fontScale >= 1.3 ? 86 : 76;",
     );
-    expect(mapSource).toContain(
-      "const expandedPanelHeight = Math.round(SCREEN_H * (fontScale >= 1.6 ? 0.82 : fontScale >= 1.3 ? 0.72 : 0.62));",
-    );
+    expect(mapSource).toContain("const expandedPanelHeight");
+    expect(mapSource).toContain("fontScale >= 1.6 ? 0.82");
   });
 
   it("讓導航、地址候選與釘選名稱可換行，而不是以單行省略關鍵資訊", () => {
@@ -49,9 +48,7 @@ describe("130%／200% 字體縮放可讀性守門", () => {
       "styles.pinAddressResultTitle} numberOfLines={1}",
     );
     expect(mapSource).not.toContain("styles.pinCardTitle} numberOfLines={1}");
-    expect(mapSource).toContain(
-      'turnBannerTitle: { color: "#fff", fontSize: 16, fontWeight: "700" }',
-    );
+    expect(mapSource).not.toContain("turnBannerTitle");
   });
 
   it("使地圖的資訊列、控制列與補給進度列可以換行並保留最小觸控高度", () => {

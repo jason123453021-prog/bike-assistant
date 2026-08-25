@@ -8,8 +8,10 @@ import {
   Dimensions,
   StatusBar,
 } from "react-native";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import type { SimplifiedModeFields, SimplifiedFieldKey } from "@/lib/settings-context";
+import type {
+  SimplifiedModeFields,
+  SimplifiedFieldKey,
+} from "@/lib/settings-context";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -17,20 +19,18 @@ export interface SimplifiedNavOverlayProps {
   visible: boolean;
   onDismiss: () => void;
   // 核心數據
-  speed: number;           // km/h
-  distance: number;        // km
-  remainingDist?: number;  // km（導航中才有）
-  direction?: string;      // 方向提示（如「左轉」「直行」）
-  directionIcon?: string;  // SF Symbol 名稱
-  currentTime: string;     // HH:MM
-  elapsedTime: string;     // MM:SS 或 HH:MM:SS
+  speed: number; // km/h
+  distance: number; // km
+  remainingDist?: number; // km（導航中才有）
+  currentTime: string; // HH:MM
+  elapsedTime: string; // MM:SS 或 HH:MM:SS
   // 額外數據（新增欄位用）
-  grade?: number;          // 坡度 %
-  power?: number;          // 功率 W
-  avgSpeed?: number;       // 均速 km/h
-  calories?: number;       // 卡路里 kcal
-  pausedTime?: string;     // 暫停時間
-  totalAscent?: number;    // 累計爬升 m
+  grade?: number; // 坡度 %
+  power?: number; // 功率 W
+  avgSpeed?: number; // 均速 km/h
+  calories?: number; // 卡路里 kcal
+  pausedTime?: string; // 暫停時間
+  totalAscent?: number; // 累計爬升 m
   currentAltitude?: number; // 目前海拔 m
   // 自訂顯示欄位（由設定頁面控制）
   fields?: SimplifiedModeFields;
@@ -44,7 +44,7 @@ const DEFAULT_FIELDS: SimplifiedModeFields = {
   showElapsed: true,
   showCurrentTime: true,
   showRemaining: true,
-  showDirection: true,
+  showDirection: false,
   showGrade: false,
   showPower: false,
   showAvgSpeed: false,
@@ -60,8 +60,6 @@ export function SimplifiedNavOverlay({
   speed,
   distance,
   remainingDist,
-  direction,
-  directionIcon,
   currentTime,
   elapsedTime,
   grade,
@@ -79,21 +77,84 @@ export function SimplifiedNavOverlay({
   const f = fields ?? DEFAULT_FIELDS;
 
   // 底部欄位：依 fieldOrder 排序，跳過 direction/remaining/speed（展示在其他區址）
-  const BOTTOM_KEY_MAP: Partial<Record<SimplifiedFieldKey, () => { value: string; label: string } | null>> = {
-    showDistance: () => f.showDistance ? { value: distance.toFixed(2), label: "公里" } : null,
-    showElapsed: () => f.showElapsed ? { value: elapsedTime, label: "時間" } : null,
-    showCurrentTime: () => f.showCurrentTime ? { value: currentTime, label: "現在" } : null,
-    showGrade: () => f.showGrade ? { value: grade !== undefined ? `${grade > 0 ? "+" : ""}${grade.toFixed(1)}%` : "--", label: "坡度" } : null,
-    showPower: () => f.showPower ? { value: power !== undefined ? `${power}W` : "--", label: "功率" } : null,
-    showAvgSpeed: () => f.showAvgSpeed ? { value: avgSpeed !== undefined && avgSpeed > 0 ? avgSpeed.toFixed(1) : "--", label: "均速" } : null,
-    showCalories: () => f.showCalories ? { value: calories !== undefined ? `${calories}` : "--", label: "kcal" } : null,
-    showPausedTime: () => f.showPausedTime ? { value: pausedTime ?? "--", label: "暫停" } : null,
-    showTotalAscent: () => f.showTotalAscent ? { value: totalAscent !== undefined ? `${totalAscent.toFixed(0)}` : "0", label: "m 爬升" } : null,
-    showCurrentAltitude: () => f.showCurrentAltitude ? { value: currentAltitude !== undefined ? `${currentAltitude.toFixed(0)}` : "--", label: "m 海拔" } : null,
+  const BOTTOM_KEY_MAP: Partial<
+    Record<SimplifiedFieldKey, () => { value: string; label: string } | null>
+  > = {
+    showDistance: () =>
+      f.showDistance ? { value: distance.toFixed(2), label: "公里" } : null,
+    showElapsed: () =>
+      f.showElapsed ? { value: elapsedTime, label: "時間" } : null,
+    showCurrentTime: () =>
+      f.showCurrentTime ? { value: currentTime, label: "現在" } : null,
+    showGrade: () =>
+      f.showGrade
+        ? {
+            value:
+              grade !== undefined
+                ? `${grade > 0 ? "+" : ""}${grade.toFixed(1)}%`
+                : "--",
+            label: "坡度",
+          }
+        : null,
+    showPower: () =>
+      f.showPower
+        ? { value: power !== undefined ? `${power}W` : "--", label: "功率" }
+        : null,
+    showAvgSpeed: () =>
+      f.showAvgSpeed
+        ? {
+            value:
+              avgSpeed !== undefined && avgSpeed > 0
+                ? avgSpeed.toFixed(1)
+                : "--",
+            label: "均速",
+          }
+        : null,
+    showCalories: () =>
+      f.showCalories
+        ? {
+            value: calories !== undefined ? `${calories}` : "--",
+            label: "kcal",
+          }
+        : null,
+    showPausedTime: () =>
+      f.showPausedTime ? { value: pausedTime ?? "--", label: "暫停" } : null,
+    showTotalAscent: () =>
+      f.showTotalAscent
+        ? {
+            value:
+              totalAscent !== undefined ? `${totalAscent.toFixed(0)}` : "0",
+            label: "m 爬升",
+          }
+        : null,
+    showCurrentAltitude: () =>
+      f.showCurrentAltitude
+        ? {
+            value:
+              currentAltitude !== undefined
+                ? `${currentAltitude.toFixed(0)}`
+                : "--",
+            label: "m 海拔",
+          }
+        : null,
   };
-  const BOTTOM_KEYS: SimplifiedFieldKey[] = ["showDistance", "showElapsed", "showCurrentTime", "showGrade", "showPower", "showAvgSpeed", "showCalories", "showPausedTime", "showTotalAscent", "showCurrentAltitude"];
+  const BOTTOM_KEYS: SimplifiedFieldKey[] = [
+    "showDistance",
+    "showElapsed",
+    "showCurrentTime",
+    "showGrade",
+    "showPower",
+    "showAvgSpeed",
+    "showCalories",
+    "showPausedTime",
+    "showTotalAscent",
+    "showCurrentAltitude",
+  ];
   const orderedKeys = fieldOrder
-    ? [...fieldOrder.filter((k) => BOTTOM_KEYS.includes(k)), ...BOTTOM_KEYS.filter((k) => !fieldOrder.includes(k))]
+    ? [
+        ...fieldOrder.filter((k) => BOTTOM_KEYS.includes(k)),
+        ...BOTTOM_KEYS.filter((k) => !fieldOrder.includes(k)),
+      ]
     : BOTTOM_KEYS;
   const bottomItems: { value: string; label: string }[] = [];
   for (const key of orderedKeys) {
@@ -107,26 +168,6 @@ export function SimplifiedNavOverlay({
   return (
     <Pressable style={styles.overlay} onPress={onDismiss}>
       <StatusBar barStyle="light-content" />
-
-      {/* 頂部：方向指引 */}
-      {f.showDirection ? (
-        direction ? (
-          <View style={styles.directionRow}>
-            {directionIcon && (
-              <IconSymbol name={directionIcon as any} size={36} color="#fff" />
-            )}
-            <Text style={styles.directionText}>{direction}</Text>
-          </View>
-        ) : (
-          <View style={styles.directionRow}>
-            <Text style={styles.directionPlaceholder}>騎乘中</Text>
-          </View>
-        )
-      ) : (
-        <View style={styles.directionRow}>
-          <Text style={styles.directionPlaceholder}>騎乘中</Text>
-        </View>
-      )}
 
       {/* 剩餘距離 */}
       {f.showRemaining && remainingDist !== undefined && (
@@ -157,17 +198,22 @@ export function SimplifiedNavOverlay({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={[
             styles.bottomRow,
-            bottomItems.length <= 3 && { width: "100%", justifyContent: "space-around" },
+            bottomItems.length <= 3 && {
+              width: "100%",
+              justifyContent: "space-around",
+            },
           ]}
           style={{ width: "100%" }}
         >
           {bottomItems.map((item, idx) => (
             <React.Fragment key={item.label}>
               {idx > 0 && <View style={styles.bottomDivider} />}
-              <View style={[
-                styles.bottomItem,
-                bottomItems.length > 3 && { minWidth: SCREEN_W / 3.5 },
-              ]}>
+              <View
+                style={[
+                  styles.bottomItem,
+                  bottomItems.length > 3 && { minWidth: SCREEN_W / 3.5 },
+                ]}
+              >
                 <Text style={styles.bottomValue}>{item.value}</Text>
                 <Text style={styles.bottomLabel}>{item.label}</Text>
               </View>
@@ -196,24 +242,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 48 /* internal spacing */,
     paddingHorizontal: 32,
-  },
-  directionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-  },
-  directionText: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#fff",
-    letterSpacing: -0.5,
-  },
-  directionPlaceholder: {
-    fontSize: 28,
-    fontWeight: "300",
-    color: "#888",
-    letterSpacing: 2,
   },
   remainRow: {
     alignItems: "center",

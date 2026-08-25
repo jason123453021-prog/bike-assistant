@@ -17,7 +17,7 @@ const historySource = readFileSync(
 const mapSource = readFileSync(
   resolve(process.cwd(), "app/(tabs)/map.tsx"),
   "utf8",
-);
+).replace(/\s+/g, " ");
 const themeSource = readFileSync(
   resolve(process.cwd(), "theme.config.js"),
   "utf8",

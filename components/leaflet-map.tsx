@@ -94,7 +94,10 @@ export interface LeafletMapProps {
   isOffRoute?: boolean;
   centerPinLocation?: { lat: number; lon: number } | null;
   onMapCenterChanged?: (lat: number, lon: number) => void;
-  onMapMoveEnd?: (bounds: { northEast: { lat: number; lon: number }; southWest: { lat: number; lon: number } }) => void;
+  onMapMoveEnd?: (bounds: {
+    northEast: { lat: number; lon: number };
+    southWest: { lat: number; lon: number };
+  }) => void;
   /** 使用者完成雙指旋轉後回報目前 bearing；相機置中不得覆寫此方向。 */
   onMapRotateEnd?: (bearing: number) => void;
   kilometersMarkers?: KilometerMarker[];
@@ -103,15 +106,38 @@ export interface LeafletMapProps {
 }
 
 export interface LeafletMapHandle {
-  animateCamera: (opts: { center: { latitude: number; longitude: number }; zoom?: number }, anim?: { duration: number }) => void;
-  fitToCoordinates: (coords: LatLng[], opts?: { edgePadding?: { top: number; right: number; bottom: number; left: number }; animated?: boolean }) => void;
-  clearNavigationGraphics: () => void;
+  animateCamera: (
+    opts: { center: { latitude: number; longitude: number }; zoom?: number },
+    anim?: { duration: number },
+  ) => void;
+  fitToCoordinates: (
+    coords: LatLng[],
+    opts?: {
+      edgePadding?: {
+        top: number;
+        right: number;
+        bottom: number;
+        left: number;
+      };
+      animated?: boolean;
+    },
+  ) => void;
+  clearNavigationGraphics: (clearLiveTrail?: boolean) => void;
   setBearing: (bearing: number, headingUp: boolean) => void;
   setPitch: (pitch: number) => void; // 俯視角設定 (0-60 度)
   setPlaybackMarker: (lat: number, lon: number, color: string) => void; // 彩色回放標點
-  animatePlaybackMarker: (lat: number, lon: number, color: string, duration: number) => void; // 平滑動畫回放標點
+  animatePlaybackMarker: (
+    lat: number,
+    lon: number,
+    color: string,
+    duration: number,
+  ) => void; // 平滑動畫回放標點
   highlightPlayedTrail: (coords: LatLng[], color?: string) => void; // 高亮已走過的軌跡
-  addDirectionArrows: (coords: LatLng[], color?: string, interval?: number) => void; // 添加方向箭头
+  addDirectionArrows: (
+    coords: LatLng[],
+    color?: string,
+    interval?: number,
+  ) => void; // 添加方向箭头
   refreshBaseTiles: () => void;
 }
 
@@ -250,8 +276,9 @@ function renderLiveTrailSegments(segments) {
 }
 
 // 由 React Native 的「清除所有導航圖層」動作直接呼叫；避免等待 state 渲染期間殘留數字或折線。
-function clearNavigationGraphics() {
+function clearNavigationGraphics(clearLiveTrail) {
   clearRouteOverlays();
+  if (clearLiveTrail) renderLiveTrailSegments([]);
   passedLayer.setLatLngs([]);
   returnLayer.setLatLngs([]);
   if (returnEndMarker) { map.removeLayer(returnEndMarker); returnEndMarker = null; }
@@ -507,7 +534,7 @@ function handleMessage(data) {
         renderRouteOverlays(msg.layers || []);
         break;
       case 'clearNavigationGraphics':
-        clearNavigationGraphics();
+        clearNavigationGraphics(Boolean(msg.clearLiveTrail));
         break;
       case 'setPassedPolyline':
         passedLayer.setLatLngs(msg.coords);
@@ -536,9 +563,12 @@ function handleMessage(data) {
         map.setView([msg.lat, msg.lon], msg.zoom || map.getZoom(), { animate: true, duration: 0.6 });
         break;
       case 'setBearing':
-        // 舊版呼叫端仍可傳送此訊息，但不得覆寫使用者以雙指選擇的地圖方向。
-        headingUpMode = false;
-        currentBearing = typeof map.getBearing === 'function' ? map.getBearing() : 0;
+        // 僅由 App 的定位模式狀態機呼叫：平滑 COG 朝前或正北置中；自由模式不送此命令。
+        var requestedBearing = Number(msg.bearing);
+        if (!Number.isFinite(requestedBearing)) break;
+        currentBearing = ((requestedBearing % 360) + 360) % 360;
+        headingUpMode = Boolean(msg.headingUp);
+        if (typeof map.setBearing === 'function') map.setBearing(currentBearing);
         break;
       case 'fitToCoordinates':
         if (msg.coords && msg.coords.length > 0) {
@@ -708,7 +738,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       photoMarkers,
       onPhotoMarkerPress,
     },
-    ref
+    ref,
   ) => {
     const webViewRef = useRef<WebView>(null);
     const [isReady, setIsReady] = useState(false);
@@ -719,10 +749,10 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       setBearing: (bearing: number, headingUp: boolean) => {
         if (!webViewRef.current) return;
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "setBearing", bearing, headingUp })
+          JSON.stringify({ type: "setBearing", bearing, headingUp }),
         );
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "setHeadingUpMode", enabled: headingUp })
+          JSON.stringify({ type: "setHeadingUpMode", enabled: headingUp }),
         );
       },
       animateCamera: (opts, _anim) => {
@@ -734,7 +764,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             lat: opts.center.latitude,
             lon: opts.center.longitude,
             zoom: opts.zoom ?? 17,
-          })
+          }),
         );
       },
       fitToCoordinates: (coords, opts) => {
@@ -746,48 +776,79 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             type: "fitToCoordinates",
             coords: mapped,
             padding: opts?.edgePadding,
-          })
+          }),
         );
       },
-      clearNavigationGraphics: () => {
+      clearNavigationGraphics: (clearLiveTrail = false) => {
         if (!webViewRef.current) return;
-        webViewRef.current.postMessage(JSON.stringify({ type: "clearNavigationGraphics" }));
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "clearNavigationGraphics", clearLiveTrail }),
+        );
       },
       setPitch: (pitch: number) => {
         if (!webViewRef.current) return;
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "setPitch", pitch: Math.max(0, Math.min(60, pitch)) })
+          JSON.stringify({
+            type: "setPitch",
+            pitch: Math.max(0, Math.min(60, pitch)),
+          }),
         );
       },
       setPlaybackMarker: (lat: number, lon: number, color: string) => {
         if (!webViewRef.current) return;
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "setPlaybackMarker", lat, lon, color })
+          JSON.stringify({ type: "setPlaybackMarker", lat, lon, color }),
         );
       },
-      animatePlaybackMarker: (lat: number, lon: number, color: string, duration: number) => {
+      animatePlaybackMarker: (
+        lat: number,
+        lon: number,
+        color: string,
+        duration: number,
+      ) => {
         if (!webViewRef.current) return;
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "animatePlaybackMarker", lat, lon, color, duration })
+          JSON.stringify({
+            type: "animatePlaybackMarker",
+            lat,
+            lon,
+            color,
+            duration,
+          }),
         );
       },
-      highlightPlayedTrail: (coords: LatLng[], color = '#10B981') => {
+      highlightPlayedTrail: (coords: LatLng[], color = "#10B981") => {
         if (!webViewRef.current) return;
         const mapped = coords.map((c) => [c.latitude, c.longitude]);
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "highlightPlayedTrail", coords: mapped, color })
+          JSON.stringify({
+            type: "highlightPlayedTrail",
+            coords: mapped,
+            color,
+          }),
         );
       },
-      addDirectionArrows: (coords: LatLng[], color = '#10B981', interval = 10) => {
+      addDirectionArrows: (
+        coords: LatLng[],
+        color = "#10B981",
+        interval = 10,
+      ) => {
         if (!webViewRef.current) return;
         const mapped = coords.map((c) => [c.latitude, c.longitude]);
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "addDirectionArrows", coords: mapped, color, interval })
+          JSON.stringify({
+            type: "addDirectionArrows",
+            coords: mapped,
+            color,
+            interval,
+          }),
         );
       },
       refreshBaseTiles: () => {
         if (!webViewRef.current) return;
-        webViewRef.current.postMessage(JSON.stringify({ type: "refreshBaseTiles" }));
+        webViewRef.current.postMessage(
+          JSON.stringify({ type: "refreshBaseTiles" }),
+        );
       },
     }));
 
@@ -802,7 +863,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             lon: currentPos.lon,
             heading: currentPos.heading,
             follow: followUserRef.current,
-          })
+          }),
         );
       }
     }, [currentPos, isReady]);
@@ -826,16 +887,19 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       }
       const segments = toLeafletSegments(gpxPolyline);
       webViewRef.current.postMessage(
-        JSON.stringify({ type: "setGpxPolyline", segments })
+        JSON.stringify({ type: "setGpxPolyline", segments }),
       );
     }, [gpxPolyline, isReady, routeOverlays]);
 
     // Send passed polyline
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
-      const coords = (passedPolyline ?? []).map((c) => [c.latitude, c.longitude]);
+      const coords = (passedPolyline ?? []).map((c) => [
+        c.latitude,
+        c.longitude,
+      ]);
       webViewRef.current.postMessage(
-        JSON.stringify({ type: "setPassedPolyline", coords })
+        JSON.stringify({ type: "setPassedPolyline", coords }),
       );
     }, [passedPolyline, isReady]);
 
@@ -844,7 +908,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       if (!isReady || !webViewRef.current) return;
       const segments = toLeafletSegments(liveTrail);
       webViewRef.current.postMessage(
-        JSON.stringify({ type: "setLiveTrail", segments })
+        JSON.stringify({ type: "setLiveTrail", segments }),
       );
     }, [liveTrail, isReady]);
 
@@ -853,12 +917,12 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       if (!isReady || !webViewRef.current) return;
       if (!isOffRoute || !returnPolyline || returnPolyline.length === 0) {
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "clearReturnPolyline" })
+          JSON.stringify({ type: "clearReturnPolyline" }),
         );
       } else {
         const coords = returnPolyline.map((c) => [c.latitude, c.longitude]);
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "setReturnPolyline", coords })
+          JSON.stringify({ type: "setReturnPolyline", coords }),
         );
       }
     }, [returnPolyline, isOffRoute, isReady]);
@@ -867,14 +931,20 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
       webViewRef.current.postMessage(
-        JSON.stringify({ type: "setKilometerMarkers", markers: kilometersMarkers || [] })
+        JSON.stringify({
+          type: "setKilometerMarkers",
+          markers: kilometersMarkers || [],
+        }),
       );
     }, [kilometersMarkers, isReady]);
 
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
       webViewRef.current.postMessage(
-        JSON.stringify({ type: "setPhotoMarkers", markers: photoMarkers || [] })
+        JSON.stringify({
+          type: "setPhotoMarkers",
+          markers: photoMarkers || [],
+        }),
       );
     }, [photoMarkers, isReady]);
 
@@ -883,11 +953,15 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       if (!isReady || !webViewRef.current) return;
       if (centerPinLocation) {
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "setCenterPin", lat: centerPinLocation.lat, lon: centerPinLocation.lon })
+          JSON.stringify({
+            type: "setCenterPin",
+            lat: centerPinLocation.lat,
+            lon: centerPinLocation.lon,
+          }),
         );
       } else {
         webViewRef.current.postMessage(
-          JSON.stringify({ type: "setCenterPin", lat: null, lon: null })
+          JSON.stringify({ type: "setCenterPin", lat: null, lon: null }),
         );
       }
     }, [centerPinLocation, isReady]);
@@ -909,7 +983,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
                 lat: initialRegion.latitude,
                 lon: initialRegion.longitude,
                 zoom,
-              })
+              }),
             );
           }
         } else if (msg.type === "panDrag") {
@@ -924,10 +998,16 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
             northEast: { lat: msg.northEast.lat, lon: msg.northEast.lon },
             southWest: { lat: msg.southWest.lat, lon: msg.southWest.lon },
           });
-        } else if (msg.type === "mapRotateEnd" && typeof msg.bearing === "number") {
+        } else if (
+          msg.type === "mapRotateEnd" &&
+          typeof msg.bearing === "number"
+        ) {
           followUserRef.current = false;
           onMapRotateEnd?.(msg.bearing);
-        } else if (msg.type === "photoMarkerPress" && typeof msg.id === "string") {
+        } else if (
+          msg.type === "photoMarkerPress" &&
+          typeof msg.id === "string"
+        ) {
           onPhotoMarkerPress?.(msg.id);
         }
       } catch {}
@@ -961,7 +1041,7 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
         />
       </View>
     );
-  }
+  },
 );
 
 LeafletMapView.displayName = "LeafletMapView";
