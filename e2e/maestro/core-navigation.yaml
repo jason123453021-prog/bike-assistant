@@ -21,6 +21,11 @@ name: Android 封版核心導覽
 - assertVisible: "History"
 - assertVisible: "Settings"
 - tapOn: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Display & Appearance"
+    direction: DOWN
+    timeout: 30000
 - assertVisible: "Display & Appearance"
 - tapOn: "Routes"
 - assertVisible: "Routes"
