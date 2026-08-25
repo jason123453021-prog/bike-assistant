@@ -8,6 +8,8 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
   const historySource = fs.readFileSync(path.join(rootDir, "app/(tabs)/history.tsx"), "utf8");
   const routeSource = fs.readFileSync(path.join(rootDir, "app/(tabs)/navigate.tsx"), "utf8");
   const settingsSource = fs.readFileSync(path.join(rootDir, "app/(tabs)/settings.tsx"), "utf8");
+  const supplyModalSource = fs.readFileSync(path.join(rootDir, "components/custom-supply-item-modal.tsx"), "utf8");
+  const adaptiveTextSource = fs.readFileSync(path.join(rootDir, "components/adaptive-form-text.tsx"), "utf8");
 
   it("語言切換以非阻塞淡入淡出遮罩回饋，並將 RTL direction 套用至全域內容", () => {
     expect(providerSource).toContain("Animated.timing");
@@ -45,5 +47,17 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
     expect(settingsSource).toContain('t("settingsActions.clearCacheLabel")');
     expect(settingsSource).toContain('t("settingsActions.resetBody")');
     expect(settingsSource).toContain("flexShrink: 1");
+  });
+
+  it("表單長字串依量測結果自動縮小字級，達最小值後改用換行而不截斷", () => {
+    expect(adaptiveTextSource).toContain("onTextLayout");
+    expect(adaptiveTextSource).toContain("maxLinesBeforeShrink");
+    expect(adaptiveTextSource).toContain("minFontScale");
+    expect(adaptiveTextSource).toContain("flexWrap: \"wrap\"");
+    expect(adaptiveTextSource).not.toContain("ellipsizeMode");
+    expect(settingsSource).toContain("AdaptiveFormText");
+    expect(settingsSource).toContain("multiline");
+    expect(supplyModalSource).toContain("AdaptiveFormText");
+    expect(supplyModalSource).toContain("multiline");
   });
 });

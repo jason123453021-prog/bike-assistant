@@ -21,9 +21,11 @@ import {
   Alert,
 } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
+import { AdaptiveFormText } from '@/components/adaptive-form-text';
 import { SupplyItem } from '@/lib/settings-context';
 import Slider from '@react-native-community/slider';
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/lib/i18n/language-provider';
 
 export interface CustomSupplyItemModalProps {
   visible: boolean;
@@ -40,6 +42,8 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
 }) => {
   const colors = useColors();
   const { t } = useTranslation();
+  const { activeLanguage } = useLanguage();
+  const isRtl = activeLanguage === 'ar-SA';
   const [name, setName] = useState('');
   const [target, setTarget] = useState<'energy' | 'water'>('energy');
   const [triggerType, setTriggerType] = useState<'time' | 'distance'>('time');
@@ -127,9 +131,9 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* 標題欄 */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+          <AdaptiveFormText baseFontSize={18} style={[styles.headerTitle, { color: colors.foreground, textAlign: isRtl ? 'right' : 'left' }]}>
             {item ? t('forms.supplyItem.editTitle') : t('forms.supplyItem.addTitle')}
-          </Text>
+          </AdaptiveFormText>
           <Pressable
             onPress={onCancel}
             style={({ pressed }) => [
@@ -146,9 +150,9 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
         <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
           {/* 補給品名稱 */}
           <View style={styles.section}>
-            <Text style={[styles.label, { color: colors.foreground }]}>
+            <AdaptiveFormText baseFontSize={14} style={[styles.label, { color: colors.foreground, textAlign: isRtl ? 'right' : 'left' }]}>
               {t('forms.supplyItem.nameLabel')}
-            </Text>
+            </AdaptiveFormText>
             <TextInput
               style={[
                 styles.input,
@@ -156,11 +160,14 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
                   borderColor: colors.border,
                   color: colors.foreground,
                   backgroundColor: colors.surface,
+                  textAlign: isRtl ? 'right' : 'left',
                 },
               ]}
               placeholder={t('forms.supplyItem.namePlaceholder')}
               placeholderTextColor={colors.muted}
               value={name}
+              multiline
+              numberOfLines={2}
               onChangeText={setName}
             />
           </View>
@@ -177,21 +184,21 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
 
           <View style={styles.section}>
             <Text style={[styles.label, { color: colors.foreground }]}>{t('forms.supplyItem.reminderCategory')}</Text>
-            <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 4 }}>
+            <AdaptiveFormText baseFontSize={12} style={{ color: colors.muted, lineHeight: 18, marginTop: 4, textAlign: isRtl ? 'right' : 'left' }}>
               {t('forms.supplyItem.reminderCategoryHint')}
-            </Text>
+            </AdaptiveFormText>
             <View style={[styles.segmentControl, { marginTop: 12 }]}>
               <Pressable
                 onPress={() => setTarget('energy')}
                 style={[styles.segmentButton, { backgroundColor: target === 'energy' ? '#D97706' : colors.surface }]}
               >
-                <Text style={[styles.segmentText, { color: target === 'energy' ? '#fff' : colors.foreground }]}>{t('forms.supplyItem.energy')}</Text>
+                <AdaptiveFormText baseFontSize={14} minFontScale={0.72} maxLinesBeforeShrink={1} style={[styles.segmentText, { color: target === 'energy' ? '#fff' : colors.foreground, textAlign: 'center' }]}>{t('forms.supplyItem.energy')}</AdaptiveFormText>
               </Pressable>
               <Pressable
                 onPress={() => setTarget('water')}
                 style={[styles.segmentButton, { backgroundColor: target === 'water' ? '#0284C7' : colors.surface }]}
               >
-                <Text style={[styles.segmentText, { color: target === 'water' ? '#fff' : colors.foreground }]}>{t('forms.supplyItem.water')}</Text>
+                <AdaptiveFormText baseFontSize={14} minFontScale={0.72} maxLinesBeforeShrink={1} style={[styles.segmentText, { color: target === 'water' ? '#fff' : colors.foreground, textAlign: 'center' }]}>{t('forms.supplyItem.water')}</AdaptiveFormText>
               </Pressable>
             </View>
           </View>
@@ -352,9 +359,9 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
               { backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 },
             ]}
           >
-            <Text style={[styles.buttonText, { color: colors.foreground }]}>
+            <AdaptiveFormText baseFontSize={16} minFontScale={0.72} maxLinesBeforeShrink={1} style={[styles.buttonText, { color: colors.foreground, textAlign: 'center' }]}>
               {t('common.cancel')}
-            </Text>
+            </AdaptiveFormText>
           </Pressable>
           <Pressable
             onPress={handleSave}
@@ -364,9 +371,9 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
               { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 },
             ]}
           >
-            <Text style={[styles.buttonText, { color: colors.onAccent }]}>
+            <AdaptiveFormText baseFontSize={16} minFontScale={0.72} maxLinesBeforeShrink={1} style={[styles.buttonText, { color: colors.onAccent, textAlign: 'center' }]}>
               {item ? t('forms.supplyItem.update') : t('forms.supplyItem.add')}
-            </Text>
+            </AdaptiveFormText>
           </Pressable>
         </View>
       </View>

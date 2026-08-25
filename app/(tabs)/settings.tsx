@@ -20,6 +20,7 @@ import Slider from "@react-native-community/slider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
+import { AdaptiveFormText } from "@/components/adaptive-form-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useThemeContext } from "@/lib/theme-provider";
@@ -1420,8 +1421,8 @@ export default function SettingsScreen() {
           >
             <IconSymbol name="trash.fill" size={18} color={colors.error} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground, flexShrink: 1, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.clearCacheLabel")}</Text>
-              <Text style={[styles.rowHint, { color: colors.muted, flexShrink: 1, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.clearCacheHint")}</Text>
+              <AdaptiveFormText baseFontSize={15} style={[styles.rowLabel, { color: colors.foreground, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.clearCacheLabel")}</AdaptiveFormText>
+              <AdaptiveFormText baseFontSize={12} style={[styles.rowHint, { color: colors.muted, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.clearCacheHint")}</AdaptiveFormText>
             </View>
             <IconSymbol name="chevron.right" size={16} color={colors.muted} />
           </Pressable>
@@ -1434,17 +1435,17 @@ export default function SettingsScreen() {
           >
             <IconSymbol name="square.and.arrow.up" size={18} color={colors.primary} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground, flexShrink: 1, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.openHistoryBackupLabel")}</Text>
-              <Text style={[styles.rowHint, { color: colors.muted, flexShrink: 1, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.openHistoryBackupHint")}</Text>
+              <AdaptiveFormText baseFontSize={15} style={[styles.rowLabel, { color: colors.foreground, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.openHistoryBackupLabel")}</AdaptiveFormText>
+              <AdaptiveFormText baseFontSize={12} style={[styles.rowHint, { color: colors.muted, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.openHistoryBackupHint")}</AdaptiveFormText>
             </View>
             <IconSymbol name="chevron.right" size={16} color={colors.muted} />
           </Pressable>
         </View>
         <View style={[styles.section, { borderColor: colors.border, marginTop: 24 }]}> 
-          <Text style={{ fontSize: 15, fontWeight: "800", color: colors.foreground, textAlign: isRtl ? "right" : "left" }}>{t("settingsActions.settingsManagement")}</Text>
-          <Text style={{ fontSize: 12, lineHeight: 18, color: colors.muted, marginTop: 6, flexShrink: 1, textAlign: isRtl ? "right" : "left" }}>
+          <AdaptiveFormText baseFontSize={15} style={{ fontWeight: "800", color: colors.foreground, textAlign: isRtl ? "right" : "left" }}>{t("settingsActions.settingsManagement")}</AdaptiveFormText>
+          <AdaptiveFormText baseFontSize={12} style={{ lineHeight: 18, color: colors.muted, marginTop: 6, textAlign: isRtl ? "right" : "left" }}>
             {t("settingsActions.settingsManagementHint")}
-          </Text>
+          </AdaptiveFormText>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("settingsActions.resetAllLabel")}
@@ -1461,7 +1462,7 @@ export default function SettingsScreen() {
               opacity: pressed ? 0.78 : 1,
             })}
           >
-            <Text style={{ color: colors.error, fontSize: 15, fontWeight: "800" }}>{t("settingsActions.resetAllLabel")}</Text>
+            <AdaptiveFormText baseFontSize={15} minFontScale={0.72} maxLinesBeforeShrink={1} style={{ color: colors.error, fontWeight: "800", textAlign: "center" }}>{t("settingsActions.resetAllLabel")}</AdaptiveFormText>
           </Pressable>
         </View>
 
@@ -1542,9 +1543,9 @@ export default function SettingsScreen() {
       >
         <View style={styles.editOverlay}>
           <View style={[styles.editCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.editTitle, { color: colors.foreground }]}>
+            <AdaptiveFormText baseFontSize={18} style={[styles.editTitle, { color: colors.foreground, textAlign: isRtl ? "right" : "left" }]}>
               {t("settingsActions.systemDataTitle")} · {editModal.label}
-            </Text>
+            </AdaptiveFormText>
             <View style={[styles.editInputRow, { borderColor: colors.border, flexDirection: isRtl ? "row-reverse" : "row" }]}>
               <TextInput
                 style={[styles.editInput, { color: colors.foreground, textAlign: isRtl ? "right" : "left" }]}
@@ -1558,7 +1559,7 @@ export default function SettingsScreen() {
               />
               <Text style={[styles.editUnit, { color: colors.muted }]}>{editModal.unit}</Text>
             </View>
-            {editInlineError ? <Text style={{ color: colors.error, fontSize: 13, lineHeight: 18, marginTop: 8, flexShrink: 1, textAlign: isRtl ? "right" : "left" }}>{editInlineError}</Text> : null}
+            {editInlineError ? <AdaptiveFormText baseFontSize={13} style={{ color: colors.error, lineHeight: 18, marginTop: 8, textAlign: isRtl ? "right" : "left" }}>{editInlineError}</AdaptiveFormText> : null}
             <View style={styles.editBtnRow}>
               <Pressable
                 style={({ pressed }) => [styles.editCancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
@@ -1587,9 +1588,9 @@ export default function SettingsScreen() {
         <SafeAreaView style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface, flex: 1, display: "flex", flexDirection: "column" }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+              <AdaptiveFormText baseFontSize={18} style={[styles.modalTitle, { color: colors.foreground, textAlign: isRtl ? "right" : "left" }]}>
                 {supplyModal.mode === "add" ? t("settingsActions.supplyAddTitle") : t("settingsActions.supplyEditTitle")}
-              </Text>
+              </AdaptiveFormText>
               <Pressable onPress={closeSupplyModal}>
                 <IconSymbol name="xmark.circle.fill" size={24} color={colors.muted} />
               </Pressable>
@@ -1598,27 +1599,29 @@ export default function SettingsScreen() {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20 }} style={{ flex: 1 }}>
               {/* 補給品名稱 */}
               <View style={{ marginBottom: 24 /* internal spacing */ }}>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 /* internal spacing */ }}>
+                <AdaptiveFormText baseFontSize={16} style={{ fontWeight: "700", color: colors.foreground, marginBottom: 10, textAlign: isRtl ? "right" : "left" }}>
                   {t("settingsActions.supplyNameLabel")}
-                </Text>
+                </AdaptiveFormText>
                 <TextInput
                   style={[
                     styles.textInput,
-                    { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 17, paddingVertical: 16, paddingHorizontal: 16 },
+                    { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 17, paddingVertical: 16, paddingHorizontal: 16, textAlign: isRtl ? "right" : "left" },
                   ]}
                   placeholder={t("settingsActions.supplyNamePlaceholder")}
                   placeholderTextColor={colors.muted}
                   value={supplyForm.name}
+                  multiline
+                  numberOfLines={2}
                   onChangeText={(text) => { setSupplyTouched((current) => ({ ...current, name: true })); setSupplyForm({ ...supplyForm, name: text }); }}
                 />
-                {supplyNameError ? <Text style={{ color: colors.error, fontSize: 13, lineHeight: 18, marginTop: 8, flexShrink: 1, textAlign: isRtl ? "right" : "left" }}>{supplyNameError}</Text> : null}
+                {supplyNameError ? <AdaptiveFormText baseFontSize={13} style={{ color: colors.error, lineHeight: 18, marginTop: 8, textAlign: isRtl ? "right" : "left" }}>{supplyNameError}</AdaptiveFormText> : null}
               </View>
 
               {/* 觸發方式 */}
               <View style={{ marginBottom: 24 /* internal spacing */ }}>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
+                <AdaptiveFormText baseFontSize={16} style={{ fontWeight: "700", color: colors.foreground, marginBottom: 12, textAlign: isRtl ? "right" : "left" }}>
                   {t("settingsActions.triggerType")}
-                </Text>
+                </AdaptiveFormText>
                 <View style={{ flexDirection: "row", gap: 12 }}>
                   {(["time", "distance"] as const).map((type) => (
                     <Pressable
@@ -1633,15 +1636,18 @@ export default function SettingsScreen() {
                       ])}
                       onPress={() => setSupplyForm({ ...supplyForm, triggerType: type })}
                     >
-                      <Text
+                      <AdaptiveFormText
+                        baseFontSize={14}
+                        minFontScale={0.72}
+                        maxLinesBeforeShrink={1}
                         style={{
                           color: supplyForm.triggerType === type ? colors.onAccent : colors.foreground,
                           fontWeight: "600",
-                          fontSize: 14,
+                          textAlign: "center",
                         }}
                       >
                         {type === "time" ? t("settingsActions.time") : t("settingsActions.distance")}
-                      </Text>
+                      </AdaptiveFormText>
                     </Pressable>
                   ))}
                 </View>
@@ -1650,9 +1656,9 @@ export default function SettingsScreen() {
               {/* 觸發值 */}
               {supplyForm.triggerType === "time" ? (
                 <View style={{ marginBottom: 24 /* internal spacing */ }}>
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
+                  <AdaptiveFormText baseFontSize={16} style={{ fontWeight: "700", color: colors.foreground, marginBottom: 12, textAlign: isRtl ? "right" : "left" }}>
                     {t("settingsActions.triggerTime")}
-                  </Text>
+                  </AdaptiveFormText>
                   <View style={{ flexDirection: isRtl ? "row-reverse" : "row", gap: 14 }}>
                     {/* 時 */}
                     <View style={{ flex: 1 }}>
@@ -1700,7 +1706,7 @@ export default function SettingsScreen() {
                       />
                     </View>
                   </View>
-                  {supplyTimeError ? <Text style={{ color: colors.error, fontSize: 13, lineHeight: 18, marginTop: 8, flexShrink: 1, textAlign: isRtl ? "right" : "left" }}>{supplyTimeError}</Text> : null}
+                  {supplyTimeError ? <AdaptiveFormText baseFontSize={13} style={{ color: colors.error, lineHeight: 18, marginTop: 8, textAlign: isRtl ? "right" : "left" }}>{supplyTimeError}</AdaptiveFormText> : null}
                 </View>
               ) : (
                 <View style={{ marginBottom: 16 /* internal spacing */ }}>

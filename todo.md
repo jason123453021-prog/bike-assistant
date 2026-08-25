@@ -2498,3 +2498,9 @@
 - [x] 為設定數值、生日與自訂補給品欄位新增即時驗證回饋，避免僅在儲存後才顯示錯誤
 - [ ] 由 Android 實機依 `references/android-rtl-form-validation-device-validation-2026-08-25.md` 完成長字串、RTL 與即時驗證驗收
 - [x] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact（run 32812652963，head `690df86`；Maestro JUnit 1 test／0 failures／31.683 秒；artifact `bike-assistant-maestro-e2e` 已下載核實）
+
+## 表單長字串自動縮放（2026-08-25）
+- [x] 為設定與活動／補給表單的標籤、按鈕與錯誤文字建立自動字級縮放與換行降級策略
+- [x] 驗證德文、俄文與阿拉伯文的長字串表單布局，新增防止截斷的回歸守門
+- [x] 完成完整品質檢查
+- [ ] 完成最新版 GitHub Android E2E 驗收並記錄 artifact
