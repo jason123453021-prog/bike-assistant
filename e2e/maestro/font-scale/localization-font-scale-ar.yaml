@@ -1,0 +1,35 @@
+appId: com.jason123453021.bikeassistant
+name: 阿拉伯文字體大小與 RTL 表單截圖
+---
+- launchApp:
+    clearState: true
+    permissions:
+      android.permission.ACCESS_FINE_LOCATION: allow
+      android.permission.ACCESS_COARSE_LOCATION: allow
+      android.permission.POST_NOTIFICATIONS: allow
+- tapOn:
+    text: "Wait"
+    optional: true
+- extendedWaitUntil:
+    visible: "Navigation"
+    timeout: 30000
+- tapOn: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Display & Appearance"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "Display & Appearance"
+- scrollUntilVisible:
+    element:
+      text: "Language"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "Language"
+- scrollUntilVisible:
+    element:
+      text: "العربية"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "العربية"
+- takeScreenshot: "font-scale-settings-ar"
