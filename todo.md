@@ -2463,4 +2463,4 @@
 - [x] 實作不阻塞操作的語言切換過渡與全域 RTL 方向服務
 - [x] 擴充歷史紀錄、路線頁及其空狀態、操作與資料標籤的 12 語系文案
 - [x] 新增 RTL 與長字串版面回歸測試，保護文字方向、截斷與可讀性
-- [ ] 完成完整品質檢查、GitHub Android E2E 與驗收連結
+- [x] 完成完整品質檢查、GitHub Android E2E 與驗收連結（Android E2E run 32799025326 成功；Maestro JUnit 1 test／0 failures／36.732 秒；artifact `bike-assistant-maestro-e2e` 已上傳）
