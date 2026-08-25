@@ -7,6 +7,7 @@ import i18n, {
   SUPPORTED_LOCALES,
 } from "../../lib/i18n/i18n";
 import { formatCourseNavigationPrompt } from "../../lib/i18n/course-navigation";
+import { getLayoutDirection, isRtlLocale } from "../../lib/i18n/layout-direction";
 import { buildSportDashboardMetrics } from "../../lib/sport-metrics";
 
 const rootDir = path.resolve(__dirname, "../..");
@@ -27,15 +28,25 @@ describe("Local-First i18n 守門", () => {
     await i18n.changeLanguage("zh-TW");
   });
 
-  it("提供指定的 12 種 ISO 語系並將未知系統語系安全回退為英文", () => {
+  it("提供既有 12 種語系與 Arabic RTL 語系，並將未知系統語系安全回退為英文", () => {
     expect(SUPPORTED_LOCALES).toEqual([
       "zh-TW", "zh-CN", "en-US", "ja-JP", "ko-KR", "es-ES",
-      "pt-BR", "fr-FR", "de-DE", "it-IT", "nl-NL", "ru-RU",
+      "pt-BR", "fr-FR", "de-DE", "it-IT", "nl-NL", "ru-RU", "ar-SA",
     ]);
     expect(normalizeLocaleTag("zh_Hant_TW")).toBe("zh-TW");
     expect(normalizeLocaleTag("ja")).toBe("ja-JP");
+    expect(normalizeLocaleTag("ar")).toBe("ar-SA");
     expect(normalizeLocaleTag("sv-SE")).toBe("en-US");
     expect(resolveLanguagePreference("system", ["ja-JP", "en-US"])).toBe("ja-JP");
+  });
+
+  it("Arabic 切換使用 RTL 方向並保留可讀的歷史與路線文案", async () => {
+    await i18n.changeLanguage("ar-SA");
+    expect(isRtlLocale("ar-SA")).toBe(true);
+    expect(getLayoutDirection("ar-SA")).toBe("rtl");
+    expect(getLayoutDirection("en-US")).toBe("ltr");
+    expect(i18n.t("history.title")).toBe("سجل الرحلات");
+    expect(i18n.t("routes.startNavigation")).toBe("تأكيد المسار وبدء التنقل");
   });
 
   it("切換至日本語時，儀表、導航與騎乘摘要均輸出日本語術語", async () => {

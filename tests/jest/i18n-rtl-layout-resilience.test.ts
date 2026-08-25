@@ -1,0 +1,36 @@
+import fs from "node:fs";
+import path from "node:path";
+
+const rootDir = path.resolve(__dirname, "../..");
+
+describe("i18n 過渡、RTL 與長字串版面守門", () => {
+  const providerSource = fs.readFileSync(path.join(rootDir, "lib/i18n/language-provider.tsx"), "utf8");
+  const historySource = fs.readFileSync(path.join(rootDir, "app/(tabs)/history.tsx"), "utf8");
+  const routeSource = fs.readFileSync(path.join(rootDir, "app/(tabs)/navigate.tsx"), "utf8");
+
+  it("語言切換以非阻塞淡入淡出遮罩回饋，並將 RTL direction 套用至全域內容", () => {
+    expect(providerSource).toContain("Animated.timing");
+    expect(providerSource).toContain("useNativeDriver: true");
+    expect(providerSource).toContain('pointerEvents="none"');
+    expect(providerSource).toContain("direction: layoutDirection");
+    expect(providerSource).toContain("isSwitching");
+  });
+
+  it("歷史頁完整接入高可見文案、語系日期與可換行統計布局", () => {
+    expect(historySource).toContain('t("history.title")');
+    expect(historySource).toContain('t("history.searchPlaceholder")');
+    expect(historySource).toContain('toLocaleDateString(activeLanguage');
+    expect(historySource).toContain("flexWrap: \"wrap\"");
+    expect(historySource).toContain("flexShrink: 1");
+    expect(historySource).not.toContain("numberOfLines={1}");
+  });
+
+  it("路線頁完整接入核心文案，並保護 RTL 圖示與長字串卡片", () => {
+    expect(routeSource).toContain('t("routes.title")');
+    expect(routeSource).toContain('t("routes.startNavigation")');
+    expect(routeSource).toContain('name={isRTL ? "chevron.left" : "chevron.right"}');
+    expect(routeSource).toContain("weatherHeader: { flexDirection: \"row\", justifyContent: \"space-between\", alignItems: \"center\", flexWrap: \"wrap\"");
+    expect(routeSource).toContain("routePreviewHeader: { flexDirection: \"row\", justifyContent: \"space-between\", alignItems: \"center\", flexWrap: \"wrap\"");
+    expect(routeSource).not.toContain("numberOfLines={1}");
+  });
+});

@@ -1,6 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import deDE from "./locales/de-DE.json";
+import arSA from "./locales/ar-SA.json";
 import enUS from "./locales/en-US.json";
 import esES from "./locales/es-ES.json";
 import frFR from "./locales/fr-FR.json";
@@ -15,8 +16,8 @@ import zhTW from "./locales/zh-TW.json";
 import { isSupportedLocale, SUPPORTED_LOCALES, type LanguagePreference, type SupportedLocale } from "./types";
 
 export { SUPPORTED_LOCALES, type LanguagePreference, type SupportedLocale } from "./types";
-export const LANGUAGE_NATIVE_NAMES: Record<SupportedLocale, string> = { "zh-TW": "繁體中文", "zh-CN": "简体中文", "en-US": "English (US)", "ja-JP": "日本語", "ko-KR": "한국어", "es-ES": "Español", "pt-BR": "Português (Brasil)", "fr-FR": "Français", "de-DE": "Deutsch", "it-IT": "Italiano", "nl-NL": "Nederlands", "ru-RU": "Русский" };
-const LANGUAGE_FALLBACKS: Record<string, SupportedLocale> = { zh: "zh-TW", en: "en-US", ja: "ja-JP", ko: "ko-KR", es: "es-ES", pt: "pt-BR", fr: "fr-FR", de: "de-DE", it: "it-IT", nl: "nl-NL", ru: "ru-RU" };
+export const LANGUAGE_NATIVE_NAMES: Record<SupportedLocale, string> = { "zh-TW": "繁體中文", "zh-CN": "简体中文", "en-US": "English (US)", "ja-JP": "日本語", "ko-KR": "한국어", "es-ES": "Español", "pt-BR": "Português (Brasil)", "fr-FR": "Français", "de-DE": "Deutsch", "it-IT": "Italiano", "nl-NL": "Nederlands", "ru-RU": "Русский", "ar-SA": "العربية" };
+const LANGUAGE_FALLBACKS: Record<string, SupportedLocale> = { zh: "zh-TW", en: "en-US", ja: "ja-JP", ko: "ko-KR", es: "es-ES", pt: "pt-BR", fr: "fr-FR", de: "de-DE", it: "it-IT", nl: "nl-NL", ru: "ru-RU", ar: "ar-SA" };
 
 export function normalizeLocaleTag(tag: string | null | undefined): SupportedLocale {
   if (!tag) return "en-US";
@@ -37,7 +38,7 @@ export function resolveLanguagePreference(preference: LanguagePreference, langua
 }
 
 void i18n.use(initReactI18next).init({
-  resources: { "zh-TW": { translation: zhTW }, "zh-CN": { translation: zhCN }, "en-US": { translation: enUS }, "ja-JP": { translation: jaJP }, "ko-KR": { translation: koKR }, "es-ES": { translation: esES }, "pt-BR": { translation: ptBR }, "fr-FR": { translation: frFR }, "de-DE": { translation: deDE }, "it-IT": { translation: itIT }, "nl-NL": { translation: nlNL }, "ru-RU": { translation: ruRU } },
+  resources: { "zh-TW": { translation: zhTW }, "zh-CN": { translation: zhCN }, "en-US": { translation: enUS }, "ja-JP": { translation: jaJP }, "ko-KR": { translation: koKR }, "es-ES": { translation: esES }, "pt-BR": { translation: ptBR }, "fr-FR": { translation: frFR }, "de-DE": { translation: deDE }, "it-IT": { translation: itIT }, "nl-NL": { translation: nlNL }, "ru-RU": { translation: ruRU }, "ar-SA": { translation: arSA } },
   lng: resolveSystemLocale(), fallbackLng: "en-US", supportedLngs: [...SUPPORTED_LOCALES], load: "currentOnly", saveMissing: false,
   returnNull: false, returnEmptyString: false, interpolation: { escapeValue: false },
 });
