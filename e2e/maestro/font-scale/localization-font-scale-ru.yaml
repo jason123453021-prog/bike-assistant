@@ -16,10 +16,10 @@ name: 俄文字體大小表單截圖
 - tapOn: "Settings"
 - scrollUntilVisible:
     element:
-      text: "Display & Appearance"
+      text: "System & Data"
     direction: DOWN
     timeout: 30000
-- tapOn: "Display & Appearance"
+- tapOn: "System & Data"
 - scrollUntilVisible:
     element:
       text: "Language.*"

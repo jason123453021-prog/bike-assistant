@@ -2518,3 +2518,6 @@
 - [ ] 核對 Google Play 新 upload key 生效，並上傳 `com.jason123453021.bikeassistant` versionCode 10090／versionName 1.0.90 AAB 至正式版草稿；不送審、不發布
 - [x] 優先完成多語系 Emulator 背景通知回前景、RTL／200% 字體與長活動名稱分享圖卡驗收，再恢復 Play 草稿處理（通知內容與 Modal 文案以 13 語系守門驗證；原生通知回前景以 Emulator artifact 驗證）
 - [x] 將通知回前景的補給／補水待確認 Modal 及 action 按鈕改為目前語言，並納入 Emulator 驗收（13 語系與 RTL 守門、Android Emulator 通知本體回前景 artifact 均通過）
+- [ ] 以可連線的實體 Android 裝置驗證 OEM 背景通知限制、通知本體／action 回前景，以及 Arabic 200% 字體顯示
+- [x] 以最新驗收版本產生可安裝 Android APK，驗證版本資訊後提供直接下載網址（GitHub run 32844526477；來源 c92ef35；1.0.90／versionCode 10090）
+- [ ] 修正設定頁「系統與資料管理」中實機 1.0.90 未顯示語言切換入口的可見性缺陷，並重新建置驗收 APK

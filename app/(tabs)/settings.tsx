@@ -1622,56 +1622,6 @@ export default function SettingsScreen() {
               })}
             </View>
           </View>
-          <View
-            style={[
-              styles.appearanceCard,
-              {
-                borderColor: colors.border,
-                backgroundColor: colors.surface,
-                marginTop: 12,
-              },
-            ]}
-          >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${t("settings.languageTitle")}：${selectedLanguageLabel}`}
-              onPress={() => setLanguageModalVisible(true)}
-              style={({ pressed }) => [
-                styles.row,
-                { paddingHorizontal: 0, opacity: pressed ? 0.72 : 1 },
-              ]}
-            >
-              <IconSymbol
-                name="gearshape.fill"
-                size={18}
-                color={colors.primary}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.rowLabel, { color: colors.foreground }]}>
-                  {t("settings.languageTitle")}
-                </Text>
-                <Text style={[styles.rowHint, { color: colors.muted }]}>
-                  {t("settings.languageHint")}
-                </Text>
-              </View>
-              <View style={{ alignItems: "flex-end", gap: 2 }}>
-                <Text
-                  style={{
-                    color: colors.primary,
-                    fontSize: 14,
-                    fontWeight: "800",
-                  }}
-                >
-                  {selectedLanguageLabel}
-                </Text>
-                {languagePreference === "system" && (
-                  <Text style={{ color: colors.muted, fontSize: 11 }}>
-                    {activeLanguage}
-                  </Text>
-                )}
-              </View>
-            </Pressable>
-          </View>
           {/* ── 智慧省電模式 ── */}
           <SectionHeader
             title="智慧省電模式"
@@ -2392,6 +2342,79 @@ export default function SettingsScreen() {
           onPress={() => toggleCategory("system")}
         >
           <RidePermissionReadiness />
+          <View
+            style={[
+              styles.section,
+              { borderColor: colors.border, marginTop: 14 },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t("settings.languageTitle")}：${selectedLanguageLabel}`}
+              onPress={() => setLanguageModalVisible(true)}
+              style={({ pressed }) => [
+                styles.row,
+                {
+                  opacity: pressed ? 0.72 : 1,
+                  flexDirection: isRtl ? "row-reverse" : "row",
+                },
+              ]}
+            >
+              <IconSymbol
+                name="gearshape.fill"
+                size={18}
+                color={colors.primary}
+              />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <AdaptiveFormText
+                  baseFontSize={15}
+                  style={[
+                    styles.rowLabel,
+                    {
+                      color: colors.foreground,
+                      textAlign: isRtl ? "right" : "left",
+                    },
+                  ]}
+                >
+                  {t("settings.languageTitle")}
+                </AdaptiveFormText>
+                <AdaptiveFormText
+                  baseFontSize={12}
+                  style={[
+                    styles.rowHint,
+                    {
+                      color: colors.muted,
+                      textAlign: isRtl ? "right" : "left",
+                    },
+                  ]}
+                >
+                  {t("settings.languageHint")}
+                </AdaptiveFormText>
+              </View>
+              <View
+                style={{
+                  alignItems: isRtl ? "flex-start" : "flex-end",
+                  gap: 2,
+                }}
+              >
+                <AdaptiveFormText
+                  baseFontSize={14}
+                  style={{
+                    color: colors.primary,
+                    fontWeight: "800",
+                    textAlign: isRtl ? "left" : "right",
+                  }}
+                >
+                  {selectedLanguageLabel}
+                </AdaptiveFormText>
+                {languagePreference === "system" && (
+                  <Text style={{ color: colors.muted, fontSize: 11 }}>
+                    {activeLanguage}
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+          </View>
           <View
             style={[
               styles.section,

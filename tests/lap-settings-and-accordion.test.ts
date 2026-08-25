@@ -8,9 +8,18 @@ import {
 } from "../lib/settings-context";
 
 const projectRoot = resolve(process.cwd());
-const settingsSource = readFileSync(resolve(projectRoot, "app/(tabs)/settings.tsx"), "utf8");
-const mapSource = readFileSync(resolve(projectRoot, "app/(tabs)/map.tsx"), "utf8");
-const themeSource = readFileSync(resolve(projectRoot, "lib/theme-provider.tsx"), "utf8");
+const settingsSource = readFileSync(
+  resolve(projectRoot, "app/(tabs)/settings.tsx"),
+  "utf8",
+);
+const mapSource = readFileSync(
+  resolve(projectRoot, "app/(tabs)/map.tsx"),
+  "utf8",
+);
+const themeSource = readFileSync(
+  resolve(projectRoot, "lib/theme-provider.tsx"),
+  "utf8",
+);
 
 describe("全域 Lap 設定與設定頁 Accordion", () => {
   it("只接受 1、5、10 km 的安全自動計圈距離，並以 5 km 作為缺省值", () => {
@@ -39,11 +48,15 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     expect(mapSource).toContain("advanceAutoLapMilestones");
     expect(mapSource).toContain("autoLapMilestoneStateRef");
     expect(mapSource).toContain("nextAutoLapDistanceMRef");
-    expect(mapSource).toContain("nextAutoLapDistanceMRef.current = result.nextDistanceM");
+    expect(mapSource).toContain(
+      "nextAutoLapDistanceMRef.current = result.nextDistanceM",
+    );
     expect(mapSource).toContain('type: "SYNC_AUTO_LAPS"');
     expect(mapSource).not.toContain("handleMarkLap");
     expect(mapSource).not.toContain("lapFloatingControlWrap");
-    expect(mapSource).toContain("autoPauseStillForSeconds: getSportTrackingPolicy(state.sportType).autoPause.stillForSeconds");
+    expect(mapSource).toContain(
+      "autoPauseStillForSeconds: getSportTrackingPolicy(state.sportType).autoPause.stillForSeconds",
+    );
     expect(mapSource).toContain("autoPauseEnabledForSport");
   });
 
@@ -51,12 +64,43 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     expect(settingsSource).toContain("騎乘與儀表板設定");
     expect(settingsSource).toContain("補給與提醒設定");
     expect(settingsSource).toContain('title={t("settings.displayAppearance")}');
-    expect(settingsSource).toContain('title={t("settingsActions.systemDataTitle")}');
+    expect(settingsSource).toContain(
+      'title={t("settingsActions.systemDataTitle")}',
+    );
     expect(settingsSource).toContain("LayoutAnimation.configureNext");
     expect(settingsSource).toContain("外觀主題");
     expect(settingsSource).toContain('t("settingsActions.clearCacheLabel")');
-    expect(settingsSource).toContain('t("settingsActions.openHistoryBackupLabel")');
+    expect(settingsSource).toContain(
+      't("settingsActions.openHistoryBackupLabel")',
+    );
     expect(themeSource).toContain("themePreference");
     expect(themeSource).toContain("setThemePreference");
+  });
+
+  it("把語言入口放在系統與資料管理，避免使用者在外觀分類找不到設定", () => {
+    const systemCategoryIndex = settingsSource.indexOf(
+      'title={t("settingsActions.systemDataTitle")}',
+    );
+    const permissionsIndex = settingsSource.indexOf(
+      "<RidePermissionReadiness />",
+    );
+    const languageEntryIndex = settingsSource.indexOf(
+      'accessibilityLabel={`${t("settings.languageTitle")}：${selectedLanguageLabel}`}',
+    );
+    const clearCacheIndex = settingsSource.indexOf(
+      'accessibilityLabel={t("settingsActions.clearCacheLabel")}',
+    );
+    const displayCategoryIndex = settingsSource.indexOf(
+      'title={t("settings.displayAppearance")}',
+    );
+
+    expect(systemCategoryIndex).toBeGreaterThan(-1);
+    expect(languageEntryIndex).toBeGreaterThan(permissionsIndex);
+    expect(languageEntryIndex).toBeGreaterThan(systemCategoryIndex);
+    expect(languageEntryIndex).toBeLessThan(clearCacheIndex);
+    expect(languageEntryIndex).toBeGreaterThan(displayCategoryIndex);
+    expect(settingsSource).not.toContain(
+      'title={t("settings.displayAppearance")}\n          subtitle="主題、螢幕常亮、省電與儀表版面"\n          colors={colors}\n          expanded={Boolean(openCategories.display)}\n          onPress={() => toggleCategory("display")}\n        >\n          <View\n            style={[\n              styles.appearanceCard,\n              {\n                borderColor: colors.border,\n                backgroundColor: colors.surface,\n                marginTop: 12,\n              },\n            ]}\n          >\n            <Pressable\n              accessibilityRole="button"\n              accessibilityLabel={`${t("settings.languageTitle")}：${selectedLanguageLabel}`}',
+    );
   });
 });
