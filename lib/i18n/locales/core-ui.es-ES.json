@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "rideTime": "Tiempo de actividad",
+    "averageSpeed": "Vel. media",
+    "currentAltitude": "Altitud actual",
+    "maxPower": "Potencia máxima",
+    "totalAscent": "Desnivel positivo",
+    "pausedTime": "Tiempo en pausa",
+    "gradeDistribution": "Distribución de pendiente",
+    "energyCountdown": "Cuenta atrás de energía",
+    "hydrationCountdown": "Cuenta atrás de hidratación",
+    "calculating": "Calculando…",
+    "nextCountdown": "Siguiente {{time}}",
+    "refuel": "Reponer energía",
+    "hydrate": "Hidratarse",
+    "confirmRefuel": "Confirmar reposición",
+    "start": "Iniciar",
+    "selectSport": "Elegir deporte",
+    "holdInProgress": "Manteniendo pulsado"
+  },
+  "map": {
+    "headingUp": "Avance",
+    "freeHeading": "Libre",
+    "northUp": "Norte",
+    "headingUpA11y": "Modo de ubicación: rumbo hacia arriba; toca para orientación libre",
+    "freeHeadingA11y": "Modo de ubicación: orientación libre; toca para norte arriba",
+    "northUpA11y": "Modo de ubicación: norte arriba; toca para rumbo hacia arriba"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "rideDashboard": "Actividad y panel",
+    "rideDashboardHint": "Vueltas, deporte, ubicación y campos del panel",
+    "supplyReminders": "Nutrición y avisos",
+    "supplyRemindersHint": "Energía, hidratación, notificaciones, voz y vibración",
+    "autoLap": "Activar vuelta automática",
+    "autoLapHint": "Crea vueltas por distancia sin mostrar un control Lap manual",
+    "autoLapDistance": "Distancia de vuelta automática",
+    "presetSport": "Deporte predeterminado",
+    "presetSportHint": "Se selecciona para tu próxima actividad; puedes cambiarlo en el panel antes de empezar.",
+    "autoPauseRules": "Reglas de pausa automática",
+    "autoPauseDescription": "El ciclismo se pausa automáticamente tras unos 10 segundos sin movimiento GPS fiable. Se reanuda con velocidad y desplazamiento fiables; la carrera usa detección de movimiento y el senderismo conserva un aviso de parada.",
+    "backgroundRidePreparation": "Preparación para actividad en segundo plano"
+  },
+  "routes": {
+    "airDensity": "Densidad del aire según el tiempo ({{temperature}}°C)",
+    "weatherDescription": "{{description}}, {{precipitation}}% de probabilidad de lluvia",
+    "weatherUnavailable": "Tiempo no disponible; se usa 25°C para el cálculo",
+    "movingTimeRange": "Intervalo de tiempo en movimiento {{lower}} – {{upper}}",
+    "energyCarry": "Energía recomendada para llevar",
+    "servingCarbohydrate": "Unos {{grams}} g de carbohidratos por ración",
+    "minimumCarry": "Mínimo",
+    "maximumCarry": "Máximo",
+    "servings": "raciones",
+    "carryFactors": "Estimado según {{factors}}; el máximo incluye reserva para alta carga o retrasos.",
+    "offlinePlanningNote": "No incluye descansos, cruces, tráfico, viento real ni estado de la carretera; solo para planificación sin conexión."
+  }
+}

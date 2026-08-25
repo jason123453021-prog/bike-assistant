@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "rideTime": "Fahrzeit",
+    "averageSpeed": "Ø Geschwindigkeit",
+    "currentAltitude": "Aktuelle Höhe",
+    "maxPower": "Max. Leistung",
+    "totalAscent": "Höhenmeter",
+    "pausedTime": "Pausenzeit",
+    "gradeDistribution": "Steigungsverteilung",
+    "energyCountdown": "Energie-Countdown",
+    "hydrationCountdown": "Trink-Countdown",
+    "calculating": "Wird berechnet…",
+    "nextCountdown": "Nächste {{time}}",
+    "refuel": "Energie zuführen",
+    "hydrate": "Trinken",
+    "confirmRefuel": "Zufuhr bestätigen",
+    "start": "Starten",
+    "selectSport": "Sport auswählen",
+    "holdInProgress": "Gedrückt halten"
+  },
+  "map": {
+    "headingUp": "Vorwärts",
+    "freeHeading": "Frei",
+    "northUp": "Nord",
+    "headingUpA11y": "Positionsmodus: Fahrtrichtung oben; tippen für freie Ausrichtung",
+    "freeHeadingA11y": "Positionsmodus: freie Ausrichtung; tippen für Norden oben",
+    "northUpA11y": "Positionsmodus: Norden oben; tippen für Fahrtrichtung oben"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "rideDashboard": "Fahrt und Dashboard",
+    "rideDashboardHint": "Runden, Sport, Position und Dashboard-Felder",
+    "supplyReminders": "Ernährung und Erinnerungen",
+    "supplyRemindersHint": "Energie, Flüssigkeit, Benachrichtigungen, Sprache und Vibration",
+    "autoLap": "Automatische Runde aktivieren",
+    "autoLapHint": "Erstellt Runden nach Distanz ohne manuelle Lap-Steuerung",
+    "autoLapDistance": "Distanz für automatische Runde",
+    "presetSport": "Standardsport",
+    "presetSportHint": "Wird für die nächste Fahrt vorausgewählt; vor dem Start im Dashboard änderbar.",
+    "autoPauseRules": "Regeln für automatische Pause",
+    "autoPauseDescription": "Beim Radfahren wird nach etwa 10 Sekunden ohne glaubwürdige GPS-Bewegung automatisch pausiert. Die Aufzeichnung wird bei glaubwürdiger Geschwindigkeit und Bewegung fortgesetzt; Laufen nutzt Bewegungserkennung und Wandern behält einen Stopp-Hinweis.",
+    "backgroundRidePreparation": "Vorbereitung für Hintergrundfahrt"
+  },
+  "routes": {
+    "airDensity": "Wetterabhängige Luftdichte ({{temperature}}°C)",
+    "weatherDescription": "{{description}}, {{precipitation}} % Regenwahrscheinlichkeit",
+    "weatherUnavailable": "Wetter nicht verfügbar; Berechnung mit 25°C",
+    "movingTimeRange": "Bereich der Bewegungszeit {{lower}} – {{upper}}",
+    "energyCarry": "Empfohlene Energie zum Mitnehmen",
+    "servingCarbohydrate": "Etwa {{grams}} g Kohlenhydrate pro Portion",
+    "minimumCarry": "Minimum",
+    "maximumCarry": "Maximum",
+    "servings": "Portionen",
+    "carryFactors": "Geschätzt anhand von {{factors}}; das Maximum enthält Reserve für hohe Belastung oder Verzögerungen.",
+    "offlinePlanningNote": "Pausen, Kreuzungen, Verkehr, tatsächlicher Wind und Straßenbedingungen sind nicht enthalten; nur für die Offline-Planung."
+  }
+}

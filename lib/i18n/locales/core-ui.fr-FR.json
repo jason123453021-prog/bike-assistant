@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "rideTime": "Temps d'activité",
+    "averageSpeed": "Vit. moyenne",
+    "currentAltitude": "Altitude actuelle",
+    "maxPower": "Puissance max.",
+    "totalAscent": "Dénivelé positif",
+    "pausedTime": "Temps en pause",
+    "gradeDistribution": "Répartition des pentes",
+    "energyCountdown": "Compte à rebours énergie",
+    "hydrationCountdown": "Compte à rebours hydratation",
+    "calculating": "Calcul en cours…",
+    "nextCountdown": "Prochain {{time}}",
+    "refuel": "S'alimenter",
+    "hydrate": "S'hydrater",
+    "confirmRefuel": "Confirmer le ravitaillement",
+    "start": "Démarrer",
+    "selectSport": "Choisir un sport",
+    "holdInProgress": "Appui long en cours"
+  },
+  "map": {
+    "headingUp": "Avant",
+    "freeHeading": "Libre",
+    "northUp": "Nord",
+    "headingUpA11y": "Mode de localisation : cap vers le haut ; touchez pour une orientation libre",
+    "freeHeadingA11y": "Mode de localisation : orientation libre ; touchez pour le nord vers le haut",
+    "northUpA11y": "Mode de localisation : nord vers le haut ; touchez pour le cap vers le haut"
+  },
+  "settings": {
+    "title": "Réglages",
+    "rideDashboard": "Activité et tableau de bord",
+    "rideDashboardHint": "Tours, sport, position et champs du tableau de bord",
+    "supplyReminders": "Nutrition et rappels",
+    "supplyRemindersHint": "Énergie, hydratation, notifications, voix et vibration",
+    "autoLap": "Activer les tours automatiques",
+    "autoLapHint": "Crée des tours selon la distance sans afficher de contrôle Lap manuel",
+    "autoLapDistance": "Distance de tour automatique",
+    "presetSport": "Sport par défaut",
+    "presetSportHint": "Sélectionné pour votre prochaine activité ; vous pourrez le modifier depuis le tableau de bord avant de démarrer.",
+    "autoPauseRules": "Règles de pause automatique",
+    "autoPauseDescription": "Le vélo se met automatiquement en pause après environ 10 secondes sans mouvement GPS fiable. Il reprend avec une vitesse et un déplacement fiables ; la course utilise la détection de mouvement et la randonnée conserve une invite d'arrêt.",
+    "backgroundRidePreparation": "Préparation de l'activité en arrière-plan"
+  },
+  "routes": {
+    "airDensity": "Densité de l'air liée à la météo ({{temperature}}°C)",
+    "weatherDescription": "{{description}}, {{precipitation}} % de risque de pluie",
+    "weatherUnavailable": "Météo indisponible ; calcul avec 25°C",
+    "movingTimeRange": "Plage de temps en mouvement {{lower}} – {{upper}}",
+    "energyCarry": "Énergie recommandée à emporter",
+    "servingCarbohydrate": "Environ {{grams}} g de glucides par portion",
+    "minimumCarry": "Minimum",
+    "maximumCarry": "Maximum",
+    "servings": "portions",
+    "carryFactors": "Estimation basée sur {{factors}} ; le maximum inclut une réserve pour forte charge ou retard.",
+    "offlinePlanningNote": "N'inclut pas les pauses, intersections, trafic, vent réel ou état de la route ; uniquement pour la planification hors ligne."
+  }
+}

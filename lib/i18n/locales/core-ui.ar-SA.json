@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "rideTime": "وقت الركوب",
+    "averageSpeed": "متوسط السرعة",
+    "currentAltitude": "الارتفاع الحالي",
+    "maxPower": "أقصى قدرة",
+    "totalAscent": "إجمالي الصعود",
+    "pausedTime": "وقت التوقف",
+    "gradeDistribution": "توزيع الانحدار",
+    "energyCountdown": "العد التنازلي للطاقة",
+    "hydrationCountdown": "العد التنازلي للترطيب",
+    "calculating": "جارٍ الحساب…",
+    "nextCountdown": "التالي {{time}}",
+    "refuel": "التزود بالطاقة",
+    "hydrate": "الترطيب",
+    "confirmRefuel": "تأكيد التزود",
+    "start": "بدء",
+    "selectSport": "اختيار الرياضة",
+    "holdInProgress": "اضغط مطولاً"
+  },
+  "map": {
+    "headingUp": "للأمام",
+    "freeHeading": "حر",
+    "northUp": "الشمال",
+    "headingUpA11y": "وضع الموقع: اتجاه الحركة للأعلى؛ انقر للاتجاه الحر",
+    "freeHeadingA11y": "وضع الموقع: اتجاه حر؛ انقر لجعل الشمال للأعلى",
+    "northUpA11y": "وضع الموقع: الشمال للأعلى؛ انقر لجعل اتجاه الحركة للأعلى"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "rideDashboard": "الركوب ولوحة المعلومات",
+    "rideDashboardHint": "اللفات والرياضة والموقع وحقول اللوحة",
+    "supplyReminders": "التغذية والتذكيرات",
+    "supplyRemindersHint": "الطاقة والترطيب والإشعارات والصوت والاهتزاز",
+    "autoLap": "تفعيل اللفة التلقائية",
+    "autoLapHint": "ينشئ لفات حسب المسافة دون إظهار تحكم Lap يدوي",
+    "autoLapDistance": "مسافة اللفة التلقائية",
+    "presetSport": "الرياضة الافتراضية",
+    "presetSportHint": "ستُختار لرحلتك التالية؛ ويمكنك تغييرها من اللوحة قبل البدء.",
+    "autoPauseRules": "قواعد الإيقاف التلقائي",
+    "autoPauseDescription": "يتوقف ركوب الدراجة تلقائياً بعد نحو 10 ثوانٍ دون حركة GPS موثوقة. يستأنف بسرعة وإزاحة موثوقتين؛ ويستخدم الجري استشعار الحركة بينما يحتفظ المشي بتنبيه التوقف.",
+    "backgroundRidePreparation": "التحضير للركوب في الخلفية"
+  },
+  "routes": {
+    "airDensity": "كثافة الهواء المرتبطة بالطقس ({{temperature}}°C)",
+    "weatherDescription": "{{description}}، احتمال المطر {{precipitation}}%",
+    "weatherUnavailable": "الطقس غير متاح؛ يُستخدم 25°C في التقدير",
+    "movingTimeRange": "نطاق وقت الحركة {{lower}} – {{upper}}",
+    "energyCarry": "الطاقة الموصى بحملها",
+    "servingCarbohydrate": "حوالي {{grams}} غ من الكربوهيدرات لكل حصة",
+    "minimumCarry": "الحد الأدنى",
+    "maximumCarry": "الحد الأقصى",
+    "servings": "حصص",
+    "carryFactors": "تقدير وفق {{factors}}؛ يشمل الحد الأقصى احتياطياً للحمل المرتفع أو التأخير.",
+    "offlinePlanningNote": "لا يشمل الاستراحات أو التقاطعات أو المرور أو الرياح الفعلية أو حالة الطريق؛ للخطط دون اتصال فقط."
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "rideTime": "騎乘時間",
+    "averageSpeed": "均速",
+    "currentAltitude": "目前海拔",
+    "maxPower": "最大功率",
+    "totalAscent": "總爬升",
+    "pausedTime": "暫停時間",
+    "gradeDistribution": "坡度分布",
+    "energyCountdown": "能量倒數",
+    "hydrationCountdown": "補水倒數",
+    "calculating": "計算中",
+    "nextCountdown": "下次 {{time}}",
+    "refuel": "補給能量",
+    "hydrate": "補充水分",
+    "confirmRefuel": "確認已補給",
+    "start": "開始",
+    "selectSport": "選擇運動類型",
+    "holdInProgress": "長按中"
+  },
+  "map": {
+    "headingUp": "朝前",
+    "freeHeading": "自由",
+    "northUp": "正北",
+    "headingUpA11y": "定位模式：COG 軌跡朝前；點擊切換自由角度",
+    "freeHeadingA11y": "定位模式：自由角度；點擊切換正北置中",
+    "northUpA11y": "定位模式：正北置中；點擊切換 COG 軌跡朝前"
+  },
+  "settings": {
+    "title": "設定",
+    "rideDashboard": "騎乘與儀表板設定",
+    "rideDashboardHint": "計圈、預設運動、定位與儀表欄位",
+    "supplyReminders": "補給與提醒設定",
+    "supplyRemindersHint": "補給、補水、通知、語音與震動",
+    "autoLap": "啟用計圈功能",
+    "autoLapHint": "依累計騎乘距離自動建立分圈，不顯示手動 Lap 控制",
+    "autoLapDistance": "自動計圈距離",
+    "presetSport": "預設運動模式",
+    "presetSportHint": "下次開始騎乘時預先選取；開始前仍可在儀表板切換。",
+    "autoPauseRules": "自動判定規則",
+    "autoPauseDescription": "單車依 GPS 移動與約 10 秒無正速度定位自動暫停，恢復時採可靠速度與位移；跑步使用動作感測，登山保留停留提示。規則由 App 自動套用，不需調整門檻。",
+    "backgroundRidePreparation": "背景騎乘準備"
+  },
+  "routes": {
+    "airDensity": "天氣連動空氣密度（{{temperature}}°C）",
+    "weatherDescription": "{{description}}，降雨機率 {{precipitation}}%",
+    "weatherUnavailable": "無法取得天氣，使用預設 25°C 計算",
+    "movingTimeRange": "移動時間區間 {{lower}} – {{upper}}",
+    "energyCarry": "建議攜帶能量補給",
+    "servingCarbohydrate": "每份約 {{grams}} g 碳水",
+    "minimumCarry": "最少攜帶",
+    "maximumCarry": "最多攜帶",
+    "servings": "份",
+    "carryFactors": "依 {{factors}} 推估；最多包含高負荷或延誤備援。",
+    "offlinePlanningNote": "不含休息、路口、交通、實際風況與路況；此為離線規劃參考。"
+  }
+}

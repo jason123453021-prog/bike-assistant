@@ -31,15 +31,15 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
   });
 
   it("持久化自動計圈主開關與距離，並在設定頁完整呈現控制項", () => {
-    expect(settingsSource).toContain("啟用計圈功能");
-    expect(settingsSource).toContain("自動計圈距離");
+    expect(settingsSource).toContain('t("settings.autoLap")');
+    expect(settingsSource).toContain('t("settings.autoLapDistance")');
     expect(settingsSource).toContain("AUTO_LAP_DISTANCE_PRESETS_KM");
     expect(settingsSource).toContain("lapEnabled");
     expect(settingsSource).toContain("autoLapDistanceKm");
     expect(settingsSource).not.toContain("計圈模式");
     expect(settingsSource).not.toContain("手動介入");
-    expect(settingsSource).toContain("預設運動模式");
-    expect(settingsSource).toContain("自動判定規則");
+    expect(settingsSource).toContain('t("settings.presetSport")');
+    expect(settingsSource).toContain('t("settings.autoPauseRules")');
     expect(settingsSource).not.toContain("自動暫停速度門檻");
     expect(settingsSource).not.toContain("自動暫停延遲時間");
   });
@@ -60,8 +60,8 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
   });
 
   it("設定頁預設只顯示四個高層分類，並保有動畫與主題選擇", () => {
-    expect(settingsSource).toContain("騎乘與儀表板設定");
-    expect(settingsSource).toContain("補給與提醒設定");
+    expect(settingsSource).toContain('title={t("settings.rideDashboard")}');
+    expect(settingsSource).toContain('title={t("settings.supplyReminders")}');
     expect(settingsSource).toContain('title={t("settings.displayAppearance")}');
     expect(settingsSource).toContain(
       'title={t("settingsActions.systemDataTitle")}',

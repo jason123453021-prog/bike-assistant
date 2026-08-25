@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "rideTime": "Tempo di attività",
+    "averageSpeed": "Velocità media",
+    "currentAltitude": "Altitudine attuale",
+    "maxPower": "Potenza max",
+    "totalAscent": "Dislivello positivo",
+    "pausedTime": "Tempo in pausa",
+    "gradeDistribution": "Distribuzione pendenza",
+    "energyCountdown": "Conto alla rovescia energia",
+    "hydrationCountdown": "Conto alla rovescia idratazione",
+    "calculating": "Calcolo in corso…",
+    "nextCountdown": "Prossimo {{time}}",
+    "refuel": "Rifornisci",
+    "hydrate": "Idratati",
+    "confirmRefuel": "Conferma rifornimento",
+    "start": "Avvia",
+    "selectSport": "Scegli sport",
+    "holdInProgress": "Pressione prolungata"
+  },
+  "map": {
+    "headingUp": "Avanti",
+    "freeHeading": "Libero",
+    "northUp": "Nord",
+    "headingUpA11y": "Modalità posizione: direzione di marcia in alto; tocca per orientamento libero",
+    "freeHeadingA11y": "Modalità posizione: orientamento libero; tocca per nord in alto",
+    "northUpA11y": "Modalità posizione: nord in alto; tocca per direzione di marcia in alto"
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "rideDashboard": "Attività e pannello",
+    "rideDashboardHint": "Giri, sport, posizione e campi del pannello",
+    "supplyReminders": "Rifornimento e promemoria",
+    "supplyRemindersHint": "Energia, idratazione, notifiche, voce e vibrazione",
+    "autoLap": "Attiva giro automatico",
+    "autoLapHint": "Crea giri per distanza senza mostrare un controllo Lap manuale",
+    "autoLapDistance": "Distanza giro automatico",
+    "presetSport": "Sport predefinito",
+    "presetSportHint": "Verrà selezionato per la prossima attività; puoi cambiarlo dal pannello prima di iniziare.",
+    "autoPauseRules": "Regole pausa automatica",
+    "autoPauseDescription": "Il ciclismo si mette automaticamente in pausa dopo circa 10 secondi senza movimento GPS affidabile. Riprende con velocità e spostamento affidabili; la corsa usa il rilevamento del movimento e l'escursionismo mantiene un avviso di sosta.",
+    "backgroundRidePreparation": "Preparazione attività in background"
+  },
+  "routes": {
+    "airDensity": "Densità dell'aria legata al meteo ({{temperature}}°C)",
+    "weatherDescription": "{{description}}, {{precipitation}}% di probabilità di pioggia",
+    "weatherUnavailable": "Meteo non disponibile; calcolo con 25°C",
+    "movingTimeRange": "Intervallo di tempo in movimento {{lower}} – {{upper}}",
+    "energyCarry": "Energia consigliata da portare",
+    "servingCarbohydrate": "Circa {{grams}} g di carboidrati per porzione",
+    "minimumCarry": "Minimo",
+    "maximumCarry": "Massimo",
+    "servings": "porzioni",
+    "carryFactors": "Stima basata su {{factors}}; il massimo include una riserva per carico elevato o ritardi.",
+    "offlinePlanningNote": "Non include pause, incroci, traffico, vento reale o condizioni stradali; solo per pianificazione offline."
+  }
+}

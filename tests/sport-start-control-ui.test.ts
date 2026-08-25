@@ -2,13 +2,18 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const mapSource = readFileSync(resolve(process.cwd(), "app/(tabs)/map.tsx"), "utf8");
+const mapSource = readFileSync(
+  resolve(process.cwd(), "app/(tabs)/map.tsx"),
+  "utf8",
+);
 
 describe("sport selection start control layout", () => {
   it("places the inactive sport selector directly to the left of the start control", () => {
     expect(mapSource).toContain("<View style={styles.preRideControls}>");
     expect(mapSource).toContain("styles.sportInlineTrigger");
-    expect(mapSource).toContain("accessibilityLabel=\"選擇運動類型\"");
+    expect(mapSource).toContain(
+      'accessibilityLabel={t("dashboard.selectSport")}',
+    );
     expect(mapSource).toContain("styles.startBtn");
   });
 

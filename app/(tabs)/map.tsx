@@ -51,6 +51,7 @@ import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import Svg, { Circle } from "react-native-svg";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/i18n/language-provider";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 import { useRide } from "@/lib/ride-context";
 import {
@@ -294,6 +295,7 @@ function haversine(
 export default function MapScreen() {
   const { t } = useTranslation();
   const { activeLanguage } = useLanguage();
+  const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const dashboardColumnCount = fontScale >= 1.6 ? 2 : 3;
@@ -4251,24 +4253,27 @@ export default function MapScreen() {
   const locationModeControl = {
     "heading-up": {
       icon: "arrow.up.circle.fill" as const,
-      label: "朝前",
-      accessibilityLabel: "定位模式：COG 軌跡朝前；點擊切換自由角度",
+      label: t("map.headingUp"),
+      accessibilityLabel: t("map.headingUpA11y"),
       color: "#34C759",
       backgroundColor: "rgba(52, 197, 89, 0.18)",
+      isFreeHeading: false,
     },
     "free-heading": {
       icon: "hand.raised.fill" as const,
-      label: "自由",
-      accessibilityLabel: "定位模式：自由角度；點擊切換正北置中",
-      color: "rgba(255,255,255,0.78)",
-      backgroundColor: "rgba(255,255,255,0.08)",
+      label: t("map.freeHeading"),
+      accessibilityLabel: t("map.freeHeadingA11y"),
+      color: colorScheme === "dark" ? "#F9FAFB" : "#374151",
+      backgroundColor: colorScheme === "dark" ? "#2C2C2E" : "#FFFFFF",
+      isFreeHeading: true,
     },
     "north-up": {
       icon: "location.north.circle.fill" as const,
-      label: "正北",
-      accessibilityLabel: "定位模式：正北置中；點擊切換 COG 軌跡朝前",
+      label: t("map.northUp"),
+      accessibilityLabel: t("map.northUpA11y"),
       color: "#34C759",
       backgroundColor: "rgba(52, 197, 89, 0.1)",
+      isFreeHeading: false,
     },
   }[locationCameraMode];
 
@@ -4751,11 +4756,11 @@ export default function MapScreen() {
     ? settings.supplyEnergyTimeIntervalEnabled
       ? {
           label: "能量時間",
-          value: `${formatDuration(Math.max(0, state.elapsed - (intervalSupplyTrackerRef.current["energy-time"] ?? 0)))} / ${settings.supplyEnergyTimeIntervalMinutes} 分鐘`,
+          value: `${formatDuration(Math.max(0, state.elapsed - (intervalSupplyTrackerRef.current["energy-time"] ?? 0)))} / ${settings.supplyEnergyTimeIntervalMinutes} ${t("forms.supplyItem.minutes")}`,
         }
       : settings.supplyEnergyDistanceIntervalEnabled
         ? {
-            label: "能量距離",
+            label: t("dashboard.energyCountdown"),
             value: `${Math.max(0, state.distance / 1000 - (intervalSupplyTrackerRef.current["energy-distance"] ?? 0)).toFixed(1)} / ${settings.supplyEnergyDistanceIntervalKm} km`,
           }
         : null
@@ -4763,12 +4768,12 @@ export default function MapScreen() {
   const manualWaterDashboard = !smartWaterSupplyEnabled
     ? settings.supplyWaterTimeIntervalEnabled
       ? {
-          label: "補水時間",
-          value: `${formatDuration(Math.max(0, state.elapsed - (intervalSupplyTrackerRef.current["water-time"] ?? 0)))} / ${settings.supplyWaterTimeIntervalMinutes} 分鐘`,
+          label: t("dashboard.hydrationCountdown"),
+          value: `${formatDuration(Math.max(0, state.elapsed - (intervalSupplyTrackerRef.current["water-time"] ?? 0)))} / ${settings.supplyWaterTimeIntervalMinutes} ${t("forms.supplyItem.minutes")}`,
         }
       : settings.supplyWaterDistanceIntervalEnabled
         ? {
-            label: "補水距離",
+            label: t("dashboard.hydrationCountdown"),
             value: `${Math.max(0, state.distance / 1000 - (intervalSupplyTrackerRef.current["water-distance"] ?? 0)).toFixed(1)} / ${settings.supplyWaterDistanceIntervalKm} km`,
           }
         : null
@@ -4792,16 +4797,20 @@ export default function MapScreen() {
   );
   const smartCalorieStatus =
     pendingCalorieRef.current || calorieAlert
-      ? "請補給能量"
+      ? t("dashboard.refuel")
       : smartCalorieRemainingSec === null
-        ? "計算中"
-        : `下次 ${formatDuration(smartCalorieRemainingSec)}`;
+        ? t("dashboard.calculating")
+        : t("dashboard.nextCountdown", {
+            time: formatDuration(smartCalorieRemainingSec),
+          });
   const smartWaterStatus =
     pendingWaterRef.current || waterAlert
-      ? "請補給水分"
+      ? t("dashboard.hydrate")
       : smartWaterRemainingSec === null
-        ? "計算中"
-        : `下次 ${formatDuration(smartWaterRemainingSec)}`;
+        ? t("dashboard.calculating")
+        : t("dashboard.nextCountdown", {
+            time: formatDuration(smartWaterRemainingSec),
+          });
 
   const sweatRateLabel =
     isActive && state.currentSweatRatePerHour > 0
@@ -4997,6 +5006,7 @@ export default function MapScreen() {
           accessibilityLabel={locationModeControl.accessibilityLabel}
           style={[
             styles.toolBtn,
+            locationModeControl.isFreeHeading && styles.freeHeadingToolBtn,
             {
               backgroundColor: locationModeControl.backgroundColor,
               borderColor: locationModeControl.color,
@@ -5301,8 +5311,9 @@ export default function MapScreen() {
                   <IconSymbol name="flame.fill" size={13} color="#F59E0B" />
                   <Text style={styles.progressLabel}>
                     {smartEnergySupplyEnabled
-                      ? "能量倒數"
-                      : (manualEnergyDashboard?.label ?? "卡路里")}
+                      ? t("dashboard.energyCountdown")
+                      : (manualEnergyDashboard?.label ??
+                        t("dashboard.calories"))}
                   </Text>
                 </View>
                 <Text style={styles.progressValue}>
@@ -5405,7 +5416,7 @@ export default function MapScreen() {
                           }
                         >
                           <Text style={styles.supplyConfirmText}>
-                            確認已補給
+                            {t("dashboard.confirmRefuel")}
                           </Text>
                         </Pressable>
                       )}
@@ -5424,8 +5435,9 @@ export default function MapScreen() {
                   />
                   <Text style={styles.progressLabel}>
                     {smartWaterSupplyEnabled
-                      ? "補水倒數"
-                      : (manualWaterDashboard?.label ?? "水分流失")}
+                      ? t("dashboard.hydrationCountdown")
+                      : (manualWaterDashboard?.label ??
+                        t("dashboard.hydrationCountdown"))}
                   </Text>
                   {sweatRateLabel && (
                     <View
@@ -5465,7 +5477,7 @@ export default function MapScreen() {
           {!isActive ? (
             <View style={styles.preRideControls}>
               <Pressable
-                accessibilityLabel="選擇運動類型"
+                accessibilityLabel={t("dashboard.selectSport")}
                 style={({ pressed }) => [
                   styles.sportInlineTrigger,
                   {
@@ -5479,7 +5491,9 @@ export default function MapScreen() {
                   {SPORT_META[state.sportType].icon}
                 </Text>
                 <Text style={styles.sportInlineLabel}>
-                  {SPORT_META[state.sportType].label}
+                  {t(
+                    `sports.${state.sportType === "trail_running" ? "trailRunning" : state.sportType}`,
+                  )}
                 </Text>
               </Pressable>
               <Pressable
@@ -5490,7 +5504,7 @@ export default function MapScreen() {
                 onPress={handleStart}
               >
                 <IconSymbol name="play.fill" size={20} color="#fff" />
-                <Text style={styles.startBtnText}>開始</Text>
+                <Text style={styles.startBtnText}>{t("dashboard.start")}</Text>
               </Pressable>
             </View>
           ) : (
@@ -6031,11 +6045,12 @@ function DashMetric({
   avgSpeed: number;
   columnCount: 2 | 3;
 }) {
+  const { t } = useTranslation();
   switch (fieldKey) {
     case "showElapsed":
       return (
         <BigMetric
-          label="騎乘時間"
+          label={t("dashboard.rideTime")}
           value={formatDuration(state.elapsed)}
           unit=""
           columnCount={columnCount}
@@ -6044,7 +6059,7 @@ function DashMetric({
     case "showSpeed":
       return (
         <BigMetric
-          label="速度"
+          label={t("dashboard.speed")}
           value={state.currentSpeed > 0 ? state.currentSpeed.toFixed(1) : "--"}
           unit="km/h"
           highlight
@@ -6054,7 +6069,7 @@ function DashMetric({
     case "showDistance":
       return (
         <BigMetric
-          label="距離"
+          label={t("dashboard.distance")}
           value={(state.distance / 1000).toFixed(2)}
           unit="km"
           columnCount={columnCount}
@@ -6063,7 +6078,7 @@ function DashMetric({
     case "showGrade":
       return (
         <BigMetric
-          label="坡度"
+          label={t("dashboard.grade")}
           value={
             isActive
               ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}`
@@ -6077,7 +6092,7 @@ function DashMetric({
     case "showPower":
       return (
         <BigMetric
-          label="功率"
+          label={t("dashboard.power")}
           value={`${state.currentPower}`}
           unit="W"
           accent
@@ -6087,7 +6102,7 @@ function DashMetric({
     case "showAvgSpeed":
       return (
         <BigMetric
-          label="均速"
+          label={t("dashboard.averageSpeed")}
           value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"}
           unit="km/h"
           columnCount={columnCount}
@@ -6096,7 +6111,7 @@ function DashMetric({
     case "showCalories":
       return (
         <BigMetric
-          label="卡路里"
+          label={t("dashboard.calories")}
           value={`${Math.round(state.totalCalories)}`}
           unit="kcal"
           columnCount={columnCount}
@@ -6105,7 +6120,7 @@ function DashMetric({
     case "showPausedTime":
       return (
         <BigMetric
-          label="暫停時間"
+          label={t("dashboard.pausedTime")}
           value={formatDuration(state.totalPausedSec)}
           unit=""
           columnCount={columnCount}
@@ -6114,7 +6129,7 @@ function DashMetric({
     case "showTotalAscent":
       return (
         <BigMetric
-          label="總爬升"
+          label={t("dashboard.totalAscent")}
           value={state.totalAscent ? state.totalAscent.toFixed(0) : "0"}
           unit="m"
           columnCount={columnCount}
@@ -6123,7 +6138,7 @@ function DashMetric({
     case "showCurrentAltitude":
       return (
         <BigMetric
-          label="目前海拔"
+          label={t("dashboard.currentAltitude")}
           value={
             state.currentAltitude ? state.currentAltitude.toFixed(0) : "--"
           }
@@ -6145,7 +6160,9 @@ function DashMetric({
           : ["0", "0", "0", "0", "0", "0"];
       return (
         <View style={styles.gradeDistributionContainer}>
-          <Text style={styles.gradeDistributionLabel}>坡度分布</Text>
+          <Text style={styles.gradeDistributionLabel}>
+            {t("dashboard.gradeDistribution")}
+          </Text>
           <View style={styles.gradeDistributionBars}>
             <View
               style={[
@@ -6233,6 +6250,7 @@ function DashboardSummaryMetric({
   currentGrade: number;
   avgSpeed: number;
 }) {
+  const { t } = useTranslation();
   if (metric === "grade") {
     const color =
       currentGrade > 8
@@ -6243,7 +6261,7 @@ function DashboardSummaryMetric({
     return (
       <View style={styles.ascentItem}>
         <IconSymbol name="arrow.down" size={13} color="#4FC3F7" />
-        <Text style={styles.ascentLabel}>坡度</Text>
+        <Text style={styles.ascentLabel}>{t("dashboard.grade")}</Text>
         <Text style={[styles.ascentValue, { color }]}>
           {isActive
             ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}`
@@ -6258,7 +6276,7 @@ function DashboardSummaryMetric({
     return (
       <View style={styles.ascentItem}>
         <IconSymbol name="speedometer" size={13} color="#A7D8FF" />
-        <Text style={styles.ascentLabel}>均速</Text>
+        <Text style={styles.ascentLabel}>{t("dashboard.averageSpeed")}</Text>
         <Text style={styles.ascentValue}>
           {avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"}
         </Text>
@@ -6274,7 +6292,7 @@ function DashboardSummaryMetric({
     return (
       <View style={styles.ascentItem}>
         <IconSymbol name="arrow.up" size={13} color="#00C853" />
-        <Text style={styles.ascentLabel}>目前海拔</Text>
+        <Text style={styles.ascentLabel}>{t("dashboard.currentAltitude")}</Text>
         <Text style={styles.ascentValue}>{altitude}</Text>
         <Text style={styles.ascentUnit}>m</Text>
       </View>
@@ -6284,7 +6302,7 @@ function DashboardSummaryMetric({
   return (
     <View style={styles.ascentItem}>
       <IconSymbol name="bolt.fill" size={13} color="#00E676" />
-      <Text style={styles.ascentLabel}>最大功率</Text>
+      <Text style={styles.ascentLabel}>{t("dashboard.maxPower")}</Text>
       <Text style={[styles.ascentValue, { color: "#00E676" }]}>
         {state.maxPower}
       </Text>
@@ -6501,6 +6519,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.32)",
+  },
+  freeHeadingToolBtn: {
+    borderWidth: 1.5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 4,
+    elevation: 5,
   },
   toolBtnActive: {
     backgroundColor: "rgba(0,122,255,0.2)",

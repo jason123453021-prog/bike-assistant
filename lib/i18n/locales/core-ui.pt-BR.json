@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "rideTime": "Tempo de pedal",
+    "averageSpeed": "Vel. média",
+    "currentAltitude": "Altitude atual",
+    "maxPower": "Potência máxima",
+    "totalAscent": "Ganho de elevação",
+    "pausedTime": "Tempo pausado",
+    "gradeDistribution": "Distribuição de inclinação",
+    "energyCountdown": "Contagem de energia",
+    "hydrationCountdown": "Contagem de hidratação",
+    "calculating": "Calculando…",
+    "nextCountdown": "Próximo {{time}}",
+    "refuel": "Repor energia",
+    "hydrate": "Hidratar",
+    "confirmRefuel": "Confirmar reposição",
+    "start": "Iniciar",
+    "selectSport": "Selecionar esporte",
+    "holdInProgress": "Pressionando"
+  },
+  "map": {
+    "headingUp": "À frente",
+    "freeHeading": "Livre",
+    "northUp": "Norte",
+    "headingUpA11y": "Modo de localização: percurso à frente; toque para orientação livre",
+    "freeHeadingA11y": "Modo de localização: orientação livre; toque para norte acima",
+    "northUpA11y": "Modo de localização: norte acima; toque para percurso à frente"
+  },
+  "settings": {
+    "title": "Configurações",
+    "rideDashboard": "Pedal e painel",
+    "rideDashboardHint": "Voltas, esporte, localização e campos do painel",
+    "supplyReminders": "Nutrição e lembretes",
+    "supplyRemindersHint": "Energia, hidratação, notificações, voz e vibração",
+    "autoLap": "Ativar volta automática",
+    "autoLapHint": "Cria voltas por distância sem mostrar o controle manual Lap",
+    "autoLapDistance": "Distância da volta automática",
+    "presetSport": "Esporte padrão",
+    "presetSportHint": "Será selecionado para seu próximo pedal; você ainda pode alterar no painel antes de iniciar.",
+    "autoPauseRules": "Regras de pausa automática",
+    "autoPauseDescription": "O ciclismo pausa automaticamente após cerca de 10 segundos sem movimento GPS confiável. Retoma com velocidade e deslocamento confiáveis; corrida usa detecção de movimento e caminhada mantém um aviso de parada.",
+    "backgroundRidePreparation": "Preparação para pedal em segundo plano"
+  },
+  "routes": {
+    "airDensity": "Densidade do ar ligada ao clima ({{temperature}}°C)",
+    "weatherDescription": "{{description}}, {{precipitation}}% de chance de chuva",
+    "weatherUnavailable": "Clima indisponível; usando 25°C no cálculo",
+    "movingTimeRange": "Faixa de tempo em movimento {{lower}} – {{upper}}",
+    "energyCarry": "Energia recomendada para levar",
+    "servingCarbohydrate": "Cerca de {{grams}} g de carboidrato por porção",
+    "minimumCarry": "Mínimo",
+    "maximumCarry": "Máximo",
+    "servings": "porções",
+    "carryFactors": "Estimado com base em {{factors}}; o máximo inclui reserva para carga alta ou atrasos.",
+    "offlinePlanningNote": "Não inclui descansos, cruzamentos, trânsito, vento real ou condições da via; apenas para planejamento offline."
+  }
+}

@@ -526,12 +526,14 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.title, { color: colors.foreground }]}>設定</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>
+          {t("settings.title")}
+        </Text>
 
         <SettingsCategory
           icon="bicycle"
-          title="騎乘與儀表板設定"
-          subtitle="計圈、預設運動、定位與儀表欄位"
+          title={t("settings.rideDashboard")}
+          subtitle={t("settings.rideDashboardHint")}
           colors={colors}
           expanded={Boolean(openCategories.riding)}
           onPress={() => toggleCategory("riding")}
@@ -544,7 +546,7 @@ export default function SettingsScreen() {
           >
             <ToggleRow
               icon="flag.fill"
-              label="啟用計圈功能"
+              label={t("settings.autoLap")}
               value={settings.lapEnabled}
               colors={colors}
               onToggle={(enabled) => updateSettings({ lapEnabled: enabled })}
@@ -554,11 +556,10 @@ export default function SettingsScreen() {
                 <Divider colors={colors} />
                 <View style={styles.lapSettingContent}>
                   <Text style={[styles.rowLabel, { color: colors.foreground }]}>
-                    自動計圈距離
+                    {t("settings.autoLapDistance")}
                   </Text>
                   <Text style={[styles.rowHint, { color: colors.muted }]}>
-                    依累計騎乘距離自動建立分圈，不顯示 Lap
-                    按鈕或提示，避免干擾導航。
+                    {t("settings.autoLapHint")}
                   </Text>
                   <View style={styles.lapModeOptions}>
                     {AUTO_LAP_DISTANCE_PRESETS_KM.map((distanceKm) => {
@@ -614,10 +615,10 @@ export default function SettingsScreen() {
             ]}
           >
             <Text style={[styles.rowLabel, { color: colors.foreground }]}>
-              預設運動模式
+              {t("settings.presetSport")}
             </Text>
             <Text style={[styles.rowHint, { color: colors.muted }]}>
-              下次開始騎乘時預先選取；開始前仍可在儀表板切換。
+              {t("settings.presetSportHint")}
             </Text>
             <View style={styles.defaultSportOptions}>
               {Object.entries(SPORT_META).map(([sportType, meta]) => {
@@ -652,7 +653,9 @@ export default function SettingsScreen() {
                         fontWeight: "800",
                       }}
                     >
-                      {meta.label}
+                      {t(
+                        `sports.${sportType === "trail_running" ? "trailRunning" : sportType}`,
+                      )}
                     </Text>
                   </Pressable>
                 );
@@ -672,7 +675,7 @@ export default function SettingsScreen() {
           >
             <ToggleRow
               icon="pause.circle.fill"
-              label="自動暫停"
+              label={t("supply.autoPause")}
               value={settings.idleAutoPauseEnabled}
               colors={colors}
               onToggle={(enabled) =>
@@ -682,12 +685,10 @@ export default function SettingsScreen() {
             <Divider colors={colors} />
             <View style={styles.lapSettingContent}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>
-                自動判定規則
+                {t("settings.autoPauseRules")}
               </Text>
               <Text style={[styles.rowHint, { color: colors.muted }]}>
-                單車依 GPS 移動與約 10
-                秒無正速度定位自動暫停，恢復時採可靠速度與位移；跑步使用動作感測，登山保留停留提示。規則由
-                App 自動套用，不需調整門檻。
+                {t("settings.autoPauseDescription")}
               </Text>
             </View>
           </View>
@@ -867,8 +868,8 @@ export default function SettingsScreen() {
 
         <SettingsCategory
           icon="bell.fill"
-          title="補給與提醒設定"
-          subtitle="補給、補水、通知、語音與震動"
+          title={t("settings.supplyReminders")}
+          subtitle={t("settings.supplyRemindersHint")}
           colors={colors}
           expanded={Boolean(openCategories.alerts)}
           onPress={() => toggleCategory("alerts")}

@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "rideTime": "라이딩 시간",
+    "averageSpeed": "평균 속도",
+    "currentAltitude": "현재 고도",
+    "maxPower": "최대 파워",
+    "totalAscent": "총 상승",
+    "pausedTime": "일시 정지 시간",
+    "gradeDistribution": "경사 분포",
+    "energyCountdown": "에너지 카운트다운",
+    "hydrationCountdown": "수분 카운트다운",
+    "calculating": "계산 중",
+    "nextCountdown": "다음 {{time}}",
+    "refuel": "에너지 보충",
+    "hydrate": "수분 보충",
+    "confirmRefuel": "보충 확인",
+    "start": "시작",
+    "selectSport": "운동 선택",
+    "holdInProgress": "길게 누르는 중"
+  },
+  "map": {
+    "headingUp": "전방",
+    "freeHeading": "자유",
+    "northUp": "북쪽",
+    "headingUpA11y": "위치 모드: 진행 방향 위쪽; 탭하여 자유 각도로 전환",
+    "freeHeadingA11y": "위치 모드: 자유 각도; 탭하여 북쪽 위로 전환",
+    "northUpA11y": "위치 모드: 북쪽 위; 탭하여 진행 방향 위로 전환"
+  },
+  "settings": {
+    "title": "설정",
+    "rideDashboard": "라이딩 및 대시보드",
+    "rideDashboardHint": "랩, 운동, 위치 및 대시보드 항목",
+    "supplyReminders": "보급 및 알림",
+    "supplyRemindersHint": "에너지, 수분, 알림, 음성 및 진동",
+    "autoLap": "자동 랩 사용",
+    "autoLapHint": "거리별로 자동 랩을 만들고 수동 Lap 제어는 표시하지 않습니다",
+    "autoLapDistance": "자동 랩 거리",
+    "presetSport": "기본 운동",
+    "presetSportHint": "다음 라이딩에 적용됩니다. 시작 전 대시보드에서 변경할 수 있습니다.",
+    "autoPauseRules": "자동 일시 정지 규칙",
+    "autoPauseDescription": "자전거는 신뢰할 수 있는 GPS 이동이 약 10초 없으면 자동으로 일시 정지합니다. 신뢰할 수 있는 속도와 이동으로 재개하며, 달리기는 동작 감지를 사용하고 등산은 정지 안내를 유지합니다.",
+    "backgroundRidePreparation": "백그라운드 라이딩 준비"
+  },
+  "routes": {
+    "airDensity": "날씨 연동 공기 밀도 ({{temperature}}°C)",
+    "weatherDescription": "{{description}}, 강수 확률 {{precipitation}}%",
+    "weatherUnavailable": "날씨를 가져올 수 없어 25°C로 계산합니다",
+    "movingTimeRange": "이동 시간 범위 {{lower}} – {{upper}}",
+    "energyCarry": "권장 에너지 보급",
+    "servingCarbohydrate": "1회 제공량당 약 {{grams}} g 탄수화물",
+    "minimumCarry": "최소",
+    "maximumCarry": "최대",
+    "servings": "회분",
+    "carryFactors": "{{factors}} 기준 추정이며 최대값에는 고부하 또는 지연 예비분이 포함됩니다.",
+    "offlinePlanningNote": "휴식, 교차로, 교통, 실제 바람 및 도로 상태는 포함하지 않습니다. 오프라인 계획 참고용입니다."
+  }
+}

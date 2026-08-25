@@ -107,9 +107,11 @@ describe("small-screen readability guardrails", () => {
     expect(elevationChartSource).toContain("const colors = useColors();");
     expect(elevationChartSource).toContain("fill={colors.surfaceInset}");
     expect(elevationChartSource).toContain("stroke={colors.accent}");
-    expect(permissionReadinessSource).toContain("action: { minHeight: 44");
-    expect(permissionReadinessSource).toContain(
-      "subtitle: { fontSize: 13, lineHeight: 19",
+    expect(permissionReadinessSource).toMatch(
+      /action:\s*\{[\s\S]*?minHeight:\s*44/,
+    );
+    expect(permissionReadinessSource).toMatch(
+      /subtitle:\s*\{[\s\S]*?fontSize:\s*13,[\s\S]*?lineHeight:\s*19/,
     );
   });
 

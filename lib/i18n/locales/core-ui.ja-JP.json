@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "rideTime": "走行時間",
+    "averageSpeed": "平均速度",
+    "currentAltitude": "現在の標高",
+    "maxPower": "最大パワー",
+    "totalAscent": "獲得標高",
+    "pausedTime": "停止時間",
+    "gradeDistribution": "勾配分布",
+    "energyCountdown": "補給カウントダウン",
+    "hydrationCountdown": "水分補給カウントダウン",
+    "calculating": "計算中",
+    "nextCountdown": "次回 {{time}}",
+    "refuel": "補給する",
+    "hydrate": "水分補給する",
+    "confirmRefuel": "補給を確認",
+    "start": "開始",
+    "selectSport": "スポーツを選択",
+    "holdInProgress": "長押し中"
+  },
+  "map": {
+    "headingUp": "進行方向",
+    "freeHeading": "自由",
+    "northUp": "北",
+    "headingUpA11y": "位置モード：進行方向を上に表示。タップして自由角度へ",
+    "freeHeadingA11y": "位置モード：自由角度。タップして北を上に表示",
+    "northUpA11y": "位置モード：北を上に表示。タップして進行方向を上に表示"
+  },
+  "settings": {
+    "title": "設定",
+    "rideDashboard": "ライドとダッシュボード",
+    "rideDashboardHint": "ラップ、スポーツ、位置、表示項目",
+    "supplyReminders": "補給とリマインダー",
+    "supplyRemindersHint": "補給、水分、通知、音声、バイブレーション",
+    "autoLap": "自動ラップを有効化",
+    "autoLapHint": "走行距離で自動的にラップを作成し、手動 Lap 操作は表示しません",
+    "autoLapDistance": "自動ラップ距離",
+    "presetSport": "既定のスポーツ",
+    "presetSportHint": "次回のライド用に選択します。開始前にダッシュボードから変更できます。",
+    "autoPauseRules": "自動一時停止の条件",
+    "autoPauseDescription": "サイクリングは、信頼できる GPS 移動が約10秒ないと自動停止します。信頼できる速度と移動で再開し、ランニングはモーション検知、登山は停止の案内を使います。",
+    "backgroundRidePreparation": "バックグラウンド走行の準備"
+  },
+  "routes": {
+    "airDensity": "天気連動の空気密度（{{temperature}}°C）",
+    "weatherDescription": "{{description}}、降水確率 {{precipitation}}%",
+    "weatherUnavailable": "天気を取得できないため、25°C で計算します",
+    "movingTimeRange": "移動時間の範囲 {{lower}} – {{upper}}",
+    "energyCarry": "推奨する補給量",
+    "servingCarbohydrate": "1食あたり約 {{grams}} g の炭水化物",
+    "minimumCarry": "最小",
+    "maximumCarry": "最大",
+    "servings": "食",
+    "carryFactors": "{{factors}} から推定。最大値には高負荷または遅延時の予備を含みます。",
+    "offlinePlanningNote": "休憩、交差点、交通、実際の風や路面状況は含みません。オフライン計画用の目安です。"
+  }
+}

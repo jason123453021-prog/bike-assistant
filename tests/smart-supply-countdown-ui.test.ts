@@ -40,8 +40,8 @@ const hydrationRecalculationSource = readFileSync(
 
 describe("smart supply countdown UI", () => {
   it("shows countdown status and restarts only after explicit confirmation", () => {
-    expect(mapSource).toContain("能量倒數");
-    expect(mapSource).toContain("補水倒數");
+    expect(mapSource).toContain('t("dashboard.energyCountdown")');
+    expect(mapSource).toContain('t("dashboard.hydrationCountdown")');
     expect(mapSource).toContain("restartSmartSupplyCountdown");
     expect(mapSource).toContain(
       "const smartEnergySupplyEnabled = smartSupplyChannels.energy",

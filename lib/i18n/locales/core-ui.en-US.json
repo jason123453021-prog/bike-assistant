@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "rideTime": "Ride Time",
+    "averageSpeed": "Avg Speed",
+    "currentAltitude": "Current Elevation",
+    "maxPower": "Max Power",
+    "totalAscent": "Elevation Gain",
+    "pausedTime": "Paused Time",
+    "gradeDistribution": "Grade Distribution",
+    "energyCountdown": "Fuel Countdown",
+    "hydrationCountdown": "Hydration Countdown",
+    "calculating": "Calculating…",
+    "nextCountdown": "Next {{time}}",
+    "refuel": "Refuel",
+    "hydrate": "Hydrate",
+    "confirmRefuel": "Confirm refuel",
+    "start": "Start",
+    "selectSport": "Select sport",
+    "holdInProgress": "Hold in progress"
+  },
+  "map": {
+    "headingUp": "Forward",
+    "freeHeading": "Free",
+    "northUp": "North",
+    "headingUpA11y": "Location mode: course heading up; tap for free orientation",
+    "freeHeadingA11y": "Location mode: free orientation; tap for north up",
+    "northUpA11y": "Location mode: north up; tap for course heading up"
+  },
+  "settings": {
+    "title": "Settings",
+    "rideDashboard": "Riding & Dashboard",
+    "rideDashboardHint": "Timer, sport, location and dashboard fields",
+    "supplyReminders": "Fuel & Reminders",
+    "supplyRemindersHint": "Fuel, hydration, notifications, voice and vibration",
+    "autoLap": "Enable auto lap",
+    "autoLapHint": "Create laps by distance without displaying a manual Lap control",
+    "autoLapDistance": "Auto lap distance",
+    "presetSport": "Default sport",
+    "presetSportHint": "Choose the sport for your next ride; you can still change it from the dashboard",
+    "autoPauseRules": "Auto-pause rules",
+    "autoPauseDescription": "Cycling pauses automatically after about 10 seconds without credible GPS movement. It resumes with reliable speed and displacement; running uses motion sensing, while hiking keeps a stop prompt. These rules are applied automatically.",
+    "backgroundRidePreparation": "Background ride readiness"
+  },
+  "routes": {
+    "airDensity": "Weather-linked air density ({{temperature}}°C)",
+    "weatherDescription": "{{description}}, {{precipitation}}% chance of rain",
+    "weatherUnavailable": "Weather unavailable; using 25°C for the estimate",
+    "movingTimeRange": "Moving-time range {{lower}} – {{upper}}",
+    "energyCarry": "Recommended fuel to carry",
+    "servingCarbohydrate": "About {{grams}} g carbohydrate per serving",
+    "minimumCarry": "Minimum",
+    "maximumCarry": "Maximum",
+    "servings": "servings",
+    "carryFactors": "Estimated from {{factors}}; the maximum includes a high-load or delay reserve.",
+    "offlinePlanningNote": "Excludes rests, intersections, traffic, actual wind, and road conditions; for offline planning only."
+  }
+}

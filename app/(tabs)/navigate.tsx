@@ -13,7 +13,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
-import Svg, { Circle, Polyline, Line, Rect, Text as SvgText } from "react-native-svg";
+import Svg, {
+  Circle,
+  Polyline,
+  Line,
+  Rect,
+  Text as SvgText,
+} from "react-native-svg";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -25,7 +31,12 @@ import { calculateAgeFromBirthday } from "@/lib/personal-profile";
 import * as Location from "expo-location";
 import { type GpxRoute } from "@/lib/gpx-parser";
 import { useGpx } from "@/lib/gpx-context";
-import { DEFAULT_ROAD_BIKE_MASS_KG, formatDuration, formatDistance, calcAirDensity } from "@/lib/power-calc";
+import {
+  DEFAULT_ROAD_BIKE_MASS_KG,
+  formatDuration,
+  formatDistance,
+  calcAirDensity,
+} from "@/lib/power-calc";
 import { fetchWeather, type WeatherData } from "@/lib/weather-service";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/i18n/language-provider";
@@ -56,25 +67,60 @@ export default function NavigateScreen() {
   const riderKg = settings.weight || 70;
   const bikeKg = settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG;
   const totalMassKg = riderKg + bikeKg;
-  const autoMetrics = useMemo(() => deriveAutoPersonalMetrics(rideState.records, {
-    ftpW: settings.ftp,
-    age: settings.age,
-    birthday: settings.birthday,
-    maxHeartRate: settings.maxHeartRate,
-    restingHeartRate: settings.restingHeartRate,
-  }), [rideState.records, settings.age, settings.birthday, settings.ftp, settings.maxHeartRate, settings.restingHeartRate]);
+  const autoMetrics = useMemo(
+    () =>
+      deriveAutoPersonalMetrics(rideState.records, {
+        ftpW: settings.ftp,
+        age: settings.age,
+        birthday: settings.birthday,
+        maxHeartRate: settings.maxHeartRate,
+        restingHeartRate: settings.restingHeartRate,
+      }),
+    [
+      rideState.records,
+      settings.age,
+      settings.birthday,
+      settings.ftp,
+      settings.maxHeartRate,
+      settings.restingHeartRate,
+    ],
+  );
 
   // 天氣連動溫度：如果已取得路線天氣則使用即時溫度，否則預設 25°C
   const forecastEnvironment = useMemo(() => {
-    const hours = routeWeather?.forecast?.length ? routeWeather.forecast : routeWeather ? [routeWeather] : [];
-    if (!hours.length) return { temperature: 25, humidity: 60, windSpeed: 0, windDirection: 0, weatherCode: 1, precipitationProb: 0 };
-    const average = (key: "temperature" | "humidity" | "windSpeed" | "precipitationProb") => hours.reduce((sum, hour) => sum + hour[key], 0) / hours.length;
-    const directionX = hours.reduce((sum, hour) => sum + Math.cos(hour.windDirection * Math.PI / 180), 0);
-    const directionY = hours.reduce((sum, hour) => sum + Math.sin(hour.windDirection * Math.PI / 180), 0);
+    const hours = routeWeather?.forecast?.length
+      ? routeWeather.forecast
+      : routeWeather
+        ? [routeWeather]
+        : [];
+    if (!hours.length)
+      return {
+        temperature: 25,
+        humidity: 60,
+        windSpeed: 0,
+        windDirection: 0,
+        weatherCode: 1,
+        precipitationProb: 0,
+      };
+    const average = (
+      key: "temperature" | "humidity" | "windSpeed" | "precipitationProb",
+    ) => hours.reduce((sum, hour) => sum + hour[key], 0) / hours.length;
+    const directionX = hours.reduce(
+      (sum, hour) => sum + Math.cos((hour.windDirection * Math.PI) / 180),
+      0,
+    );
+    const directionY = hours.reduce(
+      (sum, hour) => sum + Math.sin((hour.windDirection * Math.PI) / 180),
+      0,
+    );
     return {
-      temperature: average("temperature"), humidity: average("humidity"), windSpeed: average("windSpeed"),
-      windDirection: (Math.atan2(directionY, directionX) * 180 / Math.PI + 360) % 360,
-      weatherCode: routeWeather?.weatherCode ?? 1, precipitationProb: average("precipitationProb"),
+      temperature: average("temperature"),
+      humidity: average("humidity"),
+      windSpeed: average("windSpeed"),
+      windDirection:
+        ((Math.atan2(directionY, directionX) * 180) / Math.PI + 360) % 360,
+      weatherCode: routeWeather?.weatherCode ?? 1,
+      precipitationProb: average("precipitationProb"),
     };
   }, [routeWeather]);
   const routeTempC = forecastEnvironment.temperature;
@@ -97,10 +143,25 @@ export default function NavigateScreen() {
       precipitationProb: forecastEnvironment.precipitationProb,
       sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
       energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
-      energyCarbohydrateHourlyLimitMode: settings.energyCarbohydrateHourlyLimitMode,
+      energyCarbohydrateHourlyLimitMode:
+        settings.energyCarbohydrateHourlyLimitMode,
       energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
     });
-  }, [autoMetrics.ftpW, bikeKg, forecastEnvironment, riderKg, route, routeTempC, settings.age, settings.birthday, settings.energyCarbohydrateHourlyLimitG, settings.energyCarbohydrateHourlyLimitMode, settings.energyServingCarbohydrateG, settings.height, settings.sweatRateCalibrationMultiplier]);
+  }, [
+    autoMetrics.ftpW,
+    bikeKg,
+    forecastEnvironment,
+    riderKg,
+    route,
+    routeTempC,
+    settings.age,
+    settings.birthday,
+    settings.energyCarbohydrateHourlyLimitG,
+    settings.energyCarbohydrateHourlyLimitMode,
+    settings.energyServingCarbohydrateG,
+    settings.height,
+    settings.sweatRateCalibrationMultiplier,
+  ]);
   const routeTimeEstimate = routeEstimate?.time ?? null;
   const avgSpeedKmh = routeTimeEstimate?.movingAverageKmh ?? 20;
 
@@ -121,7 +182,9 @@ export default function NavigateScreen() {
       // 自動取得路線起點天氣（優先用 GPX 第一點座標）
       fetchRouteWeather(parsed.points[0].lat, parsed.points[0].lon);
     } catch (error) {
-      setError(error instanceof Error ? error.message : t("routes.importFailed"));
+      setError(
+        error instanceof Error ? error.message : t("routes.importFailed"),
+      );
     } finally {
       setLoading(false);
     }
@@ -158,7 +221,9 @@ export default function NavigateScreen() {
           setRouteWeather(lastWeatherRef.current);
           setWeatherOffline(true);
         }
-      } finally { setWeatherLoading(false); }
+      } finally {
+        setWeatherLoading(false);
+      }
     })();
   }, []);
 
@@ -180,7 +245,9 @@ export default function NavigateScreen() {
         setRouteWeather(lastWeatherRef.current);
         setWeatherOffline(true);
       }
-    } finally { setWeatherLoading(false); }
+    } finally {
+      setWeatherLoading(false);
+    }
   };
 
   // 外部「開啟方式」傳入 GPX 時，統一先在此頁顯示預覽與完成時間確認。
@@ -210,12 +277,15 @@ export default function NavigateScreen() {
     const points = route.elevationProfile
       .map((p) => {
         const x = PAD.left + (p.distance / maxDist) * chartW;
-        const y = PAD.top + chartH - ((p.elevation - minEle) / eleRange) * chartH;
+        const y =
+          PAD.top + chartH - ((p.elevation - minEle) / eleRange) * chartH;
         return `${x},${y}`;
       })
       .join(" ");
 
-    const yLabels = [minEle, (minEle + maxEle) / 2, maxEle].map((v) => Math.round(v));
+    const yLabels = [minEle, (minEle + maxEle) / 2, maxEle].map((v) =>
+      Math.round(v),
+    );
     const xLabels = [0, 0.25, 0.5, 0.75, 1].map((pct) => ({
       x: PAD.left + pct * chartW,
       label: `${((maxDist / 1000) * pct).toFixed(1)}`,
@@ -223,29 +293,61 @@ export default function NavigateScreen() {
 
     return (
       <View style={[styles.chartContainer, { borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("routes.elevationProfile")}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+          {t("routes.elevationProfile")}
+        </Text>
         <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
           {[0, 0.5, 1].map((pct, i) => {
             const y = PAD.top + chartH - pct * chartH;
             return (
-              <Line key={i} x1={PAD.left} y1={y} x2={PAD.left + chartW} y2={y}
-                stroke={colors.border} strokeWidth={0.5} />
+              <Line
+                key={i}
+                x1={PAD.left}
+                y1={y}
+                x2={PAD.left + chartW}
+                y2={y}
+                stroke={colors.border}
+                strokeWidth={0.5}
+              />
             );
           })}
-          <Polyline points={points} fill="none" stroke={colors.accent} strokeWidth={2} />
+          <Polyline
+            points={points}
+            fill="none"
+            stroke={colors.accent}
+            strokeWidth={2}
+          />
           {yLabels.map((label, i) => {
             const y = PAD.top + chartH - (i / 2) * chartH;
             return (
-              <SvgText key={i} x={PAD.left - 4} y={y + 4} fontSize={9}
-                fill={colors.muted} textAnchor="end">{label}</SvgText>
+              <SvgText
+                key={i}
+                x={PAD.left - 4}
+                y={y + 4}
+                fontSize={9}
+                fill={colors.muted}
+                textAnchor="end"
+              >
+                {label}
+              </SvgText>
             );
           })}
           {xLabels.map((item, i) => (
-            <SvgText key={i} x={item.x} y={CHART_HEIGHT - 4} fontSize={9}
-              fill={colors.muted} textAnchor="middle">{item.label}</SvgText>
+            <SvgText
+              key={i}
+              x={item.x}
+              y={CHART_HEIGHT - 4}
+              fontSize={9}
+              fill={colors.muted}
+              textAnchor="middle"
+            >
+              {item.label}
+            </SvgText>
           ))}
         </Svg>
-        <Text style={[styles.chartAxisLabel, { color: colors.muted }]}>{t("routes.distanceAxis")}</Text>
+        <Text style={[styles.chartAxisLabel, { color: colors.muted }]}>
+          {t("routes.distanceAxis")}
+        </Text>
       </View>
     );
   };
@@ -256,26 +358,58 @@ export default function NavigateScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 40) }]} showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
-
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: Math.max(insets.bottom, 40) },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.foreground }]}>{t("routes.title")}</Text>
-            <Text style={[styles.subtitle, { color: colors.muted }]}>{t("routes.subtitle")}</Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>
+              {t("routes.title")}
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.muted }]}>
+              {t("routes.subtitle")}
+            </Text>
           </View>
 
           {/* ── 自動騎乘條件 ─────────────────────────────────────────────────── */}
-          <View style={[styles.weightCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.weightCardTitle, { color: colors.foreground }]}>{t("routes.ridingConditions")}</Text>
-            <Text style={[styles.weightCardSub, { color: colors.muted }]}>{t("routes.ridingConditionsHint")}</Text>
-            <View style={[styles.totalMassRow, { borderTopColor: colors.border }]}>
-              <Text style={[styles.totalMassLabel, { color: colors.muted }]}>{t("routes.totalMass")}</Text>
-              <Text style={[styles.totalMassValue, { color: colors.accent }]}>{totalMassKg.toFixed(1)} kg</Text>
+          <View
+            style={[
+              styles.weightCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text
+              style={[styles.weightCardTitle, { color: colors.foreground }]}
+            >
+              {t("routes.ridingConditions")}
+            </Text>
+            <Text style={[styles.weightCardSub, { color: colors.muted }]}>
+              {t("routes.ridingConditionsHint")}
+            </Text>
+            <View
+              style={[styles.totalMassRow, { borderTopColor: colors.border }]}
+            >
+              <Text style={[styles.totalMassLabel, { color: colors.muted }]}>
+                {t("routes.totalMass")}
+              </Text>
+              <Text style={[styles.totalMassValue, { color: colors.accent }]}>
+                {totalMassKg.toFixed(1)} kg
+              </Text>
             </View>
-            <View style={[styles.totalMassRow, { borderTopColor: colors.border }]}> 
-              <Text style={[styles.totalMassLabel, { color: colors.muted }]}>{t("routes.automaticFtp")}</Text>
-              <Text style={[styles.totalMassValue, { color: colors.accent }]}>{autoMetrics.ftpW} W</Text>
+            <View
+              style={[styles.totalMassRow, { borderTopColor: colors.border }]}
+            >
+              <Text style={[styles.totalMassLabel, { color: colors.muted }]}>
+                {t("routes.automaticFtp")}
+              </Text>
+              <Text style={[styles.totalMassValue, { color: colors.accent }]}>
+                {autoMetrics.ftpW} W
+              </Text>
             </View>
           </View>
 
@@ -283,7 +417,11 @@ export default function NavigateScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.importBtn,
-              { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                opacity: pressed ? 0.7 : 1,
+              },
             ]}
             onPress={handleImportGpx}
             disabled={loading}
@@ -292,18 +430,31 @@ export default function NavigateScreen() {
               <ActivityIndicator color={colors.accent} />
             ) : (
               <>
-                <View style={[styles.importIconWrap, { backgroundColor: colors.accent + "15" }]}>
+                <View
+                  style={[
+                    styles.importIconWrap,
+                    { backgroundColor: colors.accent + "15" },
+                  ]}
+                >
                   <IconSymbol name="doc.fill" size={24} color={colors.accent} />
                 </View>
                 <View style={styles.importTextWrap}>
-                  <Text style={[styles.importTitle, { color: colors.foreground }]}>
+                  <Text
+                    style={[styles.importTitle, { color: colors.foreground }]}
+                  >
                     {route ? t("routes.reimportGpx") : t("routes.importGpx")}
                   </Text>
-                  <Text style={[styles.importSubtitle, { color: colors.muted }]}>
+                  <Text
+                    style={[styles.importSubtitle, { color: colors.muted }]}
+                  >
                     {t("routes.gpxFormat")}
                   </Text>
                 </View>
-                <IconSymbol name={isRTL ? "chevron.left" : "chevron.right"} size={18} color={colors.muted} />
+                <IconSymbol
+                  name={isRTL ? "chevron.left" : "chevron.right"}
+                  size={18}
+                  color={colors.muted}
+                />
               </>
             )}
           </Pressable>
@@ -313,56 +464,113 @@ export default function NavigateScreen() {
 
           {/* Error */}
           {error && (
-            <View style={[styles.errorBox, { backgroundColor: colors.error + "15", borderColor: colors.error + "40" }]}>
-              <IconSymbol name="exclamationmark.triangle.fill" size={16} color={colors.error} />
-              <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+            <View
+              style={[
+                styles.errorBox,
+                {
+                  backgroundColor: colors.error + "15",
+                  borderColor: colors.error + "40",
+                },
+              ]}
+            >
+              <IconSymbol
+                name="exclamationmark.triangle.fill"
+                size={16}
+                color={colors.error}
+              />
+              <Text style={[styles.errorText, { color: colors.error }]}>
+                {error}
+              </Text>
             </View>
           )}
 
           {/* ── 天氣資訊卡片（常驐顯示，不需要路線） ────────────────────────────────────────── */}
-          <View style={[styles.weatherCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.weatherCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <View style={styles.weatherHeader}>
               <Text style={[styles.weatherTitle, { color: colors.foreground }]}>
-                {weatherLinkedToRoute ? t("routes.routeStartWeather") : t("routes.currentWeather")}
+                {weatherLinkedToRoute
+                  ? t("routes.routeStartWeather")
+                  : t("routes.currentWeather")}
               </Text>
               {weatherLoading && (
                 <ActivityIndicator size="small" color={colors.accent} />
               )}
               {!weatherLoading && !routeWeather && (
-                <Text style={[styles.weatherFetching, { color: colors.muted }]}>{t("routes.fetching")}</Text>
+                <Text style={[styles.weatherFetching, { color: colors.muted }]}>
+                  {t("routes.fetching")}
+                </Text>
               )}
               {weatherOffline && routeWeather && (
-                <Text style={[styles.weatherFetching, { color: colors.warning }]}>{t("routes.offlineFallback")}</Text>
+                <Text
+                  style={[styles.weatherFetching, { color: colors.warning }]}
+                >
+                  {t("routes.offlineFallback")}
+                </Text>
               )}
             </View>
             {routeWeather ? (
               <>
                 <View style={styles.weatherGrid}>
-                  <WeatherCell icon="thermometer" label={t("routes.temperature")}
-                    value={`${routeWeather.temperature}°C`} colors={colors} />
-                  <WeatherCell icon="drop.fill" label={t("routes.humidity")}
-                    value={`${routeWeather.humidity}%`} colors={colors} />
-                  <WeatherCell icon="wind" label={t("routes.windSpeed")}
-                    value={`${routeWeather.windSpeed} km/h`} colors={colors} />
-                  <WeatherCell icon="arrow.up" label={t("routes.windDirection")}
-                    value={`${routeWeather.windDirection}°`} colors={colors} />
+                  <WeatherCell
+                    icon="thermometer"
+                    label={t("routes.temperature")}
+                    value={`${routeWeather.temperature}°C`}
+                    colors={colors}
+                  />
+                  <WeatherCell
+                    icon="drop.fill"
+                    label={t("routes.humidity")}
+                    value={`${routeWeather.humidity}%`}
+                    colors={colors}
+                  />
+                  <WeatherCell
+                    icon="wind"
+                    label={t("routes.windSpeed")}
+                    value={`${routeWeather.windSpeed} km/h`}
+                    colors={colors}
+                  />
+                  <WeatherCell
+                    icon="arrow.up"
+                    label={t("routes.windDirection")}
+                    value={`${routeWeather.windDirection}°`}
+                    colors={colors}
+                  />
                 </View>
-                <View style={[styles.airDensityRow, { borderTopColor: colors.border }]}>
-                  <Text style={[styles.airDensityLabel, { color: colors.muted }]}>
-                    天氣連動空氣密度（{routeWeather.temperature}°C）
+                <View
+                  style={[
+                    styles.airDensityRow,
+                    { borderTopColor: colors.border },
+                  ]}
+                >
+                  <Text
+                    style={[styles.airDensityLabel, { color: colors.muted }]}
+                  >
+                    {t("routes.airDensity", {
+                      temperature: routeWeather.temperature,
+                    })}
                   </Text>
-                  <Text style={[styles.airDensityValue, { color: colors.accent }]}>
+                  <Text
+                    style={[styles.airDensityValue, { color: colors.accent }]}
+                  >
                     {routeAirDensity.toFixed(4)} kg/m³
                   </Text>
                 </View>
                 <Text style={[styles.weatherDesc, { color: colors.muted }]}>
-                  {routeWeather.description}，降雨機率 {routeWeather.precipitationProb}%
+                  {t("routes.weatherDescription", {
+                    description: routeWeather.description,
+                    precipitation: routeWeather.precipitationProb,
+                  })}
                 </Text>
               </>
             ) : (
               !weatherLoading && (
                 <Text style={[styles.weatherNoData, { color: colors.muted }]}>
-                  無法取得天氣，使用預設 25°C 計算
+                  {t("routes.weatherUnavailable")}
                 </Text>
               )
             )}
@@ -372,8 +580,20 @@ export default function NavigateScreen() {
           {route && routeEstimate && (
             <>
               {/* Route Name */}
-              <View style={[styles.routeNameCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-                <IconSymbol name="location.fill" size={18} color={colors.accent} />
+              <View
+                style={[
+                  styles.routeNameCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <IconSymbol
+                  name="location.fill"
+                  size={18}
+                  color={colors.accent}
+                />
                 <Text style={[styles.routeName, { color: colors.foreground }]}>
                   {route.name}
                 </Text>
@@ -382,70 +602,291 @@ export default function NavigateScreen() {
               <RoutePreview route={route} colors={colors} />
 
               {/* Basic Stats Grid */}
-              <View style={[styles.statsGrid, { borderColor: colors.border }]}> 
-                <RouteStatCell label={t("routes.routeDistance")} value={formatDistance(route.totalDistance)} colors={colors} />
-                <RouteStatCell label={t("routes.estimatedMovingTime")} value={formatDuration(routeTimeEstimate?.estimatedDurationSeconds ?? route.estimatedDuration)} colors={colors} accent />
-                <RouteStatCell label={t("routes.elevationGain")} value={`${Math.round(route.totalAscent)} m`} colors={colors} />
-                <RouteStatCell label={t("routes.elevationLoss")} value={`${Math.round(route.totalDescent)} m`} colors={colors} />
-                <RouteStatCell label={t("routes.estimatedAvgSpeed")} value={`${avgSpeedKmh} km/h`} colors={colors} />
-                <RouteStatCell label={t("routes.targetPower")} value={`${routeTimeEstimate?.targetPowerW ?? autoMetrics.ftpW} W`} colors={colors} />
+              <View style={[styles.statsGrid, { borderColor: colors.border }]}>
+                <RouteStatCell
+                  label={t("routes.routeDistance")}
+                  value={formatDistance(route.totalDistance)}
+                  colors={colors}
+                />
+                <RouteStatCell
+                  label={t("routes.estimatedMovingTime")}
+                  value={formatDuration(
+                    routeTimeEstimate?.estimatedDurationSeconds ??
+                      route.estimatedDuration,
+                  )}
+                  colors={colors}
+                  accent
+                />
+                <RouteStatCell
+                  label={t("routes.elevationGain")}
+                  value={`${Math.round(route.totalAscent)} m`}
+                  colors={colors}
+                />
+                <RouteStatCell
+                  label={t("routes.elevationLoss")}
+                  value={`${Math.round(route.totalDescent)} m`}
+                  colors={colors}
+                />
+                <RouteStatCell
+                  label={t("routes.estimatedAvgSpeed")}
+                  value={`${avgSpeedKmh} km/h`}
+                  colors={colors}
+                />
+                <RouteStatCell
+                  label={t("routes.targetPower")}
+                  value={`${routeTimeEstimate?.targetPowerW ?? autoMetrics.ftpW} W`}
+                  colors={colors}
+                />
               </View>
 
               {routeTimeEstimate && (
-                <View style={[styles.routeConfirmCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View
+                  style={[
+                    styles.routeConfirmCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
                   <View style={styles.routeConfirmHeading}>
-                    <View style={[styles.routeConfirmIcon, { backgroundColor: colors.accent + "18" }]}>
-                      <IconSymbol name="clock.fill" size={19} color={colors.accent} />
+                    <View
+                      style={[
+                        styles.routeConfirmIcon,
+                        { backgroundColor: colors.accent + "18" },
+                      ]}
+                    >
+                      <IconSymbol
+                        name="clock.fill"
+                        size={19}
+                        color={colors.accent}
+                      />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 2 }]}>{t("routes.startConfirmation")}</Text>
-                      <Text style={[styles.routeConfirmMain, { color: colors.accent }]}>{formatDuration(routeTimeEstimate.estimatedDurationSeconds)}</Text>
-                      <Text style={[styles.routeConfirmSub, { color: colors.muted }]}>移動時間區間 {formatDuration(routeTimeEstimate.lowerDurationSeconds)} – {formatDuration(routeTimeEstimate.upperDurationSeconds)}</Text>
+                      <Text
+                        style={[
+                          styles.sectionTitle,
+                          { color: colors.foreground, marginBottom: 2 },
+                        ]}
+                      >
+                        {t("routes.startConfirmation")}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.routeConfirmMain,
+                          { color: colors.accent },
+                        ]}
+                      >
+                        {formatDuration(
+                          routeTimeEstimate.estimatedDurationSeconds,
+                        )}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.routeConfirmSub,
+                          { color: colors.muted },
+                        ]}
+                      >
+                        {t("routes.movingTimeRange", {
+                          lower: formatDuration(
+                            routeTimeEstimate.lowerDurationSeconds,
+                          ),
+                          upper: formatDuration(
+                            routeTimeEstimate.upperDurationSeconds,
+                          ),
+                        })}
+                      </Text>
                     </View>
                   </View>
-                  <Text style={[styles.routeConfirmFactors, { color: colors.muted }]}>{routeTimeEstimate.factors.join(" · ")}</Text>
-                  <View style={[styles.energyCarryCard, { backgroundColor: colors.background, borderColor: colors.border }]}> 
+                  <Text
+                    style={[
+                      styles.routeConfirmFactors,
+                      { color: colors.muted },
+                    ]}
+                  >
+                    {routeTimeEstimate.factors.join(" · ")}
+                  </Text>
+                  <View
+                    style={[
+                      styles.energyCarryCard,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
                     <View style={styles.energyCarryHeader}>
-                      <Text style={[styles.energyCarryTitle, { color: colors.foreground }]}>建議攜帶能量補給</Text>
-                      <Text style={[styles.energyCarryUnit, { color: colors.muted }]}>每份約 {routeEstimate.energySupplyCarry.standardServingCarbohydrateG} g 碳水</Text>
+                      <Text
+                        style={[
+                          styles.energyCarryTitle,
+                          { color: colors.foreground },
+                        ]}
+                      >
+                        {t("routes.energyCarry")}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.energyCarryUnit,
+                          { color: colors.muted },
+                        ]}
+                      >
+                        {t("routes.servingCarbohydrate", {
+                          grams:
+                            routeEstimate.energySupplyCarry
+                              .standardServingCarbohydrateG,
+                        })}
+                      </Text>
                     </View>
                     <View style={styles.energyCarryCounts}>
                       <View style={styles.energyCarryCount}>
-                        <Text style={[styles.energyCarryLabel, { color: colors.muted }]}>最少攜帶</Text>
-                        <Text style={[styles.energyCarryValue, { color: colors.accent }]}>{routeEstimate.energySupplyCarry.minimumServings} <Text style={styles.energyCarrySuffix}>份</Text></Text>
+                        <Text
+                          style={[
+                            styles.energyCarryLabel,
+                            { color: colors.muted },
+                          ]}
+                        >
+                          {t("routes.minimumCarry")}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.energyCarryValue,
+                            { color: colors.accent },
+                          ]}
+                        >
+                          {routeEstimate.energySupplyCarry.minimumServings}{" "}
+                          <Text style={styles.energyCarrySuffix}>
+                            {t("routes.servings")}
+                          </Text>
+                        </Text>
                       </View>
-                      <View style={[styles.energyCarryDivider, { backgroundColor: colors.border }]} />
+                      <View
+                        style={[
+                          styles.energyCarryDivider,
+                          { backgroundColor: colors.border },
+                        ]}
+                      />
                       <View style={styles.energyCarryCount}>
-                        <Text style={[styles.energyCarryLabel, { color: colors.muted }]}>最多攜帶</Text>
-                        <Text style={[styles.energyCarryValue, { color: colors.foreground }]}>{routeEstimate.energySupplyCarry.maximumServings} <Text style={styles.energyCarrySuffix}>份</Text></Text>
+                        <Text
+                          style={[
+                            styles.energyCarryLabel,
+                            { color: colors.muted },
+                          ]}
+                        >
+                          {t("routes.maximumCarry")}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.energyCarryValue,
+                            { color: colors.foreground },
+                          ]}
+                        >
+                          {routeEstimate.energySupplyCarry.maximumServings}{" "}
+                          <Text style={styles.energyCarrySuffix}>
+                            {t("routes.servings")}
+                          </Text>
+                        </Text>
                       </View>
                     </View>
-                    <Text style={[styles.energyCarryFactors, { color: colors.muted }]}>
-                      依 {routeEstimate.energySupplyCarry.factors.join("、")} 推估；最多包含高負荷或延誤備援。
+                    <Text
+                      style={[
+                        styles.energyCarryFactors,
+                        { color: colors.muted },
+                      ]}
+                    >
+                      {t("routes.carryFactors", {
+                        factors:
+                          routeEstimate.energySupplyCarry.factors.join(" · "),
+                      })}
                     </Text>
                   </View>
-                  <Text style={[styles.routeConfirmNotice, { color: colors.muted }]}>不含休息、路口、交通、實際風況與路況；此為離線規劃參考。</Text>
+                  <Text
+                    style={[styles.routeConfirmNotice, { color: colors.muted }]}
+                  >
+                    {t("routes.offlinePlanningNote")}
+                  </Text>
                   <Pressable
-                    style={({ pressed }) => [styles.startRouteBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.82 : 1 }]}
-                    onPress={() => { setSharedRoute(route); router.push("/map"); }}
+                    style={({ pressed }) => [
+                      styles.startRouteBtn,
+                      {
+                        backgroundColor: colors.accent,
+                        opacity: pressed ? 0.82 : 1,
+                      },
+                    ]}
+                    onPress={() => {
+                      setSharedRoute(route);
+                      router.push("/map");
+                    }}
                   >
                     <IconSymbol name="play.fill" size={17} color="#fff" />
-                    <Text style={styles.startRouteBtnText}>{t("routes.startNavigation")}</Text>
+                    <Text style={styles.startRouteBtnText}>
+                      {t("routes.startNavigation")}
+                    </Text>
                   </Pressable>
                 </View>
               )}
 
               {routeWeather && (
-                <View style={[styles.forecastCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>起點天氣與風向預報</Text>
-                  <Text style={[styles.forecastCurrent, { color: colors.muted }]}>{routeWeather.description} · {routeWeather.temperature}°C · 風速 {routeWeather.windSpeed} km/h · 風向 {Math.round(routeWeather.windDirection)}°</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.forecastRow}>
+                <View
+                  style={[
+                    styles.forecastCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.sectionTitle, { color: colors.foreground }]}
+                  >
+                    起點天氣與風向預報
+                  </Text>
+                  <Text
+                    style={[styles.forecastCurrent, { color: colors.muted }]}
+                  >
+                    {routeWeather.description} · {routeWeather.temperature}°C ·
+                    風速 {routeWeather.windSpeed} km/h · 風向{" "}
+                    {Math.round(routeWeather.windDirection)}°
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.forecastRow}
+                  >
                     {(routeWeather.forecast ?? []).map((hour) => (
-                      <View key={hour.time} style={[styles.forecastPill, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                        <Text style={[styles.forecastHour, { color: colors.muted }]}>{hour.time.slice(11, 16)}</Text>
-                        <Text style={[styles.forecastValue, { color: colors.foreground }]}>{hour.temperature}°</Text>
-                        <Text style={[styles.forecastMeta, { color: colors.muted }]}>風 {hour.windSpeed}</Text>
-                        <Text style={[styles.forecastMeta, { color: colors.muted }]}>{Math.round(hour.windDirection)}° · 雨 {hour.precipitationProb}%</Text>
+                      <View
+                        key={hour.time}
+                        style={[
+                          styles.forecastPill,
+                          {
+                            backgroundColor: colors.background,
+                            borderColor: colors.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.forecastHour, { color: colors.muted }]}
+                        >
+                          {hour.time.slice(11, 16)}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.forecastValue,
+                            { color: colors.foreground },
+                          ]}
+                        >
+                          {hour.temperature}°
+                        </Text>
+                        <Text
+                          style={[styles.forecastMeta, { color: colors.muted }]}
+                        >
+                          風 {hour.windSpeed}
+                        </Text>
+                        <Text
+                          style={[styles.forecastMeta, { color: colors.muted }]}
+                        >
+                          {Math.round(hour.windDirection)}° · 雨{" "}
+                          {hour.precipitationProb}%
+                        </Text>
                       </View>
                     ))}
                   </ScrollView>
@@ -453,24 +894,73 @@ export default function NavigateScreen() {
               )}
 
               {/* ── 卡路里分析卡片 ──────────────────────────────────────────── */}
-              <View style={[styles.calorieCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>統一補給與消耗預估</Text>
-                <Text style={[styles.calorieFormula, { color: colors.muted }]}> 
-                  完成時間、卡路里與水分均使用相同的 FTP、總重、GPX 坡度、天氣與風向快照。
+              <View
+                style={[
+                  styles.calorieCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.sectionTitle, { color: colors.foreground }]}
+                >
+                  統一補給與消耗預估
+                </Text>
+                <Text style={[styles.calorieFormula, { color: colors.muted }]}>
+                  完成時間、卡路里與水分均使用相同的 FTP、總重、GPX
+                  坡度、天氣與風向快照。
                 </Text>
                 <View style={styles.calorieTotalRow}>
-                  <Text style={[styles.calorieTotalValue, { color: colors.accent }]}> 
+                  <Text
+                    style={[styles.calorieTotalValue, { color: colors.accent }]}
+                  >
                     {routeEstimate.estimatedCaloriesKcal.toLocaleString()}
                   </Text>
-                  <Text style={[styles.calorieTotalUnit, { color: colors.muted }]}>kcal</Text>
+                  <Text
+                    style={[styles.calorieTotalUnit, { color: colors.muted }]}
+                  >
+                    kcal
+                  </Text>
                 </View>
-                <View style={[styles.breakdownGrid, { borderTopColor: colors.border }]}> 
-                  <BreakdownItem label="預估水分流失" sublabel="熱負荷、濕度、強度與爬升" value={routeEstimate.estimatedWaterLossMl} pct={0} color="#38BDF8" colors={colors} unit="ml" />
-                  <BreakdownItem label="每次建議補水" sublabel="依統一強度與環境負荷" value={routeEstimate.suggestedWaterMl} pct={0} color="#22C55E" colors={colors} unit="ml" />
-                  <BreakdownItem label="每次建議能量" sublabel="依預估時長與功率強度" value={routeEstimate.suggestedEnergyKcal} pct={0} color="#F97316" colors={colors} unit="kcal" />
+                <View
+                  style={[
+                    styles.breakdownGrid,
+                    { borderTopColor: colors.border },
+                  ]}
+                >
+                  <BreakdownItem
+                    label="預估水分流失"
+                    sublabel="熱負荷、濕度、強度與爬升"
+                    value={routeEstimate.estimatedWaterLossMl}
+                    pct={0}
+                    color="#38BDF8"
+                    colors={colors}
+                    unit="ml"
+                  />
+                  <BreakdownItem
+                    label="每次建議補水"
+                    sublabel="依統一強度與環境負荷"
+                    value={routeEstimate.suggestedWaterMl}
+                    pct={0}
+                    color="#22C55E"
+                    colors={colors}
+                    unit="ml"
+                  />
+                  <BreakdownItem
+                    label="每次建議能量"
+                    sublabel="依預估時長與功率強度"
+                    value={routeEstimate.suggestedEnergyKcal}
+                    pct={0}
+                    color="#F97316"
+                    colors={colors}
+                    unit="kcal"
+                  />
                 </View>
-                <Text style={[styles.calorieNote, { color: colors.muted }]}> 
-                  * {routeEstimate.sourceLabel}；請依實際補給條件安排水分與能量。
+                <Text style={[styles.calorieNote, { color: colors.muted }]}>
+                  * {routeEstimate.sourceLabel}
+                  ；請依實際補給條件安排水分與能量。
                 </Text>
               </View>
 
@@ -478,30 +968,106 @@ export default function NavigateScreen() {
               {renderElevationChart()}
 
               {/* ── 坡度分析卡片 ───────────────────────────────────────── */}
-              <View style={[styles.gradientCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>坡度區間分布</Text>
-                <Text style={[styles.gradDistTitle, { color: colors.muted }]}>各區間佔路線距離百分比</Text>
+              <View
+                style={[
+                  styles.gradientCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.sectionTitle, { color: colors.foreground }]}
+                >
+                  坡度區間分布
+                </Text>
+                <Text style={[styles.gradDistTitle, { color: colors.muted }]}>
+                  各區間佔路線距離百分比
+                </Text>
 
                 {[
-                  { bucket: 0, label: "平路", range: "< 1%",    color: "#94A3B8" },
-                  { bucket: 1, label: "緩坡", range: "1% – 5%",   color: "#22C55E" },
-                  { bucket: 2, label: "中坡", range: "6% – 10%",  color: "#84CC16" },
-                  { bucket: 3, label: "陡坡", range: "11% – 15%", color: "#F59E0B" },
-                  { bucket: 4, label: "急坡", range: "16% – 20%", color: "#F97316" },
-                  { bucket: 5, label: "極陡", range: "21% – 25%", color: "#EF4444" },
-                  { bucket: 6, label: "極限", range: "≥ 26%",    color: "#9333EA" },
+                  { bucket: 0, label: "平路", range: "< 1%", color: "#94A3B8" },
+                  {
+                    bucket: 1,
+                    label: "緩坡",
+                    range: "1% – 5%",
+                    color: "#22C55E",
+                  },
+                  {
+                    bucket: 2,
+                    label: "中坡",
+                    range: "6% – 10%",
+                    color: "#84CC16",
+                  },
+                  {
+                    bucket: 3,
+                    label: "陡坡",
+                    range: "11% – 15%",
+                    color: "#F59E0B",
+                  },
+                  {
+                    bucket: 4,
+                    label: "急坡",
+                    range: "16% – 20%",
+                    color: "#F97316",
+                  },
+                  {
+                    bucket: 5,
+                    label: "極陡",
+                    range: "21% – 25%",
+                    color: "#EF4444",
+                  },
+                  {
+                    bucket: 6,
+                    label: "極限",
+                    range: "≥ 26%",
+                    color: "#9333EA",
+                  },
                 ].map(({ bucket, label, range, color }) => {
                   const pct = route.gradientDistribution[bucket] ?? 0;
                   return (
                     <View key={bucket} style={styles.gradRow}>
                       <View style={styles.gradLabelWrap}>
-                        <Text style={[styles.gradLabelMain, { color: colors.foreground }]}>{label}</Text>
-                        <Text style={[styles.gradLabelRange, { color: colors.muted }]}>{range}</Text>
+                        <Text
+                          style={[
+                            styles.gradLabelMain,
+                            { color: colors.foreground },
+                          ]}
+                        >
+                          {label}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.gradLabelRange,
+                            { color: colors.muted },
+                          ]}
+                        >
+                          {range}
+                        </Text>
                       </View>
-                      <View style={[styles.gradBarBg, { backgroundColor: colors.border }]}>
-                        <View style={[styles.gradBarFill, { width: `${pct}%`, backgroundColor: pct > 0 ? color : "transparent" }]} />
+                      <View
+                        style={[
+                          styles.gradBarBg,
+                          { backgroundColor: colors.border },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.gradBarFill,
+                            {
+                              width: `${pct}%`,
+                              backgroundColor: pct > 0 ? color : "transparent",
+                            },
+                          ]}
+                        />
                       </View>
-                      <Text style={[styles.gradPct, { color: pct > 0 ? colors.foreground : colors.muted }]}>
+                      <Text
+                        style={[
+                          styles.gradPct,
+                          { color: pct > 0 ? colors.foreground : colors.muted },
+                        ]}
+                      >
                         {pct > 0 ? `${pct}%` : "–"}
                       </Text>
                     </View>
@@ -510,14 +1076,24 @@ export default function NavigateScreen() {
               </View>
 
               {/* Tips */}
-              <View style={[styles.tipsBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.tipsTitle, { color: colors.foreground }]}>騎乘建議</Text>
+              <View
+                style={[
+                  styles.tipsBox,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.tipsTitle, { color: colors.foreground }]}>
+                  騎乘建議
+                </Text>
                 <Text style={[styles.tipsText, { color: colors.muted }]}>
                   {route.totalAscent > 500
                     ? `本路線爬升 ${Math.round(route.totalAscent)}m，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，建議依規劃點準備補水與能量。`
                     : route.totalAscent > 200
-                    ? `本路線有適度爬升，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，建議依統一補給預估準備水分與能量。`
-                    : `本路線地形平緩，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，請以預估水分與能量需求安排補給。`}
+                      ? `本路線有適度爬升，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，建議依統一補給預估準備水分與能量。`
+                      : `本路線地形平緩，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，請以預估水分與能量需求安排補給。`}
                 </Text>
               </View>
             </>
@@ -527,7 +1103,9 @@ export default function NavigateScreen() {
           {!route && !loading && !error && (
             <View style={styles.emptyState}>
               <IconSymbol name="map.fill" size={56} color={colors.border} />
-              <Text style={[styles.emptyTitle, { color: colors.muted }]}>{t("routes.emptyTitle")}</Text>
+              <Text style={[styles.emptyTitle, { color: colors.muted }]}>
+                {t("routes.emptyTitle")}
+              </Text>
               <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
                 {t("routes.emptyDescription")}
               </Text>
@@ -545,80 +1123,180 @@ function RoutePreview({ route, colors }: { route: GpxRoute; colors: any }) {
   const { t } = useTranslation();
   const lats = route.points.map((point) => point.lat);
   const lons = route.points.map((point) => point.lon);
-  const minLat = Math.min(...lats); const maxLat = Math.max(...lats);
-  const minLon = Math.min(...lons); const maxLon = Math.max(...lons);
-  const width = CHART_WIDTH; const height = 170; const pad = 18;
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons);
+  const maxLon = Math.max(...lons);
+  const width = CHART_WIDTH;
+  const height = 170;
+  const pad = 18;
   const latSpan = Math.max(maxLat - minLat, 0.0001);
   const lonSpan = Math.max(maxLon - minLon, 0.0001);
-  const scale = Math.min((width - pad * 2) / lonSpan, (height - pad * 2) / latSpan);
-  const drawWidth = lonSpan * scale; const drawHeight = latSpan * scale;
-  const offsetX = (width - drawWidth) / 2; const offsetY = (height - drawHeight) / 2;
-  const points = route.points.map((point) => `${offsetX + (point.lon - minLon) * scale},${offsetY + (maxLat - point.lat) * scale}`).join(" ");
-  const start = route.points[0]; const end = route.points.at(-1)!;
-  const project = (point: typeof start) => ({ x: offsetX + (point.lon - minLon) * scale, y: offsetY + (maxLat - point.lat) * scale });
-  const startPoint = project(start); const endPoint = project(end);
+  const scale = Math.min(
+    (width - pad * 2) / lonSpan,
+    (height - pad * 2) / latSpan,
+  );
+  const drawWidth = lonSpan * scale;
+  const drawHeight = latSpan * scale;
+  const offsetX = (width - drawWidth) / 2;
+  const offsetY = (height - drawHeight) / 2;
+  const points = route.points
+    .map(
+      (point) =>
+        `${offsetX + (point.lon - minLon) * scale},${offsetY + (maxLat - point.lat) * scale}`,
+    )
+    .join(" ");
+  const start = route.points[0];
+  const end = route.points.at(-1)!;
+  const project = (point: typeof start) => ({
+    x: offsetX + (point.lon - minLon) * scale,
+    y: offsetY + (maxLat - point.lat) * scale,
+  });
+  const startPoint = project(start);
+  const endPoint = project(end);
   return (
-    <View style={[styles.routePreview, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View
+      style={[
+        styles.routePreview,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
       <View style={styles.routePreviewHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>{t("routes.routePreview")}</Text>
-        <Text style={[styles.routePreviewHint, { color: colors.muted }]}>{t("routes.routePreviewHint")}</Text>
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: colors.foreground, marginBottom: 0 },
+          ]}
+        >
+          {t("routes.routePreview")}
+        </Text>
+        <Text style={[styles.routePreviewHint, { color: colors.muted }]}>
+          {t("routes.routePreviewHint")}
+        </Text>
       </View>
       <Svg width={width} height={height}>
-        <Rect x={0} y={0} width={width} height={height} rx={12} fill={colors.background} />
-        <Polyline points={points} fill="none" stroke={colors.accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        <Rect
+          x={0}
+          y={0}
+          width={width}
+          height={height}
+          rx={12}
+          fill={colors.background}
+        />
+        <Polyline
+          points={points}
+          fill="none"
+          stroke={colors.accent}
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
         <Circle cx={startPoint.x} cy={startPoint.y} r={5} fill="#22C55E" />
         <Circle cx={endPoint.x} cy={endPoint.y} r={5} fill="#EF4444" />
       </Svg>
       <View style={styles.routePreviewLegend}>
-        <Text style={[styles.routePreviewLegendText, { color: colors.muted }]}>● {t("routes.start")}</Text>
-        <Text style={[styles.routePreviewLegendText, { color: colors.muted }]}>● {t("routes.finish")}</Text>
+        <Text style={[styles.routePreviewLegendText, { color: colors.muted }]}>
+          ● {t("routes.start")}
+        </Text>
+        <Text style={[styles.routePreviewLegendText, { color: colors.muted }]}>
+          ● {t("routes.finish")}
+        </Text>
       </View>
     </View>
   );
 }
 
-function RouteStatCell({ label, value, colors, accent }: {
-  label: string; value: string; colors: any; accent?: boolean;
+function RouteStatCell({
+  label,
+  value,
+  colors,
+  accent,
+}: {
+  label: string;
+  value: string;
+  colors: any;
+  accent?: boolean;
 }) {
   return (
     <View style={[styles.statCell, { borderColor: colors.border }]}>
-      <Text style={[styles.statValue, { color: accent ? colors.accent : colors.foreground }]}>{value}</Text>
+      <Text
+        style={[
+          styles.statValue,
+          { color: accent ? colors.accent : colors.foreground },
+        ]}
+      >
+        {value}
+      </Text>
       <Text style={[styles.statLabel, { color: colors.muted }]}>{label}</Text>
     </View>
   );
 }
 
 function BreakdownItem({
-  label, sublabel, value, pct, color, colors, unit = "kcal",
+  label,
+  sublabel,
+  value,
+  pct,
+  color,
+  colors,
+  unit = "kcal",
 }: {
-  label: string; sublabel: string; value: number; pct: number; color: string; colors: any; unit?: string;
+  label: string;
+  sublabel: string;
+  value: number;
+  pct: number;
+  color: string;
+  colors: any;
+  unit?: string;
 }) {
   return (
     <View style={styles.breakdownItem}>
       <View style={styles.breakdownLeft}>
         <View style={[styles.breakdownDot, { backgroundColor: color }]} />
         <View>
-          <Text style={[styles.breakdownLabel, { color: colors.foreground }]}>{label}</Text>
-          <Text style={[styles.breakdownSublabel, { color: colors.muted }]}>{sublabel}</Text>
+          <Text style={[styles.breakdownLabel, { color: colors.foreground }]}>
+            {label}
+          </Text>
+          <Text style={[styles.breakdownSublabel, { color: colors.muted }]}>
+            {sublabel}
+          </Text>
         </View>
       </View>
       <View style={styles.breakdownRight}>
-        <Text style={[styles.breakdownValue, { color }]}>{value} {unit}</Text>
-        {pct > 0 && <Text style={[styles.breakdownPct, { color: colors.muted }]}>{pct}%</Text>}
+        <Text style={[styles.breakdownValue, { color }]}>
+          {value} {unit}
+        </Text>
+        {pct > 0 && (
+          <Text style={[styles.breakdownPct, { color: colors.muted }]}>
+            {pct}%
+          </Text>
+        )}
       </View>
     </View>
   );
 }
 
-function WeatherCell({ icon, label, value, colors }: {
-  icon: string; label: string; value: string; colors: any;
+function WeatherCell({
+  icon,
+  label,
+  value,
+  colors,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  colors: any;
 }) {
   return (
     <View style={styles.weatherCellWrap}>
       <IconSymbol name={icon as any} size={14} color={colors.accent} />
       <View>
-        <Text style={[styles.weatherCellLabel, { color: colors.muted }]}>{label}</Text>
-        <Text style={[styles.weatherCellValue, { color: colors.foreground }]}>{value}</Text>
+        <Text style={[styles.weatherCellLabel, { color: colors.muted }]}>
+          {label}
+        </Text>
+        <Text style={[styles.weatherCellValue, { color: colors.foreground }]}>
+          {value}
+        </Text>
       </View>
     </View>
   );
@@ -637,8 +1315,16 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16 /* internal spacing */,
   },
-  weightCardTitle: { fontSize: 17, fontWeight: "700", marginBottom: 4 /* internal spacing */ },
-  weightCardSub: { fontSize: 13, lineHeight: 19, marginBottom: 14 /* internal spacing */ },
+  weightCardTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    marginBottom: 4 /* internal spacing */,
+  },
+  weightCardSub: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 14 /* internal spacing */,
+  },
   totalMassRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -660,7 +1346,13 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16 /* internal spacing */,
   },
-  importIconWrap: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  importIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   importTextWrap: { flex: 1 },
   importTitle: { fontSize: 17, fontWeight: "700" },
   importSubtitle: { fontSize: 13, lineHeight: 18, marginTop: 3 },
@@ -710,44 +1402,131 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 20, fontWeight: "800" },
   statLabel: { fontSize: 13, lineHeight: 18, fontWeight: "600", marginTop: 4 },
 
-  routePreview: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 12, marginBottom: 16, overflow: "hidden" },
-  routePreviewHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 8 },
+  routePreview: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+  routePreviewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 8,
+  },
   routePreviewHint: { fontSize: 12, fontWeight: "600", flexShrink: 1 },
-  routePreviewLegend: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4, marginTop: 4 },
+  routePreviewLegend: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+    marginTop: 4,
+  },
   routePreviewLegendText: { fontSize: 12, fontWeight: "600" },
 
-  routeConfirmCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 16, marginBottom: 16 },
-  routeConfirmHeading: { flexDirection: "row", gap: 11, alignItems: "center", flexWrap: "wrap" },
-  routeConfirmIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  routeConfirmCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  routeConfirmHeading: {
+    flexDirection: "row",
+    gap: 11,
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  routeConfirmIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   routeConfirmMain: { fontSize: 27, fontWeight: "700", letterSpacing: -0.5 },
   routeConfirmSub: { fontSize: 13, lineHeight: 18, marginTop: 3 },
   routeConfirmFactors: { fontSize: 12, lineHeight: 18, marginTop: 13 },
-  energyCarryCard: { marginTop: 13, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12 },
-  energyCarryHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 },
+  energyCarryCard: {
+    marginTop: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    padding: 12,
+  },
+  energyCarryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   energyCarryTitle: { fontSize: 14, fontWeight: "800", flexShrink: 1 },
-  energyCarryUnit: { fontSize: 12, flexShrink: 1, textAlign: "auto", fontWeight: "600" },
-  energyCarryCounts: { flexDirection: "row", alignItems: "center", marginTop: 11 },
+  energyCarryUnit: {
+    fontSize: 12,
+    flexShrink: 1,
+    textAlign: "auto",
+    fontWeight: "600",
+  },
+  energyCarryCounts: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 11,
+  },
   energyCarryCount: { flex: 1 },
   energyCarryLabel: { fontSize: 12, fontWeight: "600" },
   energyCarryValue: { fontSize: 25, fontWeight: "700", marginTop: 2 },
   energyCarrySuffix: { fontSize: 13, fontWeight: "600" },
-  energyCarryDivider: { width: StyleSheet.hairlineWidth, height: 34, marginHorizontal: 12 },
+  energyCarryDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 34,
+    marginHorizontal: 12,
+  },
   energyCarryFactors: { fontSize: 12, lineHeight: 18, marginTop: 10 },
   routeConfirmNotice: { fontSize: 12, lineHeight: 18, marginTop: 8 },
-  startRouteBtn: { marginTop: 15, minHeight: 48, borderRadius: 13, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
+  startRouteBtn: {
+    marginTop: 15,
+    minHeight: 48,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
   startRouteBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 
-  forecastCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 16, marginBottom: 16 },
+  forecastCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
   forecastCurrent: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
   forecastRow: { gap: 8 },
-  forecastPill: { width: 94, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 9 },
+  forecastPill: {
+    width: 94,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    padding: 9,
+  },
   forecastHour: { fontSize: 11 },
   forecastValue: { fontSize: 17, fontWeight: "700", marginTop: 3 },
   forecastMeta: { fontSize: 10, marginTop: 2 },
 
-  planningCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 16, marginBottom: 16 },
+  planningCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
   planningHint: { fontSize: 11, lineHeight: 16, marginBottom: 8 },
-  planningRow: { flexDirection: "row", gap: 10, alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 11 },
+  planningRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 11,
+  },
   planningDot: { width: 10, height: 10, borderRadius: 5 },
   planningTitle: { fontSize: 13, fontWeight: "600" },
   planningMeta: { fontSize: 11, marginTop: 3 },
@@ -759,15 +1538,41 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16 /* internal spacing */,
   },
-  calorieFormula: { fontSize: 11, marginTop: 2, marginBottom: 14 /* internal spacing */, lineHeight: 16 },
-  calorieTotalRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginBottom: 16 /* internal spacing */ },
+  calorieFormula: {
+    fontSize: 11,
+    marginTop: 2,
+    marginBottom: 14 /* internal spacing */,
+    lineHeight: 16,
+  },
+  calorieTotalRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+    marginBottom: 16 /* internal spacing */,
+  },
   calorieTotalValue: { fontSize: 48, fontWeight: "700", letterSpacing: -1 },
   calorieTotalUnit: { fontSize: 16, fontWeight: "500" },
 
   // Breakdown
-  breakdownGrid: { paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 12 },
-  breakdownItem: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 },
-  breakdownLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 180 },
+  breakdownGrid: {
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+  },
+  breakdownItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  breakdownLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+    minWidth: 180,
+  },
   breakdownDot: { width: 10, height: 10, borderRadius: 5 },
   breakdownLabel: { fontSize: 14, fontWeight: "500" },
   breakdownSublabel: { fontSize: 11, marginTop: 1 },
@@ -796,12 +1601,24 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16 /* internal spacing */,
   },
-  sectionTitle: { fontSize: 14, fontWeight: "600", marginBottom: 8 /* internal spacing */ },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8 /* internal spacing */,
+  },
   chartAxisLabel: { fontSize: 10, textAlign: "center", marginTop: 2 },
 
   // Tips
-  tipsBox: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 16 },
-  tipsTitle: { fontSize: 14, fontWeight: "600", marginBottom: 8 /* internal spacing */ },
+  tipsBox: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 16,
+  },
+  tipsTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8 /* internal spacing */,
+  },
   tipsText: { fontSize: 13, lineHeight: 20 },
 
   // Empty
@@ -816,11 +1633,30 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16 /* internal spacing */,
   },
-  weatherHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 12 /* internal spacing */ },
+  weatherHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 12 /* internal spacing */,
+  },
   weatherTitle: { fontSize: 14, fontWeight: "600", flexShrink: 1 },
   weatherFetching: { fontSize: 12 },
-  weatherGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 /* internal spacing */ },
-  weatherCellWrap: { width: "48%", minWidth: 130, flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 6 },
+  weatherGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8 /* internal spacing */,
+  },
+  weatherCellWrap: {
+    width: "48%",
+    minWidth: 130,
+    flexGrow: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   weatherCellLabel: { fontSize: 11 },
   weatherCellValue: { fontSize: 14, fontWeight: "600" },
   airDensityRow: {
@@ -851,7 +1687,11 @@ const styles = StyleSheet.create({
     marginBottom: 12 /* internal spacing */,
   },
   gradSummaryItem: { flex: 1, alignItems: "center" },
-  gradSummaryDivider: { width: StyleSheet.hairlineWidth, height: 36, marginHorizontal: 8 },
+  gradSummaryDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 36,
+    marginHorizontal: 8,
+  },
   gradSummaryValue: { fontSize: 26, fontWeight: "700", letterSpacing: -0.5 },
   gradSummaryLabel: { fontSize: 11, marginTop: 2, textAlign: "center" },
   gradDistTitle: { fontSize: 11, marginBottom: 8 /* internal spacing */ },

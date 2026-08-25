@@ -47,8 +47,12 @@ describe("導航頁使用者地圖方向守門", () => {
       "nextLocationCameraMode(locationCameraModeRef.current)",
     );
     expect(mapScreenSource).toContain('selectLocationCameraMode("heading-up")');
-    expect(mapScreenSource).toContain('label: "自由"');
-    expect(mapScreenSource).toContain('label: "正北"');
+    expect(mapScreenSource).toContain('label: t("map.freeHeading")');
+    expect(mapScreenSource).toContain('label: t("map.northUp")');
+    expect(mapScreenSource).toContain(
+      'backgroundColor: colorScheme === "dark" ? "#2C2C2E" : "#FFFFFF"',
+    );
+    expect(mapScreenSource).toContain("styles.freeHeadingToolBtn");
     expect(mapScreenSource).toContain("setFollowUser(false);");
     expect(mapScreenSource).toContain("setFollowUser(true);");
     expect(mapScreenSource).not.toContain("applyResponsiveMapBearing(");
