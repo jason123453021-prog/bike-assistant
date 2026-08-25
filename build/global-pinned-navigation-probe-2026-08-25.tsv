@@ -1,0 +1,13 @@
+region	city	provider	http	result
+Asia	Taipei	BRouter	200	route
+Asia	Taipei	OSM-bike	200	route
+Europe	Berlin	BRouter	200	route
+Europe	Berlin	OSM-bike	200	route
+North America	San Francisco	BRouter	200	route
+North America	San Francisco	OSM-bike	200	route
+South America	São Paulo	BRouter	200	route
+South America	São Paulo	OSM-bike	200	route
+Africa	Cape Town	BRouter	200	route
+Africa	Cape Town	OSM-bike	200	route
+Oceania	Sydney	BRouter	200	route
+Oceania	Sydney	OSM-bike	200	route

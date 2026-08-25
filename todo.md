@@ -2510,3 +2510,7 @@
 - [x] 將活動標題與分享圖卡文字接入自適應字級縮放與換行降級策略
 - [x] 新增長字串多語系截圖回歸測試與完整品質檢查
 - [x] 完成最新版 GitHub Android E2E 與 130%／200% 多語系截圖 artifact 驗收（GitHub run 32828435693、main `afbdb63`；核心 JUnit 1／0 failures、1.3 與 2.0 各 3／0 failures；artifact 含 Deutsch、Русский、Arabic `font-scale-settings-{de,ru,ar}.png`，並已檢視 200% 德文與 Arabic RTL 截圖）
+- [ ] 驗證全語言背景通知點擊後切回前景、待確認彈窗與下一輪倒數狀態
+- [x] 以各語系真實長活動名稱驗證分享圖卡 SVG 換行、縮放與截圖輸出（13 語系 SVG／1080×1920 PNG 全數產生；自動化確認 `<tspan>` 換行、無省略號、無遺漏值；已視覺檢視德文與 Arabic）
+- [ ] 以實體 Android 裝置驗證 RTL 語系與 200% 系統字體大小顯示
+- [x] 評估釘選導航在全球地區的資料覆蓋、離線限制與可用性（BRouter／OSM-bike 於台北、柏林、舊金山、聖保羅、開普敦、雪梨均回傳有效路線；公開服務有節流限制且無離線或全球 SLA 保證）
