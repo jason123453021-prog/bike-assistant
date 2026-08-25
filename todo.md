@@ -2497,4 +2497,4 @@
 - [x] 抽取設定頁清理、重設與補給品管理的確認、成功與失敗提示為多語系 key
 - [x] 為設定數值、生日與自訂補給品欄位新增即時驗證回饋，避免僅在儲存後才顯示錯誤
 - [ ] 由 Android 實機依 `references/android-rtl-form-validation-device-validation-2026-08-25.md` 完成長字串、RTL 與即時驗證驗收
-- [ ] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact
+- [x] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact（run 32812652963，head `690df86`；Maestro JUnit 1 test／0 failures／31.683 秒；artifact `bike-assistant-maestro-e2e` 已下載核實）
