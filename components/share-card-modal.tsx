@@ -8,6 +8,8 @@ import { useColors } from "@/hooks/use-colors";
 import { RideRecord } from "@/lib/ride-context";
 import { generateShareCard, generateShareText } from "@/lib/garmin-card-generator";
 import { createRideShareCardFilename, createRideShareCardSvg } from "@/lib/ride-share-card-svg";
+import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/lib/i18n/language-provider";
 
 export interface ShareCardModalProps {
   visible: boolean;
@@ -17,14 +19,16 @@ export interface ShareCardModalProps {
 
 export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) {
   const colors = useColors();
+  const { t } = useTranslation();
+  const { activeLanguage } = useLanguage();
   const [isPreparingImage, setIsPreparingImage] = useState(false);
 
   const shareCard = useMemo(() => {
     if (!ride) return null;
-    return generateShareCard(ride);
-  }, [ride]);
+    return generateShareCard(ride, { locale: activeLanguage, t });
+  }, [activeLanguage, ride, t]);
 
-  const shareCardSvg = useMemo(() => (ride ? createRideShareCardSvg(ride) : ""), [ride]);
+  const shareCardSvg = useMemo(() => (ride ? createRideShareCardSvg(ride, { locale: activeLanguage, t }) : ""), [activeLanguage, ride, t]);
 
   const imageRendererHtml = useMemo(() => {
     if (!shareCardSvg) return "";
@@ -52,8 +56,8 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
 
   const shareText = useMemo(() => {
     if (!shareCard) return "";
-    return generateShareText(shareCard);
-  }, [shareCard]);
+    return generateShareText(shareCard, t);
+  }, [shareCard, t]);
 
   const handleShare = async () => {
     if (!shareText) return;
@@ -61,10 +65,10 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
     try {
       await Share.share({
         message: shareText,
-        title: "分享騎乘記錄",
+        title: t("share.title"),
       });
     } catch {
-      Alert.alert("分享失敗", "無法分享騎乘記錄");
+      Alert.alert(t("share.shareFailed"), t("share.shareFailed"));
     }
   };
 
@@ -73,16 +77,16 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
 
     try {
       await Clipboard.setStringAsync(shareText);
-      Alert.alert("已複製", "分享文字已複製到剪貼板");
+      Alert.alert(t("share.copied"), t("share.copySuccess"));
     } catch {
-      Alert.alert("複製失敗", "無法寫入系統剪貼板，請稍後再試。");
+      Alert.alert(t("share.copyFailed"), t("share.copyFailed"));
     }
   };
 
   const handleShareImage = async () => {
     if (!ride) return;
     if (Platform.OS === "web") {
-      Alert.alert("此平台不支援", "本機圖像分享需在 Android 或 iOS 裝置上使用。");
+      Alert.alert(t("share.unsupported"), t("share.imageNativeOnly"));
       return;
     }
 
@@ -103,12 +107,12 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
       await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
       await FileSystem.writeAsStringAsync(uri, message.base64, { encoding: FileSystem.EncodingType.Base64 });
       await Sharing.shareAsync(uri, {
-        dialogTitle: "分享騎乘長圖",
+          dialogTitle: t("share.shareImage"),
         mimeType: "image/png",
         UTI: "public.png",
       });
     } catch {
-      Alert.alert("產生分享長圖失敗", "無法建立本機分享圖片，請稍後再試。");
+      Alert.alert(t("share.imageFailed"), t("share.imageFailed"));
     } finally {
       setIsPreparingImage(false);
     }
@@ -142,7 +146,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
             }}
           >
             <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "bold" }}>
-              分享卡片
+              {t("share.title")}
             </Text>
             <Pressable onPress={onClose} style={{ padding: 8 }}>
               <Text style={{ color: colors.muted, fontSize: 24 }}>✕</Text>
@@ -174,7 +178,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
             {/* 分享選項 */}
             <View style={{ gap: 12 }}>
               <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>
-                分享方式
+                {t("share.methods")}
               </Text>
 
               {/* 主要分享：完整騎乘長圖 */}
@@ -191,10 +195,10 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 onPress={handleShareImage}
               >
                 <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800", textAlign: "center" }}>
-                  {isPreparingImage ? "正在產生分享長圖…" : "分享完整騎乘長圖"}
+                  {isPreparingImage ? t("share.preparingImage") : t("share.shareImage")}
                 </Text>
                 <Text style={{ color: "rgba(255,255,255,0.78)", fontSize: 11, textAlign: "center", marginTop: 4 }}>
-                  包含路線概覽、活動名稱、個人最佳與核心成績
+                  {t("share.imageDescription")}
                 </Text>
               </Pressable>
 
@@ -213,7 +217,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 onPress={handleShare}
               >
                 <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600", marginBottom: 8 /* internal spacing */ }}>
-                  📱 分享至社群
+                  📱 {t("share.shareSocial")}
                 </Text>
                 <Text
                   style={{
@@ -242,7 +246,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 onPress={() => { void handleCopyShareText(); }}
               >
                 <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>
-                  📋 複製分享文字
+                  📋 {t("share.copyText")}
                 </Text>
               </Pressable>
 
@@ -262,7 +266,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 onPress={handleShareImage}
               >
                 <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>
-                  🖼️ 產生並分享圖片檔
+                  🖼️ {t("share.createImage")}
                 </Text>
               </Pressable>
             </View>
@@ -280,7 +284,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
               onPress={onClose}
             >
               <Text style={{ color: colors.onAccent, fontSize: 14, fontWeight: "600", textAlign: "center" }}>
-                關閉
+                {t("common.close")}
               </Text>
             </Pressable>
           </ScrollView>

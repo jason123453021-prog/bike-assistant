@@ -32,6 +32,12 @@ export interface ShareCard {
   tss?: number;            // 訓練壓力分數（TSS）
 }
 
+export type ShareTranslator = (key: string, options?: Record<string, unknown>) => string;
+
+const defaultShareTranslator: ShareTranslator = (key) => ({
+  "share.untitledRide": "未命名騎乘", "share.distance": "距離", "share.movingTime": "移動時間", "share.elevation": "總爬升", "share.averageSpeed": "平均速度", "share.maxSpeed": "最高速度", "share.calories": "卡路里", "share.hashtags": "#騎乘紀錄 #單車 #自行車 #運動",
+}[key] ?? key);
+
 /**
  * 格式化時間為 HH:MM:SS
  */
@@ -61,16 +67,18 @@ export function getActivityEmoji(avgSpeed: number, elevation: number, distance: 
 /**
  * 生成分享卡片資料
  */
-export function generateShareCard(ride: RideRecord): ShareCard {
+export function generateShareCard(ride: RideRecord, options?: { locale?: string; t?: ShareTranslator }): ShareCard {
+  const locale = options?.locale ?? "zh-TW";
+  const t = options?.t ?? defaultShareTranslator;
   const date = new Date(ride.date);
-  const dateStr = date.toLocaleDateString("zh-TW", {
+  const dateStr = date.toLocaleDateString(locale, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
 
   return {
-    title: `${ride.name || "騎乘紀錄"} - ${dateStr}`,
+    title: `${ride.name || t("share.untitledRide")} - ${dateStr}`,
     distance: Math.round((ride.distance / 1000) * 100) / 100,
     duration: ride.duration,
     elevation: ride.totalAscent,
@@ -78,7 +86,7 @@ export function generateShareCard(ride: RideRecord): ShareCard {
     maxSpeed: Math.round(ride.maxSpeed * 10) / 10,
     calories: Math.round(ride.calories),
     date: dateStr,
-    routeName: ride.name || "未命名路線",
+    routeName: ride.name || t("share.untitledRide"),
     emoji: getActivityEmoji(ride.avgSpeed, ride.totalAscent, ride.distance / 1000),
     movingTime: ride.movingTime,
     totalDescent: ride.totalDescent,
@@ -98,17 +106,17 @@ export function generateShareCard(ride: RideRecord): ShareCard {
 /**
  * 生成文字分享內容
  */
-export function generateShareText(card: ShareCard): string {
+export function generateShareText(card: ShareCard, t: ShareTranslator = defaultShareTranslator): string {
   const durationStr = formatDuration(card.duration);
   
   return `${card.emoji} ${card.title}\n\n` +
-    `📏 距離: ${card.distance} km\n` +
-    `⏱️ 時間: ${durationStr}\n` +
-    `📈 爬升: ${card.elevation} m\n` +
-    `⚡ 平均速度: ${card.avgSpeed} km/h\n` +
-    `🏁 最高速度: ${card.maxSpeed} km/h\n` +
-    `🔥 卡路里: ${card.calories} kcal\n\n` +
-    `#騎乘紀錄 #單車 #自行車 #運動`;
+    `📏 ${t("share.distance")}: ${card.distance} km\n` +
+    `⏱️ ${t("share.movingTime")}: ${durationStr}\n` +
+    `📈 ${t("share.elevation")}: ${card.elevation} m\n` +
+    `⚡ ${t("share.averageSpeed")}: ${card.avgSpeed} km/h\n` +
+    `🏁 ${t("share.maxSpeed")}: ${card.maxSpeed} km/h\n` +
+    `🔥 ${t("share.calories")}: ${card.calories} kcal\n\n` +
+    t("share.hashtags");
 }
 
 /**

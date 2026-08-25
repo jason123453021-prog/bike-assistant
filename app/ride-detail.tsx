@@ -60,6 +60,8 @@ import { resolveActivityCoverPhotoUri } from "@/lib/activity-media";
 import { calculateGapPaceSecPerKm, formatPaceFromKmh, formatPaceSeconds, SPORT_META, type SportType } from "@/lib/sport-metrics";
 import { sampleActivityMapPolyline } from "@/lib/activity-map-presentation";
 import * as ImagePicker from "expo-image-picker";
+import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/lib/i18n/language-provider";
 
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -98,16 +100,10 @@ function buildStoredActivityStatistics(record: RideRecord) {
 function clampActivityViewerDrawerHeight(value: number): number {
   return Math.min(ACTIVITY_VIEWER_DRAWER_EXPANDED_HEIGHT, Math.max(ACTIVITY_VIEWER_DRAWER_COLLAPSED_HEIGHT, value));
 }
-const ACTIVITY_TYPES = [
-  { value: "road", label: "公路" },
-  { value: "gravel", label: "礫石" },
-  { value: "mountain", label: "登山" },
-  { value: "commute", label: "通勤" },
-  { value: "indoor", label: "室內" },
-] as const;
+const ACTIVITY_TYPES = ["road", "gravel", "mountain", "commute", "indoor"] as const;
 
-function activityTypeLabel(value: RideRecord["activityType"]): string {
-  return ACTIVITY_TYPES.find((item) => item.value === value)?.label ?? "其他騎乘";
+function activityTypeLabel(value: RideRecord["activityType"], t: (key: string) => string): string {
+  return value ? t(`detail.activityTypes.${value}`) : t("detail.activityTypes.other");
 }
 
 function isVideoMedia(uri: string): boolean {
@@ -124,6 +120,8 @@ function formatPowerInterval(seconds: number): string {
 export default function RideDetailScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
+  const { t } = useTranslation();
+  const { activeLanguage } = useLanguage();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, updateRecordName, updateRideActivity, getRouteStats } = useRide();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -148,7 +146,7 @@ export default function RideDetailScreen() {
         setLocalMedia((prev) => [...prev, ...newUris]);
       }
     } catch {
-      Alert.alert("提示", "無法存取媒體庫");
+      Alert.alert(t("detail.title"), t("detail.mediaUnavailable"));
     }
   };
 
@@ -169,7 +167,7 @@ export default function RideDetailScreen() {
       perceivedExertionSource: "manual",
     });
     setIsEditModalVisible(false);
-    Alert.alert("成功", "已儲存活動編輯");
+    Alert.alert(t("common.done"), t("detail.saveSuccess"));
   };
   const { settings } = useSettings();
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
@@ -669,9 +667,9 @@ export default function RideDetailScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.errorState, { paddingTop: insets.top + 20 }]}>
-          <Text style={[styles.errorText, { color: colors.muted }]}>找不到記錄</Text>
+          <Text style={[styles.errorText, { color: colors.muted }]}>{t("detail.notFound")}</Text>
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={[styles.backBtnText, { color: colors.accent }]}>返回</Text>
+            <Text style={[styles.backBtnText, { color: colors.accent }]}>{t("detail.back")}</Text>
           </Pressable>
         </View>
       </View>
@@ -679,7 +677,7 @@ export default function RideDetailScreen() {
   }
 
   const date = new Date(record.date);
-  const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  const dateStr = `${date.toLocaleDateString(activeLanguage, { year: "numeric", month: "2-digit", day: "2-digit" })} ${date.toLocaleTimeString(activeLanguage, { hour: "2-digit", minute: "2-digit" })}`;
   const totalZones = record.powerZones.reduce((a, b) => a + b, 0);
   const zonePcts = record.powerZones.map((v) =>
     totalZones > 0 ? Math.round((v / totalZones) * 100) : 0
@@ -753,8 +751,8 @@ export default function RideDetailScreen() {
         >
           <Image source={{ uri: coverPhotoUri }} style={styles.activityCoverImage} />
           <View style={styles.activityCoverShade}>
-            <Text style={styles.activityCoverEyebrow}>活動封面</Text>
-            <Text style={styles.activityCoverCopy}>點擊全螢幕查看與縮放</Text>
+            <Text style={styles.activityCoverEyebrow}>{t("detail.cover")}</Text>
+            <Text style={styles.activityCoverCopy}>{t("detail.viewCover")}</Text>
           </View>
         </Pressable>
       ) : null}
@@ -818,7 +816,7 @@ export default function RideDetailScreen() {
       {/* 無軌跡提示浮層 */}
       {polylineCoords.length === 0 && (
         <View style={styles.noTrailBadge}>
-          <Text style={styles.noTrailText}>此記錄無 GPS 軌跡資料</Text>
+          <Text style={styles.noTrailText}>{t("detail.noGps")}</Text>
         </View>
       )}
 
@@ -844,7 +842,7 @@ export default function RideDetailScreen() {
         <View style={styles.activityInitialSummary}>
           <ActivitySummaryHeader
             title={record.name}
-            subtitle={`${dateStr} · ${SPORT_META[record.sportType ?? "cycling"].label}`}
+            subtitle={`${dateStr} · ${t(`sports.${record.sportType === "trail_running" ? "trailRunning" : record.sportType ?? "cycling"}`)}`}
           />
           <CoreActivitySummaryGrid
             distanceKm={activityStats.distanceM / 1000}
@@ -860,10 +858,10 @@ export default function RideDetailScreen() {
         </View>
 
         <View style={styles.activityDetailsAfterInitial}>
-          <Text style={styles.activityEyebrow}>活動詳情</Text>
+          <Text style={styles.activityEyebrow}>{t("detail.title")}</Text>
           <View style={styles.activityMetaRow}>
             <View style={styles.activityMetaChip}>
-              <Text style={styles.activityMetaChipText}>{activityTypeLabel(record.activityType)}</Text>
+              <Text style={styles.activityMetaChipText}>{activityTypeLabel(record.activityType, t)}</Text>
             </View>
             {record.perceivedExertion !== undefined && (
               <View style={[styles.activityMetaChip, styles.activityMetaRpeChip]}>
@@ -876,7 +874,7 @@ export default function RideDetailScreen() {
 
         {activityHighlights.length > 0 && (
           <View style={styles.activityHighlightsCard}>
-            <Text style={styles.activityHighlightsTitle}>本機成果</Text>
+            <Text style={styles.activityHighlightsTitle}>{t("detail.localHighlights")}</Text>
             {activityHighlights.map((highlight) => {
               const color = highlight.accent === "gold" ? "#F6C445" : highlight.accent === "green" ? "#00E676" : "#60A5FA";
               return (
@@ -1359,7 +1357,7 @@ export default function RideDetailScreen() {
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>編輯活動</Text>
             <ScrollView style={{ maxHeight: 400 }} contentContainerStyle={{ gap: 12 }}>
               <View>
-                <Text style={[styles.label, { color: colors.muted }]}>活動名稱</Text>
+                <Text style={[styles.label, { color: colors.muted }]}>{t("detail.activityName")}</Text>
                 <TextInput
                   value={editNameInput}
                   onChangeText={setEditNameInput}
@@ -1367,17 +1365,17 @@ export default function RideDetailScreen() {
                 />
               </View>
               <View>
-                <Text style={[styles.label, { color: colors.muted }]}>活動類型</Text>
+                <Text style={[styles.label, { color: colors.muted }]}>{t("detail.activityType")}</Text>
                 <View style={styles.activityTypePicker}>
                   {ACTIVITY_TYPES.map((item) => {
-                    const selected = editActivityType === item.value;
+                    const selected = editActivityType === item;
                     return (
                       <Pressable
-                        key={item.value}
-                        onPress={() => setEditActivityType(item.value)}
+                        key={item}
+                        onPress={() => setEditActivityType(item)}
                         style={[styles.activityTypeOption, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? `${colors.primary}22` : colors.surface }]}
                       >
-                        <Text style={{ color: selected ? colors.primary : colors.muted, fontSize: 12, fontWeight: "700" }}>{item.label}</Text>
+                        <Text style={{ color: selected ? colors.primary : colors.muted, fontSize: 12, fontWeight: "700" }}>{t(`detail.activityTypes.${item}`)}</Text>
                       </Pressable>
                     );
                   })}
@@ -1490,6 +1488,14 @@ export default function RideDetailScreen() {
 
 // ─── 子元件 ───────────────────────────────────────────────────────────────────
 
+const DETAIL_LABEL_KEYS: Record<string, string> = {
+  "距離": "share.distance", "總爬升": "share.elevation", "爬升海拔": "share.elevation", "移動時間": "share.movingTime", "平均速度": "share.averageSpeed", "平均功率": "share.averagePower", "卡路里": "share.calories", "最高速度": "share.maxSpeed", "最高功率": "detail.maxPower", "活動時間": "detail.elapsedTime", "暫停時間": "detail.pausedTime", "平均踏頻": "detail.avgCadence", "最大踏頻": "detail.maxCadence", "最高海拔": "detail.maxAltitude", "水分流失": "detail.sweatLoss", "補水次數": "detail.refillCount", "平均配速": "detail.avgPace", "爬升速度": "detail.climbRate",
+};
+
+function translatedDetailLabel(t: (key: string) => string, label: string): string {
+  return DETAIL_LABEL_KEYS[label] ? t(DETAIL_LABEL_KEYS[label]) : label;
+}
+
 function CoreActivitySummaryGrid({
   distanceKm,
   ascentM,
@@ -1511,6 +1517,7 @@ function CoreActivitySummaryGrid({
   averageGrade: number;
   altitudeM: number;
 }) {
+  const { t } = useTranslation();
   const pace = formatPaceFromKmh(averageSpeedKmh);
   const gap = formatPaceSeconds(calculateGapPaceSecPerKm(averageSpeedKmh > 0 ? 3600 / averageSpeedKmh : 0, averageGrade));
   const vam = movingDuration > 0 ? (ascentM / movingDuration) * 3600 : 0;
@@ -1526,7 +1533,7 @@ function CoreActivitySummaryGrid({
     <View style={styles.coreActivitySummaryGrid}>
       {entries.map(([label, value]) => (
         <View key={label} style={styles.coreActivitySummaryMetric}>
-          <Text style={styles.coreActivitySummaryLabel}>{label}</Text>
+          <Text style={styles.coreActivitySummaryLabel}>{translatedDetailLabel(t, label)}</Text>
           <Text style={styles.coreActivitySummaryValue}>{value}</Text>
         </View>
       ))}
@@ -1535,9 +1542,10 @@ function CoreActivitySummaryGrid({
 }
 
 function ActivitySummaryHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.activitySummaryHeader}>
-      <Text style={styles.activitySummaryEyebrow}>活動摘要</Text>
+      <Text style={styles.activitySummaryEyebrow}>{t("detail.summary")}</Text>
       <Text style={styles.activitySummaryTitle} numberOfLines={1}>{title}</Text>
       <Text style={styles.activitySummarySubtitle} numberOfLines={2}>{subtitle}</Text>
     </View>
@@ -1547,12 +1555,13 @@ function ActivitySummaryHeader({ title, subtitle }: { title: string; subtitle: s
 function DetailCell({ label, value, unit, accent, color }: {
   label: string; value: string; unit: string; accent?: boolean; color?: string;
 }) {
+  const { t } = useTranslation();
   const textColor = color ?? (accent ? "#00E676" : "#fff");
   return (
     <View style={detailStyles.cell}>
       <Text style={[detailStyles.value, { color: textColor }]}>{value}</Text>
       <Text style={detailStyles.unit}>{unit}</Text>
-      <Text style={detailStyles.label}>{label}</Text>
+      <Text style={detailStyles.label}>{translatedDetailLabel(t, label)}</Text>
     </View>
   );
 }

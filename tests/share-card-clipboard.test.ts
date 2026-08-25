@@ -9,8 +9,9 @@ describe("分享卡複製文字", () => {
     expect(source).toContain('import * as Clipboard from "expo-clipboard"');
     expect(source).toContain("const handleCopyShareText = async () =>");
     expect(source).toContain("await Clipboard.setStringAsync(shareText)");
-    expect(source).toContain('Alert.alert("已複製", "分享文字已複製到剪貼板")');
-    expect(source).toContain('Alert.alert("複製失敗", "無法寫入系統剪貼板，請稍後再試。")');
+    expect(source).toContain('Alert.alert(t("share.copied"), t("share.copySuccess"))');
+    expect(source).toContain('Alert.alert(t("share.copyFailed"), t("share.copyFailed"))');
+    expect(source).toContain("useTranslation");
     expect(source).not.toContain("TODO: 實現複製功能");
   });
 });

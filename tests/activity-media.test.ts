@@ -82,7 +82,8 @@ describe("activity media presentation", () => {
     expect(source).toContain("activityInitialSummary: { paddingTop: ACTIVITY_SUMMARY_CONTENT_TOP, paddingBottom: ACTIVITY_SUMMARY_CONTENT_BOTTOM }");
     expect(source).not.toContain("ACTIVITY_INITIAL_SUMMARY_MIN_HEIGHT");
     expect(source).not.toContain("activityInitialSummary: { minHeight:");
-    expect(source).toContain("<Text style={styles.activityEyebrow}>活動詳情</Text>");
+    expect(source).toContain('t("detail.title")');
+    expect(source).toContain("useTranslation");
   });
 
   it("keeps a fixed summary available for routes and every photo", () => {
@@ -104,7 +105,7 @@ describe("activity media presentation", () => {
     const filePath = path.join(process.cwd(), "app", "ride-detail.tsx");
     const source = fs.readFileSync(filePath, "utf8");
 
-    expect(source).toContain("活動摘要");
+    expect(source).toContain('t("detail.summary")');
     expect(source).toContain("爬升海拔");
     expect(source).toContain("平均功率");
     expect(source).toContain("平均速度");

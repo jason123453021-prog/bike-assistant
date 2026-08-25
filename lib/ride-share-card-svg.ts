@@ -14,9 +14,9 @@ function escapeXml(value: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function formatDate(timestamp: number): string {
+function formatDate(timestamp: number, locale: string): string {
   const date = new Date(timestamp);
-  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return `${date.toLocaleDateString(locale, { year: "numeric", month: "2-digit", day: "2-digit" })} ${date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 function formatDuration(seconds: number): string {
@@ -31,12 +31,12 @@ function truncateTitle(value: string, maximum = 18): string {
   return value.length > maximum ? `${value.slice(0, maximum - 1)}…` : value;
 }
 
-function sportLabel(record: RideRecord): string {
+function sportLabel(record: RideRecord, t: (key: string) => string): string {
   switch (record.sportType) {
-    case "running": return "跑步";
-    case "trail_running": return "越野跑";
-    case "hiking": return "健行";
-    default: return "自行車";
+    case "running": return t("sports.running");
+    case "trail_running": return t("sports.trailRunning");
+    case "hiking": return t("sports.hiking");
+    default: return t("sports.cycling");
   }
 }
 
@@ -86,7 +86,11 @@ function metricCell({
     <text x="${x}" y="${y + 102}" fill="#93A2B2" font-size="21" font-family="${FONT_STACK}" text-anchor="middle">${escapeXml(unit)}</text>`;
 }
 
-export function createRideShareCardSvg(record: RideRecord): string {
+const DEFAULT_SHARE_COPY: Record<string, string> = { "share.noGps": "此活動沒有可繪製的 GPS 軌跡", "share.distance": "距離", "share.movingTime": "移動時間", "share.elevation": "總爬升", "share.averageSpeed": "平均速度", "share.averagePower": "平均功率", "share.calories": "卡路里", "share.kilometers": "公里", "share.meters": "公尺", "share.watts": "瓦", "share.kilocalories": "大卡", "share.gpsMoving": "GPS 移動", "share.unavailable": "資料不足", "share.activitySummary": "活動摘要", "share.gpsRecord": "GPS 記錄", "share.movingTimeMethod": "移動時間依可信 GPS 位置、距離與速度計算", "share.createdOffline": "由單車助手在此裝置離線產生", "share.untitledRide": "未命名騎乘", "sports.cycling": "自行車", "sports.running": "跑步", "sports.trailRunning": "越野跑", "sports.hiking": "健行" };
+
+export function createRideShareCardSvg(record: RideRecord, options?: { t?: (key: string) => string; locale?: string }): string {
+  const t = options?.t ?? ((key: string) => DEFAULT_SHARE_COPY[key] ?? key);
+  const locale = options?.locale ?? "zh-TW";
   const points = routePoints(record);
   const hasPowerEvidence = record.powerSource !== "unavailable" && (
     record.avgPower > 0 || record.maxPower > 0 || (record.powerHistory?.some((power) => power > 0) ?? false)
@@ -106,7 +110,7 @@ export function createRideShareCardSvg(record: RideRecord): string {
     powerSource: record.powerSource ?? "unavailable",
     caloriesSource: record.caloriesSource ?? "unavailable",
   });
-  const routeName = truncateTitle(record.name?.trim() || "未命名騎乘");
+  const routeName = truncateTitle(record.name?.trim() || t("share.untitledRide"));
   const routeTokens = points ? points.split(" ") : [];
   const firstPoint = routeTokens[0]?.split(",");
   const middlePoint = routeTokens[Math.floor(routeTokens.length / 2)]?.split(",");
@@ -120,17 +124,17 @@ export function createRideShareCardSvg(record: RideRecord): string {
        <circle cx="${lastPoint?.[0]}" cy="${lastPoint?.[1]}" r="20" fill="#FF7849" stroke="#FFF7F2" stroke-width="8"/>`
     : `<g><circle cx="540" cy="415" r="64" fill="#14212A" stroke="#2C4352" stroke-width="2"/>
        <path d="M540 372 L564 420 L540 408 L516 420 Z" fill="#6B7F8D"/>
-       <text x="540" y="525" fill="#B3C0CB" font-size="28" font-family="${FONT_STACK}" text-anchor="middle">此活動沒有可繪製的 GPS 軌跡</text></g>`;
+       <text x="540" y="525" fill="#B3C0CB" font-size="28" font-family="${FONT_STACK}" text-anchor="middle">${escapeXml(t("share.noGps"))}</text></g>`;
 
   const primaryMetrics = [
-    metricCell({ x: 180, y: 1234, label: "距離", value: (stats.distanceM / 1000).toFixed(2), unit: "公里", primary: true }),
-    metricCell({ x: 540, y: 1234, label: "移動時間", value: formatDuration(stats.movingTimeSec), unit: "GPS 移動", primary: true }),
-    metricCell({ x: 900, y: 1234, label: "爬升", value: `${Math.round(stats.totalAscentM)}`, unit: "公尺", primary: true }),
+    metricCell({ x: 180, y: 1234, label: t("share.distance"), value: (stats.distanceM / 1000).toFixed(2), unit: t("share.kilometers"), primary: true }),
+    metricCell({ x: 540, y: 1234, label: t("share.movingTime"), value: formatDuration(stats.movingTimeSec), unit: t("share.gpsMoving"), primary: true }),
+    metricCell({ x: 900, y: 1234, label: t("share.elevation"), value: `${Math.round(stats.totalAscentM)}`, unit: t("share.meters"), primary: true }),
   ].join("");
   const secondaryMetrics = [
-    metricCell({ x: 180, y: 1512, label: "平均速度", value: stats.averageSpeedKmh.toFixed(1), unit: "公里／小時" }),
-    metricCell({ x: 540, y: 1512, label: "平均功率", value: averagePowerAvailable ? `${Math.round(stats.averagePowerW!)}` : "--", unit: averagePowerAvailable ? "瓦" : "資料不足", unavailable: !averagePowerAvailable }),
-    metricCell({ x: 900, y: 1512, label: "卡路里", value: Math.round(stats.caloriesKcal).toLocaleString("en-US"), unit: "大卡" }),
+    metricCell({ x: 180, y: 1512, label: t("share.averageSpeed"), value: stats.averageSpeedKmh.toFixed(1), unit: "km/h" }),
+    metricCell({ x: 540, y: 1512, label: t("share.averagePower"), value: averagePowerAvailable ? `${Math.round(stats.averagePowerW!)}` : "--", unit: averagePowerAvailable ? t("share.watts") : t("share.unavailable"), unavailable: !averagePowerAvailable }),
+    metricCell({ x: 900, y: 1512, label: t("share.calories"), value: Math.round(stats.caloriesKcal).toLocaleString(locale), unit: t("share.kilocalories") }),
   ].join("");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -146,14 +150,14 @@ export function createRideShareCardSvg(record: RideRecord): string {
   <rect x="0" y="0" width="1080" height="980" fill="url(#mapGrid)"/>
   <rect x="64" y="54" width="310" height="50" rx="25" fill="#10232A" stroke="#2A4A50" stroke-width="2"/>
   <text x="94" y="87" fill="#BFFFE0" font-size="22" font-weight="800" font-family="${FONT_STACK}" letter-spacing="2">BIKE ASSISTANT</text>
-  <text x="1012" y="84" fill="#C2CDD6" font-size="22" font-weight="700" font-family="${FONT_STACK}" text-anchor="end">${escapeXml(sportLabel(record))} · GPS 記錄</text>
+  <text x="1012" y="84" fill="#C2CDD6" font-size="22" font-weight="700" font-family="${FONT_STACK}" text-anchor="end">${escapeXml(sportLabel(record, t))} · ${escapeXml(t("share.gpsRecord"))}</text>
   ${points ? `<polyline points="${points}" fill="none" stroke="#20D984" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" opacity="0.16" filter="url(#routeGlow)"/>` : ""}
   ${routeGraphic}
   <rect x="0" y="906" width="1080" height="1014" rx="48" fill="url(#panelSurface)"/>
   <rect x="64" y="952" width="116" height="38" rx="19" fill="#123C30"/>
-  <text x="122" y="978" fill="#63F5AA" font-size="19" font-weight="800" font-family="${FONT_STACK}" text-anchor="middle" letter-spacing="1">活動摘要</text>
+  <text x="122" y="978" fill="#63F5AA" font-size="19" font-weight="800" font-family="${FONT_STACK}" text-anchor="middle" letter-spacing="1">${escapeXml(t("share.activitySummary"))}</text>
   <text x="64" y="1066" fill="#F8FBFD" font-size="56" font-weight="800" font-family="${FONT_STACK}">${escapeXml(routeName)}</text>
-  <text x="64" y="1112" fill="#93A2B2" font-size="25" font-family="${FONT_STACK}">${formatDate(record.date)}</text>
+  <text x="64" y="1112" fill="#93A2B2" font-size="25" font-family="${FONT_STACK}">${formatDate(record.date, locale)}</text>
   <line x1="64" y1="1164" x2="1016" y2="1164" stroke="#DCE8EE" stroke-opacity="0.14" stroke-width="2"/>
   ${primaryMetrics}
   <line x1="360" y1="1210" x2="360" y2="1366" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
@@ -164,8 +168,8 @@ export function createRideShareCardSvg(record: RideRecord): string {
   <line x1="720" y1="1488" x2="720" y2="1644" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
   <rect x="64" y="1748" width="952" height="96" rx="24" fill="#0E1A22" stroke="#203642" stroke-width="2"/>
   <circle cx="112" cy="1796" r="10" fill="#26E38C"/>
-  <text x="140" y="1804" fill="#C9D6DE" font-size="22" font-family="${FONT_STACK}">移動時間依可信 GPS 位置、距離與速度計算</text>
-  <text x="540" y="1890" fill="#6D7D8A" font-size="20" font-family="${FONT_STACK}" text-anchor="middle">由單車助手在此裝置離線產生</text>
+  <text x="140" y="1804" fill="#C9D6DE" font-size="22" font-family="${FONT_STACK}">${escapeXml(t("share.movingTimeMethod"))}</text>
+  <text x="540" y="1890" fill="#6D7D8A" font-size="20" font-family="${FONT_STACK}" text-anchor="middle">${escapeXml(t("share.createdOffline"))}</text>
 </svg>`;
 }
 

@@ -26,9 +26,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [isSwitching, setIsSwitching] = useState(false);
   const transitionOpacity = useRef(new Animated.Value(0)).current;
   const lastSettingsPreference = useRef<LanguagePreference>(settings.languagePreference);
-  const applyPreference = useCallback(async (nextPreference: LanguagePreference, options: { persist: boolean; syncSettings: boolean }) => {
+  const changeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const applyPreferenceNow = useCallback(async (nextPreference: LanguagePreference, options: { persist: boolean; syncSettings: boolean }) => {
     const nextLanguage = resolveLanguagePreference(nextPreference, getSystemLanguageTags());
-    const languageChanged = nextLanguage !== activeLanguage;
+    const currentLanguage = (i18n.resolvedLanguage ?? activeLanguage) as SupportedLocale;
+    const languageChanged = nextLanguage !== currentLanguage;
     if (languageChanged) {
       setIsSwitching(true);
       Animated.timing(transitionOpacity, { toValue: 1, duration: 90, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
@@ -41,6 +43,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       Animated.timing(transitionOpacity, { toValue: 0, duration: 180, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }).start(() => setIsSwitching(false));
     }
   }, [activeLanguage, settings.languagePreference, transitionOpacity, updateSettings]);
+  const applyPreference = useCallback((nextPreference: LanguagePreference, options: { persist: boolean; syncSettings: boolean }) => {
+    const nextTask = changeQueueRef.current.catch(() => undefined).then(() => applyPreferenceNow(nextPreference, options));
+    changeQueueRef.current = nextTask;
+    return nextTask;
+  }, [applyPreferenceNow]);
   useEffect(() => { let mounted = true; void (async () => { const storedPreference = await AsyncStorage.getItem(LANGUAGE_PREFERENCE_STORAGE_KEY); const initialPreference = isLanguagePreference(storedPreference) ? storedPreference : settings.languagePreference; await applyPreference(initialPreference, { persist: true, syncSettings: true }); if (mounted) setIsReady(true); })(); return () => { mounted = false; }; }, []);
   useEffect(() => { if (!isReady || lastSettingsPreference.current === settings.languagePreference) return; lastSettingsPreference.current = settings.languagePreference; void applyPreference(settings.languagePreference, { persist: true, syncSettings: false }); }, [applyPreference, isReady, settings.languagePreference]);
   useEffect(() => { const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => { if (nextState === "active" && preference === "system") void applyPreference("system", { persist: false, syncSettings: false }); }); return () => subscription.remove(); }, [applyPreference, preference]);

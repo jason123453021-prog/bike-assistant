@@ -2464,3 +2464,10 @@
 - [x] 擴充歷史紀錄、路線頁及其空狀態、操作與資料標籤的 12 語系文案
 - [x] 新增 RTL 與長字串版面回歸測試，保護文字方向、截斷與可讀性
 - [x] 完成完整品質檢查、GitHub Android E2E 與驗收連結（Android E2E run 32799025326 成功；Maestro JUnit 1 test／0 failures／36.732 秒；artifact `bike-assistant-maestro-e2e` 已上傳）
+
+## 全域語系同步、活動詳情與分享圖卡（2026-08-25）
+- [x] 稽核語系 Preference、i18next、Settings 與畫面 re-render 的同步鏈，掃描遺漏 UI 字串
+- [x] 建立所有 locale 的 key 完整性與 fallback 守門，避免切換後顯示 key、空白或舊語言字串
+- [x] 擴充活動詳情的摘要、統計、路線與操作文案為多國語系
+- [x] 擴充分享圖卡及分享 Modal 的標題、數據標籤、空狀態與操作文案為多國語系
+- [ ] 完成完整品質檢查、GitHub Android E2E 與驗收連結
