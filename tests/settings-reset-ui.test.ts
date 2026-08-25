@@ -23,10 +23,10 @@ describe("reset all settings", () => {
   });
 
   it("requires an explicit destructive confirmation and tells the rider that activities remain", () => {
-    expect(settingsScreenSource).toContain('Alert.alert(\n      "重設所有設定"');
-    expect(settingsScreenSource).toContain("騎乘活動、軌跡與照片不會被刪除");
+    expect(settingsScreenSource).toContain('Alert.alert(\n      t("settingsActions.resetTitle")');
+    expect(settingsScreenSource).toContain('t("settingsActions.resetBody")');
     expect(settingsScreenSource).toContain("await resetAllSettings()");
     expect(settingsScreenSource).toContain("powerSavingManagerRef.current.resetSettings()");
-    expect(settingsScreenSource).toContain('>重設所有設定</Text>');
+    expect(settingsScreenSource).toContain('t("settingsActions.resetAllLabel")');
   });
 });

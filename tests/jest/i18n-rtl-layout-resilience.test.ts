@@ -7,6 +7,7 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
   const providerSource = fs.readFileSync(path.join(rootDir, "lib/i18n/language-provider.tsx"), "utf8");
   const historySource = fs.readFileSync(path.join(rootDir, "app/(tabs)/history.tsx"), "utf8");
   const routeSource = fs.readFileSync(path.join(rootDir, "app/(tabs)/navigate.tsx"), "utf8");
+  const settingsSource = fs.readFileSync(path.join(rootDir, "app/(tabs)/settings.tsx"), "utf8");
 
   it("語言切換以非阻塞淡入淡出遮罩回饋，並將 RTL direction 套用至全域內容", () => {
     expect(providerSource).toContain("Animated.timing");
@@ -32,5 +33,17 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
     expect(routeSource).toContain("weatherHeader: { flexDirection: \"row\", justifyContent: \"space-between\", alignItems: \"center\", flexWrap: \"wrap\"");
     expect(routeSource).toContain("routePreviewHeader: { flexDirection: \"row\", justifyContent: \"space-between\", alignItems: \"center\", flexWrap: \"wrap\"");
     expect(routeSource).not.toContain("numberOfLines={1}");
+  });
+
+  it("設定表單支援 RTL、長字串與不打斷操作的即時驗證回饋", () => {
+    expect(settingsSource).toContain('const isRtl = activeLanguage === "ar-SA"');
+    expect(settingsSource).toContain('textAlign: isRtl ? "right" : "left"');
+    expect(settingsSource).toContain('flexDirection: isRtl ? "row-reverse" : "row"');
+    expect(settingsSource).toContain("editInlineError");
+    expect(settingsSource).toContain("supplyNameError");
+    expect(settingsSource).toContain("supplyTimeError");
+    expect(settingsSource).toContain('t("settingsActions.clearCacheLabel")');
+    expect(settingsSource).toContain('t("settingsActions.resetBody")');
+    expect(settingsSource).toContain("flexShrink: 1");
   });
 });

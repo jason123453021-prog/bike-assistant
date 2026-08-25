@@ -14,12 +14,15 @@ describe("活動編輯與表單驗證 i18n 守門", () => {
     expect(i18n.t("forms.activityEditor.coverPhotoHint")).toContain("local photo");
     expect(i18n.t("forms.supplyItem.addTitle")).toBe("Add supply item");
     expect(i18n.t("forms.errors.distancePositive")).toBe("Distance must be greater than zero.");
+    expect(i18n.t("settingsActions.clearCacheTitle")).toBe("Clear map and temporary route data");
+    expect(i18n.t("settingsActions.simplifiedLimitBody", { count: 6 })).toContain("6 fields");
 
     await i18n.changeLanguage("zh-TW");
     expect(i18n.t("forms.activityEditor.equipmentLabel")).toBe("裝備備註");
     expect(i18n.t("forms.activityEditor.coverEmpty")).toContain("活動封面");
     expect(i18n.t("forms.supplyItem.addTitle")).toBe("新增補給品");
     expect(i18n.t("forms.errors.timePositive")).toBe("時間必須大於 0。");
+    expect(i18n.t("settingsActions.resetAllLabel")).toBe("重設所有設定");
   });
 
   it("活動編輯、設定數值與自訂補給品三條表單路徑均使用翻譯 key 呈現驗證提示", () => {
@@ -30,12 +33,20 @@ describe("活動編輯與表單驗證 i18n 守門", () => {
     for (const key of ["equipmentLabel", "privateNotesPlaceholder", "coverPhotoHint", "clearCover", "localMedia", "mediaEmpty"]) {
       expect(detail).toContain(`t(\"forms.activityEditor.${key}\")`);
     }
-    for (const key of ["birthdayTitle", "birthdayBody", "numberBody", "supplyNameRequired"]) {
+    for (const key of ["birthdayBody", "numberBody", "supplyNameRequired"]) {
       expect(settings).toContain(`t(\"forms.errors.${key}\")`);
     }
+    expect(settings).toContain("editInlineError");
     for (const key of ["supplyNameRequired", "distancePositive", "timePositive"]) {
       expect(supplyModal).toContain(`t('forms.errors.${key}')`);
     }
     expect(supplyModal).toContain("useTranslation");
+  });
+
+  it("保留 Android 實機 RTL 與長字串表單驗收步驟", () => {
+    const guide = fs.readFileSync(path.join(rootDir, "references/android-rtl-form-validation-device-validation-2026-08-25.md"), "utf8");
+    expect(guide).toContain("العربية");
+    expect(guide).toContain("即時驗證");
+    expect(guide).toContain("清理地圖與暫存軌跡");
   });
 });

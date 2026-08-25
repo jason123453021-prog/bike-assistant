@@ -51,11 +51,11 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
     expect(settingsSource).toContain("騎乘與儀表板設定");
     expect(settingsSource).toContain("補給與提醒設定");
     expect(settingsSource).toContain('title={t("settings.displayAppearance")}');
-    expect(settingsSource).toContain("系統與資料管理");
+    expect(settingsSource).toContain('title={t("settingsActions.systemDataTitle")}');
     expect(settingsSource).toContain("LayoutAnimation.configureNext");
     expect(settingsSource).toContain("外觀主題");
-    expect(settingsSource).toContain("清理地圖與暫存軌跡");
-    expect(settingsSource).toContain("匯出／備份 GPX 軌跡");
+    expect(settingsSource).toContain('t("settingsActions.clearCacheLabel")');
+    expect(settingsSource).toContain('t("settingsActions.openHistoryBackupLabel")');
     expect(themeSource).toContain("themePreference");
     expect(themeSource).toContain("setThemePreference");
   });

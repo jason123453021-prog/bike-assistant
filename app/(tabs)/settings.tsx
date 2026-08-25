@@ -49,6 +49,7 @@ export default function SettingsScreen() {
   const colors = useColors();
   const { t } = useTranslation();
   const { preference: languagePreference, activeLanguage, setLanguagePreference } = useLanguage();
+  const isRtl = activeLanguage === "ar-SA";
   const { themePreference, setThemePreference } = useThemeContext();
   const { settings, updateSettings, resetAllSettings, updateNormalFields, updateSimplifiedFields, updateFieldOrder, updateSimplifiedFieldOrder, addSupplyItem, updateSupplyItem, deleteSupplyItem } = useSettings();
   const { state: rideState } = useRide();
@@ -95,18 +96,18 @@ export default function SettingsScreen() {
 
   const handleClearMapCache = () => {
     if (rideState.status === "active" || rideState.status === "paused") {
-      Alert.alert("騎乘進行中", "為避免遺失鎖定期間的軌跡資料，請先完成或停止本次騎乘後再清理暫存資料。");
+      Alert.alert(t("settingsActions.rideActiveTitle"), t("settingsActions.rideActiveBody"));
       return;
     }
-    Alert.alert("清理地圖與暫存軌跡", "這不會刪除已儲存的活動、GPX 匯出檔或個人設定。", [
-      { text: "取消", style: "cancel" },
+    Alert.alert(t("settingsActions.clearCacheTitle"), t("settingsActions.clearCacheBody"), [
+      { text: t("common.cancel"), style: "cancel" },
       {
-        text: "清理",
+        text: t("settingsActions.clear"),
         style: "destructive",
         onPress: () => {
           void AsyncStorage.multiRemove(["@bike_bg_track_points", "@bike_bg_state"])
-            .then(() => Alert.alert("已清理", "地圖與背景追蹤暫存資料已移除。"))
-            .catch(() => Alert.alert("清理失敗", "暫存資料目前無法移除，請稍後再試。"));
+            .then(() => Alert.alert(t("settingsActions.cacheClearedTitle"), t("settingsActions.cacheClearedBody")))
+            .catch(() => Alert.alert(t("settingsActions.cacheClearFailedTitle"), t("settingsActions.cacheClearFailedBody")));
         },
       },
     ]);
@@ -139,8 +140,18 @@ export default function SettingsScreen() {
     triggerSeconds: 0,
     enabled: true,
   });
+  const [editTouched, setEditTouched] = useState(false);
+  const [supplyTouched, setSupplyTouched] = useState({ name: false, time: false });
+  const editInlineError = !editTouched ? null : editModal.isNumber
+    ? (Number.isFinite(Number(editModal.value)) && Number(editModal.value) > 0 ? null : t("forms.errors.numberBody"))
+    : (normalizeBirthday(editModal.value.trim()) ? null : t("forms.errors.birthdayBody"));
+  const supplyNameError = supplyTouched.name && !supplyForm.name.trim() ? t("forms.errors.supplyNameRequired") : null;
+  const supplyTimeError = supplyTouched.time && supplyForm.triggerType === "time" && supplyForm.triggerHours === 0 && supplyForm.triggerMinutes === 0 && supplyForm.triggerSeconds === 0
+    ? t("forms.errors.timePositive")
+    : null;
 
   const openSupplyModal = (item?: SupplyItem) => {
+    setSupplyTouched({ name: false, time: false });
     if (item) {
       setSupplyForm(item);
       setSupplyModal({ visible: true, mode: "edit", item });
@@ -162,13 +173,12 @@ export default function SettingsScreen() {
 
   const closeSupplyModal = () => {
     setSupplyModal({ visible: false, mode: "add", item: null });
+    setSupplyTouched({ name: false, time: false });
   };
 
   const handleSaveSupply = async () => {
-    if (!supplyForm.name.trim()) {
-      Alert.alert(t("forms.errors.title"), t("forms.errors.supplyNameRequired"));
-      return;
-    }
+    setSupplyTouched({ name: true, time: true });
+    if (!supplyForm.name.trim() || (supplyForm.triggerType === "time" && supplyForm.triggerHours === 0 && supplyForm.triggerMinutes === 0 && supplyForm.triggerSeconds === 0)) return;
     if (supplyModal.mode === "add") {
       await addSupplyItem(supplyForm);
     } else if (supplyModal.item) {
@@ -178,20 +188,20 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteSupply = async (id: string) => {
-    Alert.alert("刪除補給品", "確定要刪除此補給品嗎？", [
-      { text: "取消", style: "cancel" },
-      { text: "刪除", style: "destructive", onPress: () => deleteSupplyItem(id) },
+    Alert.alert(t("settingsActions.deleteSupplyTitle"), t("settingsActions.deleteSupplyBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("settingsActions.delete"), style: "destructive", onPress: () => deleteSupplyItem(id) },
     ]);
   };
 
   const handleResetAllSettings = () => {
     Alert.alert(
-      "重設所有設定",
-      "這會恢復個人資料、補給、提醒、儀表板與省電偏好預設值。騎乘活動、軌跡與照片不會被刪除。",
+      t("settingsActions.resetTitle"),
+      t("settingsActions.resetBody"),
       [
-        { text: "取消", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "重設",
+          text: t("settingsActions.reset"),
           style: "destructive",
           onPress: () => {
             void (async () => {
@@ -202,9 +212,9 @@ export default function SettingsScreen() {
                 setCollapsedSections({});
                 setEditModal({ visible: false, key: "", label: "", value: "", unit: "", isNumber: true });
                 closeSupplyModal();
-                Alert.alert("已恢復預設設定", "所有設定偏好已重設；騎乘活動與照片仍保留在本機。");
+                Alert.alert(t("settingsActions.resetDoneTitle"), t("settingsActions.resetDoneBody"));
               } catch {
-                Alert.alert("無法重設設定", "設定尚未變更，請稍後再試。");
+                Alert.alert(t("settingsActions.resetFailedTitle"), t("settingsActions.resetFailedBody"));
               }
             })();
           },
@@ -366,17 +376,19 @@ export default function SettingsScreen() {
     });
 
   const openEdit = (key: string, label: string, value: number, unit: string) => {
+    setEditTouched(false);
     setEditModal({ visible: true, key, label, value: String(value), unit, isNumber: true });
   };
   const openBirthdayEdit = () => {
+    setEditTouched(false);
     setEditModal({ visible: true, key: "birthday", label: t("formLabels.birthday"), value: settings.birthday ?? "", unit: "YYYY-MM-DD", isNumber: false });
   };
 
   const saveEdit = async () => {
+    setEditTouched(true);
     if (!editModal.isNumber) {
       const birthday = normalizeBirthday(editModal.value.trim());
       if (!birthday) {
-        Alert.alert(t("forms.errors.birthdayTitle"), t("forms.errors.birthdayBody"));
         return;
       }
       await updateSettings({ birthday });
@@ -385,7 +397,6 @@ export default function SettingsScreen() {
     }
     const num = parseFloat(editModal.value);
     if (isNaN(num) || num <= 0) {
-      Alert.alert(t("forms.errors.title"), t("forms.errors.numberBody"));
       return;
     }
     const boundedNum = editModal.key === "touchGuardAutoRelockSec"
@@ -1359,9 +1370,9 @@ export default function SettingsScreen() {
                           onValueChange={(v) => {
                             if (v && simplifiedEnabledCount >= SIMPLIFIED_MAX) {
                               Alert.alert(
-                                "已達上限",
-                                `精簡模式最多只能開啟 ${SIMPLIFIED_MAX} 個欄位，請先關閉其中一個再開啟新欄位。`,
-                                [{ text: "瞭解" }]
+                                t("settingsActions.simplifiedLimitTitle"),
+                                t("settingsActions.simplifiedLimitBody", { count: SIMPLIFIED_MAX }),
+                                [{ text: t("settingsActions.acknowledge") }]
                               );
                               return;
                             }
@@ -1393,8 +1404,8 @@ export default function SettingsScreen() {
 
         <SettingsCategory
           icon="gearshape.fill"
-          title="系統與資料管理"
-          subtitle="權限狀態、本機資料與版本資訊"
+          title={t("settingsActions.systemDataTitle")}
+          subtitle={t("settingsActions.systemDataHint")}
           colors={colors}
           expanded={Boolean(openCategories.system)}
           onPress={() => toggleCategory("system")}
@@ -1403,40 +1414,40 @@ export default function SettingsScreen() {
         <View style={[styles.section, { borderColor: colors.border, marginTop: 14 }]}> 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="清理地圖與暫存軌跡"
+            accessibilityLabel={t("settingsActions.clearCacheLabel")}
             onPress={handleClearMapCache}
             style={({ pressed }) => [styles.row, { opacity: pressed ? 0.68 : 1 }]}
           >
             <IconSymbol name="trash.fill" size={18} color={colors.error} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>清理地圖與暫存軌跡</Text>
-              <Text style={[styles.rowHint, { color: colors.muted }]}>不會刪除已完成的活動、GPX 匯出檔或個人設定</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground, flexShrink: 1, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.clearCacheLabel")}</Text>
+              <Text style={[styles.rowHint, { color: colors.muted, flexShrink: 1, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.clearCacheHint")}</Text>
             </View>
             <IconSymbol name="chevron.right" size={16} color={colors.muted} />
           </Pressable>
           <Divider colors={colors} />
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="前往活動紀錄備份 GPX"
+            accessibilityLabel={t("settingsActions.openHistoryBackupLabel")}
             onPress={() => router.push("/history")}
             style={({ pressed }) => [styles.row, { opacity: pressed ? 0.68 : 1 }]}
           >
             <IconSymbol name="square.and.arrow.up" size={18} color={colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>匯出／備份 GPX 軌跡</Text>
-              <Text style={[styles.rowHint, { color: colors.muted }]}>前往活動紀錄，選擇騎乘後可透過系統分享面板備份 GPX 或 FIT</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground, flexShrink: 1, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.openHistoryBackupLabel")}</Text>
+              <Text style={[styles.rowHint, { color: colors.muted, flexShrink: 1, textAlign: isRtl ? "right" : "left" }]}>{t("settingsActions.openHistoryBackupHint")}</Text>
             </View>
             <IconSymbol name="chevron.right" size={16} color={colors.muted} />
           </Pressable>
         </View>
         <View style={[styles.section, { borderColor: colors.border, marginTop: 24 }]}> 
-          <Text style={{ fontSize: 15, fontWeight: "800", color: colors.foreground }}>設定管理</Text>
-          <Text style={{ fontSize: 12, lineHeight: 18, color: colors.muted, marginTop: 6 }}>
-            恢復個人資料、補給、提醒、儀表板與省電預設值；不會刪除騎乘活動、軌跡或照片。
+          <Text style={{ fontSize: 15, fontWeight: "800", color: colors.foreground, textAlign: isRtl ? "right" : "left" }}>{t("settingsActions.settingsManagement")}</Text>
+          <Text style={{ fontSize: 12, lineHeight: 18, color: colors.muted, marginTop: 6, flexShrink: 1, textAlign: isRtl ? "right" : "left" }}>
+            {t("settingsActions.settingsManagementHint")}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="重設所有設定"
+            accessibilityLabel={t("settingsActions.resetAllLabel")}
             onPress={handleResetAllSettings}
             style={({ pressed }) => ({
               marginTop: 14,
@@ -1450,7 +1461,7 @@ export default function SettingsScreen() {
               opacity: pressed ? 0.78 : 1,
             })}
           >
-            <Text style={{ color: colors.error, fontSize: 15, fontWeight: "800" }}>重設所有設定</Text>
+            <Text style={{ color: colors.error, fontSize: 15, fontWeight: "800" }}>{t("settingsActions.resetAllLabel")}</Text>
           </Pressable>
         </View>
 
@@ -1527,18 +1538,18 @@ export default function SettingsScreen() {
         visible={editModal.visible}
         transparent
         animationType="fade"
-        onRequestClose={() => setEditModal({ ...editModal, visible: false })}
+        onRequestClose={() => { setEditTouched(false); setEditModal({ ...editModal, visible: false }); }}
       >
         <View style={styles.editOverlay}>
           <View style={[styles.editCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.editTitle, { color: colors.foreground }]}>
-              設定 {editModal.label}
+              {t("settingsActions.systemDataTitle")} · {editModal.label}
             </Text>
-            <View style={[styles.editInputRow, { borderColor: colors.border }]}>
+            <View style={[styles.editInputRow, { borderColor: colors.border, flexDirection: isRtl ? "row-reverse" : "row" }]}>
               <TextInput
-                style={[styles.editInput, { color: colors.foreground }]}
+                style={[styles.editInput, { color: colors.foreground, textAlign: isRtl ? "right" : "left" }]}
                 value={editModal.value}
-                onChangeText={(v) => setEditModal({ ...editModal, value: v })}
+                onChangeText={(v) => { setEditTouched(true); setEditModal({ ...editModal, value: v }); }}
                 keyboardType={editModal.isNumber ? "numeric" : "numbers-and-punctuation"}
                 maxLength={editModal.isNumber ? undefined : 10}
                 autoFocus
@@ -1547,18 +1558,19 @@ export default function SettingsScreen() {
               />
               <Text style={[styles.editUnit, { color: colors.muted }]}>{editModal.unit}</Text>
             </View>
+            {editInlineError ? <Text style={{ color: colors.error, fontSize: 13, lineHeight: 18, marginTop: 8, flexShrink: 1, textAlign: isRtl ? "right" : "left" }}>{editInlineError}</Text> : null}
             <View style={styles.editBtnRow}>
               <Pressable
                 style={({ pressed }) => [styles.editCancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
-                onPress={() => setEditModal({ ...editModal, visible: false })}
+                onPress={() => { setEditTouched(false); setEditModal({ ...editModal, visible: false }); }}
               >
-                <Text style={[styles.editCancelText, { color: colors.muted }]}>取消</Text>
+                <Text style={[styles.editCancelText, { color: colors.muted }]}>{t("common.cancel")}</Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => [styles.editSaveBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
                 onPress={saveEdit}
               >
-                <Text style={styles.editSaveText}>儲存</Text>
+                <Text style={styles.editSaveText}>{t("common.save")}</Text>
               </Pressable>
             </View>
           </View>
@@ -1576,7 +1588,7 @@ export default function SettingsScreen() {
           <View style={[styles.modalContent, { backgroundColor: colors.surface, flex: 1, display: "flex", flexDirection: "column" }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-                {supplyModal.mode === "add" ? "新增補給品" : "編輯補給品"}
+                {supplyModal.mode === "add" ? t("settingsActions.supplyAddTitle") : t("settingsActions.supplyEditTitle")}
               </Text>
               <Pressable onPress={closeSupplyModal}>
                 <IconSymbol name="xmark.circle.fill" size={24} color={colors.muted} />
@@ -1587,24 +1599,25 @@ export default function SettingsScreen() {
               {/* 補給品名稱 */}
               <View style={{ marginBottom: 24 /* internal spacing */ }}>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 /* internal spacing */ }}>
-                  補給品名稱 *
+                  {t("settingsActions.supplyNameLabel")}
                 </Text>
                 <TextInput
                   style={[
                     styles.textInput,
                     { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background, fontSize: 17, paddingVertical: 16, paddingHorizontal: 16 },
                   ]}
-                  placeholder="例如：運動飲料、能量棒"
+                  placeholder={t("settingsActions.supplyNamePlaceholder")}
                   placeholderTextColor={colors.muted}
                   value={supplyForm.name}
-                  onChangeText={(text) => setSupplyForm({ ...supplyForm, name: text })}
+                  onChangeText={(text) => { setSupplyTouched((current) => ({ ...current, name: true })); setSupplyForm({ ...supplyForm, name: text }); }}
                 />
+                {supplyNameError ? <Text style={{ color: colors.error, fontSize: 13, lineHeight: 18, marginTop: 8, flexShrink: 1, textAlign: isRtl ? "right" : "left" }}>{supplyNameError}</Text> : null}
               </View>
 
               {/* 觸發方式 */}
               <View style={{ marginBottom: 24 /* internal spacing */ }}>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
-                  觸發方式
+                  {t("settingsActions.triggerType")}
                 </Text>
                 <View style={{ flexDirection: "row", gap: 12 }}>
                   {(["time", "distance"] as const).map((type) => (
@@ -1627,7 +1640,7 @@ export default function SettingsScreen() {
                           fontSize: 14,
                         }}
                       >
-                        {type === "time" ? "時間" : "距離"}
+                        {type === "time" ? t("settingsActions.time") : t("settingsActions.distance")}
                       </Text>
                     </Pressable>
                   ))}
@@ -1638,12 +1651,12 @@ export default function SettingsScreen() {
               {supplyForm.triggerType === "time" ? (
                 <View style={{ marginBottom: 24 /* internal spacing */ }}>
                   <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 /* internal spacing */ }}>
-                    觸發時間
+                    {t("settingsActions.triggerTime")}
                   </Text>
-                  <View style={{ flexDirection: "row", gap: 14 }}>
+                  <View style={{ flexDirection: isRtl ? "row-reverse" : "row", gap: 14 }}>
                     {/* 時 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8 /* internal spacing */, fontWeight: "600" }}>時</Text>
+                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8 /* internal spacing */, fontWeight: "600", textAlign: isRtl ? "right" : "left" }}>{t("settingsActions.hours")}</Text>
                       <TextInput
                         style={[
                           styles.textInput,
@@ -1653,12 +1666,12 @@ export default function SettingsScreen() {
                         placeholderTextColor={colors.muted}
                         keyboardType="number-pad"
                         value={String(supplyForm.triggerHours)}
-                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerHours: parseInt(text) || 0 })}
+                        onChangeText={(text) => { setSupplyTouched((current) => ({ ...current, time: true })); setSupplyForm({ ...supplyForm, triggerHours: parseInt(text) || 0 }); }}
                       />
                     </View>
                     {/* 分 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8 /* internal spacing */, fontWeight: "600" }}>分</Text>
+                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8 /* internal spacing */, fontWeight: "600", textAlign: isRtl ? "right" : "left" }}>{t("settingsActions.minutes")}</Text>
                       <TextInput
                         style={[
                           styles.textInput,
@@ -1668,12 +1681,12 @@ export default function SettingsScreen() {
                         placeholderTextColor={colors.muted}
                         keyboardType="number-pad"
                         value={String(supplyForm.triggerMinutes)}
-                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerMinutes: parseInt(text) || 0 })}
+                        onChangeText={(text) => { setSupplyTouched((current) => ({ ...current, time: true })); setSupplyForm({ ...supplyForm, triggerMinutes: parseInt(text) || 0 }); }}
                       />
                     </View>
                     {/* 秒 */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8 /* internal spacing */, fontWeight: "600" }}>秒</Text>
+                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 8 /* internal spacing */, fontWeight: "600", textAlign: isRtl ? "right" : "left" }}>{t("settingsActions.seconds")}</Text>
                       <TextInput
                         style={[
                           styles.textInput,
@@ -1683,19 +1696,20 @@ export default function SettingsScreen() {
                         placeholderTextColor={colors.muted}
                         keyboardType="number-pad"
                         value={String(supplyForm.triggerSeconds)}
-                        onChangeText={(text) => setSupplyForm({ ...supplyForm, triggerSeconds: parseInt(text) || 0 })}
+                        onChangeText={(text) => { setSupplyTouched((current) => ({ ...current, time: true })); setSupplyForm({ ...supplyForm, triggerSeconds: parseInt(text) || 0 }); }}
                       />
                     </View>
                   </View>
+                  {supplyTimeError ? <Text style={{ color: colors.error, fontSize: 13, lineHeight: 18, marginTop: 8, flexShrink: 1, textAlign: isRtl ? "right" : "left" }}>{supplyTimeError}</Text> : null}
                 </View>
               ) : (
                 <View style={{ marginBottom: 16 /* internal spacing */ }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 /* internal spacing */ }}>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                      觸發值
+                      {t("settingsActions.triggerValue")}
                     </Text>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
-                      {supplyForm.triggerValue} 公里
+                      {supplyForm.triggerValue} {t("settingsActions.kilometers")}
                     </Text>
                   </View>
                   <Slider
@@ -1714,7 +1728,7 @@ export default function SettingsScreen() {
             </ScrollView>
 
             {/* 固定底部按鈕區域 */}
-            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, paddingBottom: 16 /* internal spacing */, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
+            <View style={{ flexDirection: isRtl ? "row-reverse" : "row", gap: 8, paddingHorizontal: 24, paddingVertical: 16, paddingBottom: 16 /* internal spacing */, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
               <Pressable
                 style={({ pressed }) => ([
                   styles.editCancelBtn,
@@ -1722,7 +1736,7 @@ export default function SettingsScreen() {
                 ])}
                 onPress={closeSupplyModal}
               >
-                <Text style={[styles.editCancelText, { color: colors.muted }]}>取消</Text>
+                <Text style={[styles.editCancelText, { color: colors.muted }]}>{t("common.cancel")}</Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => ([
@@ -1731,7 +1745,7 @@ export default function SettingsScreen() {
                 ])}
                 onPress={handleSaveSupply}
               >
-                <Text style={[styles.editConfirmText, { color: colors.onAccent }]}>保存</Text>
+                <Text style={[styles.editConfirmText, { color: colors.onAccent }]}>{t("common.save")}</Text>
               </Pressable>
             </View>
           </View>

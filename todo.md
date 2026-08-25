@@ -2491,3 +2491,10 @@
 - [x] 將活動與補給品表單驗證錯誤、成功與確認提示改為跟隨目前語系
 - [x] 新增語言切換與表單驗證提示的自動化守門，完成品質檢查
 - [x] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact（run 32810659573，head `74c44d0`；Maestro JUnit 1 test／0 failures／37.643 秒；artifact `bike-assistant-maestro-e2e` 已下載核實）
+
+## RTL 表單實機驗收、設定提示與即時驗證（2026-08-25）
+- [x] 補強長字串與 RTL 表單版面的 Android 實機驗收步驟與回歸守門
+- [x] 抽取設定頁清理、重設與補給品管理的確認、成功與失敗提示為多語系 key
+- [x] 為設定數值、生日與自訂補給品欄位新增即時驗證回饋，避免僅在儲存後才顯示錯誤
+- [ ] 由 Android 實機依 `references/android-rtl-form-validation-device-validation-2026-08-25.md` 完成長字串、RTL 與即時驗證驗收
+- [ ] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact
