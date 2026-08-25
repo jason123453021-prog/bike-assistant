@@ -92,11 +92,11 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
     expect(routeSource).toContain(
       'name={isRTL ? "chevron.left" : "chevron.right"}',
     );
-    expect(routeSource).toContain(
-      'weatherHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap"',
+    expect(routeSource).toMatch(
+      /weatherHeader:\s*\{[\s\S]*?flexDirection:\s*"row",[\s\S]*?justifyContent:\s*"space-between",[\s\S]*?alignItems:\s*"center",[\s\S]*?flexWrap:\s*"wrap"/,
     );
-    expect(routeSource).toContain(
-      'routePreviewHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap"',
+    expect(routeSource).toMatch(
+      /routePreviewHeader:\s*\{[\s\S]*?flexDirection:\s*"row",[\s\S]*?justifyContent:\s*"space-between",[\s\S]*?alignItems:\s*"center",[\s\S]*?flexWrap:\s*"wrap"/,
     );
     expect(routeSource).not.toContain("numberOfLines={1}");
   });
