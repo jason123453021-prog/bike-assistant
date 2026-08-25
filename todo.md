@@ -2477,4 +2477,4 @@
 - [x] 建立使用目前語系的活動通知與安全、可分享的 GPX／FIT／圖卡檔名服務
 - [x] 校對 13 種語系的單車專有術語與核心運動指標翻譯
 - [x] 新增通知、匯出檔名、術語完整性與 locale 切換自動化守門
-- [ ] 完成完整品質檢查、GitHub Android E2E 與驗收連結
+- [x] 完成完整品質檢查、GitHub Android E2E 與驗收連結（Android E2E run 32804100697，head `6f194bd`；Maestro JUnit 1 test／0 failures／38.069 秒；artifact `bike-assistant-maestro-e2e` 已下載核實）
