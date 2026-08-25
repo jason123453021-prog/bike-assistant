@@ -26,7 +26,15 @@ name: 多語系字體大小與 RTL 表單截圖
     direction: DOWN
     timeout: 30000
 - tapOn: "Language"
+- extendedWaitUntil:
+    visible: "English (US)"
+    timeout: 10000
 - takeScreenshot: "font-scale-settings-en"
+- scrollUntilVisible:
+    element:
+      text: "Deutsch"
+    direction: DOWN
+    timeout: 30000
 - tapOn: "Deutsch"
 - extendedWaitUntil:
     visible: "Darstellung & Erscheinungsbild"
@@ -38,6 +46,11 @@ name: 多語系字體大小與 RTL 表單截圖
     direction: DOWN
     timeout: 30000
 - tapOn: "Sprache"
+- scrollUntilVisible:
+    element:
+      text: "Русский"
+    direction: DOWN
+    timeout: 30000
 - tapOn: "Русский"
 - extendedWaitUntil:
     visible: "Отображение и оформление"
@@ -49,5 +62,10 @@ name: 多語系字體大小與 RTL 表單截圖
     direction: DOWN
     timeout: 30000
 - tapOn: "Язык"
+- scrollUntilVisible:
+    element:
+      text: "العربية"
+    direction: DOWN
+    timeout: 30000
 - tapOn: "العربية"
 - takeScreenshot: "font-scale-settings-ar"
