@@ -60,9 +60,7 @@ export default function E2ENotificationScreen() {
           repeats: false,
         } as never,
       });
-      setStatus(
-        "Notification scheduled. The test will background the app and tap it after five seconds.",
-      );
+      setStatus("Notification scheduled");
     } catch (error) {
       setStatus(
         `Notification scheduling failed: ${error instanceof Error ? error.message : "unknown error"}`,
