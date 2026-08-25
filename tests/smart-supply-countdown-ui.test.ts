@@ -5,7 +5,14 @@ import { describe, expect, it } from "vitest";
 const mapSource = readFileSync(
   resolve(process.cwd(), "app/(tabs)/map.tsx"),
   "utf8",
-).replace(/\s+/g, " ");
+)
+  .replace(/\s+/g, " ")
+  .replace(/\(\s+/g, "(")
+  .replace(/\{\s+/g, "{")
+  .replace(/<\s+/g, "<")
+  .replace(/,\s*\}/g, "}")
+  .replace(/,\s*\)/g, ")")
+  .replace(/\s+\)/g, ")");
 const modalSource = readFileSync(
   resolve(process.cwd(), "components/supply-modal.tsx"),
   "utf8",
@@ -103,7 +110,7 @@ describe("smart supply countdown UI", () => {
 
   it("waits for weather and sensor inputs when starting the next smart-water round, then uses the defined safe fallback", () => {
     expect(mapSource).toContain(
-      "awaitHydrationInputs({ weatherPromise, sensorPromise })",
+      "awaitHydrationInputs({weatherPromise, sensorPromise})",
     );
     expect(mapSource).toContain(
       "void refreshSmartWaterCountdown(confirmedPlan",
@@ -130,8 +137,8 @@ describe("smart supply countdown UI", () => {
     expect(modalSource).not.toContain("recommendedCarbohydrateG");
     expect(modalSource).toContain("allowSnooze = true");
     expect(modalSource).toContain("{allowSnooze && (");
-    expect(mapSource).toContain(
-      "allowSnooze={(!calorieAlert || !smartEnergySupplyEnabled) && (!waterAlert || !smartWaterSupplyEnabled)}",
+    expect(mapSource).toMatch(
+      /allowSnooze=\{\s*\(!calorieAlert\s*\|\|\s*!smartEnergySupplyEnabled\)\s*&&\s*\(!waterAlert\s*\|\|\s*!smartWaterSupplyEnabled\)\s*\}/,
     );
   });
 
@@ -160,10 +167,10 @@ describe("smart supply countdown UI", () => {
       "const calorieStillPending = pendingCalorieRef.current || calorieAlert;",
     );
     expect(mapSource).toContain(
-      'restartSmartSupplyCountdown( smartSupplyCountdownRef.current, "calorie"',
+      'restartSmartSupplyCountdown(smartSupplyCountdownRef.current, "calorie"',
     );
     expect(mapSource).toContain(
-      'restartSmartSupplyCountdown( smartSupplyCountdownRef.current, "water"',
+      'restartSmartSupplyCountdown(smartSupplyCountdownRef.current, "water"',
     );
   });
 
@@ -277,10 +284,8 @@ describe("smart supply countdown UI", () => {
     expect(feedbackSource).toContain("clearSmartSupplyDueNotification");
     expect(feedbackSource).toContain("SchedulableTriggerInputTypes.DATE");
     expect(feedbackSource).toContain('channelId: "supply"');
-    expect(mapSource).toContain(
-      'scheduleSmartSupplyDueNotification( "calorie"',
-    );
-    expect(mapSource).toContain('scheduleSmartSupplyDueNotification( "water"');
+    expect(mapSource).toContain('scheduleSmartSupplyDueNotification("calorie"');
+    expect(mapSource).toContain('scheduleSmartSupplyDueNotification("water"');
     expect(mapSource).toContain("void clearAllSupplyNotifications();");
   });
 });

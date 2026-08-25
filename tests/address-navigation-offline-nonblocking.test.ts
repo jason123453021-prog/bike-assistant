@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 const mapSource = readFileSync(
   resolve(process.cwd(), "app/(tabs)/map.tsx"),
   "utf8",
-).replace(/\s+/g, " ");
+)
+  .replace(/\s+/g, " ")
+  .replace(/\(\s+/g, "(");
 
 describe("地址導航離線回退", () => {
   it("將網路或地理編碼失敗留在同頁提示，不以 Alert 阻斷騎乘畫面", () => {
