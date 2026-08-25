@@ -2509,4 +2509,4 @@
 - [x] 建立不同語言與 Android 130%／200% 系統字體大小的實機驗收流程
 - [x] 將活動標題與分享圖卡文字接入自適應字級縮放與換行降級策略
 - [x] 新增長字串多語系截圖回歸測試與完整品質檢查
-- [ ] 完成最新版 GitHub Android E2E 與 130%／200% 多語系截圖 artifact 驗收
+- [x] 完成最新版 GitHub Android E2E 與 130%／200% 多語系截圖 artifact 驗收（GitHub run 32828435693、main `afbdb63`；核心 JUnit 1／0 failures、1.3 與 2.0 各 3／0 failures；artifact 含 Deutsch、Русский、Arabic `font-scale-settings-{de,ru,ar}.png`，並已檢視 200% 德文與 Arabic RTL 截圖）
