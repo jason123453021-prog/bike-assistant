@@ -1,15 +1,18 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   View,
-  Text,
   Pressable,
   StyleSheet,
   Animated,
   Modal,
   ScrollView,
 } from "react-native";
+
+import { AdaptiveFormText } from "@/components/adaptive-form-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useLanguage } from "@/lib/i18n/language-provider";
+import { getSupplyModalCopy } from "@/lib/i18n/supply-modal-copy";
 
 export interface SupplyModalProps {
   /** 卡路里補給提醒是否觸發 */
@@ -25,7 +28,12 @@ export interface SupplyModalProps {
   /** 智慧倒數到期後必須明確確認，不能暫時關閉。 */
   allowSnooze?: boolean;
   /** 自訂補給品提醒清單，依附於能量或補水的共用提醒流程。 */
-  customSupplyAlerts?: { id: string; name: string; target: "energy" | "water"; onConfirm: () => void }[];
+  customSupplyAlerts?: {
+    id: string;
+    name: string;
+    target: "energy" | "water";
+    onConfirm: () => void;
+  }[];
 }
 
 export function SupplyModal({
@@ -38,6 +46,9 @@ export function SupplyModal({
   customSupplyAlerts = [],
 }: SupplyModalProps) {
   const colors = useColors();
+  const { activeLanguage, isRTL } = useLanguage();
+  const copy = getSupplyModalCopy(activeLanguage);
+  const textAlign = isRTL ? "right" : "left";
   const visible = calorieAlert || waterAlert || customSupplyAlerts.length > 0;
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -45,8 +56,17 @@ export function SupplyModal({
   useEffect(() => {
     if (visible) {
       Animated.parallel([
-        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, damping: 15, stiffness: 200 }),
-        Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          damping: 15,
+          stiffness: 200,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
       ]).start();
     } else {
       scaleAnim.setValue(0.85);
@@ -55,6 +75,12 @@ export function SupplyModal({
   }, [opacityAnim, scaleAnim, visible]);
 
   const bothAlert = calorieAlert && waterAlert;
+  const modalTitle =
+    bothAlert || customSupplyAlerts.length > 0
+      ? copy.reminderTitle
+      : calorieAlert
+        ? copy.energyTitle
+        : copy.waterTitle;
 
   return (
     <Modal
@@ -63,7 +89,9 @@ export function SupplyModal({
       animationType="fade"
       statusBarTranslucent
       hardwareAccelerated
-      onRequestClose={() => { if (allowSnooze) onDismiss(); }}
+      onRequestClose={() => {
+        if (allowSnooze) onDismiss();
+      }}
     >
       <View style={styles.overlay}>
         <Animated.View
@@ -83,105 +111,291 @@ export function SupplyModal({
             bounces={false}
           >
             <View style={styles.titleGroup}>
-              <Text style={[styles.mainTitle, { color: colors.foreground }]}> 
-                {bothAlert || customSupplyAlerts.length > 0 ? "補給提醒" : calorieAlert ? "補充能量" : "補充水分"}
-              </Text>
+              <AdaptiveFormText
+                baseFontSize={22}
+                maxLinesBeforeShrink={2}
+                style={[styles.mainTitle, { color: colors.foreground }]}
+              >
+                {modalTitle}
+              </AdaptiveFormText>
               {bothAlert && (
-                <View style={[styles.dualStatus, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[styles.dualStatusText, { color: colors.muted }]}>兩項皆待確認，可依任意順序完成</Text>
+                <View
+                  style={[
+                    styles.dualStatus,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <AdaptiveFormText
+                    baseFontSize={13}
+                    style={[styles.dualStatusText, { color: colors.muted }]}
+                  >
+                    {copy.bothPending}
+                  </AdaptiveFormText>
                 </View>
               )}
             </View>
 
             <View style={styles.supplyStack}>
-              {/* 卡路里區塊 */}
               {calorieAlert && (
-                <View style={[styles.alertBlock, { borderColor: "#F59E0B" + "55", backgroundColor: "#F59E0B" + "12" }]}>
-                  <View style={styles.alertBlockHeader}>
-                    <View style={[styles.alertIconWrap, { backgroundColor: "#F59E0B" + "22" }]}>
+                <View
+                  style={[
+                    styles.alertBlock,
+                    { borderColor: "#F59E0B55", backgroundColor: "#F59E0B12" },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.alertBlockHeader,
+                      isRTL && styles.alertBlockHeaderRtl,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.alertIconWrap,
+                        { backgroundColor: "#F59E0B22" },
+                      ]}
+                    >
                       <IconSymbol name="flame.fill" size={28} color="#F59E0B" />
                     </View>
                     <View style={styles.alertBlockText}>
-                      <Text style={[styles.alertBlockTitle, { color: "#F59E0B" }]}>能量補充</Text>
-                      <Text style={[styles.alertBlockSub, { color: colors.muted }]}>請補給能量，確認後立即開始下一輪能量倒數。</Text>
+                      <AdaptiveFormText
+                        baseFontSize={17}
+                        style={[
+                          styles.alertBlockTitle,
+                          { color: "#F59E0B", textAlign },
+                        ]}
+                      >
+                        {copy.energyTitle}
+                      </AdaptiveFormText>
+                      <AdaptiveFormText
+                        baseFontSize={14}
+                        maxLinesBeforeShrink={3}
+                        style={[
+                          styles.alertBlockSub,
+                          { color: colors.muted, textAlign },
+                        ]}
+                      >
+                        {copy.energyBody}
+                      </AdaptiveFormText>
                     </View>
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="確認已補給能量並重新開始能量倒數"
+                    accessibilityLabel={`${copy.energyConfirm} · ${copy.energyRestart}`}
                     hitSlop={6}
-                    style={({ pressed }) => [styles.confirmBtn, styles.energyButton, { opacity: pressed ? 0.82 : 1 }]}
+                    style={({ pressed }) => [
+                      styles.confirmBtn,
+                      styles.energyButton,
+                      { opacity: pressed ? 0.82 : 1 },
+                    ]}
                     onPress={onConfirmCalorie}
                   >
-                    <Text style={styles.confirmText}>已補給能量</Text>
-                    <Text style={styles.confirmHint}>重新開始能量倒數</Text>
+                    <AdaptiveFormText
+                      baseFontSize={16}
+                      style={styles.confirmText}
+                    >
+                      {copy.energyConfirm}
+                    </AdaptiveFormText>
+                    <AdaptiveFormText
+                      baseFontSize={12}
+                      style={styles.confirmHint}
+                    >
+                      {copy.energyRestart}
+                    </AdaptiveFormText>
                   </Pressable>
                 </View>
               )}
 
-              {/* 水分區塊 */}
               {waterAlert && (
-                <View style={[styles.alertBlock, { borderColor: "#4FC3F7" + "55", backgroundColor: "#4FC3F7" + "12" }]}>
-                  <View style={styles.alertBlockHeader}>
-                    <View style={[styles.alertIconWrap, { backgroundColor: "#4FC3F7" + "22" }]}>
+                <View
+                  style={[
+                    styles.alertBlock,
+                    { borderColor: "#4FC3F755", backgroundColor: "#4FC3F712" },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.alertBlockHeader,
+                      isRTL && styles.alertBlockHeaderRtl,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.alertIconWrap,
+                        { backgroundColor: "#4FC3F722" },
+                      ]}
+                    >
                       <IconSymbol name="drop.fill" size={28} color="#4FC3F7" />
                     </View>
                     <View style={styles.alertBlockText}>
-                      <Text style={[styles.alertBlockTitle, { color: "#1595C9" }]}>水分補充</Text>
-                      <Text style={[styles.alertBlockSub, { color: colors.muted }]}>請補給水分，確認後立即開始下一輪補水倒數。</Text>
+                      <AdaptiveFormText
+                        baseFontSize={17}
+                        style={[
+                          styles.alertBlockTitle,
+                          { color: "#1595C9", textAlign },
+                        ]}
+                      >
+                        {copy.waterTitle}
+                      </AdaptiveFormText>
+                      <AdaptiveFormText
+                        baseFontSize={14}
+                        maxLinesBeforeShrink={3}
+                        style={[
+                          styles.alertBlockSub,
+                          { color: colors.muted, textAlign },
+                        ]}
+                      >
+                        {copy.waterBody}
+                      </AdaptiveFormText>
                     </View>
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="確認已補給水分並重新開始補水倒數"
+                    accessibilityLabel={`${copy.waterConfirm} · ${copy.waterRestart}`}
                     hitSlop={6}
-                    style={({ pressed }) => [styles.confirmBtn, styles.waterButton, { opacity: pressed ? 0.82 : 1 }]}
+                    style={({ pressed }) => [
+                      styles.confirmBtn,
+                      styles.waterButton,
+                      { opacity: pressed ? 0.82 : 1 },
+                    ]}
                     onPress={onConfirmWater}
                   >
-                    <Text style={styles.confirmText}>已補給水分</Text>
-                    <Text style={styles.confirmHint}>重新開始補水倒數</Text>
+                    <AdaptiveFormText
+                      baseFontSize={16}
+                      style={styles.confirmText}
+                    >
+                      {copy.waterConfirm}
+                    </AdaptiveFormText>
+                    <AdaptiveFormText
+                      baseFontSize={12}
+                      style={styles.confirmHint}
+                    >
+                      {copy.waterRestart}
+                    </AdaptiveFormText>
                   </Pressable>
                 </View>
               )}
 
-              {/* 自訂補給品提醒區塊：沿用能量或補水的共用語意與確認方式。 */}
               {customSupplyAlerts.map((alert) => (
-                <View key={alert.id} style={[styles.alertBlock, { borderColor: (alert.target === "energy" ? "#F59E0B" : "#4FC3F7") + "55", backgroundColor: (alert.target === "energy" ? "#F59E0B" : "#4FC3F7") + "12" }]}>
-                  <View style={styles.alertBlockHeader}>
-                    <View style={[styles.alertIconWrap, { backgroundColor: (alert.target === "energy" ? "#F59E0B" : "#4FC3F7") + "22" }]}> 
-                      <IconSymbol name={alert.target === "energy" ? "flame.fill" : "drop.fill"} size={28} color={alert.target === "energy" ? "#F59E0B" : "#1595C9"} />
+                <View
+                  key={alert.id}
+                  style={[
+                    styles.alertBlock,
+                    {
+                      borderColor:
+                        alert.target === "energy" ? "#F59E0B55" : "#4FC3F755",
+                      backgroundColor:
+                        alert.target === "energy" ? "#F59E0B12" : "#4FC3F712",
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.alertBlockHeader,
+                      isRTL && styles.alertBlockHeaderRtl,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.alertIconWrap,
+                        {
+                          backgroundColor:
+                            alert.target === "energy"
+                              ? "#F59E0B22"
+                              : "#4FC3F722",
+                        },
+                      ]}
+                    >
+                      <IconSymbol
+                        name={
+                          alert.target === "energy" ? "flame.fill" : "drop.fill"
+                        }
+                        size={28}
+                        color={
+                          alert.target === "energy" ? "#F59E0B" : "#1595C9"
+                        }
+                      />
                     </View>
                     <View style={styles.alertBlockText}>
-                      <Text style={[styles.alertBlockTitle, { color: alert.target === "energy" ? "#F59E0B" : "#1595C9" }]}>{alert.name}</Text>
-                      <Text style={[styles.alertBlockSub, { color: colors.muted }]}>{alert.target === "energy" ? "請補給能量，提醒設定與能量共用。" : "請補給水分，提醒設定與補水共用。"}</Text>
+                      <AdaptiveFormText
+                        baseFontSize={17}
+                        style={[
+                          styles.alertBlockTitle,
+                          {
+                            color:
+                              alert.target === "energy" ? "#F59E0B" : "#1595C9",
+                            textAlign,
+                          },
+                        ]}
+                      >
+                        {alert.name}
+                      </AdaptiveFormText>
+                      <AdaptiveFormText
+                        baseFontSize={14}
+                        maxLinesBeforeShrink={3}
+                        style={[
+                          styles.alertBlockSub,
+                          { color: colors.muted, textAlign },
+                        ]}
+                      >
+                        {alert.target === "energy"
+                          ? copy.customEnergyBody
+                          : copy.customWaterBody}
+                      </AdaptiveFormText>
                     </View>
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`確認已補給${alert.name}`}
+                    accessibilityLabel={`${copy.customConfirmPrefix} ${alert.name}`}
                     hitSlop={6}
-                    style={({ pressed }) => [styles.confirmBtn, alert.target === "energy" ? styles.energyButton : styles.waterButton, { opacity: pressed ? 0.82 : 1 }]}
+                    style={({ pressed }) => [
+                      styles.confirmBtn,
+                      alert.target === "energy"
+                        ? styles.energyButton
+                        : styles.waterButton,
+                      { opacity: pressed ? 0.82 : 1 },
+                    ]}
                     onPress={alert.onConfirm}
                   >
-                    <Text style={styles.confirmText}>{alert.target === "energy" ? "已補給能量" : "已補給水分"}</Text>
+                    <AdaptiveFormText
+                      baseFontSize={16}
+                      style={styles.confirmText}
+                    >
+                      {alert.target === "energy"
+                        ? copy.energyConfirm
+                        : copy.waterConfirm}
+                    </AdaptiveFormText>
                   </Pressable>
                 </View>
               ))}
             </View>
 
-            <Text style={[styles.safetyHint, { color: colors.muted }]}>請分別確認已完成的補給項目。</Text>
+            <AdaptiveFormText
+              baseFontSize={13}
+              style={[styles.safetyHint, { color: colors.muted, textAlign }]}
+            >
+              {copy.safetyHint}
+            </AdaptiveFormText>
 
             {allowSnooze && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="稍後提醒"
+                accessibilityLabel={copy.snooze}
                 style={({ pressed }) => [
                   styles.dismissBtn,
                   { borderColor: colors.border, opacity: pressed ? 0.6 : 1 },
                 ]}
                 onPress={onDismiss}
               >
-                <Text style={[styles.dismissText, { color: colors.muted }]}>稍後提醒</Text>
+                <AdaptiveFormText
+                  baseFontSize={15}
+                  style={[styles.dismissText, { color: colors.muted }]}
+                >
+                  {copy.snooze}
+                </AdaptiveFormText>
               </Pressable>
             )}
           </ScrollView>
@@ -208,46 +422,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: "hidden",
   },
-  cardContent: {
-    padding: 20,
-    gap: 16,
-  },
-  titleGroup: {
-    alignItems: "center",
-    gap: 8,
-  },
-  mainTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    textAlign: "center",
-    lineHeight: 26,
-  },
+  cardContent: { padding: 20, gap: 16 },
+  titleGroup: { alignItems: "center", gap: 8 },
+  mainTitle: { fontWeight: "800", textAlign: "center", lineHeight: 26 },
   dualStatus: {
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  dualStatusText: {
-    fontSize: 13,
-    textAlign: "center",
-    lineHeight: 17,
-    fontWeight: "600",
-  },
-  supplyStack: {
-    gap: 14,
-  },
-  alertBlock: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    gap: 14,
-  },
-  alertBlockHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 13,
-  },
+  dualStatusText: { textAlign: "center", lineHeight: 17, fontWeight: "600" },
+  supplyStack: { gap: 14 },
+  alertBlock: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 14 },
+  alertBlockHeader: { flexDirection: "row", alignItems: "flex-start", gap: 13 },
+  alertBlockHeaderRtl: { flexDirection: "row-reverse" },
   alertIconWrap: {
     width: 48,
     height: 48,
@@ -255,19 +443,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  alertBlockText: {
-    flex: 1,
-    gap: 5,
-  },
-  alertBlockTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    lineHeight: 23,
-  },
-  alertBlockSub: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
+  alertBlockText: { flex: 1, gap: 5 },
+  alertBlockTitle: { fontWeight: "800", lineHeight: 23 },
+  alertBlockSub: { lineHeight: 20 },
   confirmBtn: {
     minHeight: 66,
     borderRadius: 12,
@@ -275,32 +453,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 2,
   },
-  energyButton: {
-    backgroundColor: "#D97706",
-  },
-  waterButton: {
-    backgroundColor: "#0284C7",
-  },
-  customButton: {
-    backgroundColor: "#7E22CE",
-  },
-  confirmText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
+  energyButton: { backgroundColor: "#D97706" },
+  waterButton: { backgroundColor: "#0284C7" },
+  confirmText: { fontWeight: "700", color: "#FFFFFF", textAlign: "center" },
   confirmHint: {
-    fontSize: 13,
     lineHeight: 16,
     fontWeight: "600",
     color: "rgba(255,255,255,0.84)",
-  },
-  safetyHint: {
-    fontSize: 13,
-    lineHeight: 19,
     textAlign: "center",
-    paddingHorizontal: 10,
   },
+  safetyHint: { lineHeight: 19, paddingHorizontal: 10 },
   dismissBtn: {
     paddingVertical: 12,
     borderRadius: 10,
@@ -308,8 +470,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 2,
   },
-  dismissText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  dismissText: { fontWeight: "600", textAlign: "center" },
 });

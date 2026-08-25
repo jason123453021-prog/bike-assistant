@@ -2514,3 +2514,7 @@
 - [x] 以各語系真實長活動名稱驗證分享圖卡 SVG 換行、縮放與截圖輸出（13 語系 SVG／1080×1920 PNG 全數產生；自動化確認 `<tspan>` 換行、無省略號、無遺漏值；已視覺檢視德文與 Arabic）
 - [ ] 以實體 Android 裝置驗證 RTL 語系與 200% 系統字體大小顯示
 - [x] 評估釘選導航在全球地區的資料覆蓋、離線限制與可用性（BRouter／OSM-bike 於台北、柏林、舊金山、聖保羅、開普敦、雪梨均回傳有效路線；公開服務有節流限制且無離線或全球 SLA 保證）
+- [ ] 以 GitHub Android Emulator 自行驗證背景通知回前景 action、RTL 與 200% 字體大小流程並檢視 artifact
+- [ ] 核對 Google Play 新 upload key 生效，並上傳 `com.jason123453021.bikeassistant` versionCode 10090／versionName 1.0.90 AAB 至正式版草稿；不送審、不發布
+- [ ] 優先完成多語系 Emulator 背景通知回前景、RTL／200% 字體與長活動名稱分享圖卡驗收，再恢復 Play 草稿處理
+- [ ] 將通知回前景的補給／補水待確認 Modal 及 action 按鈕改為目前語言，並納入 Emulator 驗收

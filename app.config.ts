@@ -8,14 +8,16 @@ const isProductionEasBuild = process.env.EAS_BUILD_PROFILE === "production";
 const env = {
   appName: "單車助手",
   appSlug: "bike-assistant",
-  logoUrl: "https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/icon-5x7JypaRBZMZUk4remNAHQ.png",
+  logoUrl:
+    "https://d2xsxph8kpxj0f.cloudfront.net/310519663766814562/BdbKiMdccrZSR9xLuck2qy/icon-5x7JypaRBZMZUk4remNAHQ.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
   // 隱私政策公開 URL（Google Play 上架必填）
   privacyPolicyUrl: "https://bikeassist-bdbkimdc.manus.space/privacy",
   // 僅用於每七天一次的已審核模型清單驗證；離線時不影響任何騎乘功能。
-  modelUpdateManifestUrl: "https://bikeassist-bdbkimdc.manus.space/api/model-update/manifest",
+  modelUpdateManifestUrl:
+    "https://bikeassist-bdbkimdc.manus.space/api/model-update/manifest",
 };
 
 const config: ExpoConfig = {
@@ -80,19 +82,29 @@ const config: ExpoConfig = {
       "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
     ],
     // 套件若宣告開機接收或懸浮窗，均從最終 manifest 明確移除：本 App 僅由使用者開始騎乘後啟動 location 前景服務。
-    blockedPermissions: [
-      "android.permission.RECEIVE_BOOT_COMPLETED",
-    ],
+    blockedPermissions: ["android.permission.RECEIVE_BOOT_COMPLETED"],
     intentFilters: [
       {
         action: "VIEW",
         data: [
           { scheme: "content", mimeType: "application/gpx+xml" },
-          { scheme: "content", mimeType: "application/xml", pathPattern: ".*\\.gpx" },
+          {
+            scheme: "content",
+            mimeType: "application/xml",
+            pathPattern: ".*\\.gpx",
+          },
           { scheme: "content", mimeType: "text/xml", pathPattern: ".*\\.gpx" },
-          { scheme: "content", mimeType: "application/octet-stream", pathPattern: ".*\\.gpx" },
+          {
+            scheme: "content",
+            mimeType: "application/octet-stream",
+            pathPattern: ".*\\.gpx",
+          },
           { scheme: "file", mimeType: "application/gpx+xml" },
-          { scheme: "file", mimeType: "application/octet-stream", pathPattern: ".*\\.gpx" },
+          {
+            scheme: "file",
+            mimeType: "application/octet-stream",
+            pathPattern: ".*\\.gpx",
+          },
         ],
         category: ["BROWSABLE", "DEFAULT"],
       },
@@ -150,7 +162,8 @@ const config: ExpoConfig = {
     [
       "expo-image-picker",
       {
-        photosPermission: "單車助手僅在您主動選取時讀取相片，以加入本機騎乘時間軸。",
+        photosPermission:
+          "單車助手僅在您主動選取時讀取相片，以加入本機騎乘時間軸。",
       },
     ],
     [
@@ -188,6 +201,8 @@ const config: ExpoConfig = {
   },
   extra: {
     modelUpdateManifestUrl: env.modelUpdateManifestUrl,
+    // 僅 GitHub Android Emulator E2E release build 會啟用，正式發行版不可使用這個驗收入口。
+    e2eNotificationHarness: process.env.E2E_NOTIFICATION_HARNESS === "true",
     eas: {
       projectId: "af286610-25f1-45e5-afcc-6c30040d4124",
     },
