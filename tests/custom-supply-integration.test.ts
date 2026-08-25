@@ -16,8 +16,8 @@ describe("自訂補給與共用提醒整合", () => {
 
   it("自訂補給編輯器只保留類別與時間或距離，說明其餘行為沿用共用設定", () => {
     const source = read("components/custom-supply-item-modal.tsx");
-    expect(source).toContain("整合提醒類別");
-    expect(source).toContain("沿用所選能量或補水的共用設定");
+    expect(source).toContain("forms.supplyItem.reminderCategory");
+    expect(source).toContain("forms.supplyItem.reminderCategoryHint");
     expect(source).not.toContain("setRepeatMode");
     expect(source).not.toContain("setPauseOnDownhill");
   });

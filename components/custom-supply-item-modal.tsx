@@ -23,6 +23,7 @@ import {
 import { useColors } from '@/hooks/use-colors';
 import { SupplyItem } from '@/lib/settings-context';
 import Slider from '@react-native-community/slider';
+import { useTranslation } from 'react-i18next';
 
 export interface CustomSupplyItemModalProps {
   visible: boolean;
@@ -38,6 +39,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
   onCancel,
 }) => {
   const colors = useColors();
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [target, setTarget] = useState<'energy' | 'water'>('energy');
   const [triggerType, setTriggerType] = useState<'time' | 'distance'>('time');
@@ -74,12 +76,12 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
   // 驗證表單
   const validateForm = (): boolean => {
     if (!name.trim()) {
-      Alert.alert('錯誤', '請輸入補給品名稱');
+      Alert.alert(t('forms.errors.title'), t('forms.errors.supplyNameRequired'));
       return false;
     }
 
     if (triggerType === 'distance' && triggerValue <= 0) {
-      Alert.alert('錯誤', '距離必須大於 0');
+      Alert.alert(t('forms.errors.title'), t('forms.errors.distancePositive'));
       return false;
     }
 
@@ -89,7 +91,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
       triggerMinutes === 0 &&
       triggerSeconds === 0
     ) {
-      Alert.alert('錯誤', '時間必須大於 0');
+      Alert.alert(t('forms.errors.title'), t('forms.errors.timePositive'));
       return false;
     }
 
@@ -126,7 +128,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
         {/* 標題欄 */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>
-            {item ? '編輯補給品' : '新增補給品'}
+            {item ? t('forms.supplyItem.editTitle') : t('forms.supplyItem.addTitle')}
           </Text>
           <Pressable
             onPress={onCancel}
@@ -145,7 +147,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
           {/* 補給品名稱 */}
           <View style={styles.section}>
             <Text style={[styles.label, { color: colors.foreground }]}>
-              補給品名稱 *
+              {t('forms.supplyItem.nameLabel')}
             </Text>
             <TextInput
               style={[
@@ -156,7 +158,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
                   backgroundColor: colors.surface,
                 },
               ]}
-              placeholder="例如：水分、BCAA、電解質"
+              placeholder={t('forms.supplyItem.namePlaceholder')}
               placeholderTextColor={colors.muted}
               value={name}
               onChangeText={setName}
@@ -165,7 +167,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
 
           {/* 啟用開關 */}
           <View style={[styles.section, styles.switchRow]}>
-            <Text style={[styles.label, { color: colors.foreground }]}>啟用</Text>
+            <Text style={[styles.label, { color: colors.foreground }]}>{t('forms.supplyItem.enabled')}</Text>
             <Switch
               value={enabled}
               onValueChange={setEnabled}
@@ -174,22 +176,22 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.label, { color: colors.foreground }]}>整合提醒類別</Text>
+            <Text style={[styles.label, { color: colors.foreground }]}>{t('forms.supplyItem.reminderCategory')}</Text>
             <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 4 }}>
-              通知、語音、震動與重複提醒會沿用所選能量或補水的共用設定。
+              {t('forms.supplyItem.reminderCategoryHint')}
             </Text>
             <View style={[styles.segmentControl, { marginTop: 12 }]}>
               <Pressable
                 onPress={() => setTarget('energy')}
                 style={[styles.segmentButton, { backgroundColor: target === 'energy' ? '#D97706' : colors.surface }]}
               >
-                <Text style={[styles.segmentText, { color: target === 'energy' ? '#fff' : colors.foreground }]}>能量補給</Text>
+                <Text style={[styles.segmentText, { color: target === 'energy' ? '#fff' : colors.foreground }]}>{t('forms.supplyItem.energy')}</Text>
               </Pressable>
               <Pressable
                 onPress={() => setTarget('water')}
                 style={[styles.segmentButton, { backgroundColor: target === 'water' ? '#0284C7' : colors.surface }]}
               >
-                <Text style={[styles.segmentText, { color: target === 'water' ? '#fff' : colors.foreground }]}>補水</Text>
+                <Text style={[styles.segmentText, { color: target === 'water' ? '#fff' : colors.foreground }]}>{t('forms.supplyItem.water')}</Text>
               </Pressable>
             </View>
           </View>
@@ -197,7 +199,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
           {/* 觸發方式 */}
           <View style={styles.section}>
             <Text style={[styles.label, { color: colors.foreground }]}>
-              觸發方式
+              {t('forms.supplyItem.triggerType')}
             </Text>
             <View style={styles.segmentControl}>
               <Pressable
@@ -220,7 +222,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
                     },
                   ]}
                 >
-                  時間
+                  {t('forms.supplyItem.time')}
                 </Text>
               </Pressable>
               <Pressable
@@ -243,7 +245,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
                     },
                   ]}
                 >
-                  距離
+                  {t('forms.supplyItem.distance')}
                 </Text>
               </Pressable>
             </View>
@@ -253,11 +255,11 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
           {triggerType === 'time' && (
             <View style={styles.section}>
               <Text style={[styles.label, { color: colors.foreground }]}>
-                觸發時間
+                {t('forms.supplyItem.triggerTime')}
               </Text>
               <View style={styles.timeInputRow}>
                 <View style={styles.timeInputGroup}>
-                  <Text style={[styles.timeLabel, { color: colors.muted }]}>小時</Text>
+                  <Text style={[styles.timeLabel, { color: colors.muted }]}>{t('forms.supplyItem.hours')}</Text>
                   <TextInput
                     style={[
                       styles.timeInput,
@@ -275,7 +277,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
                   />
                 </View>
                 <View style={styles.timeInputGroup}>
-                  <Text style={[styles.timeLabel, { color: colors.muted }]}>分鐘</Text>
+                  <Text style={[styles.timeLabel, { color: colors.muted }]}>{t('forms.supplyItem.minutes')}</Text>
                   <TextInput
                     style={[
                       styles.timeInput,
@@ -293,7 +295,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
                   />
                 </View>
                 <View style={styles.timeInputGroup}>
-                  <Text style={[styles.timeLabel, { color: colors.muted }]}>秒</Text>
+                  <Text style={[styles.timeLabel, { color: colors.muted }]}>{t('forms.supplyItem.seconds')}</Text>
                   <TextInput
                     style={[
                       styles.timeInput,
@@ -319,7 +321,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
             <View style={styles.section}>
               <View style={styles.sliderLabelRow}>
                 <Text style={[styles.label, { color: colors.foreground }]}>
-                  觸發距離
+                  {t('forms.supplyItem.triggerDistance')}
                 </Text>
                 <Text style={[styles.sliderValue, { color: colors.primary }]}>
                   {triggerValue.toFixed(1)} km
@@ -351,7 +353,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
             ]}
           >
             <Text style={[styles.buttonText, { color: colors.foreground }]}>
-              取消
+              {t('common.cancel')}
             </Text>
           </Pressable>
           <Pressable
@@ -363,7 +365,7 @@ export const CustomSupplyItemModal: React.FC<CustomSupplyItemModalProps> = ({
             ]}
           >
             <Text style={[styles.buttonText, { color: colors.onAccent }]}>
-              {item ? '更新' : '新增'}
+              {item ? t('forms.supplyItem.update') : t('forms.supplyItem.add')}
             </Text>
           </Pressable>
         </View>

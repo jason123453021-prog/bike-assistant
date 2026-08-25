@@ -166,7 +166,7 @@ export default function SettingsScreen() {
 
   const handleSaveSupply = async () => {
     if (!supplyForm.name.trim()) {
-      Alert.alert("錯誤", "請輸入補給品名稱");
+      Alert.alert(t("forms.errors.title"), t("forms.errors.supplyNameRequired"));
       return;
     }
     if (supplyModal.mode === "add") {
@@ -369,14 +369,14 @@ export default function SettingsScreen() {
     setEditModal({ visible: true, key, label, value: String(value), unit, isNumber: true });
   };
   const openBirthdayEdit = () => {
-    setEditModal({ visible: true, key: "birthday", label: "生日", value: settings.birthday ?? "", unit: "YYYY-MM-DD", isNumber: false });
+    setEditModal({ visible: true, key: "birthday", label: t("formLabels.birthday"), value: settings.birthday ?? "", unit: "YYYY-MM-DD", isNumber: false });
   };
 
   const saveEdit = async () => {
     if (!editModal.isNumber) {
       const birthday = normalizeBirthday(editModal.value.trim());
       if (!birthday) {
-        Alert.alert("生日格式錯誤", "請使用 YYYY-MM-DD，例如 1990-08-15。");
+        Alert.alert(t("forms.errors.birthdayTitle"), t("forms.errors.birthdayBody"));
         return;
       }
       await updateSettings({ birthday });
@@ -385,7 +385,7 @@ export default function SettingsScreen() {
     }
     const num = parseFloat(editModal.value);
     if (isNaN(num) || num <= 0) {
-      Alert.alert("錯誤", "請輸入有效的數值");
+      Alert.alert(t("forms.errors.title"), t("forms.errors.numberBody"));
       return;
     }
     const boundedNum = editModal.key === "touchGuardAutoRelockSec"

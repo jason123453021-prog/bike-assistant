@@ -52,7 +52,7 @@ describe("ride detail JSX safety", () => {
     expect(source).not.toContain("styles.activityViewerDrawerHandle");
     expect(source).not.toContain("styles.activityViewerDrawerHint");
     expect(source).toContain("activityViewerRoutePhotoMeta");
-    expect(source).toContain("活動封面照片");
+    expect(source).toContain("forms.activityEditor.coverPhoto");
     expect(source).toContain("coverPhotoUri");
     expect(source).toContain("routeMapPhotoThumbButton");
     expect(source).toContain("activityViewerMode === \"route\"");

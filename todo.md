@@ -2485,3 +2485,9 @@
 - [x] 擴充活動詳情優先次要資訊、分析、匯出與操作文案的多國語系支援，維持 fallback 與 RTL 版面韌性
 - [x] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact（run 32808917098，head `23bd460`；Maestro JUnit 1 test／0 failures／35.078 秒；artifact `bike-assistant-maestro-e2e` 已下載核實）
 - [ ] 由 Android 實機依 `references/android-notification-device-validation-2026-08-25.md` 驗證通知 action、背景回前景與語言重排
+
+## 活動編輯 Modal 與驗證訊息多語系化（2026-08-25）
+- [x] 抽取活動編輯 Modal 的裝備、RPE、私人備註、封面與媒體等剩餘可見文案
+- [x] 將活動與補給品表單驗證錯誤、成功與確認提示改為跟隨目前語系
+- [x] 新增語言切換與表單驗證提示的自動化守門，完成品質檢查
+- [ ] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact

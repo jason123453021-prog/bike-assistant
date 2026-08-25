@@ -1382,18 +1382,18 @@ export default function RideDetailScreen() {
                 </View>
               </View>
               <View>
-                <Text style={[styles.label, { color: colors.muted }]}>裝備備註</Text>
+                <Text style={[styles.label, { color: colors.muted }]}>{t("forms.activityEditor.equipmentLabel")}</Text>
                 <TextInput
                   value={editEquipmentInput}
                   onChangeText={setEditEquipmentInput}
-                  placeholder="例如：公路車、32 mm 胎、備用燈"
+                  placeholder={t("forms.activityEditor.equipmentPlaceholder")}
                   placeholderTextColor={colors.muted}
                   maxLength={80}
                   style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
                 />
               </View>
               <View>
-                <Text style={[styles.label, { color: colors.muted }]}>RPE（App 已自動推定，可選手動調整）</Text>
+                <Text style={[styles.label, { color: colors.muted }]}>{t("forms.activityEditor.rpeHint")}</Text>
                 <View style={styles.rpePicker}>
                   {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => {
                     const selected = editRpe === value;
@@ -1406,11 +1406,11 @@ export default function RideDetailScreen() {
                 </View>
               </View>
               <View>
-                <Text style={[styles.label, { color: colors.muted }]}>私人備註</Text>
+                <Text style={[styles.label, { color: colors.muted }]}>{t("forms.activityEditor.privateNotes")}</Text>
                 <TextInput
                   value={editDescInput}
                   onChangeText={setEditDescInput}
-                  placeholder="只保存在此裝置，例如路況、感受與下次調整…"
+                  placeholder={t("forms.activityEditor.privateNotesPlaceholder")}
                   placeholderTextColor={colors.muted}
                   multiline
                   numberOfLines={3}
@@ -1418,8 +1418,8 @@ export default function RideDetailScreen() {
                 />
               </View>
               <View>
-                <Text style={[styles.label, { color: colors.muted }]}>活動封面照片</Text>
-                <Text style={[styles.coverPickerHint, { color: colors.muted }]}>選擇本機照片作為活動主視覺；未設定時會顯示完整路線。</Text>
+                <Text style={[styles.label, { color: colors.muted }]}>{t("forms.activityEditor.coverPhoto")}</Text>
+                <Text style={[styles.coverPickerHint, { color: colors.muted }]}>{t("forms.activityEditor.coverPhotoHint")}</Text>
                 {coverPhotoChoices.length > 0 ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.coverPickerRail}>
                     {coverPhotoChoices.map((photo) => {
@@ -1427,23 +1427,23 @@ export default function RideDetailScreen() {
                       return (
                         <Pressable key={photo.id} style={[styles.coverPickerOption, { borderColor: selected ? colors.primary : colors.border }]} onPress={() => setEditCoverPhotoUri(photo.uri)}>
                           <Image source={{ uri: photo.uri }} style={styles.coverPickerImage} />
-                          {selected ? <View style={[styles.coverPickerSelected, { backgroundColor: colors.primary }]}><Text style={[styles.coverPickerSelectedText, { color: colors.onAccent }]}>封面</Text></View> : null}
+                          {selected ? <View style={[styles.coverPickerSelected, { backgroundColor: colors.primary }]}><Text style={[styles.coverPickerSelectedText, { color: colors.onAccent }]}>{t("forms.activityEditor.coverSelected")}</Text></View> : null}
                         </Pressable>
                       );
                     })}
                   </ScrollView>
-                ) : <Text style={[styles.coverPickerEmpty, { color: colors.muted }]}>請先於下方加入本機相片，再選擇活動封面。</Text>}
+                ) : <Text style={[styles.coverPickerEmpty, { color: colors.muted }]}>{t("forms.activityEditor.coverEmpty")}</Text>}
                 {editCoverPhotoUri ? (
                   <Pressable style={styles.clearCoverButton} onPress={() => setEditCoverPhotoUri(undefined)}>
-                    <Text style={styles.clearCoverButtonText}>清除活動封面，改回路線視覺</Text>
+                    <Text style={styles.clearCoverButtonText}>{t("forms.activityEditor.clearCover")}</Text>
                   </Pressable>
                 ) : null}
               </View>
               <View>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={[styles.label, { color: colors.muted }]}>本機媒體（相片或影片）</Text>
+                  <Text style={[styles.label, { color: colors.muted }]}>{t("forms.activityEditor.localMedia")}</Text>
                   <Pressable onPress={handlePickMedia} style={[styles.mediaAddBtn, { backgroundColor: colors.primary }]}>
-                    <Text style={{ color: colors.onAccent, fontSize: 12, fontWeight: "bold" }}>+ 新增媒體</Text>
+                    <Text style={{ color: colors.onAccent, fontSize: 12, fontWeight: "bold" }}>+ {t("forms.activityEditor.addMedia")}</Text>
                   </Pressable>
                 </View>
                 {localMedia.length > 0 ? (
@@ -1461,7 +1461,7 @@ export default function RideDetailScreen() {
                     ))}
                   </ScrollView>
                 ) : (
-                  <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>尚未附加相片或影片</Text>
+                  <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>{t("forms.activityEditor.mediaEmpty")}</Text>
                 )}
               </View>
             </ScrollView>
