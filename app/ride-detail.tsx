@@ -57,7 +57,7 @@ import { attachRidePhotos, loadRidePhotoTimeline, removeRidePhoto, type RidePhot
 import { persistRideMedia } from "@/lib/local-ride-media";
 import { ZoomableActivityPhoto } from "@/components/zoomable-activity-photo";
 import { resolveActivityCoverPhotoUri } from "@/lib/activity-media";
-import { calculateGapPaceSecPerKm, formatPaceFromKmh, formatPaceSeconds, SPORT_META, type SportType } from "@/lib/sport-metrics";
+import { calculateGapPaceSecPerKm, formatPaceFromKmh, formatPaceSeconds, type SportType } from "@/lib/sport-metrics";
 import { sampleActivityMapPolyline } from "@/lib/activity-map-presentation";
 import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "react-i18next";
