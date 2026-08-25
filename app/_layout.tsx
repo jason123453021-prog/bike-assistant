@@ -16,8 +16,15 @@ import {
   initialWindowMetrics,
 } from "react-native-safe-area-context";
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
-import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
-import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from "@react-navigation/native";
+import {
+  initManusRuntime,
+  subscribeSafeAreaInsets,
+} from "@/lib/_core/manus-runtime";
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider as NavThemeProvider,
+} from "@react-navigation/native";
 import { RideProvider } from "@/lib/ride-context";
 import { GpxProvider, useGpx } from "@/lib/gpx-context";
 import { isExternalGpxUri } from "@/lib/external-gpx-import";
@@ -56,10 +63,15 @@ function InnerLayout() {
 
   return (
     <>
-      <NavThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <NavThemeProvider
+        value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+      >
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="ride-detail" options={{ headerShown: false, presentation: "fullScreenModal" }} />
+          <Stack.Screen
+            name="ride-detail"
+            options={{ headerShown: false, presentation: "fullScreenModal" }}
+          />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
@@ -73,20 +85,31 @@ function ExternalGpxReceiver() {
   const { importExternalRoute } = useGpx();
   const handledUris = useRef(new Set<string>());
 
-  const handleUri = useCallback(async (uri: string | null) => {
-    if (!uri || !isExternalGpxUri(uri) || handledUris.current.has(uri)) return;
-    handledUris.current.add(uri);
-    try {
-      await importExternalRoute(uri);
-      router.replace("/navigate");
-    } catch (error) {
-      Alert.alert("GPX 載入失敗", error instanceof Error ? error.message : "無法讀取這個 GPX 檔案。");
-    }
-  }, [importExternalRoute]);
+  const handleUri = useCallback(
+    async (uri: string | null) => {
+      if (!uri || !isExternalGpxUri(uri) || handledUris.current.has(uri))
+        return;
+      handledUris.current.add(uri);
+      try {
+        await importExternalRoute(uri);
+        router.replace("/navigate");
+      } catch (error) {
+        Alert.alert(
+          "GPX 載入失敗",
+          error instanceof Error ? error.message : "無法讀取這個 GPX 檔案。",
+        );
+      }
+    },
+    [importExternalRoute],
+  );
 
   useEffect(() => {
-    Linking.getInitialURL().then(handleUri).catch(() => {});
-    const subscription = Linking.addEventListener("url", ({ url }) => { void handleUri(url); });
+    Linking.getInitialURL()
+      .then(handleUri)
+      .catch(() => {});
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      void handleUri(url);
+    });
     return () => subscription.remove();
   }, [handleUri]);
 
@@ -133,24 +156,42 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => startSupplyNotificationActionListener({
-    // Android 允許使用者點擊通知所附的 PendingIntent 開啟 App；此處不會從背景強制切換 Activity。
-    onOpen: () => router.replace("/navigate"),
-    // 「已補給」按鈕需在導航頁掛載前先寫入背景快照；Map 頁收到佇列動作後只同步 UI 與本機倒數。
-    onConfirm: async (action) => {
-      if (action.kind === "calorie" || action.kind === "water") {
-        await acknowledgeBackgroundSupplyReminder(action.kind);
-        return;
-      }
-      if (action.kind === "interval-energy-time" || action.kind === "interval-energy-distance") {
-        await acknowledgeBackgroundSupplyInterval(action.kind.replace("interval-", "") as "energy-time" | "energy-distance");
-        return;
-      }
-      if (action.kind === "interval-water-time" || action.kind === "interval-water-distance") {
-        await acknowledgeBackgroundSupplyInterval(action.kind.replace("interval-", "") as "water-time" | "water-distance");
-      }
-    },
-  }), []);
+  useEffect(
+    () =>
+      startSupplyNotificationActionListener({
+        // Android 允許使用者點擊通知所附的 PendingIntent 開啟 App；此處不會從背景強制切換 Activity。
+        onOpen: () => router.replace("/map"),
+        // 「已補給」按鈕需在導航頁掛載前先寫入背景快照；Map 頁收到佇列動作後只同步 UI 與本機倒數。
+        onConfirm: async (action) => {
+          if (action.kind === "calorie" || action.kind === "water") {
+            await acknowledgeBackgroundSupplyReminder(action.kind);
+            return;
+          }
+          if (
+            action.kind === "interval-energy-time" ||
+            action.kind === "interval-energy-distance"
+          ) {
+            await acknowledgeBackgroundSupplyInterval(
+              action.kind.replace("interval-", "") as
+                | "energy-time"
+                | "energy-distance",
+            );
+            return;
+          }
+          if (
+            action.kind === "interval-water-time" ||
+            action.kind === "interval-water-distance"
+          ) {
+            await acknowledgeBackgroundSupplyInterval(
+              action.kind.replace("interval-", "") as
+                | "water-time"
+                | "water-distance",
+            );
+          }
+        },
+      }),
+    [],
+  );
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);
@@ -164,7 +205,10 @@ export default function RootLayout() {
   }, [handleSafeAreaUpdate]);
 
   const providerInitialMetrics = useMemo(() => {
-    const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
+    const metrics = initialWindowMetrics ?? {
+      insets: initialInsets,
+      frame: initialFrame,
+    };
     return {
       ...metrics,
       insets: {
@@ -176,7 +220,10 @@ export default function RootLayout() {
   }, [initialInsets, initialFrame]);
 
   const content = (
-    <GestureHandlerRootView style={{ flex: 1 }} onLayout={hideNativeSplashAfterFirstLayout}>
+    <GestureHandlerRootView
+      style={{ flex: 1 }}
+      onLayout={hideNativeSplashAfterFirstLayout}
+    >
       <AppErrorBoundary>
         <SettingsProvider>
           <LanguageProvider>
@@ -207,6 +254,8 @@ export default function RootLayout() {
     );
   }
   return (
-    <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
+    <SafeAreaProvider initialMetrics={providerInitialMetrics}>
+      {content}
+    </SafeAreaProvider>
   );
 }
