@@ -2470,4 +2470,4 @@
 - [x] 建立所有 locale 的 key 完整性與 fallback 守門，避免切換後顯示 key、空白或舊語言字串
 - [x] 擴充活動詳情的摘要、統計、路線與操作文案為多國語系
 - [x] 擴充分享圖卡及分享 Modal 的標題、數據標籤、空狀態與操作文案為多國語系
-- [ ] 完成完整品質檢查、GitHub Android E2E 與驗收連結
+- [x] 完成完整品質檢查、GitHub Android E2E 與驗收連結（Android E2E run 32800973187 成功；Maestro JUnit 1 test／0 failures／29.555 秒；artifact `bike-assistant-maestro-e2e` 已上傳）
