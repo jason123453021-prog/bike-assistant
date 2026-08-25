@@ -2490,4 +2490,4 @@
 - [x] 抽取活動編輯 Modal 的裝備、RPE、私人備註、封面與媒體等剩餘可見文案
 - [x] 將活動與補給品表單驗證錯誤、成功與確認提示改為跟隨目前語系
 - [x] 新增語言切換與表單驗證提示的自動化守門，完成品質檢查
-- [ ] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact
+- [x] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact（run 32810659573，head `74c44d0`；Maestro JUnit 1 test／0 failures／37.643 秒；artifact `bike-assistant-maestro-e2e` 已下載核實）
