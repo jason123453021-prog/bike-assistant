@@ -28,8 +28,56 @@ function formatDuration(seconds: number): string {
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${String(remain).padStart(2, "0")}` : `${minutes}:${String(remain).padStart(2, "0")}`;
 }
 
-function truncateTitle(value: string, maximum = 18): string {
-  return value.length > maximum ? `${value.slice(0, maximum - 1)}…` : value;
+function visualUnits(value: string): number {
+  return Array.from(value).reduce((total, character) => total + (/\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u.test(character) ? 1.45 : /\s/u.test(character) ? 0.35 : 0.78), 0);
+}
+
+function fitSvgFontSize(value: string, preferred: number, minimum: number, availableWidth: number): number {
+  const estimatedWidth = Math.max(1, visualUnits(value) * preferred * 0.62);
+  return Math.max(minimum, Math.min(preferred, Number((preferred * (availableWidth / estimatedWidth)).toFixed(1))));
+}
+
+function wrapSvgText(value: string, maxUnits: number): string[] {
+  const words = value.split(/(\s+)/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const token of words) {
+    if (visualUnits(token) > maxUnits) {
+      if (current.trim()) {
+        lines.push(current.trim());
+        current = "";
+      }
+      let tokenLine = "";
+      for (const character of Array.from(token)) {
+        if (tokenLine && visualUnits(`${tokenLine}${character}`) > maxUnits) {
+          lines.push(tokenLine);
+          tokenLine = character;
+        } else {
+          tokenLine += character;
+        }
+      }
+      current = tokenLine;
+      continue;
+    }
+    const candidate = `${current}${token}`;
+    if (current && visualUnits(candidate) > maxUnits) {
+      lines.push(current.trim());
+      current = token.trimStart();
+    } else {
+      current = candidate;
+    }
+  }
+  if (current.trim()) lines.push(current.trim());
+  if (lines.length > 0) return lines;
+  return [value];
+}
+
+function svgMultiLineText(value: string, x: number, y: number, preferredSize: number, minimumSize: number, availableWidth: number, lineHeight: number): { markup: string; lineCount: number } {
+  const fontSize = fitSvgFontSize(value, preferredSize, minimumSize, availableWidth);
+  const maxUnits = availableWidth / Math.max(1, fontSize * 0.62);
+  const lines = wrapSvgText(value, maxUnits);
+  const markup = `<text x="${x}" y="${y}" fill="#F8FBFD" font-size="${fontSize}" font-weight="800" font-family="${FONT_STACK}">${lines.map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : lineHeight}">${escapeXml(line)}</tspan>`).join("")}</text>`;
+  return { markup, lineCount: lines.length };
 }
 
 function sportLabel(record: RideRecord, t: (key: string) => string): string {
@@ -81,10 +129,12 @@ function metricCell({
   unavailable?: boolean;
 }): string {
   const valueColor = unavailable ? "#7E8B99" : "#F8FBFD";
-  const valueSize = primary ? 62 : 50;
-  return `<text x="${x}" y="${y}" fill="#93A2B2" font-size="24" font-weight="700" font-family="${FONT_STACK}" text-anchor="middle" letter-spacing="1">${escapeXml(label)}</text>
+  const valueSize = fitSvgFontSize(value, primary ? 62 : 50, primary ? 42 : 34, 290);
+  const labelSize = fitSvgFontSize(label, 24, 17, 290);
+  const unitSize = fitSvgFontSize(unit, 21, 15, 290);
+  return `<text x="${x}" y="${y}" fill="#93A2B2" font-size="${labelSize}" font-weight="700" font-family="${FONT_STACK}" text-anchor="middle" letter-spacing="1">${escapeXml(label)}</text>
     <text x="${x}" y="${y + 66}" fill="${valueColor}" font-size="${valueSize}" font-weight="800" font-family="${FONT_STACK}" text-anchor="middle">${escapeXml(value)}</text>
-    <text x="${x}" y="${y + 102}" fill="#93A2B2" font-size="21" font-family="${FONT_STACK}" text-anchor="middle">${escapeXml(unit)}</text>`;
+    <text x="${x}" y="${y + 102}" fill="#93A2B2" font-size="${unitSize}" font-family="${FONT_STACK}" text-anchor="middle">${escapeXml(unit)}</text>`;
 }
 
 const DEFAULT_SHARE_COPY: Record<string, string> = { "share.noGps": "此活動沒有可繪製的 GPS 軌跡", "share.distance": "距離", "share.movingTime": "移動時間", "share.elevation": "總爬升", "share.averageSpeed": "平均速度", "share.averagePower": "平均功率", "share.calories": "卡路里", "share.kilometers": "公里", "share.meters": "公尺", "share.watts": "瓦", "share.kilocalories": "大卡", "share.gpsMoving": "GPS 移動", "share.unavailable": "資料不足", "share.activitySummary": "活動摘要", "share.gpsRecord": "GPS 記錄", "share.movingTimeMethod": "移動時間依可信 GPS 位置、距離與速度計算", "share.createdOffline": "由單車助手在此裝置離線產生", "share.untitledRide": "未命名騎乘", "sports.cycling": "自行車", "sports.running": "跑步", "sports.trailRunning": "越野跑", "sports.hiking": "健行" };
@@ -111,7 +161,10 @@ export function createRideShareCardSvg(record: RideRecord, options?: { t?: (key:
     powerSource: record.powerSource ?? "unavailable",
     caloriesSource: record.caloriesSource ?? "unavailable",
   });
-  const routeName = truncateTitle(record.name?.trim() || t("share.untitledRide"));
+  const routeName = record.name?.trim() || t("share.untitledRide");
+  const routeNameText = svgMultiLineText(routeName, 64, 1066, 56, 34, 940, 62);
+  const titleOffset = Math.min(124, Math.max(0, routeNameText.lineCount - 1) * 62);
+  const footerMethodSize = fitSvgFontSize(t("share.movingTimeMethod"), 22, 15, 840);
   const routeTokens = points ? points.split(" ") : [];
   const firstPoint = routeTokens[0]?.split(",");
   const middlePoint = routeTokens[Math.floor(routeTokens.length / 2)]?.split(",");
@@ -128,14 +181,14 @@ export function createRideShareCardSvg(record: RideRecord, options?: { t?: (key:
        <text x="540" y="525" fill="#B3C0CB" font-size="28" font-family="${FONT_STACK}" text-anchor="middle">${escapeXml(t("share.noGps"))}</text></g>`;
 
   const primaryMetrics = [
-    metricCell({ x: 180, y: 1234, label: t("share.distance"), value: (stats.distanceM / 1000).toFixed(2), unit: t("share.kilometers"), primary: true }),
-    metricCell({ x: 540, y: 1234, label: t("share.movingTime"), value: formatDuration(stats.movingTimeSec), unit: t("share.gpsMoving"), primary: true }),
-    metricCell({ x: 900, y: 1234, label: t("share.elevation"), value: `${Math.round(stats.totalAscentM)}`, unit: t("share.meters"), primary: true }),
+    metricCell({ x: 180, y: 1234 + titleOffset, label: t("share.distance"), value: (stats.distanceM / 1000).toFixed(2), unit: t("share.kilometers"), primary: true }),
+    metricCell({ x: 540, y: 1234 + titleOffset, label: t("share.movingTime"), value: formatDuration(stats.movingTimeSec), unit: t("share.gpsMoving"), primary: true }),
+    metricCell({ x: 900, y: 1234 + titleOffset, label: t("share.elevation"), value: `${Math.round(stats.totalAscentM)}`, unit: t("share.meters"), primary: true }),
   ].join("");
   const secondaryMetrics = [
-    metricCell({ x: 180, y: 1512, label: t("share.averageSpeed"), value: stats.averageSpeedKmh.toFixed(1), unit: "km/h" }),
-    metricCell({ x: 540, y: 1512, label: t("share.averagePower"), value: averagePowerAvailable ? `${Math.round(stats.averagePowerW!)}` : "--", unit: averagePowerAvailable ? t("share.watts") : t("share.unavailable"), unavailable: !averagePowerAvailable }),
-    metricCell({ x: 900, y: 1512, label: t("share.calories"), value: Math.round(stats.caloriesKcal).toLocaleString(locale), unit: t("share.kilocalories") }),
+    metricCell({ x: 180, y: 1512 + titleOffset, label: t("share.averageSpeed"), value: stats.averageSpeedKmh.toFixed(1), unit: "km/h" }),
+    metricCell({ x: 540, y: 1512 + titleOffset, label: t("share.averagePower"), value: averagePowerAvailable ? `${Math.round(stats.averagePowerW!)}` : "--", unit: averagePowerAvailable ? t("share.watts") : t("share.unavailable"), unavailable: !averagePowerAvailable }),
+    metricCell({ x: 900, y: 1512 + titleOffset, label: t("share.calories"), value: Math.round(stats.caloriesKcal).toLocaleString(locale), unit: t("share.kilocalories") }),
   ].join("");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -157,19 +210,19 @@ export function createRideShareCardSvg(record: RideRecord, options?: { t?: (key:
   <rect x="0" y="906" width="1080" height="1014" rx="48" fill="url(#panelSurface)"/>
   <rect x="64" y="952" width="116" height="38" rx="19" fill="#123C30"/>
   <text x="122" y="978" fill="#63F5AA" font-size="19" font-weight="800" font-family="${FONT_STACK}" text-anchor="middle" letter-spacing="1">${escapeXml(t("share.activitySummary"))}</text>
-  <text x="64" y="1066" fill="#F8FBFD" font-size="56" font-weight="800" font-family="${FONT_STACK}">${escapeXml(routeName)}</text>
-  <text x="64" y="1112" fill="#93A2B2" font-size="25" font-family="${FONT_STACK}">${formatDate(record.date, locale)}</text>
-  <line x1="64" y1="1164" x2="1016" y2="1164" stroke="#DCE8EE" stroke-opacity="0.14" stroke-width="2"/>
+  ${routeNameText.markup}
+  <text x="64" y="${1112 + titleOffset}" fill="#93A2B2" font-size="25" font-family="${FONT_STACK}">${formatDate(record.date, locale)}</text>
+  <line x1="64" y1="${1164 + titleOffset}" x2="1016" y2="${1164 + titleOffset}" stroke="#DCE8EE" stroke-opacity="0.14" stroke-width="2"/>
   ${primaryMetrics}
-  <line x1="360" y1="1210" x2="360" y2="1366" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
-  <line x1="720" y1="1210" x2="720" y2="1366" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
-  <line x1="64" y1="1412" x2="1016" y2="1412" stroke="#DCE8EE" stroke-opacity="0.14" stroke-width="2"/>
+  <line x1="360" y1="${1210 + titleOffset}" x2="360" y2="${1366 + titleOffset}" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
+  <line x1="720" y1="${1210 + titleOffset}" x2="720" y2="${1366 + titleOffset}" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
+  <line x1="64" y1="${1412 + titleOffset}" x2="1016" y2="${1412 + titleOffset}" stroke="#DCE8EE" stroke-opacity="0.14" stroke-width="2"/>
   ${secondaryMetrics}
-  <line x1="360" y1="1488" x2="360" y2="1644" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
-  <line x1="720" y1="1488" x2="720" y2="1644" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
+  <line x1="360" y1="${1488 + titleOffset}" x2="360" y2="${1644 + titleOffset}" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
+  <line x1="720" y1="${1488 + titleOffset}" x2="720" y2="${1644 + titleOffset}" stroke="#DCE8EE" stroke-opacity="0.12" stroke-width="2"/>
   <rect x="64" y="1748" width="952" height="96" rx="24" fill="#0E1A22" stroke="#203642" stroke-width="2"/>
   <circle cx="112" cy="1796" r="10" fill="#26E38C"/>
-  <text x="140" y="1804" fill="#C9D6DE" font-size="22" font-family="${FONT_STACK}">${escapeXml(t("share.movingTimeMethod"))}</text>
+  <text x="140" y="1804" fill="#C9D6DE" font-size="${footerMethodSize}" font-family="${FONT_STACK}">${escapeXml(t("share.movingTimeMethod"))}</text>
   <text x="540" y="1890" fill="#6D7D8A" font-size="20" font-family="${FONT_STACK}" text-anchor="middle">${escapeXml(t("share.createdOffline"))}</text>
 </svg>`;
 }

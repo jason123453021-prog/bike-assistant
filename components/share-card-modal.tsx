@@ -5,6 +5,7 @@ import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import { WebView } from "react-native-webview";
 import { useColors } from "@/hooks/use-colors";
+import { AdaptiveFormText } from "@/components/adaptive-form-text";
 import { RideRecord } from "@/lib/ride-context";
 import { generateShareCard, generateShareText } from "@/lib/garmin-card-generator";
 import { createRideShareCardFilename, createRideShareCardSvg } from "@/lib/ride-share-card-svg";
@@ -21,6 +22,7 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
   const colors = useColors();
   const { t } = useTranslation();
   const { activeLanguage } = useLanguage();
+  const isRtl = activeLanguage === "ar-SA";
   const [isPreparingImage, setIsPreparingImage] = useState(false);
 
   const shareCard = useMemo(() => {
@@ -145,9 +147,9 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
               borderBottomWidth: 1,
             }}
           >
-            <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "bold" }}>
+            <AdaptiveFormText baseFontSize={18} style={{ color: colors.foreground, fontWeight: "bold", textAlign: isRtl ? "right" : "left" }}>
               {t("share.title")}
-            </Text>
+            </AdaptiveFormText>
             <Pressable onPress={onClose} style={{ padding: 8 }}>
               <Text style={{ color: colors.muted, fontSize: 24 }}>✕</Text>
             </Pressable>
@@ -177,9 +179,9 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
 
             {/* 分享選項 */}
             <View style={{ gap: 12 }}>
-              <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>
+              <AdaptiveFormText baseFontSize={14} style={{ color: colors.foreground, fontWeight: "600", textAlign: isRtl ? "right" : "left" }}>
                 {t("share.methods")}
-              </Text>
+              </AdaptiveFormText>
 
               {/* 主要分享：完整騎乘長圖 */}
               <Pressable
@@ -194,12 +196,12 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 disabled={isPreparingImage}
                 onPress={handleShareImage}
               >
-                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800", textAlign: "center" }}>
+                <AdaptiveFormText baseFontSize={14} minFontScale={0.72} maxLinesBeforeShrink={1} style={{ color: "#fff", fontWeight: "800", textAlign: "center" }}>
                   {isPreparingImage ? t("share.preparingImage") : t("share.shareImage")}
-                </Text>
-                <Text style={{ color: "rgba(255,255,255,0.78)", fontSize: 11, textAlign: "center", marginTop: 4 }}>
+                </AdaptiveFormText>
+                <AdaptiveFormText baseFontSize={11} style={{ color: "rgba(255,255,255,0.78)", textAlign: "center", marginTop: 4 }}>
                   {t("share.imageDescription")}
-                </Text>
+                </AdaptiveFormText>
               </Pressable>
 
               {/* 分享文字 */}
@@ -216,9 +218,9 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 ]}
                 onPress={handleShare}
               >
-                <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600", marginBottom: 8 /* internal spacing */ }}>
+                <AdaptiveFormText baseFontSize={12} minFontScale={0.72} maxLinesBeforeShrink={1} style={{ color: colors.foreground, fontWeight: "600", marginBottom: 8, textAlign: isRtl ? "right" : "left" }}>
                   📱 {t("share.shareSocial")}
-                </Text>
+                </AdaptiveFormText>
                 <Text
                   style={{
                     color: colors.muted,
@@ -245,9 +247,9 @@ export function ShareCardModal({ visible, ride, onClose }: ShareCardModalProps) 
                 ]}
                 onPress={() => { void handleCopyShareText(); }}
               >
-                <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>
+                <AdaptiveFormText baseFontSize={12} minFontScale={0.72} maxLinesBeforeShrink={1} style={{ color: colors.foreground, fontWeight: "600", textAlign: isRtl ? "right" : "left" }}>
                   📋 {t("share.copyText")}
-                </Text>
+                </AdaptiveFormText>
               </Pressable>
 
               {/* 建立可分享圖檔 */}

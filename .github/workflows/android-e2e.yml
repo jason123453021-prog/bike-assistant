@@ -103,6 +103,12 @@ jobs:
             adb install -r build/e2e-under-test.apk
             curl -fsSL https://get.maestro.mobile.dev | bash
             "$HOME/.maestro/bin/maestro" test --format junit --output build/maestro-report.xml --test-output-dir build/maestro-results e2e/maestro
+            for SCALE in 1.3 2.0; do
+              SCALE_TAG="$(printf '%s' "$SCALE" | tr '.' '-')"
+              adb shell settings put system font_scale "$SCALE"
+              "$HOME/.maestro/bin/maestro" test --format junit --output "build/maestro-font-scale-${SCALE_TAG}.xml" --test-output-dir "build/maestro-results/font-scale-${SCALE_TAG}" e2e/maestro/localization-font-scale.yaml
+            done
+            adb shell settings put system font_scale 1.0
 
       - name: 上傳 Maestro 報告與診斷 artifact
         if: always()
@@ -111,6 +117,7 @@ jobs:
           name: bike-assistant-maestro-e2e
           path: |
             build/maestro-report.xml
+            build/maestro-font-scale-*.xml
             build/maestro-results
           if-no-files-found: warn
           retention-days: 14

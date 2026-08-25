@@ -2504,3 +2504,9 @@
 - [x] 驗證德文、俄文與阿拉伯文的長字串表單布局，新增防止截斷的回歸守門
 - [x] 完成完整品質檢查
 - [x] 完成最新版 GitHub Android E2E 驗收並記錄 artifact（run 32814141657，head `41a77c6`；Maestro JUnit 1 test／0 failures／36.673 秒；artifact `bike-assistant-maestro-e2e` 已下載核實）
+
+## 多語系字體大小、活動標題與分享圖卡布局（2026-08-25）
+- [x] 建立不同語言與 Android 130%／200% 系統字體大小的實機驗收流程
+- [x] 將活動標題與分享圖卡文字接入自適應字級縮放與換行降級策略
+- [x] 新增長字串多語系截圖回歸測試與完整品質檢查
+- [ ] 完成最新版 GitHub Android E2E 與 130%／200% 多語系截圖 artifact 驗收

@@ -35,6 +35,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/use-colors";
+import { AdaptiveFormText } from "@/components/adaptive-form-text";
 import { useRide, type RideRecord, type RouteStats } from "@/lib/ride-context";
 import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power-calc";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -777,7 +778,9 @@ export default function RideDetailScreen() {
             returnKeyType="done"
             autoFocus
             selectTextOnFocus
-            maxLength={30}
+            multiline
+            numberOfLines={2}
+            maxLength={90}
           />
         ) : (
           <Pressable
@@ -787,7 +790,7 @@ export default function RideDetailScreen() {
               setTimeout(() => nameInputRef.current?.focus(), 100);
             }}
           >
-            <Text style={styles.routeName}>{record.name}</Text>
+            <AdaptiveFormText baseFontSize={16} minFontScale={0.72} maxLinesBeforeShrink={1} style={styles.routeName}>{record.name}</AdaptiveFormText>
             <IconSymbol name="pencil" size={13} color="rgba(255,255,255,0.5)" />
           </Pressable>
         )}
@@ -1546,8 +1549,8 @@ function ActivitySummaryHeader({ title, subtitle }: { title: string; subtitle: s
   return (
     <View style={styles.activitySummaryHeader}>
       <Text style={styles.activitySummaryEyebrow}>{t("detail.summary")}</Text>
-      <Text style={styles.activitySummaryTitle} numberOfLines={1}>{title}</Text>
-      <Text style={styles.activitySummarySubtitle} numberOfLines={2}>{subtitle}</Text>
+      <AdaptiveFormText baseFontSize={21} minFontScale={0.72} maxLinesBeforeShrink={1} style={styles.activitySummaryTitle}>{title}</AdaptiveFormText>
+      <AdaptiveFormText baseFontSize={12} minFontScale={0.78} maxLinesBeforeShrink={2} style={styles.activitySummarySubtitle}>{subtitle}</AdaptiveFormText>
     </View>
   );
 }

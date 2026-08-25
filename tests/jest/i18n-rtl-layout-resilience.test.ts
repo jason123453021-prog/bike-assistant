@@ -10,6 +10,11 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
   const settingsSource = fs.readFileSync(path.join(rootDir, "app/(tabs)/settings.tsx"), "utf8");
   const supplyModalSource = fs.readFileSync(path.join(rootDir, "components/custom-supply-item-modal.tsx"), "utf8");
   const adaptiveTextSource = fs.readFileSync(path.join(rootDir, "components/adaptive-form-text.tsx"), "utf8");
+  const activityDetailSource = fs.readFileSync(path.join(rootDir, "app/ride-detail.tsx"), "utf8");
+  const shareCardSource = fs.readFileSync(path.join(rootDir, "components/share-card-modal.tsx"), "utf8");
+  const maestroFontScaleSource = fs.readFileSync(path.join(rootDir, "e2e/maestro/localization-font-scale.yaml"), "utf8");
+  const workflowSource = fs.readFileSync(path.join(rootDir, ".github/workflows/android-e2e.yml"), "utf8");
+  const deviceValidationSource = fs.readFileSync(path.join(rootDir, "references/android-font-scale-activity-share-device-validation-2026-08-25.md"), "utf8");
 
   it("語言切換以非阻塞淡入淡出遮罩回饋，並將 RTL direction 套用至全域內容", () => {
     expect(providerSource).toContain("Animated.timing");
@@ -59,5 +64,18 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
     expect(settingsSource).toContain("multiline");
     expect(supplyModalSource).toContain("AdaptiveFormText");
     expect(supplyModalSource).toContain("multiline");
+  });
+
+  it("活動與分享內容沿用自適應策略，並保存 130%／200% 多語系截圖 artifact", () => {
+    expect(activityDetailSource).toContain("AdaptiveFormText");
+    expect(activityDetailSource).toContain("maxLength={90}");
+    expect(shareCardSource).toContain("AdaptiveFormText");
+    expect(maestroFontScaleSource).toContain('takeScreenshot: "font-scale-settings-de"');
+    expect(maestroFontScaleSource).toContain('takeScreenshot: "font-scale-settings-ru"');
+    expect(maestroFontScaleSource).toContain('takeScreenshot: "font-scale-settings-ar"');
+    expect(workflowSource).toContain("for SCALE in 1.3 2.0");
+    expect(workflowSource).toContain("adb shell settings put system font_scale");
+    expect(deviceValidationSource).toContain("130%");
+    expect(deviceValidationSource).toContain("200%");
   });
 });

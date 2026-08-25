@@ -83,4 +83,19 @@ describe("local ride share card", () => {
     expect(modalSource).toContain("預覽與實際匯出的 PNG 使用同一張 SVG");
     expect(modalSource).not.toContain('backgroundColor: "#667eea"');
   });
+
+  it("長德文、俄文與阿拉伯文活動標題會縮放或分行，不以省略號截斷", () => {
+    const names = [
+      "Donaudampfschifffahrtsgesellschaftskapitänin bei Gegenwind",
+      "Многодневнаявелосипеднаяпоездкачерезгорныемаршруты",
+      "جولة دراجات طويلة عبر الجبال والطرق الساحلية",
+    ];
+
+    for (const name of names) {
+      const svg = createRideShareCardSvg({ ...record, name }, { locale: "de-DE" });
+      expect(svg).toContain("<tspan");
+      expect(svg).not.toContain("…");
+      expect(svg).toMatch(/font-size="(?:3[4-9]|4\d|5\d(?:\.\d)?)"/);
+    }
+  });
 });
