@@ -2503,4 +2503,4 @@
 - [x] 為設定與活動／補給表單的標籤、按鈕與錯誤文字建立自動字級縮放與換行降級策略
 - [x] 驗證德文、俄文與阿拉伯文的長字串表單布局，新增防止截斷的回歸守門
 - [x] 完成完整品質檢查
-- [ ] 完成最新版 GitHub Android E2E 驗收並記錄 artifact
+- [x] 完成最新版 GitHub Android E2E 驗收並記錄 artifact（run 32814141657，head `41a77c6`；Maestro JUnit 1 test／0 failures／36.673 秒；artifact `bike-assistant-maestro-e2e` 已下載核實）
