@@ -122,8 +122,9 @@ describe("smart supply countdown UI", () => {
   it("uses a native modal over the map and omits amount guidance", () => {
     expect(modalSource).toContain("<Modal");
     expect(modalSource).toContain("hardwareAccelerated");
-    expect(modalSource).toContain("請補給能量");
-    expect(modalSource).toContain("請補給水分");
+    expect(modalSource).toContain("getSupplyModalCopy(activeLanguage)");
+    expect(modalSource).toContain("copy.energyBody");
+    expect(modalSource).toContain("copy.waterBody");
     expect(modalSource).not.toContain("recommendedMl");
     expect(modalSource).not.toContain("recommendedEnergyKcal");
     expect(modalSource).not.toContain("recommendedCarbohydrateG");
@@ -172,12 +173,10 @@ describe("smart supply countdown UI", () => {
     expect(modalSource).toContain('maxHeight: "86%"');
     expect(modalSource).toContain("supplyStack");
     expect(modalSource).toContain("gap: 14");
-    expect(modalSource).toContain(
-      'accessibilityLabel="確認已補給能量並重新開始能量倒數"',
-    );
-    expect(modalSource).toContain(
-      'accessibilityLabel="確認已補給水分並重新開始補水倒數"',
-    );
+    expect(modalSource).toContain("copy.energyConfirm");
+    expect(modalSource).toContain("copy.waterConfirm");
+    expect(modalSource).toContain("copy.energyRestart");
+    expect(modalSource).toContain("copy.waterRestart");
     expect(modalSource).toContain("hitSlop={6}");
     expect(modalSource).toContain("energyButton");
     expect(modalSource).toContain("waterButton");
