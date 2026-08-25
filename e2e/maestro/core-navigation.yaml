@@ -10,6 +10,12 @@ name: Android 封版核心導覽
 - tapOn:
     text: "Wait"
     optional: true
+- tapOn:
+    text: "Wait"
+    optional: true
+- extendedWaitUntil:
+    visible: "Navigation"
+    timeout: 30000
 - assertVisible: "Navigation"
 - assertVisible: "Routes"
 - assertVisible: "History"
