@@ -54,7 +54,11 @@ export default function E2ENotificationScreen() {
           sound: false,
           channelId: "supply",
         } as never,
-        trigger: { seconds: 5 } as never,
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 5,
+          repeats: false,
+        } as never,
       });
       setStatus(
         "Notification scheduled. The test will background the app and tap it after five seconds.",
