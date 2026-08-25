@@ -2483,5 +2483,5 @@
 - [x] 語言變更後取消並以新語言重排既有本機補給／補水通知，保留當前倒數與待確認狀態
 - [x] 建立 Android 實機可執行的通知 action／背景回前景驗收流程與對應自動化守門
 - [x] 擴充活動詳情優先次要資訊、分析、匯出與操作文案的多國語系支援，維持 fallback 與 RTL 版面韌性
-- [ ] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact
+- [x] 完成最新版本 GitHub Android E2E 驗收並記錄 artifact（run 32808917098，head `23bd460`；Maestro JUnit 1 test／0 failures／35.078 秒；artifact `bike-assistant-maestro-e2e` 已下載核實）
 - [ ] 由 Android 實機依 `references/android-notification-device-validation-2026-08-25.md` 驗證通知 action、背景回前景與語言重排
