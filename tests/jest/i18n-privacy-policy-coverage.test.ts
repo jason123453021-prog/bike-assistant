@@ -79,6 +79,6 @@ describe("隱私政策 i18n 與 RTL 守門", () => {
     expect(settings).toContain('testID="privacy-policy-entry"');
     expect(settings).toContain('router.push("/privacy")');
     expect(rootLayout).toContain('<Stack.Screen name="privacy"');
-    expect(maestroFlow).toContain('id: "privacy-policy-entry"');
+    expect(maestroFlow).toContain('openLink: "manus20260617://privacy"');
   });
 });
