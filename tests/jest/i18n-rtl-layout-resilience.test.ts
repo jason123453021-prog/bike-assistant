@@ -151,7 +151,7 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
     );
     expect(workflowSource).toContain("for SCALE in 1.3 2.0");
     expect(workflowSource).toContain(
-      "adb shell settings put system font_scale",
+      'adb -s "$ANDROID_SERIAL" shell settings put system font_scale',
     );
     expect(deviceValidationSource).toContain("130%");
     expect(deviceValidationSource).toContain("200%");
