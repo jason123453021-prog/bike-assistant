@@ -2494,6 +2494,7 @@ export default function SettingsScreen() {
             ]}
           >
             <Pressable
+              testID="privacy-policy-entry"
               accessibilityRole="button"
               accessibilityLabel={t("audit.privacyPolicy")}
               onPress={() => router.push("/privacy")}

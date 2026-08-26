@@ -71,8 +71,14 @@ describe("隱私政策 i18n 與 RTL 守門", () => {
       path.join(rootDir, "app/_layout.tsx"),
       "utf8",
     );
+    const maestroFlow = fs.readFileSync(
+      path.join(rootDir, "e2e/maestro/localization-privacy-pages.yaml"),
+      "utf8",
+    );
     expect(settings).toContain('accessibilityLabel={t("audit.privacyPolicy")}');
+    expect(settings).toContain('testID="privacy-policy-entry"');
     expect(settings).toContain('router.push("/privacy")');
     expect(rootLayout).toContain('<Stack.Screen name="privacy"');
+    expect(maestroFlow).toContain('id: "privacy-policy-entry"');
   });
 });
