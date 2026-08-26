@@ -2372,6 +2372,7 @@ export default function SettingsScreen() {
             ]}
           >
             <Pressable
+              testID="settings-language-selector"
               accessibilityRole="button"
               accessibilityLabel={`${t("settings.languageTitle")}：${selectedLanguageLabel}`}
               onPress={() => setLanguageModalVisible(true)}

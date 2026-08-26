@@ -22,10 +22,11 @@ name: ${LOCALE_NAME} navigation, RTL, and privacy policy screenshots
 - tapOn: "System & Data"
 - scrollUntilVisible:
     element:
-      text: "Language.*"
+      id: "settings-language-selector"
     direction: DOWN
     timeout: 30000
-- tapOn: "Language.*"
+- tapOn:
+    id: "settings-language-selector"
 - runFlow:
     file: scroll-language-option.yaml
     env:
