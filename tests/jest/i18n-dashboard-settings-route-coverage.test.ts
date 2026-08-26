@@ -20,6 +20,13 @@ describe("儀表板、設定與路線分析全語系守門", () => {
       "settings.rideDashboard",
       "settings.autoPauseDescription",
       "routes.airDensity",
+      "routes.title",
+      "routes.weatherFallback",
+      "routes.forecastTitle",
+      "routes.calorieAnalysis",
+      "routes.gradientDistribution",
+      "routes.ridingTipHigh",
+      "routes.weatherThunderstorm",
       "permissions.title",
     ];
 
@@ -42,6 +49,30 @@ describe("儀表板、設定與路線分析全語系守門", () => {
     await i18n.changeLanguage("ja-JP");
     expect(i18n.t("dashboard.energyCountdown")).toBe("補給カウントダウン");
     expect(i18n.t("settings.title")).toBe("設定");
+    expect(i18n.t("settingsDetail.fieldRideTime")).toBe("ライド時間");
+    expect(i18n.t("settingsDetail.fieldSpeed")).toBe("速度");
+    expect(i18n.t("settingsDetail.fieldDistance")).toBe("距離");
+    expect(i18n.t("settingsDetail.fieldGrade")).toBe("勾配");
+    expect(i18n.t("settingsDetail.fieldPower")).toBe("パワー");
+    expect(i18n.t("settingsDetail.panel")).toBe("パネル");
+    expect(i18n.t("settingsDetail.expand")).toBe("展開");
+    expect(i18n.t("settingsActions.systemDataTitle")).toBe("システムとデータ");
+    expect(i18n.t("settingsActions.openHistoryBackupLabel")).toBe(
+      "GPX トラックをエクスポート / バックアップ",
+    );
+    expect(i18n.t("settingsActions.resetAllLabel")).toBe(
+      "すべての設定をリセット",
+    );
+    expect(i18n.t("routes.title")).toMatch(/[\u3040-\u30ff\u4e00-\u9fff]/);
+    expect(i18n.t("routes.weatherFallback", { temp: 25 })).toMatch(/25°C/);
+
+    await i18n.changeLanguage("ko-KR");
+    const koreanFallback = i18n.t("routes.weatherFallback", { temp: 25 });
+    expect(koreanFallback).toMatch(/[\uac00-\ud7af]/);
+    expect(koreanFallback).not.toMatch(/[\u3040-\u30ff]/);
+    expect(i18n.t("settingsDetail.panel")).toBe("패널");
+    expect(i18n.t("settingsDetail.expand")).toBe("확장");
+    expect(i18n.t("settingsActions.systemDataTitle")).toBe("시스템 및 데이터");
 
     await i18n.changeLanguage("ar-SA");
     expect(i18n.t("map.freeHeading")).toBe("حر");
@@ -72,8 +103,15 @@ describe("儀表板、設定與路線分析全語系守門", () => {
 
     expect(routeSource).toContain('t("routes.airDensity"');
     expect(routeSource).toContain('t("routes.weatherDescription"');
-    expect(routeSource).toContain('t("routes.weatherUnavailable")');
+    expect(routeSource).toContain('t("routes.weatherFallback", { temp: 25 })');
+    expect(routeSource).toContain('t("routes.forecastTitle")');
+    expect(routeSource).toContain('t("routes.calorieAnalysis")');
+    expect(routeSource).toContain('t("routes.gradientDistribution")');
+    expect(routeSource).toContain('t("routes.ridingTips")');
+    expect(routeSource).toContain("getRouteWeatherDescriptionKey");
     expect(routeSource).not.toContain("天氣連動空氣密度（");
+    expect(routeSource).not.toContain('label="預估水分流失"');
+    expect(routeSource).not.toContain("起點天氣與風向預報");
     expect(readinessSource).toContain("useTranslation");
     expect(readinessSource).toContain("permissions.title");
   });

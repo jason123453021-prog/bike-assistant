@@ -62,7 +62,7 @@ describe("Local-First i18n 守門", () => {
     expect(getLayoutDirection("ar-SA")).toBe("rtl");
     expect(getLayoutDirection("en-US")).toBe("ltr");
     expect(i18n.t("history.title")).toBe("سجل الرحلات");
-    expect(i18n.t("routes.startNavigation")).toBe("تأكيد المسار وبدء التنقل");
+    expect(i18n.t("routes.startNavigation")).toBe("تأكيد المسار وبدء الملاحة");
   });
 
   it("切換至日本語時，儀表、導航與騎乘摘要均輸出日本語術語", async () => {
@@ -105,10 +105,10 @@ describe("Local-First i18n 守門", () => {
     expect(i18n.t("summary.saveAndFinish")).toBe("Save & Finish");
   });
 
-  it("保留英文 fallback，且核心儀表、路線進度與摘要元件確實接入翻譯 hook", async () => {
+  it("缺失鍵固定依繁中、英文回退，且核心儀表、路線進度與摘要元件確實接入翻譯 hook", async () => {
     await i18n.changeLanguage("ja-JP");
     expect(i18n.options.saveMissing).toBe(false);
-    expect(i18n.options.fallbackLng).toEqual(expect.arrayContaining(["en-US"]));
+    expect(i18n.options.fallbackLng).toEqual(["zh-TW", "en-US"]);
     expect(
       i18n.t("dashboard.missingKey", { defaultValue: "English fallback" }),
     ).toBe("English fallback");

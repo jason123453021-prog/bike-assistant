@@ -45,6 +45,20 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CHART_WIDTH = SCREEN_WIDTH - 48;
 const CHART_HEIGHT = 120;
 
+export function getRouteWeatherDescriptionKey(weatherCode: number): string {
+  if (weatherCode === 0) return "routes.weatherClear";
+  if (weatherCode === 1) return "routes.weatherMostlyClear";
+  if (weatherCode === 2) return "routes.weatherPartlyCloudy";
+  if (weatherCode === 3) return "routes.weatherOvercast";
+  if (weatherCode === 45 || weatherCode === 48) return "routes.weatherFog";
+  if ([51, 53, 55].includes(weatherCode)) return "routes.weatherDrizzle";
+  if ([61, 63, 65].includes(weatherCode)) return "routes.weatherRain";
+  if ([71, 73, 75].includes(weatherCode)) return "routes.weatherSnow";
+  if ([80, 81, 82].includes(weatherCode)) return "routes.weatherShowers";
+  if ([95, 96, 99].includes(weatherCode)) return "routes.weatherThunderstorm";
+  return "routes.weatherUnknown";
+}
+
 export default function NavigateScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
@@ -124,6 +138,9 @@ export default function NavigateScreen() {
     };
   }, [routeWeather]);
   const routeTempC = forecastEnvironment.temperature;
+  const localizedWeatherDescription = t(
+    getRouteWeatherDescriptionKey(routeWeather?.weatherCode ?? -1),
+  );
   // 空氣密度（依溫度計算）
   const routeAirDensity = calcAirDensity(routeTempC);
   const routeEstimate = useMemo(() => {
@@ -562,7 +579,7 @@ export default function NavigateScreen() {
                 </View>
                 <Text style={[styles.weatherDesc, { color: colors.muted }]}>
                   {t("routes.weatherDescription", {
-                    description: routeWeather.description,
+                    description: localizedWeatherDescription,
                     precipitation: routeWeather.precipitationProb,
                   })}
                 </Text>
@@ -570,7 +587,7 @@ export default function NavigateScreen() {
             ) : (
               !weatherLoading && (
                 <Text style={[styles.weatherNoData, { color: colors.muted }]}>
-                  {t("routes.weatherUnavailable")}
+                  {t("routes.weatherFallback", { temp: 25 })}
                 </Text>
               )
             )}
@@ -838,14 +855,17 @@ export default function NavigateScreen() {
                   <Text
                     style={[styles.sectionTitle, { color: colors.foreground }]}
                   >
-                    起點天氣與風向預報
+                    {t("routes.forecastTitle")}
                   </Text>
                   <Text
                     style={[styles.forecastCurrent, { color: colors.muted }]}
                   >
-                    {routeWeather.description} · {routeWeather.temperature}°C ·
-                    風速 {routeWeather.windSpeed} km/h · 風向{" "}
-                    {Math.round(routeWeather.windDirection)}°
+                    {t("routes.forecastCurrent", {
+                      description: localizedWeatherDescription,
+                      temperature: routeWeather.temperature,
+                      windSpeed: routeWeather.windSpeed,
+                      windDirection: Math.round(routeWeather.windDirection),
+                    })}
                   </Text>
                   <ScrollView
                     horizontal
@@ -879,13 +899,17 @@ export default function NavigateScreen() {
                         <Text
                           style={[styles.forecastMeta, { color: colors.muted }]}
                         >
-                          風 {hour.windSpeed}
+                          {t("routes.forecastWind", {
+                            windSpeed: hour.windSpeed,
+                          })}
                         </Text>
                         <Text
                           style={[styles.forecastMeta, { color: colors.muted }]}
                         >
-                          {Math.round(hour.windDirection)}° · 雨{" "}
-                          {hour.precipitationProb}%
+                          {t("routes.forecastPrecipitation", {
+                            windDirection: Math.round(hour.windDirection),
+                            precipitation: hour.precipitationProb,
+                          })}
                         </Text>
                       </View>
                     ))}
@@ -906,11 +930,10 @@ export default function NavigateScreen() {
                 <Text
                   style={[styles.sectionTitle, { color: colors.foreground }]}
                 >
-                  統一補給與消耗預估
+                  {t("routes.calorieAnalysis")}
                 </Text>
                 <Text style={[styles.calorieFormula, { color: colors.muted }]}>
-                  完成時間、卡路里與水分均使用相同的 FTP、總重、GPX
-                  坡度、天氣與風向快照。
+                  {t("routes.calorieFormula")}
                 </Text>
                 <View style={styles.calorieTotalRow}>
                   <Text
@@ -931,8 +954,8 @@ export default function NavigateScreen() {
                   ]}
                 >
                   <BreakdownItem
-                    label="預估水分流失"
-                    sublabel="熱負荷、濕度、強度與爬升"
+                    label={t("routes.estimatedWaterLoss")}
+                    sublabel={t("routes.estimatedWaterLossHint")}
                     value={routeEstimate.estimatedWaterLossMl}
                     pct={0}
                     color="#38BDF8"
@@ -940,8 +963,8 @@ export default function NavigateScreen() {
                     unit="ml"
                   />
                   <BreakdownItem
-                    label="每次建議補水"
-                    sublabel="依統一強度與環境負荷"
+                    label={t("routes.suggestedWater")}
+                    sublabel={t("routes.suggestedWaterHint")}
                     value={routeEstimate.suggestedWaterMl}
                     pct={0}
                     color="#22C55E"
@@ -949,8 +972,8 @@ export default function NavigateScreen() {
                     unit="ml"
                   />
                   <BreakdownItem
-                    label="每次建議能量"
-                    sublabel="依預估時長與功率強度"
+                    label={t("routes.suggestedEnergy")}
+                    sublabel={t("routes.suggestedEnergyHint")}
                     value={routeEstimate.suggestedEnergyKcal}
                     pct={0}
                     color="#F97316"
@@ -959,8 +982,7 @@ export default function NavigateScreen() {
                   />
                 </View>
                 <Text style={[styles.calorieNote, { color: colors.muted }]}>
-                  * {routeEstimate.sourceLabel}
-                  ；請依實際補給條件安排水分與能量。
+                  {t("routes.calorieNote")}
                 </Text>
               </View>
 
@@ -980,51 +1002,56 @@ export default function NavigateScreen() {
                 <Text
                   style={[styles.sectionTitle, { color: colors.foreground }]}
                 >
-                  坡度區間分布
+                  {t("routes.gradientDistribution")}
                 </Text>
                 <Text style={[styles.gradDistTitle, { color: colors.muted }]}>
-                  各區間佔路線距離百分比
+                  {t("routes.gradientDistanceShare")}
                 </Text>
 
                 {[
-                  { bucket: 0, label: "平路", range: "< 1%", color: "#94A3B8" },
+                  {
+                    bucket: 0,
+                    labelKey: "gradientFlat",
+                    range: "< 1%",
+                    color: "#94A3B8",
+                  },
                   {
                     bucket: 1,
-                    label: "緩坡",
+                    labelKey: "gradientGentle",
                     range: "1% – 5%",
                     color: "#22C55E",
                   },
                   {
                     bucket: 2,
-                    label: "中坡",
+                    labelKey: "gradientModerate",
                     range: "6% – 10%",
                     color: "#84CC16",
                   },
                   {
                     bucket: 3,
-                    label: "陡坡",
+                    labelKey: "gradientSteep",
                     range: "11% – 15%",
                     color: "#F59E0B",
                   },
                   {
                     bucket: 4,
-                    label: "急坡",
+                    labelKey: "gradientVerySteep",
                     range: "16% – 20%",
                     color: "#F97316",
                   },
                   {
                     bucket: 5,
-                    label: "極陡",
+                    labelKey: "gradientExtreme",
                     range: "21% – 25%",
                     color: "#EF4444",
                   },
                   {
                     bucket: 6,
-                    label: "極限",
+                    labelKey: "gradientMaximum",
                     range: "≥ 26%",
                     color: "#9333EA",
                   },
-                ].map(({ bucket, label, range, color }) => {
+                ].map(({ bucket, labelKey, range, color }) => {
                   const pct = route.gradientDistribution[bucket] ?? 0;
                   return (
                     <View key={bucket} style={styles.gradRow}>
@@ -1035,7 +1062,7 @@ export default function NavigateScreen() {
                             { color: colors.foreground },
                           ]}
                         >
-                          {label}
+                          {t(`routes.${labelKey}`)}
                         </Text>
                         <Text
                           style={[
@@ -1086,14 +1113,21 @@ export default function NavigateScreen() {
                 ]}
               >
                 <Text style={[styles.tipsTitle, { color: colors.foreground }]}>
-                  騎乘建議
+                  {t("routes.ridingTips")}
                 </Text>
                 <Text style={[styles.tipsText, { color: colors.muted }]}>
                   {route.totalAscent > 500
-                    ? `本路線爬升 ${Math.round(route.totalAscent)}m，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，建議依規劃點準備補水與能量。`
+                    ? t("routes.ridingTipHigh", {
+                        ascent: Math.round(route.totalAscent),
+                        calories: routeEstimate.estimatedCaloriesKcal,
+                      })
                     : route.totalAscent > 200
-                      ? `本路線有適度爬升，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，建議依統一補給預估準備水分與能量。`
-                      : `本路線地形平緩，預估消耗 ${routeEstimate.estimatedCaloriesKcal} kcal，請以預估水分與能量需求安排補給。`}
+                      ? t("routes.ridingTipMedium", {
+                          calories: routeEstimate.estimatedCaloriesKcal,
+                        })
+                      : t("routes.ridingTipLow", {
+                          calories: routeEstimate.estimatedCaloriesKcal,
+                        })}
                 </Text>
               </View>
             </>

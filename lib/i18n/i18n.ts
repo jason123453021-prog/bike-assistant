@@ -233,7 +233,7 @@ void i18n.use(initReactI18next).init({
     ]),
   ),
   lng: resolveSystemLocale(),
-  fallbackLng: "en-US",
+  fallbackLng: ["zh-TW", "en-US"],
   supportedLngs: [...SUPPORTED_LOCALES],
   load: "currentOnly",
   saveMissing: false,

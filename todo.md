@@ -2824,3 +2824,7 @@
 - [x] 修復語言切換後設定、儀表欄位與全域 Header 殘留舊語言或英文 fallback，確保樹狀元件訂閱 i18n 並即時重新渲染；原生 Android 安裝名稱仍屬 manifest 固定標籤，不能隨 App 內語言即時變動
 - [x] 補齊設定系統資料、匯出、重設、儀表板欄位與 app 名稱的 13 語系翻譯鍵，防止日文與其他 locale 回退為英文／繁中
 - [x] 新增長文字、日文與 Arabic RTL 的設定頁排版與全語系鍵完整性守門，完成品質驗證與新版 Android APK artifact（1.0.97／versionCode 10097；GitHub run 32929371119，artifact 9592995004，28,555,303 bytes，未過期；Jest、Vitest 127 檔／446 tests、TypeScript、Lint、Expo config 與差異檢查均通過）
+- [x] 將路線分析頁所有標題、說明、卡片、GPX 匯入、天氣與載入狀態抽取為 13 語系翻譯鍵，移除英文硬編碼
+- [x] 修復路線分析天氣失敗提示的跨語系洩漏，改採當前 locale 的 interpolation fallback 並禁止日文常數流入韓文或其他語系
+- [x] 補齊日文與其他 locale 的儀表設定欄位、Panel、Expand、系統資料、GPX 匯出、設定管理與重設文案，防止英文回退
+- [x] 建立 app／components 使用者可見 JSX 字串的 TypeScript AST 掃描與 13 語系 fallback 回歸守門，完成品質驗證與新版 Android APK artifact
