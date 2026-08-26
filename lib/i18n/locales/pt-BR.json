@@ -278,5 +278,29 @@
     "estimatedCurveNote": "A confiança baseia-se nos dados disponíveis e no histórico de calibração local. Fatores: {{factors}}. Apenas para revisão de tendência; isto não é uma medição de sensor externo.",
     "remaining": "Restante",
     "returnToStandardMode": "Toque em qualquer lugar para retornar ao modo padrão"
+  },
+  "poiLayers": {
+    "title": "Locais no mapa",
+    "showWaterRefill": "Mostrar pontos de reabastecimento de água",
+    "showPhotoScenic": "Mostrar pontos fotográficos e cênicos",
+    "close": "Fechar detalhes do local",
+    "categories": {
+      "drinking_water": "Água potável",
+      "water_point": "Ponto de reabastecimento",
+      "free_refill_partner": "Parceiro de reabastecimento gratuito",
+      "viewpoint": "Mirante",
+      "peak": "Cume",
+      "landmark": "Marco",
+      "police_station": "Água na delegacia",
+      "transit_station": "Água na estação",
+      "bicycle_shop": "Água na loja de bicicletas",
+      "visitor_center": "Água no centro de visitantes",
+      "bicycle_station": "Água na estação de bicicletas"
+    },
+    "distanceAway": "A {{distance}} km",
+    "distanceUnavailable": "A distância estará disponível quando a localização atual estiver pronta",
+    "dataNotice": "As informações do mapa são mantidas pela comunidade. Confirme no local o acesso, o horário e a disponibilidade de água.",
+    "previewImage": "Imagem de prévia de {{name}}",
+    "pinDestination": "Fixar {{name}} como destino"
   }
 }

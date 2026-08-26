@@ -2047,6 +2047,30 @@ export default function SettingsScreen() {
                     {t("settingsDetail.repeatEvery", { seconds: 60 })}
                   </Text>
                 </View>
+                <Divider colors={colors} />
+                <ToggleRow
+                  testID="settings-water-refill-layer-toggle"
+                  icon="drop.fill"
+                  label={t("poiLayers.showWaterRefill")}
+                  value={settings.showWaterRefillSpots}
+                  colors={colors}
+                  isRtl={isRtl}
+                  onToggle={(showWaterRefillSpots) =>
+                    updateSettings({ showWaterRefillSpots })
+                  }
+                />
+                <Divider colors={colors} />
+                <ToggleRow
+                  testID="settings-photo-scenic-layer-toggle"
+                  icon="photo.fill"
+                  label={t("poiLayers.showPhotoScenic")}
+                  value={settings.showPhotoScenicSpots}
+                  colors={colors}
+                  isRtl={isRtl}
+                  onToggle={(showPhotoScenicSpots) =>
+                    updateSettings({ showPhotoScenicSpots })
+                  }
+                />
               </View>
             </View>
           )}
@@ -3498,25 +3522,40 @@ function TextRow({
 }
 
 function ToggleRow({
+  testID,
   icon,
   label,
   value,
   colors,
+  isRtl = false,
   onToggle,
   disabled = false,
 }: {
+  testID?: string;
   icon: string;
   label: string;
   value: boolean;
   colors: any;
+  isRtl?: boolean;
   onToggle: (v: boolean) => void;
   disabled?: boolean;
 }) {
   return (
-    <View style={[styles.row, disabled && { opacity: 0.45 }]}>
+    <View
+      testID={testID}
+      style={[
+        styles.row,
+        { flexDirection: isRtl ? "row-reverse" : "row" },
+        disabled && { opacity: 0.45 },
+      ]}
+    >
       <IconSymbol name={icon as any} size={18} color={colors.muted} />
       <Text
-        style={[styles.rowLabel, styles.rowCopy, { color: colors.foreground }]}
+        style={[
+          styles.rowLabel,
+          styles.rowCopy,
+          { color: colors.foreground, textAlign: isRtl ? "right" : "left" },
+        ]}
         allowFontScaling
       >
         {label}

@@ -26,6 +26,7 @@ import React, {
 } from "react";
 import { StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
+import type { PoiMarker } from "@/lib/poi-layer";
 
 export interface LatLng {
   latitude: number;
@@ -73,6 +74,9 @@ export interface PhotoMapMarker {
   source: "exif" | "route-time";
 }
 
+/** 使用者開關啟用後，依目前地圖範圍載入的公開補水／景點候選點。 */
+export type MapPoiMarker = PoiMarker;
+
 export interface LeafletMapProps {
   style?: object;
   initialRegion?: {
@@ -103,6 +107,8 @@ export interface LeafletMapProps {
   kilometersMarkers?: KilometerMarker[];
   photoMarkers?: PhotoMapMarker[];
   onPhotoMarkerPress?: (id: string) => void;
+  poiMarkers?: MapPoiMarker[];
+  onPoiMarkerPress?: (id: string) => void;
 }
 
 export interface LeafletMapHandle {
@@ -348,6 +354,9 @@ var kilometerMarkersLayer = [];
 var endMarker = null;
 var returnEndMarker = null;
 var centerPinMarker = null; // 中心圖釘標記
+var photoMarkersLayer = [];
+var poiMarkersLayer = [];
+var poiMarkersData = [];
 
 // 更新位置標記（統一以圓形定位點呈現；地圖方向由使用者自行旋轉控制）
 var directionArrowMarker = null;
@@ -381,6 +390,88 @@ function makeCircleIcon(color, size, borderColor) {
     html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + color + ';border:2.5px solid ' + borderColor + ';box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>',
     iconSize: [size, size],
     iconAnchor: [size/2, size/2],
+  });
+}
+
+function clearPoiMarkers() {
+  poiMarkersLayer.forEach(function(marker) { map.removeLayer(marker); });
+  poiMarkersLayer = [];
+}
+
+function shouldClusterPoiMarkers() {
+  return map.getZoom() < 13;
+}
+
+function getPoiClusterCellDegrees() {
+  return Math.max(0.006, 0.12 / Math.pow(2, Math.max(0, map.getZoom() - 8)));
+}
+
+function makePoiIcon(kind) {
+  var isWater = kind === 'water_refill';
+  var color = isWater ? '#0A84FF' : '#FF9500';
+  var glyph = isWater ? '&#128167;' : '&#128247;';
+  return L.divIcon({
+    html: '<div style="width:34px;height:34px;border-radius:17px;background:' + color + ';border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.48);display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;">' + glyph + '</div>',
+    iconSize: [34, 34], iconAnchor: [17, 17], className: 'bike-assistant-poi-marker'
+  });
+}
+
+function makePoiClusterIcon(count) {
+  return L.divIcon({
+    html: '<div style="min-width:36px;height:36px;padding:0 7px;border-radius:18px;background:#1F2937;border:3px solid #fff;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.48);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">' + count + '</div>',
+    iconSize: [36, 36], iconAnchor: [18, 18], className: 'bike-assistant-poi-cluster'
+  });
+}
+
+function postPoiMarkerPress(id) {
+  if (window.ReactNativeWebView) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'poiMarkerPress', id: id }));
+  }
+}
+
+function renderPoiMarkers() {
+  clearPoiMarkers();
+  if (!poiMarkersData || !poiMarkersData.length) return;
+  if (!shouldClusterPoiMarkers()) {
+    poiMarkersData.forEach(function(poi) {
+      if (!Number.isFinite(poi.latitude) || !Number.isFinite(poi.longitude)) return;
+      var marker = L.marker([poi.latitude, poi.longitude], {
+        icon: makePoiIcon(poi.kind), zIndexOffset: 620, title: poi.name || ''
+      }).addTo(map);
+      marker.on('click', function() { postPoiMarkerPress(poi.id); });
+      poiMarkersLayer.push(marker);
+    });
+    return;
+  }
+
+  var cellDegrees = getPoiClusterCellDegrees();
+  var groups = {};
+  poiMarkersData.forEach(function(poi) {
+    if (!Number.isFinite(poi.latitude) || !Number.isFinite(poi.longitude)) return;
+    var key = Math.floor(poi.latitude / cellDegrees) + ':' + Math.floor(poi.longitude / cellDegrees);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(poi);
+  });
+  Object.keys(groups).forEach(function(key) {
+    var members = groups[key];
+    var lat = members.reduce(function(sum, poi) { return sum + poi.latitude; }, 0) / members.length;
+    var lon = members.reduce(function(sum, poi) { return sum + poi.longitude; }, 0) / members.length;
+    if (members.length === 1) {
+      var poi = members[0];
+      var marker = L.marker([lat, lon], {
+        icon: makePoiIcon(poi.kind), zIndexOffset: 620, title: poi.name || ''
+      }).addTo(map);
+      marker.on('click', function() { postPoiMarkerPress(poi.id); });
+      poiMarkersLayer.push(marker);
+      return;
+    }
+    var cluster = L.marker([lat, lon], {
+      icon: makePoiClusterIcon(members.length), zIndexOffset: 620, title: String(members.length)
+    }).addTo(map);
+    cluster.on('click', function() {
+      map.setView([lat, lon], Math.min(17, map.getZoom() + 2), { animate: true, duration: 0.35 });
+    });
+    poiMarkersLayer.push(cluster);
   });
 }
 
@@ -423,6 +514,7 @@ map.on('dragend', function() {
 });
 
 map.on('zoomend', function() {
+  renderPoiMarkers();
   if (window.ReactNativeWebView) {
     var bounds = map.getBounds();
     window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -691,6 +783,10 @@ function handleMessage(data) {
           photoMarkersLayer.push(photoMarker);
         });
         break;
+      case 'setPoiMarkers':
+        poiMarkersData = msg.markers || [];
+        renderPoiMarkers();
+        break;
       case 'setHeadingUpMode':
         headingUpMode = msg.enabled || false;
         break;
@@ -737,6 +833,8 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       onMapRotateEnd,
       photoMarkers,
       onPhotoMarkerPress,
+      poiMarkers,
+      onPoiMarkerPress,
     },
     ref,
   ) => {
@@ -948,6 +1046,13 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
       );
     }, [photoMarkers, isReady]);
 
+    useEffect(() => {
+      if (!isReady || !webViewRef.current) return;
+      webViewRef.current.postMessage(
+        JSON.stringify({ type: "setPoiMarkers", markers: poiMarkers || [] }),
+      );
+    }, [poiMarkers, isReady]);
+
     // Send center pin location
     useEffect(() => {
       if (!isReady || !webViewRef.current) return;
@@ -1009,6 +1114,11 @@ const LeafletMapView = forwardRef<LeafletMapHandle, LeafletMapProps>(
           typeof msg.id === "string"
         ) {
           onPhotoMarkerPress?.(msg.id);
+        } else if (
+          msg.type === "poiMarkerPress" &&
+          typeof msg.id === "string"
+        ) {
+          onPoiMarkerPress?.(msg.id);
         }
       } catch {}
     };

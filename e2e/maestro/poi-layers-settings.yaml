@@ -1,0 +1,43 @@
+appId: com.jason123453021.bikeassistant
+name: POI 圖層設定頁驗收
+---
+- launchApp:
+    clearState: true
+    permissions:
+      android.permission.ACCESS_FINE_LOCATION: allow
+      android.permission.ACCESS_COARSE_LOCATION: allow
+- tapOn:
+    text: "Wait"
+    optional: true
+- extendedWaitUntil:
+    visible: "Navigation"
+    timeout: 30000
+- tapOn: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Display & Appearance"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "Display & Appearance"
+- scrollUntilVisible:
+    element:
+      text: "Map interaction"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "Map interaction"
+- scrollUntilVisible:
+    element:
+      id: "settings-water-refill-layer-toggle"
+    direction: DOWN
+    timeout: 30000
+- assertVisible:
+    id: "settings-water-refill-layer-toggle"
+- assertVisible:
+    id: "settings-photo-scenic-layer-toggle"
+- tapOn:
+    id: "settings-water-refill-layer-toggle"
+- tapOn:
+    id: "settings-photo-scenic-layer-toggle"
+- takeScreenshot: "poi-layer-settings-toggles"
+- tapOn: "Navigation"
+- takeScreenshot: "poi-layer-map-without-extra-controls"

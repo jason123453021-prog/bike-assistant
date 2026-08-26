@@ -108,6 +108,7 @@ jobs:
             export MAESTRO_CLI_NO_ANALYTICS=true
             adb -s "$ANDROID_SERIAL" wait-for-device
             "$HOME/.maestro/bin/maestro" test --device "$ANDROID_SERIAL" --format junit --output build/maestro-report.xml --test-output-dir build/maestro-results e2e/maestro/core-navigation.yaml
+            "$HOME/.maestro/bin/maestro" test --device "$ANDROID_SERIAL" --format junit --output build/maestro-poi-layers.xml --test-output-dir build/maestro-results/poi-layers e2e/maestro/poi-layers-settings.yaml
             bash -lc 'set -e; adb -s "$ANDROID_SERIAL" shell settings put system font_scale 1.0; for LOCALE in ja ko ar; do adb -s "$ANDROID_SERIAL" wait-for-device; "$HOME/.maestro/bin/maestro" test --device "$ANDROID_SERIAL" --format junit --output "build/maestro-localization-${LOCALE}.xml" --test-output-dir "build/maestro-results/localization-${LOCALE}" "e2e/maestro/localization-pages-${LOCALE}.yaml"; done'
             bash -lc 'set -e; adb -s "$ANDROID_SERIAL" wait-for-device; adb -s "$ANDROID_SERIAL" shell settings put system font_scale 2.0; adb -s "$ANDROID_SERIAL" shell am force-stop com.jason123453021.bikeassistant; sleep 5; "$HOME/.maestro/bin/maestro" test --device "$ANDROID_SERIAL" --format junit --output build/maestro-localization-ar-200.xml --test-output-dir build/maestro-results/localization-ar-200 e2e/maestro/localization-ar-large-text.yaml; adb -s "$ANDROID_SERIAL" shell settings put system font_scale 1.0'
             bash -lc 'set -e; SCALE=1.3; SCALE_TAG="$(printf "%s" "$SCALE" | tr "." "-")"; adb -s "$ANDROID_SERIAL" wait-for-device; adb -s "$ANDROID_SERIAL" shell settings put system font_scale "$SCALE"; "$HOME/.maestro/bin/maestro" test --device "$ANDROID_SERIAL" --format junit --output "build/maestro-font-scale-${SCALE_TAG}.xml" --test-output-dir "build/maestro-results/font-scale-${SCALE_TAG}" e2e/maestro/font-scale; adb -s "$ANDROID_SERIAL" shell settings put system font_scale 1.0'
@@ -120,6 +121,7 @@ jobs:
           name: bike-assistant-maestro-e2e
           path: |
             build/maestro-report.xml
+            build/maestro-poi-layers.xml
             build/maestro-notification-*.xml
             build/maestro-font-scale-*.xml
             build/maestro-localization-*.xml

@@ -304,5 +304,29 @@
     "back": "回到",
     "privacyUpdated": "最后更新日期： 2026年8月13日",
     "privacyCopyright": "© 2026骑行助理。保留所有权利。"
+  },
+  "poiLayers": {
+    "title": "地图地点",
+    "showWaterRefill": "显示免费补水点",
+    "showPhotoScenic": "显示拍照／景点",
+    "close": "关闭地点信息",
+    "categories": {
+      "drinking_water": "饮水机",
+      "water_point": "补水点",
+      "free_refill_partner": "免费补水合作点",
+      "viewpoint": "观景点",
+      "peak": "山顶",
+      "landmark": "地标",
+      "police_station": "警察局饮水",
+      "transit_station": "车站饮水",
+      "bicycle_shop": "自行车店饮水",
+      "visitor_center": "游客中心饮水",
+      "bicycle_station": "自行车驿站饮水"
+    },
+    "distanceAway": "距离 {{distance}} 公里",
+    "distanceUnavailable": "获取当前位置后即可显示距离",
+    "dataNotice": "地图信息由社区维护；请在现场确认可进入性、开放状态和水源是否可用。",
+    "previewImage": "{{name}} 的预览图片",
+    "pinDestination": "将 {{name}} 设为标记目的地"
   }
 }

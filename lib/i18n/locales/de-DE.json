@@ -278,5 +278,29 @@
     "estimatedCurveNote": "Die Zuverlässigkeit basiert auf verfügbaren Daten und lokaler Kalibrierungshistorie. Faktoren: {{factors}}. Nur zur Trendbetrachtung; dies ist keine Messung eines externen Sensors.",
     "remaining": "Verbleibend",
     "returnToStandardMode": "Tippe irgendwo, um zum Standardmodus zurückzukehren"
+  },
+  "poiLayers": {
+    "title": "Orte auf der Karte",
+    "showWaterRefill": "Wasserauffüllstellen anzeigen",
+    "showPhotoScenic": "Foto- und Aussichtspunkte anzeigen",
+    "close": "Ortsdetails schließen",
+    "categories": {
+      "drinking_water": "Trinkwasser",
+      "water_point": "Wasserauffüllstelle",
+      "free_refill_partner": "Kostenloser Nachfüllpartner",
+      "viewpoint": "Aussichtspunkt",
+      "peak": "Gipfel",
+      "landmark": "Sehenswürdigkeit",
+      "police_station": "Wasser an der Polizeistation",
+      "transit_station": "Wasser am Bahnhof",
+      "bicycle_shop": "Wasser im Fahrradladen",
+      "visitor_center": "Wasser im Besucherzentrum",
+      "bicycle_station": "Wasser an der Fahrradstation"
+    },
+    "distanceAway": "{{distance}} km entfernt",
+    "distanceUnavailable": "Die Entfernung ist verfügbar, sobald der aktuelle Standort bereit ist",
+    "dataNotice": "Karteninformationen werden von der Community gepflegt. Zugang, Öffnungsstatus und Wasserverfügbarkeit bitte vor Ort prüfen.",
+    "previewImage": "Vorschaubild für {{name}}",
+    "pinDestination": "{{name}} als Ziel anheften"
   }
 }

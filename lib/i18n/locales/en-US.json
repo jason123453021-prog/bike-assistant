@@ -570,7 +570,7 @@
       },
       "sharing": {
         "title": "5. Data sharing",
-        "body": "The App has no friend location sharing, social features, or cloud database. You may voluntarily export GPX files, activity cards, or media through the Android system share sheet; you decide both the recipient and the content.\n\nIf you actively use online routing or weather information while connected to the internet, the App may send coordinates needed for route calculation to public map or routing services. These services are not account, tracking, or synchronization mechanisms, and offline features do not depend on them."
+        "body": "The App has no friend location sharing, social features, or cloud database. You may voluntarily export GPX files, activity cards, or media through the Android system share sheet; you decide both the recipient and the content.\n\nIf you actively use online routing or weather information while connected to the internet, the App may send coordinates needed for route calculation to public map or routing services. These services are not account, tracking, or synchronization mechanisms, and offline features do not depend on them.\n\nIf you enable the water-refill or photo/scenic-place layers while connected to the internet, the App sends the current map viewport bounds to a public OpenStreetMap-compatible POI query service to retrieve nearby map candidates. Retrieved POI data is cached temporarily on your device for up to 30 minutes. The request does not include your ride history, account identity, contacts, or media."
       },
       "rights": {
         "title": "6. Your choices and rights",
@@ -601,5 +601,29 @@
         "body": "If you have questions about this privacy policy or need to exercise your data rights, contact us through the developer contact option in Google Play.\n\nThis policy applies to all versions of the Bike Assistant Android application."
       }
     }
+  },
+  "poiLayers": {
+    "title": "Map places",
+    "showWaterRefill": "Show water refill spots",
+    "showPhotoScenic": "Show photo & scenic spots",
+    "close": "Close place details",
+    "categories": {
+      "drinking_water": "Drinking water",
+      "water_point": "Water refill point",
+      "free_refill_partner": "Free refill partner",
+      "viewpoint": "Viewpoint",
+      "peak": "Peak",
+      "landmark": "Landmark",
+      "police_station": "Police station water",
+      "transit_station": "Station water",
+      "bicycle_shop": "Bicycle shop water",
+      "visitor_center": "Visitor center water",
+      "bicycle_station": "Bicycle station water"
+    },
+    "distanceAway": "{{distance}} km away",
+    "distanceUnavailable": "Distance is available after current location is ready",
+    "dataNotice": "Map information is community-maintained. Confirm access, opening conditions, and water availability on site.",
+    "previewImage": "Preview image for {{name}}",
+    "pinDestination": "Pin {{name}} as destination"
   }
 }

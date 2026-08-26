@@ -27,6 +27,7 @@ import {
   Animated,
   AppState,
   Dimensions,
+  Image,
   Modal,
   PanResponder,
   Platform,
@@ -229,6 +230,12 @@ import {
   type NavigationDashboardSummaryKey,
 } from "@/lib/navigation-dashboard-summary";
 import {
+  filterPoiMarkers,
+  loadPoiMarkers,
+  type PoiBounds,
+  type PoiMarker,
+} from "@/lib/poi-layer";
+import {
   hasReliableRideMovement,
   shouldScheduleTouchGuardRelock,
   shouldZeroLiveRideReadings,
@@ -290,7 +297,7 @@ function haversine(
 
 export default function MapScreen() {
   const { t } = useTranslation();
-  const { activeLanguage } = useLanguage();
+  const { activeLanguage, isRTL } = useLanguage();
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
@@ -362,6 +369,10 @@ export default function MapScreen() {
     lon: number;
     heading: number;
   } | null>(null);
+  const [poiMarkers, setPoiMarkers] = useState<PoiMarker[]>([]);
+  const [selectedPoi, setSelectedPoi] = useState<PoiMarker | null>(null);
+  const poiRequestIdRef = useRef(0);
+  const poiBoundsRef = useRef<PoiBounds | null>(null);
   const currentPosRef = useRef<{
     lat: number;
     lon: number;
@@ -403,6 +414,81 @@ export default function MapScreen() {
   useEffect(() => {
     currentPosRef.current = currentPos;
   }, [currentPos]);
+
+  const poiInitialLatitude = currentPos?.lat;
+  const poiInitialLongitude = currentPos?.lon;
+
+  const poiLayersEnabled =
+    settings.showWaterRefillSpots || settings.showPhotoScenicSpots;
+  const visiblePoiMarkers = useMemo(
+    () =>
+      filterPoiMarkers(poiMarkers, {
+        showWaterRefillSpots: settings.showWaterRefillSpots,
+        showPhotoScenicSpots: settings.showPhotoScenicSpots,
+      }),
+    [
+      poiMarkers,
+      settings.showPhotoScenicSpots,
+      settings.showWaterRefillSpots,
+    ],
+  );
+
+  const loadPoiMarkersForBounds = useCallback(
+    async (bounds: PoiBounds) => {
+      if (!poiLayersEnabled) {
+        setPoiMarkers([]);
+        setSelectedPoi(null);
+        return;
+      }
+      const latSpan = Math.abs(bounds.northEast.lat - bounds.southWest.lat);
+      const lonSpan = Math.abs(bounds.northEast.lon - bounds.southWest.lon);
+      // 全球或洲際縮放不直接發送超大 Overpass 查詢；保留已快取的地區資料並由 Leaflet 聚合。
+      if (latSpan > 0.3 || lonSpan > 0.3) return;
+
+      const requestId = ++poiRequestIdRef.current;
+      poiBoundsRef.current = bounds;
+      try {
+        const nextMarkers = await loadPoiMarkers(bounds);
+        if (requestId === poiRequestIdRef.current) {
+          setPoiMarkers(nextMarkers);
+        }
+      } catch {
+        // 網路暫時不可用時保留已快取／已顯示的 POI，不影響導航與騎乘。
+      }
+    },
+    [poiLayersEnabled],
+  );
+
+  useEffect(() => {
+    if (poiLayersEnabled || !poiMarkers.length) return;
+    setPoiMarkers([]);
+    setSelectedPoi(null);
+  }, [poiLayersEnabled, poiMarkers.length]);
+
+  useEffect(() => {
+    if (
+      !poiLayersEnabled ||
+      poiInitialLatitude === undefined ||
+      poiInitialLongitude === undefined
+    ) {
+      return;
+    }
+    void loadPoiMarkersForBounds({
+      southWest: {
+        lat: poiInitialLatitude - 0.025,
+        lon: poiInitialLongitude - 0.025,
+      },
+      northEast: {
+        lat: poiInitialLatitude + 0.025,
+        lon: poiInitialLongitude + 0.025,
+      },
+    });
+  }, [
+    loadPoiMarkersForBounds,
+    poiInitialLatitude,
+    poiInitialLongitude,
+    poiLayersEnabled,
+  ]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentClock(new Date()), 1_000);
@@ -5034,7 +5120,15 @@ export default function MapScreen() {
             setCenterPinLocation({ lat, lon });
           }
         }}
+        onMapMoveEnd={(bounds) => {
+          void loadPoiMarkersForBounds(bounds);
+        }}
         kilometersMarkers={kilometersMarkers}
+        poiMarkers={visiblePoiMarkers}
+        onPoiMarkerPress={(id) => {
+          const poi = visiblePoiMarkers.find((marker) => marker.id === id);
+          if (poi) setSelectedPoi(poi);
+        }}
         onMapRotateEnd={() => {
           if (Date.now() < programmaticBearingUntilRef.current) return;
           scheduleAutoRecenter();
@@ -5949,6 +6043,137 @@ export default function MapScreen() {
         fields={settings.simplifiedModeFields}
         fieldOrder={settings.simplifiedModeFieldOrder}
       />
+
+      {selectedPoi && (
+        <View
+          testID="poi-info-sheet"
+          style={[styles.poiCard, { bottom: dynamicCollapsedH + 16 }]}
+        >
+          <View
+            style={[
+              styles.poiCardHeader,
+              { flexDirection: isRTL ? "row-reverse" : "row" },
+            ]}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                style={[styles.poiCardTitle, { textAlign: isRTL ? "right" : "left" }]}
+                numberOfLines={2}
+              >
+                {selectedPoi.name}
+              </Text>
+              <View
+                style={[
+                  styles.poiCategoryBadge,
+                  {
+                    alignSelf: isRTL ? "flex-end" : "flex-start",
+                    backgroundColor:
+                      selectedPoi.kind === "water_refill" ? "#0A84FF" : "#FF9500",
+                  },
+                ]}
+              >
+                <Text style={styles.poiCategoryBadgeText}>
+                  {t(`poiLayers.categories.${selectedPoi.category}`)}
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("poiLayers.close")}
+              style={styles.pinCardClose}
+              onPress={() => setSelectedPoi(null)}
+            >
+              <IconSymbol name="xmark.circle.fill" size={20} color="#666" />
+            </Pressable>
+          </View>
+          {selectedPoi.imageUrl ? (
+            <Image
+              source={{ uri: selectedPoi.imageUrl }}
+              accessibilityLabel={t("poiLayers.previewImage", {
+                name: selectedPoi.name,
+              })}
+              resizeMode="cover"
+              style={styles.poiPreviewImage}
+            />
+          ) : null}
+          <View style={styles.poiCardBody}>
+            {selectedPoi.description ? (
+              <Text
+                style={[
+                  styles.poiDescription,
+                  { textAlign: isRTL ? "right" : "left" },
+                ]}
+                numberOfLines={2}
+              >
+                {selectedPoi.description}
+              </Text>
+            ) : null}
+            <Text
+              style={[
+                styles.poiDistance,
+                { textAlign: isRTL ? "right" : "left" },
+              ]}
+            >
+              {currentPos
+                ? t("poiLayers.distanceAway", {
+                    distance: (
+                      haversine(
+                        currentPos.lat,
+                        currentPos.lon,
+                        selectedPoi.latitude,
+                        selectedPoi.longitude,
+                      ) / 1000
+                    ).toFixed(1),
+                  })
+                : t("poiLayers.distanceUnavailable")}
+            </Text>
+            <Text
+              style={[
+                styles.poiDataNotice,
+                { textAlign: isRTL ? "right" : "left" },
+              ]}
+            >
+              {t("poiLayers.dataNotice")}
+            </Text>
+          </View>
+          <Pressable
+            testID="poi-pin-destination"
+            accessibilityRole="button"
+            accessibilityLabel={t("poiLayers.pinDestination", {
+              name: selectedPoi.name,
+            })}
+            style={({ pressed }) => [
+              styles.poiPinButton,
+              { opacity: pressed ? 0.78 : 1 },
+            ]}
+            onPress={() => {
+              setPinnedLocation({
+                lat: selectedPoi.latitude,
+                lon: selectedPoi.longitude,
+              });
+              setPinnedLocationLabel(selectedPoi.name);
+              setPinRouteInfo(null);
+              setShowPinCard(true);
+              setSelectedPoi(null);
+              mapRef.current?.animateCamera(
+                {
+                  center: {
+                    latitude: selectedPoi.latitude,
+                    longitude: selectedPoi.longitude,
+                  },
+                  zoom: 16,
+                },
+                { duration: 320 },
+              );
+            }}
+          >
+            <IconSymbol name="mappin.circle.fill" size={18} color="#fff" />
+            <Text style={styles.poiPinButtonText}>
+              {t("poiLayers.pinDestination", { name: selectedPoi.name })}
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* ── 釘選地點卡片 ── */}
       {showPinCard && pinnedLocation && (
@@ -7441,6 +7666,84 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "600",
+  },
+  poiCard: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(18,18,18,0.98)",
+    borderRadius: 16,
+    padding: 14,
+    zIndex: 260,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  poiCardHeader: {
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  poiCardTitle: {
+    color: "#fff",
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: "800",
+  },
+  poiCategoryBadge: {
+    marginTop: 6,
+    maxWidth: "100%",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  poiCategoryBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  poiPreviewImage: {
+    width: "100%",
+    height: 126,
+    borderRadius: 12,
+    marginTop: 12,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  poiCardBody: {
+    marginTop: 10,
+    gap: 5,
+  },
+  poiDescription: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  poiDistance: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  poiDataNotice: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  poiPinButton: {
+    minHeight: 44,
+    marginTop: 12,
+    borderRadius: 11,
+    backgroundColor: "#007AFF",
+    flexDirection: "row",
+    gap: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  poiPinButtonText: {
+    flexShrink: 1,
+    color: "#fff",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "800",
+    textAlign: "center",
   },
 
   supplyConfirmBtn: {

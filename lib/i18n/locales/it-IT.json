@@ -278,5 +278,29 @@
     "estimatedCurveNote": "L'affidabilità si basa sui dati disponibili e sulla cronologia di calibrazione locale. Fattori: {{factors}}. Solo per analisi delle tendenze; non è una misurazione da sensore esterno.",
     "remaining": "Rimanente",
     "returnToStandardMode": "Tocca in qualsiasi punto per tornare alla modalità standard"
+  },
+  "poiLayers": {
+    "title": "Luoghi sulla mappa",
+    "showWaterRefill": "Mostra punti di rifornimento acqua",
+    "showPhotoScenic": "Mostra luoghi fotografici e panoramici",
+    "close": "Chiudi dettagli del luogo",
+    "categories": {
+      "drinking_water": "Acqua potabile",
+      "water_point": "Punto di rifornimento",
+      "free_refill_partner": "Partner di rifornimento gratuito",
+      "viewpoint": "Punto panoramico",
+      "peak": "Vetta",
+      "landmark": "Luogo d’interesse",
+      "police_station": "Acqua alla stazione di polizia",
+      "transit_station": "Acqua in stazione",
+      "bicycle_shop": "Acqua nel negozio di biciclette",
+      "visitor_center": "Acqua al centro visitatori",
+      "bicycle_station": "Acqua alla stazione bici"
+    },
+    "distanceAway": "A {{distance}} km",
+    "distanceUnavailable": "La distanza sarà disponibile quando la posizione corrente sarà pronta",
+    "dataNotice": "Le informazioni sulla mappa sono gestite dalla comunità. Verifica sul posto accesso, orari e disponibilità dell’acqua.",
+    "previewImage": "Immagine di anteprima di {{name}}",
+    "pinDestination": "Fissa {{name}} come destinazione"
   }
 }

@@ -570,7 +570,7 @@
       },
       "sharing": {
         "title": "5. 資料的分享",
-        "body": "App 沒有好友位置共享、社群功能或雲端資料庫。您可透過 Android 系統分享功能主動匯出 GPX、活動卡片或媒體；分享對象與內容完全由您決定。\n\n若您主動在有網路時使用線上路徑或天氣資訊，App 可能會將路徑計算所需的座標傳送至公開地圖或路徑服務。這些服務不是帳號、追蹤或同步機制；離線功能不依賴它們。"
+        "body": "App 沒有好友位置共享、社群功能或雲端資料庫。您可透過 Android 系統分享功能主動匯出 GPX、活動卡片或媒體；分享對象與內容完全由您決定。\n\n若您主動在有網路時使用線上路徑或天氣資訊，App 可能會將路徑計算所需的座標傳送至公開地圖或路徑服務。這些服務不是帳號、追蹤或同步機制；離線功能不依賴它們。\n\n若您在連網時開啟免費補水點或拍照／景點圖層，App 會將目前地圖可視範圍傳送至相容 OpenStreetMap 的公開 POI 查詢服務，以取得附近的地圖候選點。取得的 POI 資料最長會在您的裝置上暫存 30 分鐘。此請求不包含您的騎乘歷史、帳號識別、聯絡人或媒體。"
       },
       "rights": {
         "title": "6. 您的權利",
@@ -601,5 +601,29 @@
         "body": "若您對本隱私政策有任何疑問，或需要行使您的資料權利，請透過 Google Play 商店的開發者聯絡功能與我們聯繫。\n\n本政策適用於智慧單車騎乘助手 Android 應用程式的所有版本。"
       }
     }
+  },
+  "poiLayers": {
+    "title": "地圖點位",
+    "showWaterRefill": "顯示免費補水點",
+    "showPhotoScenic": "顯示拍照／景點",
+    "close": "關閉點位資訊",
+    "categories": {
+      "drinking_water": "飲水機",
+      "water_point": "補水點",
+      "free_refill_partner": "免費補水合作點",
+      "viewpoint": "觀景點",
+      "peak": "山頂",
+      "landmark": "地標",
+      "police_station": "警察局飲水",
+      "transit_station": "車站飲水",
+      "bicycle_shop": "單車店飲水",
+      "visitor_center": "遊客中心飲水",
+      "bicycle_station": "單車驛站飲水"
+    },
+    "distanceAway": "距離 {{distance}} 公里",
+    "distanceUnavailable": "取得目前位置後即可顯示距離",
+    "dataNotice": "地圖資訊由社群維護；請於現場確認可進入性、開放狀態與水源是否可用。",
+    "previewImage": "{{name}} 的預覽圖片",
+    "pinDestination": "將 {{name}} 設為釘選目的地"
   }
 }

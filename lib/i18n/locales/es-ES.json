@@ -278,5 +278,29 @@
     "estimatedCurveNote": "La confianza se basa en los datos disponibles y el historial de calibración local. Factores: {{factors}}. Solo para revisión de tendencias; esto no es una medición de un sensor externo.",
     "remaining": "Restante",
     "returnToStandardMode": "Toca en cualquier parte para volver al modo estándar"
+  },
+  "poiLayers": {
+    "title": "Lugares del mapa",
+    "showWaterRefill": "Mostrar puntos de recarga de agua",
+    "showPhotoScenic": "Mostrar lugares fotográficos y panorámicos",
+    "close": "Cerrar detalles del lugar",
+    "categories": {
+      "drinking_water": "Agua potable",
+      "water_point": "Punto de recarga",
+      "free_refill_partner": "Socio de recarga gratuita",
+      "viewpoint": "Mirador",
+      "peak": "Cima",
+      "landmark": "Lugar emblemático",
+      "police_station": "Agua en comisaría",
+      "transit_station": "Agua en estación",
+      "bicycle_shop": "Agua en tienda de bicicletas",
+      "visitor_center": "Agua en centro de visitantes",
+      "bicycle_station": "Agua en estación ciclista"
+    },
+    "distanceAway": "A {{distance}} km",
+    "distanceUnavailable": "La distancia estará disponible cuando se obtenga la ubicación actual",
+    "dataNotice": "La información del mapa la mantiene la comunidad. Confirma en el lugar el acceso, el horario y la disponibilidad de agua.",
+    "previewImage": "Imagen de vista previa de {{name}}",
+    "pinDestination": "Fijar {{name}} como destino"
   }
 }

@@ -246,5 +246,29 @@
     "clearNavigationLayersTitle": "Alle navigatielagen verwijderen?",
     "clearNavigationLayersBody": "Dit verwijdert de geïmporteerde GPX, alle vastgezette navigatieroutes, start-/eindmarkeringen en richtingpijlen.",
     "clear": "Wissen"
+  },
+  "poiLayers": {
+    "title": "Plaatsen op de kaart",
+    "showWaterRefill": "Watervulpunten tonen",
+    "showPhotoScenic": "Foto- en uitzichtspunten tonen",
+    "close": "Plaatsdetails sluiten",
+    "categories": {
+      "drinking_water": "Drinkwater",
+      "water_point": "Watervulpunt",
+      "free_refill_partner": "Gratis vulpartner",
+      "viewpoint": "Uitzichtpunt",
+      "peak": "Top",
+      "landmark": "Bezienswaardigheid",
+      "police_station": "Water bij politiebureau",
+      "transit_station": "Water op station",
+      "bicycle_shop": "Water bij fietsenwinkel",
+      "visitor_center": "Water bij bezoekerscentrum",
+      "bicycle_station": "Water bij fietsstation"
+    },
+    "distanceAway": "{{distance}} km afstand",
+    "distanceUnavailable": "De afstand is beschikbaar zodra de huidige locatie gereed is",
+    "dataNotice": "Kaartinformatie wordt door de community onderhouden. Controleer ter plaatse toegang, openingstijden en waterbeschikbaarheid.",
+    "previewImage": "Voorbeeldafbeelding van {{name}}",
+    "pinDestination": "{{name}} als bestemming vastzetten"
   }
 }

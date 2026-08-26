@@ -206,6 +206,10 @@ export interface AppSettings {
   simplifiedNavIdleSec: number; // 自動模式開啟前的閒置秒數（預設 30 秒）
   /** 使用者平移或旋轉地圖後，多久自動回到目前位置；不改變使用者選擇的方向。 */
   autoRecenterSec: number;
+  /** 是否在地圖顯示公開資料已標記為可飲用／免費補水的候選點。 */
+  showWaterRefillSpots: boolean;
+  /** 是否在地圖顯示公開資料已標記為觀景、山頂或地標的拍照候選點。 */
+  showPhotoScenicSpots: boolean;
   // 騎乘防誤觸：鎖定時仍可直接閱讀資訊，僅阻擋地圖與控制誤觸
   touchGuardEnabled: boolean;
   /** 長按此毫秒數後解除騎乘防誤觸；設定頁僅提供 400、800、1200 ms。 */
@@ -306,6 +310,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   simplifiedNavMode: "off",
   simplifiedNavIdleSec: 30,
   autoRecenterSec: 12,
+  showWaterRefillSpots: true,
+  showPhotoScenicSpots: true,
   touchGuardEnabled: true,
   touchGuardUnlockHoldMs: DEFAULT_TOUCH_GUARD_UNLOCK_HOLD_MS,
   touchGuardUnlockHoldMsSchemaVersion: 2,
