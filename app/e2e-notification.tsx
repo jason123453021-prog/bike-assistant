@@ -14,6 +14,7 @@ import {
   configureSupplyNotificationActions,
   SUPPLY_NOTIFICATION_CATEGORY,
 } from "@/lib/supply-notification-actions";
+import { useSettings } from "@/lib/settings-context";
 
 const E2E_NOTIFICATION_HARNESS_ENABLED =
   Constants.expoConfig?.extra?.e2eNotificationHarness === true;
@@ -22,11 +23,13 @@ export default function E2ENotificationScreen() {
   const [status, setStatus] = useState(
     "Ready to schedule a local Android notification.",
   );
+  const { updateSettings } = useSettings();
 
   if (!E2E_NOTIFICATION_HARNESS_ENABLED) return <Redirect href="/navigate" />;
 
   const scheduleNotification = async () => {
     try {
+      updateSettings({ supplyReminderEnabled: true });
       const Notifications = await getLocalNotifications();
       if (!Notifications) {
         setStatus(
