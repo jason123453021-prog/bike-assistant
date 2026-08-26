@@ -41,6 +41,26 @@ describe("Android 多語系與大字體 Emulator 驗收 workflow", () => {
     expect(notificationFlowIndex).toBeGreaterThan(localeFlowIndex);
   });
 
+  it("在清除 App 資料後先恢復通知與前景位置權限，避免系統權限視窗遮擋通知回前景 Modal", () => {
+    const clearDataIndex = workflow.indexOf(
+      "shell pm clear com.jason123453021.bikeassistant",
+    );
+    const coarseLocationGrantIndex = workflow.indexOf(
+      "android.permission.ACCESS_COARSE_LOCATION",
+    );
+    const fineLocationGrantIndex = workflow.indexOf(
+      "android.permission.ACCESS_FINE_LOCATION",
+    );
+    const harnessOpenIndex = workflow.indexOf(
+      'manus20260617://e2e-notification',
+    );
+
+    expect(clearDataIndex).toBeGreaterThan(-1);
+    expect(coarseLocationGrantIndex).toBeGreaterThan(clearDataIndex);
+    expect(fineLocationGrantIndex).toBeGreaterThan(coarseLocationGrantIndex);
+    expect(harnessOpenIndex).toBeGreaterThan(fineLocationGrantIndex);
+  });
+
   it("將多語系 JUnit 與 screenshots 一併上傳為可追溯 artifact", () => {
     expect(workflow).toContain("build/maestro-localization-*.xml");
     expect(workflow).toContain("build/maestro-results");
