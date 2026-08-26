@@ -17,9 +17,23 @@ describe("Android 多語系與大字體 Emulator 驗收 workflow", () => {
 
   it("固定在 Arabic 截圖流程中使用 200% 系統字體並於結束後還原", () => {
     expect(workflow).toContain(
-      'if [ "$LOCALE" = "ar" ]; then adb shell settings put system font_scale 2.0',
+      'if [ "$LOCALE" = "ar" ]; then adb -s "$ANDROID_SERIAL" shell settings put system font_scale 2.0',
     );
-    expect(workflow).toContain("adb shell settings put system font_scale 1.0");
+    expect(workflow).toContain(
+      'adb -s "$ANDROID_SERIAL" shell settings put system font_scale 1.0',
+    );
+  });
+
+  it("在既有通知驗收前完成多語系截圖，並將 Maestro 呼叫綁定目前 Emulator", () => {
+    const localeFlowIndex = workflow.indexOf("for LOCALE in ja ko ar");
+    const notificationFlowIndex = workflow.indexOf(
+      "e2e/maestro/notification-harness-schedule.yaml",
+    );
+
+    expect(workflow).toContain('export ANDROID_SERIAL="$(adb devices');
+    expect(workflow).toContain('--device "$ANDROID_SERIAL"');
+    expect(localeFlowIndex).toBeGreaterThan(-1);
+    expect(notificationFlowIndex).toBeGreaterThan(localeFlowIndex);
   });
 
   it("將多語系 JUnit 與 screenshots 一併上傳為可追溯 artifact", () => {
