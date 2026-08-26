@@ -15,9 +15,11 @@ describe("Android 多語系與大字體 Emulator 驗收 workflow", () => {
     expect(workflow).toContain("build/maestro-results/localization-${LOCALE}");
   });
 
-  it("固定在 Arabic 截圖流程中使用 200% 系統字體並於結束後還原", () => {
+  it("在 Arabic locale 已確立後使用獨立流程驗收 200% 系統字體並於結束後還原", () => {
+    expect(workflow).toContain("localization-ar-large-text.yaml");
+    expect(workflow).toContain("maestro-localization-ar-200.xml");
     expect(workflow).toContain(
-      'if [ "$LOCALE" = "ar" ]; then adb -s "$ANDROID_SERIAL" shell settings put system font_scale 2.0',
+      'adb -s "$ANDROID_SERIAL" shell settings put system font_scale 2.0',
     );
     expect(workflow).toContain(
       'adb -s "$ANDROID_SERIAL" shell settings put system font_scale 1.0',

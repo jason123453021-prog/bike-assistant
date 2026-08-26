@@ -1,0 +1,22 @@
+appId: com.jason123453021.bikeassistant
+name: Arabic RTL 200% font screenshots
+---
+- openLink: "manus20260617://map"
+- extendedWaitUntil:
+    visible: "التنقل"
+    timeout: 30000
+- tapOn: "الإعدادات"
+- assertVisible: "الإعدادات"
+- takeScreenshot: "locale-ar-200-settings"
+- tapOn: "التنقل"
+- assertVisible: "التنقل"
+- takeScreenshot: "locale-ar-200-navigation"
+- tapOn: "المسارات"
+- assertVisible: "المسارات"
+- takeScreenshot: "locale-ar-200-routes"
+- tapOn: "السجل"
+- assertVisible: "السجل"
+- takeScreenshot: "locale-ar-200-history"
+- openLink: "manus20260617://privacy"
+- assertVisible: "سياسة الخصوصية"
+- takeScreenshot: "locale-ar-200-privacy"
