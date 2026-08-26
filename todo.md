@@ -2823,4 +2823,4 @@
 - [x] 修復設定頁長文字被壓縮成逐字直排：所有設定列文字容器改採可伸縮寬度、最小寬度 0 與自然換行，不以固定窄寬度擠壓英文／日文
 - [x] 修復語言切換後設定、儀表欄位與全域 Header 殘留舊語言或英文 fallback，確保樹狀元件訂閱 i18n 並即時重新渲染；原生 Android 安裝名稱仍屬 manifest 固定標籤，不能隨 App 內語言即時變動
 - [x] 補齊設定系統資料、匯出、重設、儀表板欄位與 app 名稱的 13 語系翻譯鍵，防止日文與其他 locale 回退為英文／繁中
-- [ ] 新增長文字、日文與 Arabic RTL 的設定頁排版與全語系鍵完整性守門，完成品質驗證與新版 Android APK artifact
+- [x] 新增長文字、日文與 Arabic RTL 的設定頁排版與全語系鍵完整性守門，完成品質驗證與新版 Android APK artifact（1.0.97／versionCode 10097；GitHub run 32929371119，artifact 9592995004，28,555,303 bytes，未過期；Jest、Vitest 127 檔／446 tests、TypeScript、Lint、Expo config 與差異檢查均通過）
