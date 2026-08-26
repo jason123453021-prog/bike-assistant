@@ -4955,10 +4955,12 @@ export default function MapScreen() {
       {/* ── 崩潰恢復強調表示 */}
       {showRecoveryAlert && recoverySnapshot && (
         <View style={[styles.recoveryBanner, { top: insets.top + 8 }]}>
-          <Text style={styles.recoveryTitle}>偵測到未完成的騎乘</Text>
+          <Text style={styles.recoveryTitle}>{t("audit.recoveryTitle")}</Text>
           <Text style={styles.recoveryDesc}>
-            騎乘時間 {formatDuration(recoverySnapshot.elapsed ?? 0)}， 距離{" "}
-            {((recoverySnapshot.distance ?? 0) / 1000).toFixed(2)} km
+            {t("audit.recoveryDescription", {
+              time: formatDuration(recoverySnapshot.elapsed ?? 0),
+              distance: ((recoverySnapshot.distance ?? 0) / 1000).toFixed(2),
+            })}
           </Text>
           <View style={styles.recoveryBtns}>
             <Pressable
@@ -4975,7 +4977,9 @@ export default function MapScreen() {
                 }
               }}
             >
-              <Text style={styles.recoveryBtnText}>繼續騎乘</Text>
+              <Text style={styles.recoveryBtnText}>
+                {t("audit.resumeRide")}
+              </Text>
             </Pressable>
             <Pressable
               style={[
@@ -4988,7 +4992,7 @@ export default function MapScreen() {
                 setRecoverySnapshot(null);
               }}
             >
-              <Text style={styles.recoveryBtnText}>新騎乘</Text>
+              <Text style={styles.recoveryBtnText}>{t("audit.newRide")}</Text>
             </Pressable>
           </View>
         </View>
@@ -5047,7 +5051,7 @@ export default function MapScreen() {
                 setPinAddressCandidates([]);
                 setPinAddressNotice(null);
               }}
-              placeholder="輸入地址、地標或店家名稱"
+              placeholder={t("audit.addressPlaceholder")}
               placeholderTextColor="rgba(255,255,255,0.52)"
               style={styles.pinAddressInput}
               returnKeyType="search"
@@ -5067,7 +5071,9 @@ export default function MapScreen() {
               }}
             >
               <Text style={styles.pinAddressSearchText}>
-                {isResolvingPinAddress ? "搜尋中" : "搜尋"}
+                {isResolvingPinAddress
+                  ? t("audit.searching")
+                  : t("audit.search")}
               </Text>
             </Pressable>
           </View>
@@ -5083,7 +5089,9 @@ export default function MapScreen() {
           )}
           {pinAddressCandidates.length > 1 && (
             <View style={styles.pinAddressResults}>
-              <Text style={styles.pinAddressResultsTitle}>選擇目的地</Text>
+              <Text style={styles.pinAddressResultsTitle}>
+                {t("audit.chooseDestination")}
+              </Text>
               {pinAddressCandidates.map((candidate, index) => (
                 <Pressable
                   key={`${candidate.latitude}-${candidate.longitude}`}
@@ -5094,8 +5102,11 @@ export default function MapScreen() {
                     {candidate.label}
                   </Text>
                   <Text style={styles.pinAddressResultMeta}>
-                    候選 {index + 1} · {candidate.latitude.toFixed(5)},{" "}
-                    {candidate.longitude.toFixed(5)}
+                    {t("audit.candidate", {
+                      index: index + 1,
+                      latitude: candidate.latitude.toFixed(5),
+                      longitude: candidate.longitude.toFixed(5),
+                    })}
                   </Text>
                 </Pressable>
               ))}
@@ -5105,7 +5116,9 @@ export default function MapScreen() {
             pinAddressCandidates.length === 0 &&
             recentAddressSearches.length > 0 && (
               <View style={styles.pinAddressResults}>
-                <Text style={styles.pinAddressResultsTitle}>最近搜尋</Text>
+                <Text style={styles.pinAddressResultsTitle}>
+                  {t("audit.recentSearches")}
+                </Text>
                 {recentAddressSearches.slice(0, 3).map((item) => (
                   <Pressable
                     key={`${item.label}-${item.latitude}-${item.longitude}`}
@@ -5182,7 +5195,7 @@ export default function MapScreen() {
                 fontWeight: "800",
               }}
             >
-              {touchGuardEnabled ? "鎖" : "開"}
+              {touchGuardEnabled ? t("audit.touchGuardOn") : t("audit.touchGuardOff")}
             </Text>
             <Text
               style={[
@@ -5194,7 +5207,7 @@ export default function MapScreen() {
                 },
               ]}
             >
-              觸控
+              {t("audit.touchControl")}
             </Text>
           </Pressable>
         )}
@@ -5204,12 +5217,12 @@ export default function MapScreen() {
             style={styles.toolBtn}
             onPress={() => {
               Alert.alert(
-                "清除所有導航圖層？",
-                "這會完整清除匯入 GPX、所有釘選導航路徑、起訖標記與方向箭頭。",
+                t("audit.clearNavigationLayersTitle"),
+                t("audit.clearNavigationLayersBody"),
                 [
-                  { text: "取消", style: "cancel" },
+                  { text: t("audit.cancel"), style: "cancel" },
                   {
-                    text: "清除",
+                    text: t("audit.clear"),
                     style: "destructive",
                     onPress: clearAllNavigationLayers,
                   },
@@ -5251,7 +5264,7 @@ export default function MapScreen() {
                 },
               ]}
             >
-              精簡
+              {t("audit.simplified")}
             </Text>
           </Pressable>
         )}
@@ -5348,7 +5361,7 @@ export default function MapScreen() {
               )}
               {isPaused && (
                 <View style={styles.pausedBadge}>
-                  <Text style={styles.pausedText}>已暫停</Text>
+                  <Text style={styles.pausedText}>{t("audit.paused")}</Text>
                 </View>
               )}
             </View>
@@ -5667,7 +5680,7 @@ export default function MapScreen() {
                 onPress={handleStop}
               >
                 <IconSymbol name="stop.fill" size={18} color="#fff" />
-                <Text style={styles.startBtnText}>結束</Text>
+                <Text style={styles.startBtnText}>{t("audit.finishRide")}</Text>
               </Pressable>
             </View>
           )}
@@ -5679,7 +5692,7 @@ export default function MapScreen() {
           onPress={() => togglePanel(!panelExpanded)}
         >
           <Text style={styles.expandHintText}>
-            {panelExpanded ? "下滑收起" : "上滑查看更多"}
+            {panelExpanded ? t("audit.collapsePanel") : t("audit.expandPanel")}
           </Text>
           <IconSymbol
             name="chevron.right"
@@ -5711,9 +5724,11 @@ export default function MapScreen() {
           >
             <View style={styles.sportPickerHandle} />
             <View style={styles.sportPickerHeader}>
-              <Text style={styles.sportPickerTitle}>選擇運動</Text>
+              <Text style={styles.sportPickerTitle}>
+                {t("audit.chooseSport")}
+              </Text>
               <Pressable
-                accessibilityLabel="關閉運動選擇"
+                accessibilityLabel={t("audit.closeSportPicker")}
                 onPress={() => setSportPickerVisible(false)}
                 style={styles.sportPickerClose}
               >
@@ -5729,20 +5744,22 @@ export default function MapScreen() {
               <TextInput
                 value={sportPickerQuery}
                 onChangeText={setSportPickerQuery}
-                placeholder="搜尋運動"
+                placeholder={t("audit.searchSports")}
                 placeholderTextColor="rgba(255,255,255,0.42)"
                 style={styles.sportPickerSearchInput}
                 returnKeyType="done"
               />
             </View>
-            <Text style={styles.sportPickerSectionTitle}>你的運動</Text>
+            <Text style={styles.sportPickerSectionTitle}>
+              {t("audit.yourSports")}
+            </Text>
             {sportPickerOptions.map((sportType) => {
               const meta = SPORT_META[sportType];
               const selected = state.sportType === sportType;
               return (
                 <Pressable
                   key={sportType}
-                  accessibilityLabel={`選擇${meta.label}`}
+                  accessibilityLabel={`${t("audit.chooseSport")}: ${meta.label}`}
                   style={({ pressed }) => [
                     styles.sportPickerRow,
                     { opacity: pressed ? 0.68 : 1 },
@@ -5792,7 +5809,7 @@ export default function MapScreen() {
             const item = settings.supplyItems.find((i) => i.id === id);
             return {
               id,
-              name: item?.name || "未命名補給品",
+              name: item?.name || t("audit.unnamedSupply"),
               target: item?.target ?? "energy",
               onConfirm: () =>
                 handleConfirmCustomSupply(id, item?.triggerType || "time"),
@@ -5802,7 +5819,9 @@ export default function MapScreen() {
             ? [
                 {
                   id: "supply-interval-energy-time",
-                  name: `能量時間提醒（每 ${settings.supplyEnergyTimeIntervalMinutes} 分鐘）`,
+                  name: t("audit.energyTimeReminder", {
+                    minutes: settings.supplyEnergyTimeIntervalMinutes,
+                  }),
                   target: "energy" as const,
                   onConfirm: () => handleConfirmIntervalSupply("energy-time"),
                 },
@@ -5812,7 +5831,9 @@ export default function MapScreen() {
             ? [
                 {
                   id: "supply-interval-energy-distance",
-                  name: `能量距離提醒（每 ${settings.supplyEnergyDistanceIntervalKm} km）`,
+                  name: t("audit.energyDistanceReminder", {
+                    distance: settings.supplyEnergyDistanceIntervalKm,
+                  }),
                   target: "energy" as const,
                   onConfirm: () =>
                     handleConfirmIntervalSupply("energy-distance"),
@@ -5823,7 +5844,9 @@ export default function MapScreen() {
             ? [
                 {
                   id: "supply-interval-water-time",
-                  name: `補水時間提醒（每 ${settings.supplyWaterTimeIntervalMinutes} 分鐘）`,
+                  name: t("audit.waterTimeReminder", {
+                    minutes: settings.supplyWaterTimeIntervalMinutes,
+                  }),
                   target: "water" as const,
                   onConfirm: () => handleConfirmIntervalSupply("water-time"),
                 },
@@ -5833,7 +5856,9 @@ export default function MapScreen() {
             ? [
                 {
                   id: "supply-interval-water-distance",
-                  name: `補水距離提醒（每 ${settings.supplyWaterDistanceIntervalKm} km）`,
+                  name: t("audit.waterDistanceReminder", {
+                    distance: settings.supplyWaterDistanceIntervalKm,
+                  }),
                   target: "water" as const,
                   onConfirm: () =>
                     handleConfirmIntervalSupply("water-distance"),
@@ -5930,7 +5955,7 @@ export default function MapScreen() {
         <View style={[styles.pinCard, { bottom: dynamicCollapsedH + 16 }]}>
           <View style={styles.pinCardHeader}>
             <Text style={styles.pinCardTitle}>
-              {pinnedLocationLabel ?? "釘選位置"}
+              {pinnedLocationLabel ?? t("audit.pinnedLocation")}
             </Text>
             <Pressable
               style={styles.pinCardClose}
@@ -5949,15 +5974,21 @@ export default function MapScreen() {
               {pinnedLocation.lat.toFixed(4)}, {pinnedLocation.lon.toFixed(4)}
             </Text>
             {isFetchingPinRoute && (
-              <Text style={styles.pinCardStatus}>計算路線中…</Text>
+              <Text style={styles.pinCardStatus}>
+                {t("audit.calculatingRoute")}
+              </Text>
             )}
             {pinRouteInfo && (
               <View style={styles.pinCardRoute}>
                 <Text style={styles.pinCardRouteDist}>
-                  距離: {(pinRouteInfo.distM / 1000).toFixed(2)} km
+                  {t("audit.routeDistance", {
+                    distance: (pinRouteInfo.distM / 1000).toFixed(2),
+                  })}
                 </Text>
                 <Text style={styles.pinCardRouteDur}>
-                  預計: {Math.round(pinRouteInfo.durSec / 60)} 分
+                  {t("audit.routeDuration", {
+                    minutes: Math.round(pinRouteInfo.durSec / 60),
+                  })}
                 </Text>
               </View>
             )}
@@ -5967,14 +5998,16 @@ export default function MapScreen() {
                   {formatNavigationDataFreshness(lastNavigationDataRefreshAt)}
                 </Text>
                 <Text style={styles.pinDataFreshnessNote}>
-                  道路施工與臨時封路未必即時反映，請以現場管制為準。
+                  {t("audit.mapDataNotice")}
                 </Text>
               </View>
               <Pressable
                 style={styles.pinDataRefreshButton}
                 onPress={handleRefreshPinMapData}
               >
-                <Text style={styles.pinDataRefreshText}>更新圖資</Text>
+                <Text style={styles.pinDataRefreshText}>
+                  {t("audit.refreshMapData")}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -6003,16 +6036,16 @@ export default function MapScreen() {
                     } else {
                       setPinRouteInfo(null);
                       Alert.alert(
-                        "找不到可通行路線",
-                        "釘選位置可能位於封閉區、匝道、河川或無法通過的路口。請將圖釘移到可騎行道路後重新規劃。",
+                        t("audit.noRoutableRouteTitle"),
+                        t("audit.noRoutableRouteBody"),
                       );
                     }
                   })
                   .catch(() => {
                     setPinRouteInfo(null);
                     Alert.alert(
-                      "路徑規劃暫時不可用",
-                      "請確認網路後重試；系統會以最新道路資料重新規劃。",
+                      t("audit.routeServiceUnavailableTitle"),
+                      t("audit.routeServiceUnavailableBody"),
                     );
                   })
                   .finally(() => {
@@ -6021,19 +6054,28 @@ export default function MapScreen() {
               }}
             >
               <IconSymbol name="location.fill" size={16} color="#fff" />
-              <Text style={styles.pinCardBtnText}>計算路線</Text>
+              <Text style={styles.pinCardBtnText}>
+                {t("audit.calculateRoute")}
+              </Text>
             </Pressable>
             <Pressable
               style={[styles.pinCardBtn, { backgroundColor: "#34C759" }]}
               onPress={() => {
                 if (!pinRouteInfo) {
-                  Alert.alert("計算路線", "請先計算路線");
+                  Alert.alert(
+                    t("audit.calculateRoute"),
+                    t("audit.calculateRouteFirst"),
+                  );
                   return;
                 }
                 const osmrRoute = {
                   name: pinnedLocationLabel
-                    ? `${pinnedLocationLabel} 導航`
-                    : "釘選位置導航",
+                    ? t("audit.pinnedNavigationName", {
+                        location: pinnedLocationLabel,
+                      })
+                    : t("audit.pinnedNavigationName", {
+                        location: t("audit.pinnedLocation"),
+                      }),
                   points: pinRouteInfo.polyline.map((p) => ({
                     lat: p.latitude,
                     lon: p.longitude,
@@ -6051,13 +6093,17 @@ export default function MapScreen() {
                 };
                 startPinnedNavigationRoute(
                   osmrRoute,
-                  `開始導航到${pinnedLocationLabel ?? "釘選位置"}`,
+                  t("audit.startingNavigation", {
+                    location: pinnedLocationLabel ?? t("audit.pinnedLocation"),
+                  }),
                 );
                 setShowPinCard(false);
               }}
             >
               <IconSymbol name="play.fill" size={16} color="#fff" />
-              <Text style={styles.pinCardBtnText}>開始導航</Text>
+              <Text style={styles.pinCardBtnText}>
+                {t("audit.startNavigation")}
+              </Text>
             </Pressable>
             <Pressable
               style={[styles.pinCardBtn, { backgroundColor: "#FF3B30" }]}
@@ -6069,7 +6115,7 @@ export default function MapScreen() {
               }}
             >
               <IconSymbol name="xmark.circle.fill" size={16} color="#fff" />
-              <Text style={styles.pinCardBtnText}>取消</Text>
+              <Text style={styles.pinCardBtnText}>{t("audit.cancel")}</Text>
             </Pressable>
           </View>
         </View>
@@ -6101,7 +6147,9 @@ export default function MapScreen() {
             >
               <IconSymbol name="lock.fill" size={14} color="#9CFFB5" />
               <Text style={styles.touchGuardCornerText}>
-                {`已鎖定 · 長按 ${touchGuardHoldLabel} 解除`}
+                {t("audit.touchGuardLocked", {
+                  duration: touchGuardHoldLabel,
+                })}
               </Text>
             </Animated.View>
             {touchGuardHoldProgress > 0 && (
@@ -6131,7 +6179,9 @@ export default function MapScreen() {
                 <Text style={styles.touchGuardProgressText}>
                   {Math.round(touchGuardHoldProgress * 100)}%
                 </Text>
-                <Text style={styles.touchGuardProgressLabel}>長按中</Text>
+                <Text style={styles.touchGuardProgressLabel}>
+                  {t("audit.touchGuardHolding")}
+                </Text>
               </View>
             )}
           </View>

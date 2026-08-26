@@ -183,13 +183,9 @@ const rawLocaleResources: Record<SupportedLocale, TranslationTree> = {
   ),
 };
 
-const englishReference = rawLocaleResources["en-US"];
 export const LOCALE_RESOURCES: Record<SupportedLocale, TranslationTree> =
   Object.fromEntries(
-    SUPPORTED_LOCALES.map((locale) => [
-      locale,
-      fillMissingTranslationKeys(englishReference, rawLocaleResources[locale]),
-    ]),
+    SUPPORTED_LOCALES.map((locale) => [locale, rawLocaleResources[locale]]),
   ) as Record<SupportedLocale, TranslationTree>;
 
 export function normalizeLocaleTag(

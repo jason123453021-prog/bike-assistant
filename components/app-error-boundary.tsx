@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import i18n from "@/lib/i18n/i18n";
 
 type AppErrorBoundaryProps = {
   children: ReactNode;
@@ -16,7 +17,10 @@ type AppErrorBoundaryState = {
  * The fallback deliberately avoids rendering technical exception content so that
  * a release build does not expose internal implementation details to riders.
  */
-export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
+export class AppErrorBoundary extends Component<
+  AppErrorBoundaryProps,
+  AppErrorBoundaryState
+> {
   state: AppErrorBoundaryState = {
     hasError: false,
     recoveryKey: 0,
@@ -40,26 +44,38 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   render() {
     if (this.state.hasError) {
       return (
-        <SafeAreaView style={styles.safeArea} edges={["top", "bottom", "left", "right"]}>
+        <SafeAreaView
+          style={styles.safeArea}
+          edges={["top", "bottom", "left", "right"]}
+        >
           <View style={styles.content}>
-            <Text accessibilityRole="header" style={styles.title}>暫時無法顯示此畫面</Text>
-            <Text style={styles.body}>
-              目前騎乘資料已保留在本機。請先嘗試重新開啟此畫面；若問題持續，請重新啟動單車助手。
+            <Text accessibilityRole="header" style={styles.title}>
+              {i18n.t("audit.errorTitle")}
             </Text>
+            <Text style={styles.body}>{i18n.t("audit.errorDescription")}</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="重新嘗試顯示畫面"
+              accessibilityLabel={i18n.t("audit.retry")}
               onPress={this.retry}
-              style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]}
+              style={({ pressed }) => [
+                styles.retryButton,
+                pressed && styles.retryButtonPressed,
+              ]}
             >
-              <Text style={styles.retryButtonText}>重新嘗試</Text>
+              <Text style={styles.retryButtonText}>
+                {i18n.t("audit.retry")}
+              </Text>
             </Pressable>
           </View>
         </SafeAreaView>
       );
     }
 
-    return <View key={this.state.recoveryKey} style={styles.fill}>{this.props.children}</View>;
+    return (
+      <View key={this.state.recoveryKey} style={styles.fill}>
+        {this.props.children}
+      </View>
+    );
   }
 }
 

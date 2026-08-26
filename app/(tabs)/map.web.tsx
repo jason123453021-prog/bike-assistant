@@ -5,16 +5,20 @@
 import { View, Text, StyleSheet } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { useTranslation } from "react-i18next";
 
 export default function MapScreenWeb() {
   const colors = useColors();
+  const { t } = useTranslation();
   return (
     <ScreenContainer>
       <View style={styles.center}>
         <Text style={styles.icon}>🗺️</Text>
-        <Text style={[styles.title, { color: colors.foreground }]}>地圖導航</Text>
-        <Text style={[styles.desc, { color: colors.muted }]}> 
-          地圖導航功能僅支援 Android 裝置，請使用 Expo Go 掃描 QR Code 在手機上體驗完整功能。
+        <Text style={[styles.title, { color: colors.foreground }]}>
+          {t("audit.webMapTitle")}
+        </Text>
+        <Text style={[styles.desc, { color: colors.muted }]}>
+          {t("audit.webMapDescription")}
         </Text>
       </View>
     </ScreenContainer>

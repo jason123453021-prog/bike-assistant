@@ -128,4 +128,10 @@ describe("Local-First i18n 守門", () => {
     expect(summarySource).toContain('t("summary.rideSummary")');
     expect(summarySource).toContain('t("summary.saveAndFinish")');
   });
+
+  it("Arabic audit 文案使用專屬翻譯，且不跨語系借用內容", async () => {
+    await i18n.changeLanguage("ar-SA");
+    expect(i18n.t("audit.touchControl")).toBe("اللمس");
+    expect(i18n.t("audit.touchControl")).not.toMatch(/[\u3040-\u30ff]/);
+  });
 });

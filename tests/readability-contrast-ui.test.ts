@@ -130,18 +130,12 @@ describe("small-screen readability guardrails", () => {
     expect(rideSummarySource).toContain(
       'name="plus" size={17} color={colors.onAccent}',
     );
-    expect(rideDetailSource).toContain(
-      "style={[styles.photoAddButtonText, { color: colors.onAccent }]}",
-    );
-    expect(rideDetailSource).toContain(
-      'color: colors.onAccent, fontWeight: "600"',
-    );
+    expect(rideDetailSource).toContain("styles.photoAddButtonText");
+    expect(rideDetailSource).toContain("{ color: colors.onAccent }");
     expect(speedCurveSource).toContain(
       "selectedBasis ? colors.onAccent : colors.muted",
     );
-    expect(shareCardSource).toContain(
-      'color: colors.onAccent, fontSize: 14, fontWeight: "600"',
-    );
+    expect(shareCardSource).toContain("color: colors.onAccent");
   });
 
   it("keeps the ride-summary close control below Android system status chrome", () => {

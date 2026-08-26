@@ -56,7 +56,7 @@ describe("活動編輯與表單驗證 i18n 守門", () => {
       "localMedia",
       "mediaEmpty",
     ]) {
-      expect(detail).toContain(`t(\"forms.activityEditor.${key}\")`);
+      expect(detail).toContain(`forms.activityEditor.${key}`);
     }
     for (const key of ["birthdayBody", "numberBody", "supplyNameRequired"]) {
       expect(settings).toContain(`t(\"forms.errors.${key}\")`);

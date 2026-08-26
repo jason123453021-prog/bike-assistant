@@ -1,11 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import i18n, {
-  findMissingTranslationKeys,
-  LOCALE_RESOURCES,
-  SUPPORTED_LOCALES,
-} from "../../lib/i18n/i18n";
+import i18n, { LOCALE_RESOURCES, SUPPORTED_LOCALES } from "../../lib/i18n/i18n";
 import {
   generateShareCard,
   generateShareText,
@@ -14,6 +10,14 @@ import { createRideShareCardSvg } from "../../lib/ride-share-card-svg";
 import type { RideRecord } from "../../lib/ride-context";
 
 const rootDir = path.resolve(__dirname, "../..");
+
+function collectTranslationKeys(value: unknown, prefix = ""): string[] {
+  if (typeof value === "string") return [prefix];
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(value).flatMap(([key, child]) =>
+    collectTranslationKeys(child, prefix ? `${prefix}.${key}` : key),
+  );
+}
 const ride = {
   id: "i18n-share",
   name: "Harbor Sunrise",
@@ -39,14 +43,15 @@ describe("全域 i18n 同步、活動詳情與分享守門", () => {
     await i18n.changeLanguage("zh-TW");
   });
 
-  it("所有註冊 locale 都以英文資源補齊完整 key，沒有空值或未解析 fallback", () => {
+  it("所有註冊 locale 都透過自身資源或 zh-TW → en-US fallback 解析完整 key", async () => {
+    const englishKeys = collectTranslationKeys(LOCALE_RESOURCES["en-US"]);
     for (const locale of SUPPORTED_LOCALES) {
-      expect(
-        findMissingTranslationKeys(
-          LOCALE_RESOURCES["en-US"],
-          LOCALE_RESOURCES[locale],
-        ),
-      ).toEqual([]);
+      await i18n.changeLanguage(locale);
+      for (const key of englishKeys) {
+        const resolved = i18n.t(key);
+        expect(resolved).not.toBe(key);
+        expect(resolved.trim()).not.toBe("");
+      }
     }
   });
 

@@ -12,6 +12,7 @@ import type {
   SimplifiedModeFields,
   SimplifiedFieldKey,
 } from "@/lib/settings-context";
+import { useTranslation } from "react-i18next";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -72,6 +73,7 @@ export function SimplifiedNavOverlay({
   fields,
   fieldOrder,
 }: SimplifiedNavOverlayProps) {
+  const { t } = useTranslation();
   if (!visible) return null;
 
   const f = fields ?? DEFAULT_FIELDS;
@@ -172,7 +174,7 @@ export function SimplifiedNavOverlay({
       {/* 剩餘距離 */}
       {f.showRemaining && remainingDist !== undefined && (
         <View style={styles.remainRow}>
-          <Text style={styles.remainLabel}>剩餘</Text>
+          <Text style={styles.remainLabel}>{t("audit.remaining")}</Text>
           <Text style={styles.remainValue}>
             {remainingDist < 1
               ? `${Math.round(remainingDist * 1000)} m`
@@ -223,7 +225,7 @@ export function SimplifiedNavOverlay({
       )}
 
       {/* 提示文字 */}
-      <Text style={styles.tapHint}>點擊任意處返回標準模式</Text>
+      <Text style={styles.tapHint}>{t("audit.returnToStandardMode")}</Text>
     </Pressable>
   );
 }

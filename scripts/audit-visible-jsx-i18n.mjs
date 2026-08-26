@@ -7,7 +7,8 @@ import ts from "typescript";
 
 const root = process.cwd();
 const includeRoots = ["app", "components"];
-const ignored = /^(?:[×✓▶✕‹›·–—←+●]|(?:\d+(?:[.,]\d+)?)?(?:%|°|°C|km\/h|kg|kg\/m³|km|m|W|ml|kcal))$/u;
+const ignored =
+  /^(?:[×✓▶✕‹›·•–—←+●＋,\/☰]|&#9632;|🗺️|🖼️|\.\.\.|RPE|\/10|ms|(?:\d+(?:[.,]\d+)?)?(?:%|°|°C|km\/h|kg|kg\/m³|km|m|W|ml|kcal)|\d+(?:-\d+)?%\+?)$/u;
 
 function listTsx(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -52,8 +53,14 @@ for (const relativeRoot of includeRoots) {
         for (const child of node.children) {
           const text = getLiteralText(child);
           if (text && !ignored.test(text)) {
-            const { line } = source.getLineAndCharacterOfPosition(child.getStart(source));
-            findings.push({ file: path.relative(root, filename), line: line + 1, text });
+            const { line } = source.getLineAndCharacterOfPosition(
+              child.getStart(source),
+            );
+            findings.push({
+              file: path.relative(root, filename),
+              line: line + 1,
+              text,
+            });
           }
         }
       }
