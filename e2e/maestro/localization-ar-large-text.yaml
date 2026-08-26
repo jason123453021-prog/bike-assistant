@@ -1,6 +1,7 @@
 appId: com.jason123453021.bikeassistant
 name: Arabic RTL 200% font screenshots
 ---
+- openLink: "manus20260617://privacy"
 - assertVisible: "سياسة الخصوصية"
 - takeScreenshot: "locale-ar-200-privacy"
 - pressKey: back
