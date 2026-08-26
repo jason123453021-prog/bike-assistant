@@ -119,6 +119,22 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
     expect(settingsSource).toContain("flexShrink: 1");
   });
 
+  it("日文重複提醒的快速選項可在窄寬與字體縮放時換行，不將標籤或選項壓成逐字直排", () => {
+    expect(settingsSource).toContain('testID="supply-repeat-quick-setting"');
+    expect(settingsSource).toMatch(
+      /supplyRepeatQuickSetting:\s*\{[\s\S]*?gap:\s*8,[\s\S]*?paddingBottom:\s*12/,
+    );
+    expect(settingsSource).toMatch(
+      /supplyRepeatPresetOptions:\s*\{[\s\S]*?flexDirection:\s*"row",[\s\S]*?flexWrap:\s*"wrap",[\s\S]*?width:\s*"100%"/,
+    );
+    expect(settingsSource).toMatch(
+      /supplyRepeatPreset:\s*\{[\s\S]*?flexBasis:\s*88,[\s\S]*?flexGrow:\s*1,[\s\S]*?minWidth:\s*88,[\s\S]*?minHeight:\s*40/,
+    );
+    expect(settingsSource).toMatch(
+      /supplyRepeatPresetText:\s*\{[\s\S]*?lineHeight:\s*18,[\s\S]*?textAlign:\s*"center"/,
+    );
+  });
+
   it("表單長字串依量測結果自動縮小字級，達最小值後改用換行而不截斷", () => {
     expect(adaptiveTextSource).toContain("onTextLayout");
     expect(adaptiveTextSource).toContain("maxLinesBeforeShrink");

@@ -1316,7 +1316,10 @@ export default function SettingsScreen() {
                   )
                 }
               />
-              <View style={styles.supplyRepeatPresetRow}>
+              <View
+                testID="supply-repeat-quick-setting"
+                style={styles.supplyRepeatQuickSetting}
+              >
                 <Text
                   style={[
                     styles.supplyRepeatPresetLabel,
@@ -1325,65 +1328,69 @@ export default function SettingsScreen() {
                 >
                   {t("settingsDetail.quickSet")}
                 </Text>
-                {[0, 30, 60].map((seconds) => {
-                  const selected = settings.supplyReminderRepeatSec === seconds;
-                  return (
-                    <Pressable
-                      key={seconds}
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected,
-                        disabled: supplyControlsDisabled,
-                      }}
-                      accessibilityLabel={
-                        seconds === 0
-                          ? t("settingsDetail.disableRepeats")
-                          : t("settingsDetail.repeatEvery", { seconds })
-                      }
-                      disabled={supplyControlsDisabled}
-                      onPress={() =>
-                        void updateSettings({
-                          supplyReminderRepeatSec: seconds,
-                        })
-                      }
-                      style={({ pressed }) => [
-                        styles.supplyRepeatPreset,
-                        {
-                          backgroundColor:
-                            selected && !supplyControlsDisabled
-                              ? colors.accent
-                              : colors.surface,
-                          borderColor:
-                            selected && !supplyControlsDisabled
-                              ? colors.accent
-                              : colors.border,
-                          opacity: supplyControlsDisabled
-                            ? 0.45
-                            : pressed
-                              ? 0.65
-                              : 1,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          color:
-                            selected && !supplyControlsDisabled
-                              ? colors.onAccent
-                              : supplyControlsDisabled
-                                ? colors.muted
-                                : colors.foreground,
-                          fontSize: 14,
-                          fontWeight: "800",
+                <View style={styles.supplyRepeatPresetOptions}>
+                  {[0, 30, 60].map((seconds) => {
+                    const selected =
+                      settings.supplyReminderRepeatSec === seconds;
+                    return (
+                      <Pressable
+                        key={seconds}
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          selected,
+                          disabled: supplyControlsDisabled,
                         }}
+                        accessibilityLabel={
+                          seconds === 0
+                            ? t("settingsDetail.disableRepeats")
+                            : t("settingsDetail.repeatEvery", { seconds })
+                        }
+                        disabled={supplyControlsDisabled}
+                        onPress={() =>
+                          void updateSettings({
+                            supplyReminderRepeatSec: seconds,
+                          })
+                        }
+                        style={({ pressed }) => [
+                          styles.supplyRepeatPreset,
+                          {
+                            backgroundColor:
+                              selected && !supplyControlsDisabled
+                                ? colors.accent
+                                : colors.surface,
+                            borderColor:
+                              selected && !supplyControlsDisabled
+                                ? colors.accent
+                                : colors.border,
+                            opacity: supplyControlsDisabled
+                              ? 0.45
+                              : pressed
+                                ? 0.65
+                                : 1,
+                          },
+                        ]}
                       >
-                        {seconds === 0
-                          ? t("settingsDetail.off")
-                          : t("settingsDetail.repeatEvery", { seconds })}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+                        <Text
+                          style={[
+                            styles.supplyRepeatPresetText,
+                            {
+                              color:
+                                selected && !supplyControlsDisabled
+                                  ? colors.onAccent
+                                  : supplyControlsDisabled
+                                    ? colors.muted
+                                    : colors.foreground,
+                            },
+                          ]}
+                        >
+                          {seconds === 0
+                            ? t("settingsDetail.off")
+                            : t("settingsDetail.repeatEvery", { seconds })}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
             </View>
           )}
@@ -3975,17 +3982,40 @@ const styles = StyleSheet.create({
   },
   supplyRepeatPresetLabel: {
     fontSize: 12,
+    lineHeight: 18,
     fontWeight: "700",
     marginRight: 2,
+    flexShrink: 1,
+  },
+  supplyRepeatQuickSetting: {
+    gap: 8,
+    paddingHorizontal: 4,
+    paddingBottom: 12,
+  },
+  supplyRepeatPresetOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    width: "100%",
   },
   supplyRepeatPreset: {
-    minWidth: 64,
-    minHeight: 36,
+    flexBasis: 88,
+    flexGrow: 1,
+    minWidth: 88,
+    minHeight: 40,
     paddingHorizontal: 10,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 10,
     borderWidth: 1,
+  },
+  supplyRepeatPresetText: {
+    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: "800",
+    lineHeight: 18,
+    textAlign: "center",
   },
   guardModeRow: {
     flexDirection: "row",

@@ -2849,5 +2849,11 @@
 - [x] 在設定頁新增並持久化「顯示免費補水點」及「顯示拍照景點」開關，不在地圖主畫面新增控制按鈕
 - [x] 實作高對比水滴／相機 Marker、點擊資訊卡、選用預覽與「設為導航點／釘選」既有路線整合
 - [x] 補齊所有支援語系的設定、類別、資訊卡與導航動作文案，並新增單元與 Maestro E2E 回歸流程
-- [ ] 確認 GitHub Android Emulator 的 POI 設定頁 artifact 與 1.0.101／versionCode 10101 APK artifact（run 32984432667／32984433920 目前等待 GitHub runner）
-- [ ] GitHub runner 恢復後，重新核對或重跑 POI 圖層 Android Emulator E2E 與 1.0.101 APK artifact；本輪依使用者選擇先以完整本機 QA 交付
+- [ ] 確認 GitHub Android Emulator 的 POI 設定頁 artifact 與 1.0.102／versionCode 10102 APK artifact（run 32984432667／32984433920 對應舊版 1.0.101，仍在等待 GitHub runner）
+- [ ] GitHub runner 恢復後，重新核對或重跑包含日文版面修正的 POI 圖層 Android Emulator E2E 與 1.0.102 APK artifact；本輪依使用者選擇先以完整本機 QA 交付
+
+## 日文設定列長字串版面修正（2026-08-27）
+
+- [x] 修正「未確認時のリピートリマインダー」在日文介面被壓縮成逐字直排，並避免「クイック設定」標籤受窄欄寬影響
+- [x] 讓重複提醒的分段選項在窄螢幕與字體縮放下能安全換行，不截斷、不超出卡片
+- [x] 新增日文長字串與字體縮放版面回歸，完成 TypeScript、Lint 與相關 Jest 測試驗證
