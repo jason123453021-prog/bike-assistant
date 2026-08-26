@@ -22,6 +22,9 @@ describe("Android 多語系與大字體 Emulator 驗收 workflow", () => {
       'adb -s "$ANDROID_SERIAL" shell settings put system font_scale 2.0',
     );
     expect(workflow).toContain(
+      'adb -s "$ANDROID_SERIAL" shell am force-stop com.jason123453021.bikeassistant; sleep 5',
+    );
+    expect(workflow).toContain(
       'adb -s "$ANDROID_SERIAL" shell settings put system font_scale 1.0',
     );
   });
