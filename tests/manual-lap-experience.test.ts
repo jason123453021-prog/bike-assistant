@@ -68,7 +68,7 @@ describe("自動距離 Lap 體驗", () => {
     expect(mapSource).not.toContain("buildManualRideLap(currentState)");
     expect(mapSource).not.toContain("lapFeedbackToast");
     expect(mapSource).not.toContain("currentLapOverlay");
-    expect(summarySource).toContain("計圈（Laps）");
+    expect(summarySource).toContain('t("summaryDetail.laps")');
     expect(summarySource).toContain("laps.map((lap)");
     expect(summarySource).toContain(
       "getLapPresentationMetrics(lapSportType, lap)",

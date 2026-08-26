@@ -230,13 +230,13 @@ describe("規格書智慧補給與補水守門", () => {
     ).toBe(900);
   });
 
-  it("暫停補償僅套用下輪能量提醒，補水維持溫濕度對應間隔", () => {
-    expect(calculatePausedRecoveryExtensionSec(600)).toBe(240);
-    expect(calculatePausedRecoveryExtensionSec(10_000)).toBe(300);
+  it("暫停不會套用到下一輪能量提醒或改寫既有倒數", () => {
+    expect(calculatePausedRecoveryExtensionSec(600)).toBe(0);
+    expect(calculatePausedRecoveryExtensionSec(10_000)).toBe(0);
     const adjusted = applyPausedRecoveryToNextSupplyPlan(BASE_SUPPLY_PLAN, 600);
-    expect(adjusted.energyCountdownSec).toBe(3_840);
+    expect(adjusted.energyCountdownSec).toBe(3_600);
     expect(adjusted.waterCountdownSec).toBe(1_200);
-    expect(adjusted.reason).toContain("下一輪");
+    expect(adjusted.reason).toBe(BASE_SUPPLY_PLAN.reason);
   });
 
   it("天氣資料在 60 秒 Timeout 後可降級，後續使用前輪間隔或首輪 10 分鐘", async () => {

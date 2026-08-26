@@ -19,7 +19,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { useRide } from "@/lib/ride-context";
 import { persistRideMedia } from "@/lib/local-ride-media";
-import { formatDuration, POWER_ZONE_NAMES, POWER_ZONE_COLORS } from "@/lib/power-calc";
+import {
+  formatDuration,
+  POWER_ZONE_NAMES,
+  POWER_ZONE_COLORS,
+} from "@/lib/power-calc";
 import { buildActivityStatistics } from "@/lib/activity-statistics";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import type { RideSummarySnapshot } from "@/lib/ride-summary-snapshot";
@@ -36,7 +40,13 @@ interface RideSummaryModalProps {
 }
 
 // ─── 圓餅圖（純 SVG）────────────────────────────────────────────────────────────
-function PieChart({ data, colors: zoneColors }: { data: number[]; colors: string[] }) {
+function PieChart({
+  data,
+  colors: zoneColors,
+}: {
+  data: number[];
+  colors: string[];
+}) {
   const total = data.reduce((a, b) => a + b, 0);
   if (total === 0) return null;
   const size = 140;
@@ -55,13 +65,18 @@ function PieChart({ data, colors: zoneColors }: { data: number[]; colors: string
     const x2 = cx + r * Math.cos(endAngle);
     const y2 = cy + r * Math.sin(endAngle);
     const largeArc = angle > Math.PI ? 1 : 0;
-    slices.push({ path: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`, color: zoneColors[i] });
+    slices.push({
+      path: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`,
+      color: zoneColors[i],
+    });
     startAngle = endAngle;
   });
   return (
     <Svg width={size} height={size}>
       <G>
-        {slices.map((s, i) => <Path key={i} d={s.path} fill={s.color} />)}
+        {slices.map((s, i) => (
+          <Path key={i} d={s.path} fill={s.color} />
+        ))}
         <Circle cx={cx} cy={cy} r={28} fill="transparent" />
       </G>
     </Svg>
@@ -69,17 +84,22 @@ function PieChart({ data, colors: zoneColors }: { data: number[]; colors: string
 }
 
 // ─── 生成預設路線名稱 ────────────────────────────────────────────────────────────
-function generateDefaultName(): string {
+function generateDefaultName(
+  t: (key: string, options?: Record<string, number | string>) => string,
+): string {
   const d = new Date();
   const month = d.getMonth() + 1;
   const day = d.getDate();
-  const hour = d.getHours();
-  const period = hour < 6 ? "深夜" : hour < 12 ? "早晨" : hour < 18 ? "下午" : "夜間";
-  return `${month}月${day}日 ${period}騎乘`;
+  return t("summaryDetail.defaultRide", { month, day });
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideSummaryModalProps) {
+export function RideSummaryModal({
+  visible,
+  recordId,
+  snapshot,
+  onClose,
+}: RideSummaryModalProps) {
   const colors = useColors();
   const { t } = useTranslation();
   const { state } = useRide();
@@ -91,17 +111,17 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
   // 每次 Modal 開啟時重設為預設名稱
   useEffect(() => {
     if (visible) {
-      setRouteName(generateDefaultName());
+      setRouteName(generateDefaultName(t));
       setMediaItems([]);
     }
-  }, [visible]);
+  }, [t, visible]);
 
   const summary = snapshot ?? state;
   const laps = summary.laps ?? [];
   const lapSportType = summary.sportType ?? state.sportType;
   const totalPowerSamples = summary.powerZones.reduce((a, b) => a + b, 0);
   const zonePcts = summary.powerZones.map((v) =>
-    totalPowerSamples > 0 ? Math.round((v / totalPowerSamples) * 100) : 0
+    totalPowerSamples > 0 ? Math.round((v / totalPowerSamples) * 100) : 0,
   );
 
   const activityStats = buildActivityStatistics({
@@ -122,32 +142,62 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
   });
   const distKm = (activityStats.distanceM / 1000).toFixed(2);
   const avgSpd = activityStats.averageSpeedKmh.toFixed(1);
-  const powerSourceLabel = activityStats.powerSource === "measured"
-    ? "功率計量測"
-    : activityStats.powerSource === "estimated"
-      ? "本機物理估算"
-      : "功率資料不足";
+  const powerSourceLabel =
+    activityStats.powerSource === "estimated"
+      ? t("summaryDetail.estimated")
+      : t("summaryDetail.noData");
 
   const handleShare = async () => {
     const msg = [
-      `🚴 ${routeName || "智慧單車騎乘記錄"}`,
-      `距離：${distKm} km`,
-      `活動時間：${formatDuration(activityStats.elapsedTimeSec)}`,
-      `移動時間：${formatDuration(activityStats.movingTimeSec)}`,
-      `均速：${avgSpd} km/h`,
-      `最高速：${summary.maxSpeed.toFixed(1)} km/h`,
-      `爬升／下降：${Math.round(activityStats.totalAscentM)}／${Math.round(activityStats.totalDescentM)} m`,
-      `卡路里：${Math.round(activityStats.caloriesKcal)} kcal（估算）`,
-      `暫停時間：${formatDuration(activityStats.pausedTimeSec)}`,
-      `均功率：${activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)} W`}（${powerSourceLabel}）`,
-      `最大功率：${activityStats.maxPowerW === undefined ? "--" : `${Math.round(activityStats.maxPowerW)} W`}`,
+      t("summaryDetail.shareTitle", {
+        name: routeName || t("summary.rideSummary"),
+      }),
+      t("summaryDetail.shareDistance", { distance: distKm }),
+      t("summaryDetail.shareElapsed", {
+        time: formatDuration(activityStats.elapsedTimeSec),
+      }),
+      t("summaryDetail.shareMoving", {
+        time: formatDuration(activityStats.movingTimeSec),
+      }),
+      t("summaryDetail.shareAverageSpeed", { speed: avgSpd }),
+      t("summaryDetail.shareMaxSpeed", {
+        speed: summary.maxSpeed.toFixed(1),
+      }),
+      t("summaryDetail.shareElevation", {
+        ascent: Math.round(activityStats.totalAscentM),
+        descent: Math.round(activityStats.totalDescentM),
+      }),
+      t("summaryDetail.shareCalories", {
+        calories: Math.round(activityStats.caloriesKcal),
+      }),
+      t("summaryDetail.sharePaused", {
+        time: formatDuration(activityStats.pausedTimeSec),
+      }),
+      t("summaryDetail.shareAveragePower", {
+        power:
+          activityStats.averagePowerW === undefined
+            ? "--"
+            : `${Math.round(activityStats.averagePowerW)} W`,
+        source: powerSourceLabel,
+      }),
+      t("summaryDetail.shareMaxPower", {
+        power:
+          activityStats.maxPowerW === undefined
+            ? "--"
+            : `${Math.round(activityStats.maxPowerW)} W`,
+      }),
     ].join("\n");
-    try { await Share.share({ message: msg }); } catch {}
+    try {
+      await Share.share({ message: msg });
+    } catch {}
   };
 
   const handlePickMedia = async () => {
     if (!recordId) {
-      Alert.alert("請稍候", "騎乘紀錄尚在準備中，請稍後再加入媒體。");
+      Alert.alert(
+        t("summaryDetail.mediaWaitTitle"),
+        t("summaryDetail.mediaWaitBody"),
+      );
       return;
     }
     try {
@@ -163,34 +213,54 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
         setMediaItems((previous) => [...previous, ...saved].slice(0, 10));
       }
     } catch {
-      Alert.alert("無法加入媒體", "請確認已允許選取相片或影片。");
+      Alert.alert(
+        t("summaryDetail.mediaErrorTitle"),
+        t("summaryDetail.mediaErrorBody"),
+      );
     } finally {
       setIsPickingMedia(false);
     }
   };
 
   const handleSave = async () => {
-    await onClose(routeName.trim() || generateDefaultName(), mediaItems);
+    await onClose(routeName.trim() || generateDefaultName(t), mediaItems);
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => onClose()}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => onClose()}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}>
+        <SafeAreaView
+          edges={["top", "left", "right"]}
+          style={[styles.container, { backgroundColor: colors.background }]}
+        >
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]}>{t("summary.rideSummary")}</Text>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+              {t("summary.rideSummary")}
+            </Text>
             <Pressable
-              style={({ pressed }) => [styles.headerCloseButton, { opacity: pressed ? 0.6 : 1 }]}
+              style={({ pressed }) => [
+                styles.headerCloseButton,
+                { opacity: pressed ? 0.6 : 1 },
+              ]}
               onPress={() => onClose()}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel="關閉騎乘摘要"
+              accessibilityLabel={t("summaryDetail.close")}
             >
-              <IconSymbol name="xmark.circle.fill" size={28} color={colors.muted} />
+              <IconSymbol
+                name="xmark.circle.fill"
+                size={28}
+                color={colors.muted}
+              />
             </Pressable>
           </View>
 
@@ -200,54 +270,118 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
             keyboardShouldPersistTaps="handled"
           >
             {/* ── 路線命名區塊 ── */}
-            <View style={[styles.nameSection, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <View
+              style={[
+                styles.nameSection,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+            >
               <View style={styles.nameLabelRow}>
                 <IconSymbol name="pencil" size={15} color={colors.accent} />
-                <Text style={[styles.nameLabel, { color: colors.foreground }]}>路線名稱</Text>
+                <Text style={[styles.nameLabel, { color: colors.foreground }]}>
+                  {t("summaryDetail.routeName")}
+                </Text>
               </View>
               <TextInput
-                style={[styles.nameInput, { color: colors.foreground, borderColor: colors.border }]}
+                style={[
+                  styles.nameInput,
+                  { color: colors.foreground, borderColor: colors.border },
+                ]}
                 value={routeName}
                 onChangeText={setRouteName}
-                placeholder="輸入路線名稱..."
+                placeholder={t("summaryDetail.routeNamePlaceholder")}
                 placeholderTextColor={colors.muted}
                 returnKeyType="done"
                 maxLength={40}
                 selectTextOnFocus
               />
-              <Text style={[styles.nameHint, { color: colors.muted }]}> 
-                儲存後可在歷史記錄中查看、修改與分享
+              <Text style={[styles.nameHint, { color: colors.muted }]}>
+                {t("summaryDetail.routeNameHint")}
               </Text>
             </View>
 
-            <View style={[styles.mediaSection, { borderColor: colors.border, backgroundColor: colors.surface }]}> 
+            <View
+              style={[
+                styles.mediaSection,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+            >
               <View style={styles.mediaHeader}>
                 <View>
-                  <Text style={[styles.panelTitle, { color: colors.foreground, marginBottom: 2 }]}>活動媒體</Text>
-                  <Text style={[styles.nameHint, { color: colors.muted }]}>相片或影片只會保存於此裝置</Text>
+                  <Text
+                    style={[
+                      styles.panelTitle,
+                      { color: colors.foreground, marginBottom: 2 },
+                    ]}
+                  >
+                    {t("summaryDetail.media")}
+                  </Text>
+                  <Text style={[styles.nameHint, { color: colors.muted }]}>
+                    {t("summaryDetail.mediaLocal")}
+                  </Text>
                 </View>
                 <Pressable
-                  style={({ pressed }) => [styles.addMediaButton, { backgroundColor: colors.accent, opacity: pressed || isPickingMedia ? 0.72 : 1 }]}
+                  style={({ pressed }) => [
+                    styles.addMediaButton,
+                    {
+                      backgroundColor: colors.accent,
+                      opacity: pressed || isPickingMedia ? 0.72 : 1,
+                    },
+                  ]}
                   onPress={handlePickMedia}
                   disabled={isPickingMedia}
                 >
                   <IconSymbol name="plus" size={17} color={colors.onAccent} />
-                  <Text style={styles.addMediaButtonText}>{isPickingMedia ? "處理中" : "加入"}</Text>
+                  <Text style={styles.addMediaButtonText}>
+                    {isPickingMedia
+                      ? t("summaryDetail.processing")
+                      : t("summaryDetail.add")}
+                  </Text>
                 </Pressable>
               </View>
               {mediaItems.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaPreviewRow}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.mediaPreviewRow}
+                >
                   {mediaItems.map((uri, index) => (
-                    <View key={`${uri}-${index}`} style={styles.mediaPreviewItem}>
+                    <View
+                      key={`${uri}-${index}`}
+                      style={styles.mediaPreviewItem}
+                    >
                       {/(\.mp4|\.mov|\.m4v|\.webm)(\?|$)/i.test(uri) ? (
-                        <View style={[styles.videoPreview, { backgroundColor: colors.background }]}>
+                        <View
+                          style={[
+                            styles.videoPreview,
+                            { backgroundColor: colors.background },
+                          ]}
+                        >
                           <Text style={styles.videoPlayGlyph}>▶</Text>
-                          <Text style={[styles.videoPreviewLabel, { color: colors.muted }]}>影片</Text>
+                          <Text
+                            style={[
+                              styles.videoPreviewLabel,
+                              { color: colors.muted },
+                            ]}
+                          >
+                            {t("summaryDetail.video")}
+                          </Text>
                         </View>
-                      ) : <Image source={{ uri }} style={styles.mediaPreviewImage} />}
+                      ) : (
+                        <Image
+                          source={{ uri }}
+                          style={styles.mediaPreviewImage}
+                        />
+                      )}
                       <Pressable
                         style={styles.removeMediaButton}
-                        onPress={() => setMediaItems((previous) => previous.filter((_, itemIndex) => itemIndex !== index))}
+                        onPress={() =>
+                          setMediaItems((previous) =>
+                            previous.filter(
+                              (_, itemIndex) => itemIndex !== index,
+                            ),
+                          )
+                        }
                       >
                         <Text style={styles.removeMediaButtonText}>×</Text>
                       </Pressable>
@@ -255,68 +389,226 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
                   ))}
                 </ScrollView>
               ) : (
-                <Pressable style={[styles.mediaEmptyState, { borderColor: colors.border }]} onPress={handlePickMedia}>
-                  <Text style={[styles.mediaEmptyIcon, { color: colors.accent }]}>＋</Text>
-                  <Text style={[styles.mediaEmptyText, { color: colors.muted }]}>為這次騎乘加入照片或影片</Text>
+                <Pressable
+                  style={[
+                    styles.mediaEmptyState,
+                    { borderColor: colors.border },
+                  ]}
+                  onPress={handlePickMedia}
+                >
+                  <Text
+                    style={[styles.mediaEmptyIcon, { color: colors.accent }]}
+                  >
+                    ＋
+                  </Text>
+                  <Text
+                    style={[styles.mediaEmptyText, { color: colors.muted }]}
+                  >
+                    {t("summaryDetail.addMediaEmpty")}
+                  </Text>
                 </Pressable>
               )}
             </View>
 
             {/* 核心數據面板 */}
             <View style={[styles.statsPanel, { borderColor: colors.border }]}>
-              <Text style={[styles.panelTitle, { color: colors.foreground }]}>核心數據</Text>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>
+                {t("summaryDetail.coreMetrics")}
+              </Text>
               <View style={styles.statsGrid}>
-                <StatCell label={t("dashboard.distance")} value={distKm} unit="km" colors={colors} />
-                <StatCell label={t("summary.elapsedTime")} value={formatDuration(activityStats.elapsedTimeSec)} unit="" colors={colors} />
-                <StatCell label={t("summary.movingTime")} value={formatDuration(activityStats.movingTimeSec)} unit="" colors={colors} />
-                <StatCell label={t("summary.avgSpeed")} value={activityStats.averageSpeedKmh.toFixed(1)} unit="km/h" colors={colors} />
-                <StatCell label={t("summary.maxSpeed")} value={activityStats.maxSpeedKmh.toFixed(1)} unit="km/h" colors={colors} />
-                <StatCell label="消耗熱量" value={`${Math.round(activityStats.caloriesKcal)}`} unit="kcal（估算）" colors={colors} />
+                <StatCell
+                  label={t("dashboard.distance")}
+                  value={distKm}
+                  unit="km"
+                  colors={colors}
+                />
+                <StatCell
+                  label={t("summary.elapsedTime")}
+                  value={formatDuration(activityStats.elapsedTimeSec)}
+                  unit=""
+                  colors={colors}
+                />
+                <StatCell
+                  label={t("summary.movingTime")}
+                  value={formatDuration(activityStats.movingTimeSec)}
+                  unit=""
+                  colors={colors}
+                />
+                <StatCell
+                  label={t("summary.avgSpeed")}
+                  value={activityStats.averageSpeedKmh.toFixed(1)}
+                  unit="km/h"
+                  colors={colors}
+                />
+                <StatCell
+                  label={t("summary.maxSpeed")}
+                  value={activityStats.maxSpeedKmh.toFixed(1)}
+                  unit="km/h"
+                  colors={colors}
+                />
+                <StatCell
+                  label={t("summaryDetail.calories")}
+                  value={`${Math.round(activityStats.caloriesKcal)}`}
+                  unit={`kcal (${t("summaryDetail.estimated")})`}
+                  colors={colors}
+                />
               </View>
             </View>
 
             {/* 爬升與地形數據面板 */}
             <View style={[styles.statsPanel, { borderColor: colors.border }]}>
-              <Text style={[styles.panelTitle, { color: colors.foreground }]}>爬升與地形</Text>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>
+                {t("summaryDetail.terrain")}
+              </Text>
               <View style={styles.statsGrid}>
-                <StatCell label={t("summary.elevationGain")} value={`${Math.round(activityStats.totalAscentM)}`} unit="m" colors={colors} />
-                <StatCell label="總下降高度" value={`${Math.round(activityStats.totalDescentM)}`} unit="m" colors={colors} />
-                <StatCell label="最高海拔" value={activityStats.maxElevationM === undefined ? "--" : `${Math.round(activityStats.maxElevationM)}`} unit="m" colors={colors} />
-                <StatCell label="最低海拔" value={activityStats.minElevationM === undefined ? "--" : `${Math.round(activityStats.minElevationM)}`} unit="m" colors={colors} />
+                <StatCell
+                  label={t("summary.elevationGain")}
+                  value={`${Math.round(activityStats.totalAscentM)}`}
+                  unit="m"
+                  colors={colors}
+                />
+                <StatCell
+                  label={t("summaryDetail.totalDescent")}
+                  value={`${Math.round(activityStats.totalDescentM)}`}
+                  unit="m"
+                  colors={colors}
+                />
+                <StatCell
+                  label={t("summaryDetail.maxElevation")}
+                  value={
+                    activityStats.maxElevationM === undefined
+                      ? "--"
+                      : `${Math.round(activityStats.maxElevationM)}`
+                  }
+                  unit="m"
+                  colors={colors}
+                />
+                <StatCell
+                  label={t("summaryDetail.minElevation")}
+                  value={
+                    activityStats.minElevationM === undefined
+                      ? "--"
+                      : `${Math.round(activityStats.minElevationM)}`
+                  }
+                  unit="m"
+                  colors={colors}
+                />
               </View>
             </View>
 
             {/* 進階訓練數據面板 */}
             <View style={[styles.statsPanel, { borderColor: colors.border }]}>
-              <Text style={[styles.panelTitle, { color: colors.foreground }]}>進階訓練數據</Text>
+              <Text style={[styles.panelTitle, { color: colors.foreground }]}>
+                {t("summaryDetail.advanced")}
+              </Text>
               <View style={styles.statsGrid}>
-                <StatCell label="平均功率" value={activityStats.averagePowerW === undefined ? "--" : `${Math.round(activityStats.averagePowerW)}`} unit="W" colors={colors} accent />
-                <StatCell label="最大功率" value={activityStats.maxPowerW === undefined ? "--" : `${Math.round(activityStats.maxPowerW)}`} unit={activityStats.maxPowerW === undefined ? "資料不足" : "W"} colors={colors} accent />
-                <StatCell label="機械工作量" value={activityStats.totalWorkKj === undefined ? "--" : `${Math.round(activityStats.totalWorkKj)}`} unit="kJ" colors={colors} />
-                <StatCell label="暫停時間" value={formatDuration(activityStats.pausedTimeSec)} unit="" colors={colors} />
+                <StatCell
+                  label={t("summaryDetail.averagePower")}
+                  value={
+                    activityStats.averagePowerW === undefined
+                      ? "--"
+                      : `${Math.round(activityStats.averagePowerW)}`
+                  }
+                  unit="W"
+                  colors={colors}
+                  accent
+                />
+                <StatCell
+                  label={t("summaryDetail.maxPower")}
+                  value={
+                    activityStats.maxPowerW === undefined
+                      ? "--"
+                      : `${Math.round(activityStats.maxPowerW)}`
+                  }
+                  unit={
+                    activityStats.maxPowerW === undefined
+                      ? t("summaryDetail.noData")
+                      : "W"
+                  }
+                  colors={colors}
+                  accent
+                />
+                <StatCell
+                  label={t("summaryDetail.mechanicalWork")}
+                  value={
+                    activityStats.totalWorkKj === undefined
+                      ? "--"
+                      : `${Math.round(activityStats.totalWorkKj)}`
+                  }
+                  unit="kJ"
+                  colors={colors}
+                />
+                <StatCell
+                  label={t("summaryDetail.pausedTime")}
+                  value={formatDuration(activityStats.pausedTimeSec)}
+                  unit=""
+                  colors={colors}
+                />
               </View>
-              <Text style={[styles.nameHint, { color: colors.muted }]}>{powerSourceLabel}；卡路里為本機估算，非功率計或代謝量測值。</Text>
+              <Text style={[styles.nameHint, { color: colors.muted }]}>
+                {t("summaryDetail.powerNote", { source: powerSourceLabel })}
+              </Text>
             </View>
 
             {laps.length > 0 && (
-              <View style={[styles.lapsPanel, { borderColor: colors.border, backgroundColor: colors.surface }]}> 
+              <View
+                style={[
+                  styles.lapsPanel,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: colors.surface,
+                  },
+                ]}
+              >
                 <View style={styles.lapsHeader}>
                   <View style={styles.lapsHeadingCopy}>
-                    <Text style={[styles.panelTitle, { color: colors.foreground }]}>計圈（Laps）</Text>
-                    <Text style={[styles.nameHint, { color: colors.muted }]}>列出本次活動依固定距離自動建立的分段；儲存後會與活動詳情及 FIT 匯出一致。</Text>
+                    <Text
+                      style={[styles.panelTitle, { color: colors.foreground }]}
+                    >
+                      {t("summaryDetail.laps")}
+                    </Text>
+                    <Text style={[styles.nameHint, { color: colors.muted }]}>
+                      {t("summaryDetail.lapsHint")}
+                    </Text>
                   </View>
-                  <Text style={[styles.lapsCount, { color: colors.accent }]}>{laps.length} 圈</Text>
+                  <Text style={[styles.lapsCount, { color: colors.accent }]}>
+                    {t("summaryDetail.lapCount", { count: laps.length })}
+                  </Text>
                 </View>
                 {laps.map((lap) => (
-                  <View key={`${lap.index}-${lap.endedAtElapsedSec}`} style={[styles.lapRow, { borderTopColor: colors.border }]}> 
+                  <View
+                    key={`${lap.index}-${lap.endedAtElapsedSec}`}
+                    style={[styles.lapRow, { borderTopColor: colors.border }]}
+                  >
                     <View style={styles.lapRowHeader}>
-                      <Text style={[styles.lapRowTitle, { color: colors.foreground }]}>Lap {lap.index}</Text>
-                      <Text style={[styles.lapRowTime, { color: colors.foreground }]}>{formatDuration(lap.movingTimeSec)}</Text>
+                      <Text
+                        style={[
+                          styles.lapRowTitle,
+                          { color: colors.foreground },
+                        ]}
+                      >
+                        {t("summaryDetail.lap", { index: lap.index })}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.lapRowTime,
+                          { color: colors.foreground },
+                        ]}
+                      >
+                        {formatDuration(lap.movingTimeSec)}
+                      </Text>
                     </View>
                     <View style={styles.lapMetricsGrid}>
-                      {getLapPresentationMetrics(lapSportType, lap).map((metric) => (
-                        <LapMetric key={metric.id} label={metric.label} value={metric.value} colors={colors} />
-                      ))}
+                      {getLapPresentationMetrics(lapSportType, lap).map(
+                        (metric) => (
+                          <LapMetric
+                            key={metric.id}
+                            label={metric.label}
+                            value={metric.value}
+                            colors={colors}
+                          />
+                        ),
+                      )}
                     </View>
                   </View>
                 ))}
@@ -325,16 +617,41 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
 
             {/* Power Zone Chart */}
             {totalPowerSamples > 0 && (
-              <View style={[styles.chartSection, { borderColor: colors.border }]}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>功率分布</Text>
+              <View
+                style={[styles.chartSection, { borderColor: colors.border }]}
+              >
+                <Text
+                  style={[styles.sectionTitle, { color: colors.foreground }]}
+                >
+                  {t("summaryDetail.powerDistribution")}
+                </Text>
                 <View style={styles.chartRow}>
-                  <PieChart data={summary.powerZones} colors={POWER_ZONE_COLORS} />
+                  <PieChart
+                    data={summary.powerZones}
+                    colors={POWER_ZONE_COLORS}
+                  />
                   <View style={styles.legend}>
                     {POWER_ZONE_NAMES.map((name, i) => (
                       <View key={i} style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: POWER_ZONE_COLORS[i] }]} />
-                        <Text style={[styles.legendText, { color: colors.muted }]}>{name}</Text>
-                        <Text style={[styles.legendPct, { color: colors.foreground }]}>{zonePcts[i]}%</Text>
+                        <View
+                          style={[
+                            styles.legendDot,
+                            { backgroundColor: POWER_ZONE_COLORS[i] },
+                          ]}
+                        />
+                        <Text
+                          style={[styles.legendText, { color: colors.muted }]}
+                        >
+                          {name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.legendPct,
+                            { color: colors.foreground },
+                          ]}
+                        >
+                          {zonePcts[i]}%
+                        </Text>
                       </View>
                     ))}
                   </View>
@@ -346,12 +663,22 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
             <Pressable
               style={({ pressed }) => [
                 styles.shareBtn,
-                { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
               ]}
               onPress={handleShare}
             >
-              <IconSymbol name="square.and.arrow.up" size={18} color={colors.foreground} />
-              <Text style={[styles.shareBtnText, { color: colors.foreground }]}>{t("summary.share")}</Text>
+              <IconSymbol
+                name="square.and.arrow.up"
+                size={18}
+                color={colors.foreground}
+              />
+              <Text style={[styles.shareBtnText, { color: colors.foreground }]}>
+                {t("summary.share")}
+              </Text>
             </Pressable>
 
             {/* Save & Close Button */}
@@ -362,8 +689,14 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
               ]}
               onPress={handleSave}
             >
-              <IconSymbol name="checkmark.circle.fill" size={20} color={colors.onAccent} />
-              <Text style={[styles.saveBtnText, { color: colors.onAccent }]}>{t("summary.saveAndFinish")}</Text>
+              <IconSymbol
+                name="checkmark.circle.fill"
+                size={20}
+                color={colors.onAccent}
+              />
+              <Text style={[styles.saveBtnText, { color: colors.onAccent }]}>
+                {t("summary.saveAndFinish")}
+              </Text>
             </Pressable>
           </ScrollView>
         </SafeAreaView>
@@ -373,13 +706,37 @@ export function RideSummaryModal({ visible, recordId, snapshot, onClose }: RideS
 }
 
 function StatCell({
-  label, value, unit, colors, large, accent,
+  label,
+  value,
+  unit,
+  colors,
+  large,
+  accent,
 }: {
-  label: string; value: string; unit: string; colors: any; large?: boolean; accent?: boolean;
+  label: string;
+  value: string;
+  unit: string;
+  colors: any;
+  large?: boolean;
+  accent?: boolean;
 }) {
   return (
-    <View style={[styles.statCell, { backgroundColor: accent ? `${colors.accent}15` : `${colors.foreground}08` }]}>
-      <Text style={[styles.statValue, { color: accent ? colors.accent : colors.foreground }]}>
+    <View
+      style={[
+        styles.statCell,
+        {
+          backgroundColor: accent
+            ? `${colors.accent}15`
+            : `${colors.foreground}08`,
+        },
+      ]}
+    >
+      <Text
+        style={[
+          styles.statValue,
+          { color: accent ? colors.accent : colors.foreground },
+        ]}
+      >
         {value}
       </Text>
       <Text style={[styles.statUnit, { color: colors.muted }]}>{unit}</Text>
@@ -388,11 +745,26 @@ function StatCell({
   );
 }
 
-function LapMetric({ label, value, colors }: { label: string; value: string; colors: any }) {
+function LapMetric({
+  label,
+  value,
+  colors,
+}: {
+  label: string;
+  value: string;
+  colors: any;
+}) {
   return (
     <View style={styles.lapMetric}>
-      <Text style={[styles.lapMetricLabel, { color: colors.muted }]}>{label}</Text>
-      <Text style={[styles.lapMetricValue, { color: colors.foreground }]} numberOfLines={1}>{value}</Text>
+      <Text style={[styles.lapMetricLabel, { color: colors.muted }]}>
+        {label}
+      </Text>
+      <Text
+        style={[styles.lapMetricValue, { color: colors.foreground }]}
+        numberOfLines={1}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -408,17 +780,44 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: { fontSize: 20, fontWeight: "800" },
-  headerCloseButton: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", marginRight: -8 },
+  headerCloseButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: -8,
+  },
   content: { padding: 20, paddingBottom: 40 },
-  lapsPanel: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 14, marginBottom: 16, overflow: "hidden" },
-  lapsHeader: { flexDirection: "row", justifyContent: "space-between", gap: 12, paddingVertical: 14, alignItems: "flex-start" },
+  lapsPanel: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+  lapsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingVertical: 14,
+    alignItems: "flex-start",
+  },
   lapsHeadingCopy: { flex: 1 },
   lapsCount: { fontSize: 13, fontWeight: "900", paddingTop: 3 },
   lapRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 12 },
-  lapRowHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  lapRowHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   lapRowTitle: { fontSize: 16, fontWeight: "900" },
   lapRowTime: { fontSize: 16, fontWeight: "900" },
-  lapMetricsGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 9, rowGap: 8 },
+  lapMetricsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 9,
+    rowGap: 8,
+  },
   lapMetric: { width: "50%", paddingRight: 8 },
   lapMetricLabel: { fontSize: 11, fontWeight: "700" },
   lapMetricValue: { fontSize: 13, fontWeight: "800", marginTop: 2 },
@@ -444,19 +843,75 @@ const styles = StyleSheet.create({
   },
   nameHint: { fontSize: 13, lineHeight: 18, marginTop: 3 },
 
-  mediaSection: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, marginBottom: 16 },
-  mediaHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  addMediaButton: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  mediaSection: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  mediaHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  addMediaButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
   addMediaButtonText: { color: "#fff", fontSize: 13, fontWeight: "800" },
   mediaPreviewRow: { gap: 10, paddingRight: 4 },
-  mediaPreviewItem: { width: 114, height: 88, borderRadius: 11, overflow: "visible" },
-  mediaPreviewImage: { width: "100%", height: "100%", borderRadius: 11, backgroundColor: "#111" },
-  videoPreview: { width: "100%", height: "100%", borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  mediaPreviewItem: {
+    width: 114,
+    height: 88,
+    borderRadius: 11,
+    overflow: "visible",
+  },
+  mediaPreviewImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 11,
+    backgroundColor: "#111",
+  },
+  videoPreview: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   videoPlayGlyph: { color: "#fff", fontSize: 24, marginBottom: 3 },
   videoPreviewLabel: { fontSize: 12, fontWeight: "800" },
-  removeMediaButton: { position: "absolute", top: -7, right: -7, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "#F04438" },
-  removeMediaButtonText: { color: "#fff", fontSize: 17, lineHeight: 19, fontWeight: "700" },
-  mediaEmptyState: { height: 76, borderWidth: StyleSheet.hairlineWidth, borderStyle: "dashed", borderRadius: 11, alignItems: "center", justifyContent: "center", gap: 3 },
+  removeMediaButton: {
+    position: "absolute",
+    top: -7,
+    right: -7,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F04438",
+  },
+  removeMediaButtonText: {
+    color: "#fff",
+    fontSize: 17,
+    lineHeight: 19,
+    fontWeight: "700",
+  },
+  mediaEmptyState: {
+    height: 76,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderStyle: "dashed",
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+  },
   mediaEmptyIcon: { fontSize: 22, lineHeight: 24, fontWeight: "300" },
   mediaEmptyText: { fontSize: 13, fontWeight: "600" },
 

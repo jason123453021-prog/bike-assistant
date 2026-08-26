@@ -31,10 +31,11 @@ describe("圖示與繁體中文守門", () => {
     expect(webIcons).not.toContain('?? "?"');
   });
 
-  it("對使用者清楚標示補水僅依溫濕度，且不保留可見的未知英文回退", () => {
+  it("對使用者清楚標示補水採綜合重排與溫濕度安全區間，且不保留可見的未知英文回退", () => {
     expect(activityDetail).toContain("本機環境基準");
     expect(activityDetail).not.toContain("離線回退");
-    expect(supplyPlan).toContain("補水間隔僅依溫度");
+    expect(supplyPlan).toContain("補水重排綜合 FTP、體重、強度、時長、坡度、環境、汗率與暫停");
+    expect(supplyPlan).toContain("安全區間箝制");
     expect(mapScreen).toContain('"未命名補給品"');
     expect(mapScreen).not.toContain("'Unknown'");
   });

@@ -32,27 +32,28 @@ describe("rider-focus experience guards", () => {
     expect(mapSource).toContain("settings.touchGuardAutoRelockSec * 1000");
   });
 
-  it("keeps supply countdowns in real time while stationary and buffers pause recovery only for the next round", () => {
+  it("keeps supply countdowns in real time while stationary, without pausing the next energy round", () => {
     expect(backgroundSource).toContain("smartCalorieCountdownPausedTotalMs");
     expect(backgroundSource).toContain("isReliablyMovingForSupply");
     expect(backgroundSource).toContain(
       "supplyNowMs >= (state.smartCalorieCountdownDueAtMs",
     );
-    expect(backgroundSource).toContain("calculatePausedRecoveryExtensionSec");
+    expect(backgroundSource).toContain(
+      'consumeBackgroundSmartSupplyPauseSec(state, "calorie", nowMs)',
+    );
+    expect(backgroundSource).toContain("pausedDuringRoundSec");
     expect(mapSource).toContain(
       "currentCountdown ?? createSmartSupplyCountdown",
     );
     expect(mapSource).toContain(
       "setInterval(() => setSmartSupplyCountdownNowMs(Date.now()), 1_000)",
     );
-    expect(mapSource).toContain("applyPausedRecoveryToNextSupplyPlan");
+    expect(mapSource).not.toContain("applyPausedRecoveryToNextSupplyPlan");
     expect(mapSource).not.toContain("refreshSmartSupplyCountdown");
   });
 
   it("uses a shared carbohydrate serving setting for live and route supply plans", () => {
-    expect(settingsSource).toContain(
-      't("settingsDetail.servingCarbohydrate")',
-    );
+    expect(settingsSource).toContain('t("settingsDetail.servingCarbohydrate")');
     expect(settingsContextSource).toContain(
       "energyServingCarbohydrateG: number",
     );

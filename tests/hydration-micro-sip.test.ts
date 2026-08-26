@@ -19,7 +19,7 @@ describe("智慧補水小量分次", () => {
     expect(highSweat.recommendedRefillMl).toBe(250);
   });
 
-  it("智慧模式不讀取手動門檻，並以小量水分流失設定觸發節奏", () => {
+  it("智慧模式不讀取手動門檻，並在溫和天氣的小量補水安全範圍內觸發節奏", () => {
     const plan = createSupplyPlan({
       mode: "smart",
       calorieThresholdKcal: 99_999,
@@ -33,9 +33,10 @@ describe("智慧補水小量分次", () => {
       weatherAvailable: true,
     });
 
-    expect(plan.waterRecommendationMl).toBe(250);
+    expect(plan.waterRecommendationMl).toBeGreaterThanOrEqual(150);
+    expect(plan.waterRecommendationMl).toBeLessThanOrEqual(200);
     expect(plan.waterTriggerMl).toBeGreaterThanOrEqual(100);
     expect(plan.waterTriggerMl).toBeLessThanOrEqual(250);
-    expect(plan.reason).toContain("10–30 分鐘");
+    expect(plan.reason).toContain("15–20 分鐘");
   });
 });

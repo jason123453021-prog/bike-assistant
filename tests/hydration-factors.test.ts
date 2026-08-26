@@ -44,7 +44,7 @@ describe("smart hydration factors", () => {
     );
   });
 
-  it("維持補水量耐受範圍，且不讓騎乘時長改變補水倒數", () => {
+  it("維持溫和天氣的補水量耐受範圍，並讓騎乘時長在安全區間內重排倒數", () => {
     const basePlan = createSupplyPlan({
       mode: "smart",
       calorieThresholdKcal: 300,
@@ -70,13 +70,19 @@ describe("smart hydration factors", () => {
       weatherAvailable: true,
     });
 
-    expect(longPlan.waterTriggerMl).toBeLessThanOrEqual(
+    expect(longPlan.waterTriggerMl).toBeGreaterThanOrEqual(
       basePlan.waterTriggerMl,
     );
-    expect(longPlan.waterRecommendationMl).toBe(basePlan.waterRecommendationMl);
+    expect(longPlan.waterRecommendationMl).toBeGreaterThanOrEqual(
+      basePlan.waterRecommendationMl,
+    );
     expect(longPlan.waterRecommendationMl).toBeGreaterThanOrEqual(150);
-    expect(longPlan.waterRecommendationMl).toBeLessThanOrEqual(250);
-    expect(longPlan.waterCountdownSec).toBe(basePlan.waterCountdownSec);
-    expect(longPlan.reason).toContain("補水間隔僅依溫度");
+    expect(longPlan.waterRecommendationMl).toBeLessThanOrEqual(200);
+    expect(longPlan.waterCountdownSec).toBeLessThan(basePlan.waterCountdownSec);
+    for (const plan of [basePlan, longPlan]) {
+      expect(plan.waterCountdownSec).toBeGreaterThanOrEqual(15 * 60);
+      expect(plan.waterCountdownSec).toBeLessThanOrEqual(20 * 60);
+    }
+    expect(longPlan.reason).toContain("安全區間箝制");
   });
 });

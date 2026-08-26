@@ -28,7 +28,7 @@ describe("smart supply plan", () => {
     expect(plan.waterRecommendationMl).toBeGreaterThanOrEqual(150);
   });
 
-  it("提高汗率時增加每次補水量，但不以強度或熱負荷改變未提供溫濕度的補水倒數", () => {
+  it("提高汗率與騎乘負荷時增加每次補水量，並在安全區間內縮短下一輪補水倒數", () => {
     const mild = createSupplyPlan({ ...baseInput, mode: "smart" });
     const heatStress = createSupplyPlan({
       ...baseInput,
@@ -51,7 +51,9 @@ describe("smart supply plan", () => {
     expect(heatStress.waterRecommendationMl).toBeGreaterThanOrEqual(150);
     expect(heatStress.waterTriggerMl).toBeLessThanOrEqual(250);
     expect(heatStress.waterTriggerMl).toBeGreaterThanOrEqual(100);
-    expect(heatStress.waterCountdownSec).toBe(mild.waterCountdownSec);
+    expect(heatStress.waterCountdownSec).toBeLessThan(mild.waterCountdownSec);
+    expect(heatStress.waterCountdownSec).toBeGreaterThanOrEqual(15 * 60);
+    expect(heatStress.waterCountdownSec).toBeLessThanOrEqual(20 * 60);
     expect(heatStress.energyCountdownSec).toBeLessThanOrEqual(
       mild.energyCountdownSec,
     );
@@ -113,7 +115,7 @@ describe("smart supply plan", () => {
     expect(longHard.waterCountdownSec).toBeLessThanOrEqual(30 * 60);
   });
 
-  it("將每輪補水倒數限制在 10–30 分鐘，並以環境基礎區間、汗率、強度與時長動態修正", () => {
+  it("將每輪補水倒數依溫濕度硬性箝制，並在安全區間內以個人與騎乘負荷動態重排", () => {
     const coldEasy = createSupplyPlan({
       ...baseInput,
       mode: "smart",
@@ -159,7 +161,7 @@ describe("smart supply plan", () => {
     );
   });
 
-  it("補水倒數只採溫濕度；斷網採固定安全中位值", () => {
+  it("高濕度同樣套用酷熱安全區間；斷網採溫和安全區間", () => {
     const humidFirstRound = createSupplyPlan({
       ...baseInput,
       mode: "smart",
@@ -186,10 +188,11 @@ describe("smart supply plan", () => {
 
     expect(humidFirstRound.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
     expect(humidFirstRound.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
-    expect(offlineFirstRound.waterCountdownSec).toBe(15 * 60);
+    expect(offlineFirstRound.waterCountdownSec).toBeGreaterThanOrEqual(15 * 60);
+    expect(offlineFirstRound.waterCountdownSec).toBeLessThanOrEqual(20 * 60);
   });
 
-  it("不讓強度、汗率、時長、暫停前環境負荷或天氣代碼改變相同溫濕度的補水倒數", () => {
+  it("讓綜合負荷在同一溫濕度安全區間內重排，且不得突破該區間", () => {
     const coolEasy = createSupplyPlan({
       ...baseInput,
       mode: "smart",
@@ -213,9 +216,38 @@ describe("smart supply plan", () => {
       weatherCode: 99,
     });
 
-    expect(coolEasy.waterCountdownSec).toBe(hotHardLong.waterCountdownSec);
-    expect(coolEasy.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
-    expect(coolEasy.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
+    expect(hotHardLong.waterCountdownSec).toBeLessThan(
+      coolEasy.waterCountdownSec,
+    );
+    for (const plan of [coolEasy, hotHardLong]) {
+      expect(plan.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
+      expect(plan.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
+    }
+  });
+
+  it("只允許暫停重排補水下一輪，且仍不可超出天氣安全區間", () => {
+    const movingPlan = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      temperatureC: 25,
+      humidityPct: 60,
+      pausedDuringRoundSec: 0,
+    });
+    const pausedPlan = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      temperatureC: 25,
+      humidityPct: 60,
+      pausedDuringRoundSec: 15 * 60,
+    });
+
+    expect(pausedPlan.waterCountdownSec).toBeGreaterThan(
+      movingPlan.waterCountdownSec,
+    );
+    for (const plan of [movingPlan, pausedPlan]) {
+      expect(plan.waterCountdownSec).toBeGreaterThanOrEqual(15 * 60);
+      expect(plan.waterCountdownSec).toBeLessThanOrEqual(20 * 60);
+    }
   });
 
   it("uses the user-selected carbohydrate per serving to schedule the next energy countdown", () => {
@@ -286,7 +318,7 @@ describe("smart supply plan", () => {
     });
 
     expect(plan.source).toBe("smart-offline-fallback");
-    expect(plan.reason).toContain("補水間隔僅依溫度");
+    expect(plan.reason).toContain("安全區間箝制");
     expect(plan.calorieTriggerKcal).toBeGreaterThan(0);
     expect(plan.waterTriggerMl).toBeGreaterThan(0);
   });

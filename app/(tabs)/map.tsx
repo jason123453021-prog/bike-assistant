@@ -121,11 +121,7 @@ import {
   formatSweatRate,
 } from "@/lib/hydration-calc";
 import { calculatePersonalizedCalories } from "@/lib/personalized-ride-calculations";
-import {
-  applyPausedRecoveryToNextSupplyPlan,
-  createSupplyPlan,
-  type SupplyPlan,
-} from "@/lib/smart-supply-plan";
+import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
 import { buildInitialSupplyPlanInput } from "@/lib/initial-supply-plan";
 import {
   awaitHydrationInputs,
@@ -1380,10 +1376,9 @@ export default function MapScreen() {
     clearSupplyAutoDismissTimer("calorie");
     setCalorieAlert(false);
     const confirmedPlan = resolveConfirmedSupplyPlan("calorie");
-    const nextPlan = applyPausedRecoveryToNextSupplyPlan(
-      confirmedPlan,
-      consumePausedRecoveryForNextRound("calorie"),
-    );
+    // 能量倒數依絕對時間持續；v2 不讓本輪暫停時長重排下一輪。
+    consumePausedRecoveryForNextRound("calorie");
+    const nextPlan = confirmedPlan;
     if (smartEnergySupplyEnabled && smartSupplyCountdownRef.current) {
       syncSmartSupplyCountdown(
         restartSmartSupplyCountdown(
@@ -1435,7 +1430,11 @@ export default function MapScreen() {
   ]);
 
   const refreshSmartWaterCountdown = useCallback(
-    async (confirmedPlan: SupplyPlan, previousWaterDurationSec?: number) => {
+    async (
+      confirmedPlan: SupplyPlan,
+      previousWaterDurationSec?: number,
+      pausedDuringRoundSec = 0,
+    ) => {
       const location = lastLocationRef.current;
       const currentHydrationThresholdMl =
         settings.waterThreshold > 0
@@ -1517,6 +1516,8 @@ export default function MapScreen() {
         temperatureC: nextWeather.temperature,
         humidityPct: nextWeather.humidity,
         weatherCode: nextWeather.weatherCode,
+        gradePct: currentGrade,
+        pausedDuringRoundSec,
         isFirstWaterCountdown: false,
         energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
         energyCarbohydrateHourlyLimitMode:
@@ -1525,8 +1526,22 @@ export default function MapScreen() {
       });
       setActiveSupplyPlan(nextPlan);
       setSupplyRecommendation(nextPlan);
+      syncSmartSupplyCountdown(
+        restartSmartSupplyCountdown(
+          countdown,
+          "water",
+          nextPlan,
+          stateRef.current.elapsed,
+        ),
+      );
     },
-    [currentGrade, estimateAgeYears, estimateFtpW, settings],
+    [
+      currentGrade,
+      estimateAgeYears,
+      estimateFtpW,
+      settings,
+      syncSmartSupplyCountdown,
+    ],
   );
 
   const handleConfirmWaterSupply = useCallback(() => {
@@ -1534,20 +1549,41 @@ export default function MapScreen() {
     setWaterAlert(false);
     setSupplyRecommendedMl(undefined);
     const confirmedPlan = resolveConfirmedSupplyPlan("water");
-    const pausedRecoverySec = consumePausedRecoveryForNextRound("water");
+    const pausedDuringRoundSec = consumePausedRecoveryForNextRound("water");
     if (smartWaterSupplyEnabled && smartSupplyCountdownRef.current) {
       const previousWaterDurationSec =
         smartSupplyCountdownRef.current.waterDurationSec;
-      const nextPlan = applyPausedRecoveryToNextSupplyPlan(
-        {
-          ...confirmedPlan,
-          waterCountdownSec: resolveWaterCountdownFallbackDuration(
-            previousWaterDurationSec,
-          ),
-          reason: `${confirmedPlan.reason}；正在同步天氣與感測資料以校正後續輪次補水倒數。`,
-        },
-        pausedRecoverySec,
-      );
+      const weather = weatherRef.current;
+      const current = stateRef.current;
+      const nextPlan = createSupplyPlan({
+        mode: settings.supplyCalculationMode,
+        sportType: current.sportType,
+        calorieThresholdKcal: settings.calorieThreshold,
+        waterThresholdMl:
+          settings.waterThreshold > 0
+            ? settings.waterThreshold
+            : DEFAULT_HYDRATION_THRESHOLD_ML,
+        elapsedSec: current.elapsed,
+        riderWeightKg: settings.weight,
+        ftpW: estimateFtpW,
+        intensityFactor:
+          current.sportType === "cycling"
+            ? Math.min(2, current.currentPower / Math.max(1, estimateFtpW))
+            : 1,
+        sweatRatePerHour: current.currentSweatRatePerHour,
+        environmentLoad: 0,
+        weatherAvailable: Boolean(weather),
+        temperatureC: weather?.temperature,
+        humidityPct: weather?.humidity,
+        weatherCode: weather?.weatherCode,
+        gradePct: currentGrade,
+        pausedDuringRoundSec,
+        isFirstWaterCountdown: false,
+        energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+        energyCarbohydrateHourlyLimitMode:
+          settings.energyCarbohydrateHourlyLimitMode,
+        energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+      });
       syncSmartSupplyCountdown(
         restartSmartSupplyCountdown(
           smartSupplyCountdownRef.current,
@@ -1556,7 +1592,11 @@ export default function MapScreen() {
           stateRef.current.elapsed,
         ),
       );
-      void refreshSmartWaterCountdown(confirmedPlan, previousWaterDurationSec);
+      void refreshSmartWaterCountdown(
+        confirmedPlan,
+        previousWaterDurationSec,
+        pausedDuringRoundSec,
+      );
     } else {
       dispatch({ type: "CONSUME_WATER" });
     }
@@ -1590,10 +1630,19 @@ export default function MapScreen() {
     clearSupplyAutoDismissTimer,
     clearSupplyRepeatTimer,
     consumePausedRecoveryForNextRound,
+    currentGrade,
     dispatch,
+    estimateFtpW,
     refreshSmartWaterCountdown,
     resolveConfirmedSupplyPlan,
+    settings.calorieThreshold,
+    settings.energyCarbohydrateHourlyLimitG,
+    settings.energyCarbohydrateHourlyLimitMode,
+    settings.energyServingCarbohydrateG,
+    settings.supplyCalculationMode,
     settings.vibrationEnabled,
+    settings.waterThreshold,
+    settings.weight,
     smartWaterSupplyEnabled,
     supplyRecommendedMl,
     syncSmartSupplyCountdown,

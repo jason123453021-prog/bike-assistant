@@ -148,11 +148,11 @@ describe("small-screen readability guardrails", () => {
     expect(rideSummarySource).toContain(
       'import { SafeAreaView } from "react-native-safe-area-context";',
     );
-    expect(rideSummarySource).toContain(
-      '<SafeAreaView edges={["top", "left", "right"]}',
+    expect(rideSummarySource).toMatch(
+      /<SafeAreaView\s+edges=\{\["top", "left", "right"\]\}/,
     );
-    expect(rideSummarySource).toContain(
-      "headerCloseButton: { minWidth: 44, minHeight: 44",
+    expect(rideSummarySource).toMatch(
+      /headerCloseButton:\s*\{\s*minWidth:\s*44,\s*minHeight:\s*44/,
     );
     expect(rideSummarySource).toContain("hitSlop={12}");
   });

@@ -25,6 +25,10 @@ export interface SupplyPlanInput {
   temperatureC?: number;
   humidityPct?: number;
   weatherCode?: number;
+  /** 即時坡度由已平滑的 GPS 高程資料鏈提供；只影響智慧補水建議，不會突破天氣安全區間。 */
+  gradePct?: number;
+  /** 本輪累計暫停僅供下一輪補水重排使用；能量倒數不讀取此值。 */
+  pausedDuringRoundSec?: number;
   /** 首輪不以尚未形成的功率／時長資料修正，只採環境與預設汗率。 */
   isFirstWaterCountdown?: boolean;
   /** 使用者單包能量補給可提供的碳水克數，用於推導下一次能量倒數。 */
@@ -68,50 +72,34 @@ const SMART_ENERGY_COUNTDOWN_ALLOWED_RANGE_SEC = {
   min: 20 * 60,
   max: 75 * 60,
 } as const;
-/** 暫停時肌肉主動產熱下降的保守恢復係數；10 分鐘休息約延長下一輪 4 分鐘。 */
-export const PAUSE_RECOVERY_COEFFICIENT = 0.4;
-const MAX_PAUSE_RECOVERY_EXTENSION_SEC = 5 * 60;
+type WaterClimateBand = "hot" | "temperate" | "cold";
+
+export interface WaterCountdownBounds {
+  minSec: number;
+  maxSec: number;
+  climateBand: WaterClimateBand;
+}
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
 /**
- * 本輪的真實時間倒數不會因暫停而改變；暫停恢復權重只套用於能量提醒。
- * 補水倒數必須維持由溫度與濕度推導出的明確環境節奏。
+ * v2 起，能量與補水倒數均以絕對時間持續計時；能量的下一輪不再套用暫停補償。
+ * 此函式保留為舊本機資料呼叫相容，且必定回傳未調整的原計畫。
  */
 export function applyPausedRecoveryToNextSupplyPlan(
   plan: SupplyPlan,
-  pausedDuringRoundSec: number,
+  _pausedDuringRoundSec: number,
 ): SupplyPlan {
-  const pauseSec = Math.max(0, Math.round(pausedDuringRoundSec));
-  const extensionSec = calculatePausedRecoveryExtensionSec(pauseSec);
-  if (extensionSec <= 0) return plan;
-  return {
-    ...plan,
-    energyCountdownSec: Math.round(
-      clamp(
-        plan.energyCountdownSec + extensionSec,
-        SMART_ENERGY_COUNTDOWN_ALLOWED_RANGE_SEC.min,
-        SMART_ENERGY_COUNTDOWN_ALLOWED_RANGE_SEC.max,
-      ),
-    ),
-    waterCountdownSec: plan.waterCountdownSec,
-    reason: `${plan.reason} 本輪累計暫停 ${Math.ceil(pauseSec / 60)} 分鐘，恢復權重僅於下一輪能量提醒延長 ${Math.ceil(extensionSec / 60)} 分鐘；補水間隔維持溫濕度對應值。`,
-  };
+  return plan;
 }
 
-/** 將本輪實際暫停時間轉為僅供下一輪使用的保守恢復延長秒數。 */
+/** v2 起不再將暫停轉換成能量倒數延長秒數。 */
 export function calculatePausedRecoveryExtensionSec(
-  pausedDuringRoundSec: number,
+  _pausedDuringRoundSec: number,
 ): number {
-  return Math.round(
-    clamp(
-      Math.max(0, pausedDuringRoundSec) * PAUSE_RECOVERY_COEFFICIENT,
-      0,
-      MAX_PAUSE_RECOVERY_EXTENSION_SEC,
-    ),
-  );
+  return 0;
 }
 
 function carbohydrateTargetGPerHour(
@@ -178,37 +166,137 @@ export function resolveCarbohydrateHourlyLimit(
 
 /**
  * 將既有的科學化補給模型轉為下一次提醒的時間。
- * 補水倒數維持 10–30 分鐘：只以即時溫度與濕度映射，避免功率、暫停、汗率、時長或天氣代碼造成反直覺延長。
+ * 補水先由 FTP、體重、強度、時長、坡度、環境、汗率與本輪暫停進行重排，
+ * 再由當前溫濕度帶硬性箝制在安全時間窗內；能量則依每小時碳水目標推導。
  * 能量則依每小時碳水目標推導，保守維持 30–60 分鐘提醒，避免以單次大量補給取代規律分次。
  */
-function environmentBaseWaterCountdownSec(
+export function resolveWaterCountdownBounds(
   input: Pick<
     SupplyPlanInput,
     "weatherAvailable" | "temperatureC" | "humidityPct"
   >,
-): number {
-  if (!input.weatherAvailable) {
-    // 無即時環境資料時採安全中位值；不以騎乘資料猜測炎熱或寒冷。
-    return 15 * 60;
+): WaterCountdownBounds {
+  const cold = {
+    minSec: 20 * 60,
+    maxSec: 30 * 60,
+    climateBand: "cold" as const,
+  };
+  const temperate = {
+    minSec: 15 * 60,
+    maxSec: 20 * 60,
+    climateBand: "temperate" as const,
+  };
+  const hot = { minSec: 10 * 60, maxSec: 15 * 60, climateBand: "hot" as const };
+  if (!input.weatherAvailable || !Number.isFinite(Number(input.temperatureC))) {
+    return temperate;
   }
 
   const temperatureC = Number(input.temperatureC);
   const humidityPct = clamp(Number(input.humidityPct) || 60, 0, 100);
-  if (!Number.isFinite(temperatureC)) {
-    return 15 * 60;
+  if (temperatureC <= 15) return cold;
+  if (temperatureC >= 30 || humidityPct >= 85) return hot;
+  if (temperatureC < 20) {
+    const ratio = (temperatureC - 15) / 5;
+    return {
+      minSec: Math.round(
+        cold.minSec + (temperate.minSec - cold.minSec) * ratio,
+      ),
+      maxSec: Math.round(
+        cold.maxSec + (temperate.maxSec - cold.maxSec) * ratio,
+      ),
+      climateBand: "temperate",
+    };
   }
+  if (temperatureC > 28) {
+    const ratio = (temperatureC - 28) / 2;
+    return {
+      minSec: Math.round(
+        temperate.minSec + (hot.minSec - temperate.minSec) * ratio,
+      ),
+      maxSec: Math.round(
+        temperate.maxSec + (hot.maxSec - temperate.maxSec) * ratio,
+      ),
+      climateBand: "temperate",
+    };
+  }
+  return temperate;
+}
 
-  // 以 15–30°C 與 45–90% 為完整壓力區間，兩者愈高間隔愈短。
-  // 27°C／88% 會落在約 13 分鐘，符合炎熱高濕時優先小量補水的節奏。
-  const temperatureLoad = clamp((temperatureC - 15) / 15, 0, 1);
-  const humidityLoad = clamp((humidityPct - 45) / 45, 0, 1);
-  const combinedLoad = clamp(temperatureLoad * 0.6 + humidityLoad * 0.4, 0, 1);
-  return Math.round(
-    SMART_WATER_COUNTDOWN_RANGE_SEC.max -
-      (SMART_WATER_COUNTDOWN_RANGE_SEC.max -
-        SMART_WATER_COUNTDOWN_RANGE_SEC.min) *
-        combinedLoad,
+function calculateWaterEffortLoad(
+  input: Pick<
+    SupplyPlanInput,
+    | "elapsedSec"
+    | "riderWeightKg"
+    | "ftpW"
+    | "intensityFactor"
+    | "sweatRatePerHour"
+    | "environmentLoad"
+    | "gradePct"
+  >,
+): number {
+  const intensityLoad = clamp(
+    ((Number(input.intensityFactor) || 0.6) - 0.45) / 0.8,
+    0,
+    1,
   );
+  const sweatLoad = clamp(
+    ((Number(input.sweatRatePerHour) || 650) - 350) / 1_450,
+    0,
+    1,
+  );
+  const durationLoad = clamp(
+    (Number(input.elapsedSec) || 0) / (4 * 60 * 60),
+    0,
+    1,
+  );
+  const gradeLoad = clamp(Math.max(0, Number(input.gradePct) || 0) / 10, 0, 1);
+  const environmentLoad = clamp(Number(input.environmentLoad) || 0, 0, 1);
+  const riderMassLoad = clamp(
+    ((Number(input.riderWeightKg) || 70) - 55) / 55,
+    0,
+    1,
+  );
+  const ftpLoad = clamp(((Number(input.ftpW) || 245) - 160) / 220, 0, 1);
+  return clamp(
+    intensityLoad * 0.26 +
+      sweatLoad * 0.22 +
+      durationLoad * 0.14 +
+      gradeLoad * 0.12 +
+      environmentLoad * 0.12 +
+      riderMassLoad * 0.07 +
+      ftpLoad * 0.07,
+    0,
+    1,
+  );
+}
+
+function resolveSmartWaterRecommendationMl(
+  input: Pick<
+    SupplyPlanInput,
+    | "weatherAvailable"
+    | "temperatureC"
+    | "humidityPct"
+    | "elapsedSec"
+    | "riderWeightKg"
+    | "ftpW"
+    | "intensityFactor"
+    | "sweatRatePerHour"
+    | "environmentLoad"
+    | "gradePct"
+    | "sportType"
+  >,
+): number {
+  const { climateBand } = resolveWaterCountdownBounds(input);
+  const effortLoad = calculateWaterEffortLoad(input);
+  const sportProfile = getSportModelProfile(input.sportType ?? "cycling");
+  const minimum = climateBand === "temperate" ? 150 : 100;
+  const maximum = climateBand === "temperate" ? 200 : 150;
+  const sportAdjustedLoad = clamp(
+    effortLoad * sportProfile.supply.hydrationRateMultiplier,
+    0,
+    1,
+  );
+  return Math.round(minimum + (maximum - minimum) * sportAdjustedLoad);
 }
 
 function deriveCountdowns(
@@ -219,12 +307,31 @@ function deriveCountdowns(
     | "weatherAvailable"
     | "temperatureC"
     | "humidityPct"
+    | "riderWeightKg"
+    | "ftpW"
+    | "sweatRatePerHour"
+    | "environmentLoad"
+    | "gradePct"
+    | "pausedDuringRoundSec"
   >,
   carbohydrateGPerHour: number,
   energyServingCarbohydrateG: number,
 ): { energyCountdownSec: number; waterCountdownSec: number } {
-  const environmentBaseSec = environmentBaseWaterCountdownSec(input);
-  const waterCountdownSec = environmentBaseSec;
+  const waterBounds = resolveWaterCountdownBounds(input);
+  const midpointSec = (waterBounds.minSec + waterBounds.maxSec) / 2;
+  const effortLoad = calculateWaterEffortLoad(input);
+  const pauseRecoveryLoad = clamp(
+    (Number(input.pausedDuringRoundSec) || 0) / (15 * 60),
+    0,
+    1,
+  );
+  const rawWaterCountdownSec =
+    midpointSec -
+    (waterBounds.maxSec - waterBounds.minSec) *
+      (effortLoad * 0.55 - pauseRecoveryLoad * 0.2);
+  const waterCountdownSec = Math.round(
+    clamp(rawWaterCountdownSec, waterBounds.minSec, waterBounds.maxSec),
+  );
   const energyCountdownSec =
     carbohydrateGPerHour <= 0
       ? SMART_ENERGY_COUNTDOWN_RANGE_SEC.max
@@ -334,26 +441,55 @@ export function createSupplyPlan(input: SupplyPlanInput): SupplyPlan {
       weatherAvailable: input.weatherAvailable,
       temperatureC: input.temperatureC,
       humidityPct: input.humidityPct,
+      riderWeightKg: input.riderWeightKg,
+      ftpW: input.ftpW,
+      sweatRatePerHour: sweatRate,
+      environmentLoad,
+      gradePct: input.gradePct,
+      pausedDuringRoundSec: input.pausedDuringRoundSec,
     },
     carbohydrateG,
     energyServingCarbohydrateG,
   );
+  const smartWaterRecommendationMl = resolveSmartWaterRecommendationMl({
+    weatherAvailable: input.weatherAvailable,
+    temperatureC: input.temperatureC,
+    humidityPct: input.humidityPct,
+    elapsedSec: input.elapsedSec,
+    riderWeightKg: input.riderWeightKg,
+    ftpW: input.ftpW,
+    intensityFactor: intensity,
+    sweatRatePerHour: sweatRate,
+    environmentLoad,
+    gradePct: input.gradePct,
+    sportType: input.sportType,
+  });
+  const waterBounds = resolveWaterCountdownBounds(input);
   const reasonParts = [
-    `全自動智慧計畫（單包 ${energyServingCarbohydrateG} g 碳水；每小時上限 ${carbohydrateHourlyLimit.gramsPerHour} g${carbohydrateHourlyLimit.mode === "science" ? "，科學建議" : "，手動設定"}；補水 ${Math.round(waterCountdownSec / 60)} 分鐘，限制於 10–30 分鐘）`,
-    `補水間隔僅依溫度 ${Number.isFinite(Number(input.temperatureC)) ? Math.round(Number(input.temperatureC)) : "—"}°C 與濕度 ${Number.isFinite(Number(input.humidityPct)) ? Math.round(Number(input.humidityPct)) : "—"}% 映射`,
+    `全自動智慧計畫（單包 ${energyServingCarbohydrateG} g 碳水；每小時上限 ${carbohydrateHourlyLimit.gramsPerHour} g${carbohydrateHourlyLimit.mode === "science" ? "，科學建議" : "，手動設定"}；補水 ${Math.round(waterCountdownSec / 60)} 分鐘，嚴格限制於 ${Math.round(waterBounds.minSec / 60)}–${Math.round(waterBounds.maxSec / 60)} 分鐘）`,
+    `補水重排綜合 FTP、體重、強度、時長、坡度、環境、汗率與暫停；目前溫度 ${Number.isFinite(Number(input.temperatureC)) ? Math.round(Number(input.temperatureC)) : "—"}°C、濕度 ${Number.isFinite(Number(input.humidityPct)) ? Math.round(Number(input.humidityPct)) : "—"}% 僅用於安全區間箝制`,
   ];
+  if (waterBounds.climateBand === "hot") {
+    reasonParts.push("單次建議 100–150 mL，建議搭配電解質或鹽錠");
+  }
 
   return {
     // 智慧模式永遠只由個人、騎乘與環境資料決定；絕不讀取手動自訂門檻。
     calorieTriggerKcal: smartEnergyTriggerKcal,
-    waterTriggerMl: smartWaterTriggerMl,
+    waterTriggerMl: Math.round(
+      clamp(
+        smartWaterRecommendationMl,
+        SMART_WATER_TRIGGER_RANGE.min,
+        SMART_WATER_TRIGGER_RANGE.max,
+      ),
+    ),
     energyCountdownSec,
     waterCountdownSec,
     energyRecommendationKcal,
     carbohydrateRecommendationG: carbohydrateG,
     carbohydrateHourlyLimitG: carbohydrateHourlyLimit.gramsPerHour,
     carbohydrateHourlyLimitMode: carbohydrateHourlyLimit.mode,
-    waterRecommendationMl,
+    waterRecommendationMl: smartWaterRecommendationMl,
     source,
     reason: reasonParts.join("；"),
   };

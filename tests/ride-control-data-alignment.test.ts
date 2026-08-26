@@ -28,6 +28,10 @@ const immersiveSource = readFileSync(
   resolve(projectRoot, "lib/ride-immersive-mode.ts"),
   "utf8",
 );
+const backgroundSource = readFileSync(
+  resolve(projectRoot, "lib/background-location.ts"),
+  "utf8",
+);
 
 const supplyInput = {
   mode: "smart" as const,
@@ -46,7 +50,7 @@ const supplyInput = {
 };
 
 describe("騎乘控制與資料對齊", () => {
-  it("補水倒數維持純溫濕度映射，排除騎乘強度、汗率、時長與舊環境負荷", () => {
+  it("補水倒數以綜合負荷重排，但在高溫高濕安全區間內不得越界", () => {
     const easy = createSupplyPlan(supplyInput);
     const hard = createSupplyPlan({
       ...supplyInput,
@@ -57,9 +61,11 @@ describe("騎乘控制與資料對齊", () => {
       weatherCode: 95,
     });
 
-    expect(easy.waterCountdownSec).toBe(hard.waterCountdownSec);
-    expect(easy.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
-    expect(easy.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
+    expect(hard.waterCountdownSec).toBeLessThan(easy.waterCountdownSec);
+    for (const plan of [easy, hard]) {
+      expect(plan.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
+      expect(plan.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
+    }
   });
 
   it("以較短平滑窗與 10 m GPS 海拔門檻濾除垂直雜訊", () => {
@@ -87,6 +93,19 @@ describe("騎乘控制與資料對齊", () => {
     expect(powerSavingSource).toContain("useSystemBrightnessAsync");
     expect(powerSavingSource).toContain("await useSystemBrightnessAsync()");
     expect(powerSavingSource).toContain("await getSystemBrightnessAsync()");
+  });
+
+  it("能量下一輪不再套用暫停補償，補水前後台皆帶入暫停與坡度重排", () => {
+    expect(mapSource).not.toContain("applyPausedRecoveryToNextSupplyPlan");
+    expect(mapSource).toContain('consumePausedRecoveryForNextRound("calorie")');
+    expect(mapSource).toContain("pausedDuringRoundSec");
+    expect(backgroundSource).not.toContain(
+      "calculatePausedRecoveryExtensionSec",
+    );
+    expect(backgroundSource).toContain(
+      'consumeBackgroundSmartSupplyPauseSec(state, "calorie", nowMs)',
+    );
+    expect(backgroundSource).toContain("smartSupplyGradePct");
   });
 
   it("觸控鎖以指標、取消事件與安全逾時清除幽靈長按，且騎乘開始依設定安排上鎖", () => {
