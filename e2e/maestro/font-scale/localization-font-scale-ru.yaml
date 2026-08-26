@@ -19,13 +19,19 @@ name: 俄文字體大小表單截圖
       text: "System & Data"
     direction: DOWN
     timeout: 30000
-- tapOn: "System & Data"
+- runFlow:
+    when:
+      notVisible:
+        id: "settings-language-selector"
+    commands:
+      - tapOn: "System & Data"
 - scrollUntilVisible:
     element:
-      text: "Language.*"
+      id: "settings-language-selector"
     direction: DOWN
     timeout: 30000
-- tapOn: "Language.*"
+- tapOn:
+    id: "settings-language-selector"
 - runFlow:
     file: ../scroll-language-option.yaml
     env:

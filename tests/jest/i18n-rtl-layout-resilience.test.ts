@@ -144,7 +144,9 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
     expect(maestroFontScaleArabicSource).toContain(
       'takeScreenshot: "font-scale-settings-ar"',
     );
-    expect(maestroFontScaleGermanSource).toContain('text: "Language.*"');
+    expect(maestroFontScaleGermanSource).toContain(
+      'id: "settings-language-selector"',
+    );
     expect(settingsSource).toContain("testID={`language-option-${option}`}");
     expect(maestroFontScaleGermanSource).toContain(
       "scroll-language-option.yaml",
