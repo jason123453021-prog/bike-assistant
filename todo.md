@@ -2835,9 +2835,9 @@
 
 ## 日韓 Arabic 視覺驗收與隱私政策在地化（2026-08-26）
 
-- [ ] 盤點既有 Android Emulator／GitHub 驗收流程，明確區分模擬器與實體 Android 裝置的驗證範圍
-- [ ] 建立日文、韓文與 Arabic RTL 的 Android 截圖回歸，覆蓋導航、路線、歷史、設定與隱私政策頁面
-- [ ] 在 Arabic RTL 及 200% 系統字體下驗證版面、觸控目標與長字串，保存可追溯截圖 artifact
-- [ ] 將隱私政策拆分為可審閱段落並準備 13 語系在地化草案，標記待合格律師確認的法域與事實內容
-- [ ] 修復 Android E2E 在清除 App 資料後未預先授予位置權限，導致系統權限視窗遮擋背景通知回前景 Refuel Modal 的驗收流程
-- [ ] 完成 QA、提交與 GitHub Android APK 驗收
+- [x] 盤點既有 Android Emulator／GitHub 驗收流程，明確區分模擬器與實體 Android 裝置的驗證範圍（Android Emulator API 35／x86_64 已驗收；實體 Android／OEM 仍待驗證）
+- [x] 建立日文、韓文與 Arabic RTL 的 Android 截圖回歸，覆蓋導航、路線、歷史、設定與隱私政策頁面（E2E run 32978807675）
+- [x] 在 Arabic RTL 及 200% 系統字體下驗證版面、觸控目標與長字串，保存可追溯截圖 artifact（含 Arabic 200% 與 ar／de／ru 130%）
+- [x] 將隱私政策拆分為可審閱段落並準備 13 語系在地化草案，標記待合格律師確認的法域與事實內容
+- [x] 修復 Android E2E 在清除 App 資料後未預先授予位置權限，導致系統權限視窗遮擋背景通知回前景 Refuel Modal 的驗收流程（授予 coarse／fine location 後 run 32978807675 通過）
+- [x] 完成 QA、提交與 GitHub Android APK 驗收（本機 Jest、Vitest 128 檔／451 tests、TypeScript、Lint、Expo config、diff；APK run 32978807726／artifact 9611221489）

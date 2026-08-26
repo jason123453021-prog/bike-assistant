@@ -1,20 +1,25 @@
-# Android Emulator 多語系驗收執行紀錄（2026-08-26）
+# Android Emulator 多語系、RTL 與字體縮放驗收紀錄（2026-08-26）
 
 | 項目 | 值 |
 | --- | --- |
-| GitHub Actions run | `32944024715`（Android 原生 E2E） |
-| APK workflow | `32944024714`（Android 驗收 APK） |
-| Commit | `bbd9079` |
-| 驗收環境 | GitHub Actions Android Emulator，API 35、x86_64；**非實體 Android 裝置**。 |
-| 目前狀態 | 2026-08-26 07:46 GMT+8，E2E 與 APK workflow 均仍在執行；尚未產生 artifact。GitHub 公開執行頁：<https://github.com/jason123453021-prog/bike-assistant/actions/runs/32944024715>。 |
-| 目標流程 | 日文、韓文及 Arabic 的導航、路線、歷史、設定與隱私政策截圖；Arabic 流程使用 200% 系統字體。 |
+| GitHub Actions E2E run | [`32978807675`](https://github.com/jason123453021-prog/bike-assistant/actions/runs/32978807675)（Android 原生 E2E，成功） |
+| Commit | `72dcb2e`（`fix(e2e): grant location after clearing app data`） |
+| 驗收環境 | GitHub Actions Android Emulator，API 35、Google APIs、x86_64；**非實體 Android 裝置**。 |
+| artifact | [`bike-assistant-maestro-e2e`](https://github.com/jason123453021-prog/bike-assistant/actions/runs/32978807675#artifacts)；保留 14 天。 |
+| 驗收範圍 | 核心導覽、日文／韓文／Arabic 逐頁、Arabic RTL 200%、Arabic／德文／俄文 130% 表單、背景本機通知排程與點擊通知回前景。 |
 
-## 執行中觀察（07:56 GMT+8）
+## 成功結果
 
-GitHub job 已完成原生專案產生（11 分 49 秒）、安裝 E2E APK、授予通知權限並安裝 Maestro。目前正在執行既有 `core-navigation.yaml`；新增的 locale 截圖流程尚未開始，尚不可據此判定日文、韓文或 Arabic 的畫面結果。
+下載 artifact 後已核對 JUnit XML 皆為 `failures="0"`，並確認以下 Maestro 流程各自產出可追溯 PNG 截圖：核心導覽、日文、韓文、Arabic RTL、Arabic RTL 200%、Arabic／德文／俄文 130% 表單、背景本機通知排程，以及背景通知本體回前景。
 
-## 失敗診斷（08:00 GMT+8）
+日文、韓文與 Arabic 每一流程皆覆蓋導航、路線、歷史、設定及隱私政策頁面。Arabic 200% 流程另覆蓋相同五頁。已視覺檢視 `locale-ar-200-privacy.png`：Arabic 標題、段落與清單維持由右至左對齊與可讀折行，頁面在 320×640 Emulator 截圖中未見截斷；該畫面仍明確標示政策最後更新日期。
 
-`core-navigation.yaml` 已通過（1/1，38 秒）。後續既有通知流程在 Maestro 回報 Android 裝置遺失後中止，因此 workflow 尚未到達 130%／200% 字體或新增的 locale 截圖步驟。下一輪需把多語系截圖移到通知流程之前，並為後續 Maestro 呼叫明確指定目前的 Android serial，才能取得本任務所需 artifact。
+## 通知流程修復與驗收
 
-> 後續結果必須以 workflow 的 JUnit、Maestro screenshot artifact 與實際 Android Emulator 畫面為準；本紀錄不可作為實體設備或 OEM 行為驗證的證據。
+前一輪 `32976012887` 的通知回前景斷言失敗並非文案、RTL 或字體縮放問題。artifact 截圖顯示清除 App 資料後，Android 前景位置權限系統視窗遮擋了 `Refuel` Modal。`72dcb2e` 已在通知驗收的 `pm clear` 後明確授予 `ACCESS_COARSE_LOCATION` 與 `ACCESS_FINE_LOCATION`，並加入 workflow 回歸守門。此後 `32978807675` 已成功通過背景通知本體回前景流程，並產出 `background-notification-open-refuel-modal.png`。
+
+> 此紀錄只能證明 GitHub Android Emulator 的自動化驗收結果；尚未驗證實體 Android 裝置、各 OEM 的背景限制、電池最佳化或通知行為。
+
+## 限制與後續
+
+本次已證實文字、方向、字體縮放與通知流程在定義的 Emulator 環境中通過。實體 Android／OEM 驗收仍需在可連線裝置上進行，尤其是背景通知、權限自動重設與廠商電池管理差異。
