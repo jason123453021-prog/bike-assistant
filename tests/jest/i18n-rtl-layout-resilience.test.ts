@@ -151,7 +151,8 @@ describe("i18n 過渡、RTL 與長字串版面守門", () => {
     expect(maestroFontScaleGermanSource).toContain(
       "scroll-language-option.yaml",
     );
-    expect(workflowSource).toContain("for SCALE in 1.3 2.0");
+    expect(workflowSource).toContain("SCALE=1.3");
+    expect(workflowSource).toContain("localization-ar-large-text.yaml");
     expect(workflowSource).toContain(
       'adb -s "$ANDROID_SERIAL" shell settings put system font_scale',
     );
