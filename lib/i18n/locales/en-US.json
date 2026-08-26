@@ -113,7 +113,9 @@
       "add": "Add"
     }
   },
-  "formLabels": { "birthday": "Birthday" },
+  "formLabels": {
+    "birthday": "Birthday"
+  },
   "settingsActions": {
     "rideActiveTitle": "Ride in progress",
     "rideActiveBody": "To avoid losing the locked route data, finish or stop this ride before clearing temporary data.",
@@ -547,5 +549,57 @@
     "snoozedBody": "Your reminder is due. Refuel or hydrate according to your ride.",
     "energyVoice": "Time to refuel",
     "waterVoice": "Time to hydrate"
+  },
+  "privacy": {
+    "sections": {
+      "introduction": {
+        "title": "1. Introduction",
+        "body": "Bike Assistant uses a Local-First design. This policy explains how the App processes, stores, and deletes data on your device. The App does not provide accounts, social features, friends, cloud synchronization, or remote push-notification services."
+      },
+      "collection": {
+        "title": "2. Data we collect",
+        "body": "The App processes the following data only on your device:\n\n[Location and route data]\n• GPS location, elevation, speed, and direction of travel\n• Ride tracks and imported GPX routes\n\nPurpose: current-location display, offline ride records, background tracking, route preview, and navigation.\n\n[Personal and activity data]\n• Date of birth, height, weight, and locally estimated physiological metrics\n• Ride duration, distance, elevation gain, power, calories, and supply estimates\n• Photos, videos, and ride notes that you choose to attach\n\nPurpose: local activity analysis, supply reminders, and personalized estimates. The App does not create accounts or collect email, contacts, or friend data."
+      },
+      "use": {
+        "title": "3. How data is used",
+        "body": "Data is used only for on-device GPS navigation, ride recording, power and expenditure estimates, supply reminders, activity analysis, and GPX export. Ride notifications are local notifications; the App does not register for or receive remote push notifications."
+      },
+      "storage": {
+        "title": "4. Storage and retention",
+        "body": "Ride records, GPX files, settings, media, and crash-recovery snapshots are stored on your device. Data is retained until you delete activities, clear the cache, or uninstall the App. The App does not automatically upload or synchronize this data across devices."
+      },
+      "sharing": {
+        "title": "5. Data sharing",
+        "body": "The App has no friend location sharing, social features, or cloud database. You may voluntarily export GPX files, activity cards, or media through the Android system share sheet; you decide both the recipient and the content.\n\nIf you actively use online routing or weather information while connected to the internet, the App may send coordinates needed for route calculation to public map or routing services. These services are not account, tracking, or synchronization mechanisms, and offline features do not depend on them."
+      },
+      "rights": {
+        "title": "6. Your choices and rights",
+        "body": "You can edit personal information, delete activities and media, and export your data as GPX files or activity share cards directly in the App. You can also revoke location, notification, photo, or media permissions at any time in device settings. Because the App stores no accounts or cloud copies, there is no account-deletion or server-data-deletion process."
+      },
+      "children": {
+        "title": "7. Children's privacy",
+        "body": "This App is not designed for children under 13, and we do not knowingly collect children's personal information. If you become aware that a child is using this App, please contact us."
+      },
+      "locationPermissions": {
+        "title": "8. Location permission information",
+        "body": "The App uses the following location-related permissions:\n\n• ACCESS_FINE_LOCATION (precise location): accurate GPS navigation and speed calculation\n• ACCESS_COARSE_LOCATION (approximate location): a fallback for precise location\n• ACCESS_BACKGROUND_LOCATION (background location): continued route tracking while the screen is off during a ride, and updates to the foreground notification with speed and distance\n• FOREGROUND_SERVICE (foreground service): shows the persistent ride notification and helps prevent Android from interrupting GPS tracking\n\nBackground location is enabled only after you actively start a ride. You can pause or stop a ride at any time to end background tracking."
+      },
+      "notificationPermissions": {
+        "title": "9. Notification permission information",
+        "body": "• POST_NOTIFICATIONS (notifications): displays ride speed, distance, and time information, together with supply reminder notifications\n\nYou can manage notification permission in device settings."
+      },
+      "security": {
+        "title": "10. Data security",
+        "body": "The App stores data in the application's private storage on your device and reads location, photos, or files only after you grant permission. To protect your data, use a screen lock on your device and review the content before sharing an activity, media, or GPX file."
+      },
+      "changes": {
+        "title": "11. Changes to this policy",
+        "body": "We may update this privacy policy from time to time. For material changes, we will notify you through the App. Your continued use of the App indicates acceptance of the updated policy."
+      },
+      "contact": {
+        "title": "12. Contact us",
+        "body": "If you have questions about this privacy policy or need to exercise your data rights, contact us through the developer contact option in Google Play.\n\nThis policy applies to all versions of the Bike Assistant Android application."
+      }
+    }
   }
 }

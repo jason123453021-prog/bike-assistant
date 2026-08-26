@@ -1,0 +1,15 @@
+appId: com.jason123453021.bikeassistant
+name: 日本語ページのスクリーンショット
+---
+- runFlow:
+    file: localization-privacy-pages.yaml
+    env:
+      LOCALE_NAME: "Japanese"
+      LANGUAGE_OPTION_ID: ".*language-option-ja-JP"
+      SETTINGS_LABEL: "設定"
+      NAVIGATION_LABEL: "ナビ"
+      ROUTES_LABEL: "ルート"
+      HISTORY_LABEL: "履歴"
+      SYSTEM_DATA_LABEL: "システムとデータ"
+      PRIVACY_LABEL: "プライバシーポリシー"
+      SCREENSHOT_PREFIX: "locale-ja"

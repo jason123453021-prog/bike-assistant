@@ -72,6 +72,7 @@ function InnerLayout() {
             name="ride-detail"
             options={{ headerShown: false, presentation: "fullScreenModal" }}
           />
+          <Stack.Screen name="privacy" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />

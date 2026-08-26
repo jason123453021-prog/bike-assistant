@@ -106,6 +106,7 @@ jobs:
             "$HOME/.maestro/bin/maestro" test --format junit --output build/maestro-report.xml --test-output-dir build/maestro-results e2e/maestro/core-navigation.yaml
             bash -lc 'set -e; adb shell am force-stop com.jason123453021.bikeassistant; adb shell am start -W -a android.intent.action.VIEW -d "manus20260617://e2e-notification" com.jason123453021.bikeassistant; sleep 3; "$HOME/.maestro/bin/maestro" test --format junit --output build/maestro-notification-schedule.xml --test-output-dir build/maestro-results/notification-schedule e2e/maestro/notification-harness-schedule.yaml; adb shell input keyevent KEYCODE_HOME; sleep 7; adb shell cmd statusbar expand-notifications; sleep 2; "$HOME/.maestro/bin/maestro" test --format junit --output build/maestro-notification-open.xml --test-output-dir build/maestro-results/notification-open e2e/maestro/notification-harness-open.yaml'
             bash -lc 'set -e; for SCALE in 1.3 2.0; do SCALE_TAG="$(printf "%s" "$SCALE" | tr "." "-")"; adb shell settings put system font_scale "$SCALE"; "$HOME/.maestro/bin/maestro" test --format junit --output "build/maestro-font-scale-${SCALE_TAG}.xml" --test-output-dir "build/maestro-results/font-scale-${SCALE_TAG}" e2e/maestro/font-scale; done; adb shell settings put system font_scale 1.0'
+            bash -lc 'set -e; for LOCALE in ja ko ar; do if [ "$LOCALE" = "ar" ]; then adb shell settings put system font_scale 2.0; else adb shell settings put system font_scale 1.0; fi; "$HOME/.maestro/bin/maestro" test --format junit --output "build/maestro-localization-${LOCALE}.xml" --test-output-dir "build/maestro-results/localization-${LOCALE}" "e2e/maestro/localization-pages-${LOCALE}.yaml"; done; adb shell settings put system font_scale 1.0'
 
       - name: 上傳 Maestro 報告與診斷 artifact
         if: always()
@@ -115,7 +116,8 @@ jobs:
           path: |
             build/maestro-report.xml
             build/maestro-notification-*.xml
-            build/maestro-font-scale-*.xml
+              build/maestro-font-scale-*.xml
+              build/maestro-localization-*.xml
             build/maestro-results
           if-no-files-found: warn
           retention-days: 14

@@ -2490,6 +2490,58 @@ export default function SettingsScreen() {
           <View
             style={[
               styles.section,
+              { borderColor: colors.border, marginTop: 14 },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("audit.privacyPolicy")}
+              onPress={() => router.push("/privacy")}
+              style={({ pressed }) => [
+                styles.row,
+                {
+                  opacity: pressed ? 0.68 : 1,
+                  flexDirection: isRtl ? "row-reverse" : "row",
+                },
+              ]}
+            >
+              <IconSymbol
+                name="gearshape.fill"
+                size={18}
+                color={colors.primary}
+              />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <AdaptiveFormText
+                  baseFontSize={15}
+                  style={[
+                    styles.rowLabel,
+                    {
+                      color: colors.foreground,
+                      textAlign: isRtl ? "right" : "left",
+                    },
+                  ]}
+                >
+                  {t("audit.privacyPolicy")}
+                </AdaptiveFormText>
+                <AdaptiveFormText
+                  baseFontSize={12}
+                  style={[
+                    styles.rowHint,
+                    {
+                      color: colors.muted,
+                      textAlign: isRtl ? "right" : "left",
+                    },
+                  ]}
+                >
+                  {t("audit.privacyUpdated")}
+                </AdaptiveFormText>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </Pressable>
+          </View>
+          <View
+            style={[
+              styles.section,
               { borderColor: colors.border, marginTop: 24 },
             ]}
           >
