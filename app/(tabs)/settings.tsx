@@ -523,6 +523,7 @@ export default function SettingsScreen() {
   return (
     <ScreenContainer containerClassName="bg-background">
       <ScrollView
+        key={activeLanguage}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
@@ -1640,11 +1641,17 @@ export default function SettingsScreen() {
               <Divider colors={colors} />
               <View style={styles.row}>
                 <IconSymbol name="moon.fill" size={18} color={colors.muted} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: colors.foreground }]}>
+                <View style={styles.rowCopy}>
+                  <Text
+                    style={[styles.rowLabel, { color: colors.foreground }]}
+                    allowFontScaling
+                  >
                     {t("settingsDetail.dimAfterIdle")}
                   </Text>
-                  <Text style={[styles.rowHint, { color: colors.muted }]}>
+                  <Text
+                    style={[styles.rowHint, { color: colors.muted }]}
+                    allowFontScaling
+                  >
                     {t("settingsDetail.dimAfterIdleHint")}
                   </Text>
                 </View>
@@ -1681,11 +1688,17 @@ export default function SettingsScreen() {
                   size={18}
                   color={colors.muted}
                 />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: colors.foreground }]}>
+                <View style={styles.rowCopy}>
+                  <Text
+                    style={[styles.rowLabel, { color: colors.foreground }]}
+                    allowFontScaling
+                  >
                     {t("settingsDetail.idlePowerMonitoring")}
                   </Text>
-                  <Text style={[styles.rowHint, { color: colors.muted }]}>
+                  <Text
+                    style={[styles.rowHint, { color: colors.muted }]}
+                    allowFontScaling
+                  >
                     {t("settingsDetail.idlePowerMonitoringHint")}
                   </Text>
                 </View>
@@ -3295,10 +3308,16 @@ function SettingsCategory({
           <IconSymbol name={icon as any} size={20} color={colors.accent} />
         </View>
         <View style={styles.categoryCopy}>
-          <Text style={[styles.categoryTitle, { color: colors.foreground }]}>
+          <Text
+            style={[styles.categoryTitle, { color: colors.foreground }]}
+            allowFontScaling
+          >
             {title}
           </Text>
-          <Text style={[styles.categorySubtitle, { color: colors.muted }]}>
+          <Text
+            style={[styles.categorySubtitle, { color: colors.muted }]}
+            allowFontScaling
+          >
             {subtitle}
           </Text>
         </View>
@@ -3353,12 +3372,20 @@ function NumberRow({
         size={18}
         color={iconColor ?? colors.muted}
       />
-      <View style={{ flex: 1, flexShrink: 1 }}>
-        <Text style={[styles.rowLabel, { color: colors.foreground }]}>
+      <View style={styles.rowCopy}>
+        <Text
+          style={[styles.rowLabel, { color: colors.foreground }]}
+          allowFontScaling
+        >
           {label}
         </Text>
         {hint && (
-          <Text style={[styles.rowHint, { color: colors.muted }]}>{hint}</Text>
+          <Text
+            style={[styles.rowHint, { color: colors.muted }]}
+            allowFontScaling
+          >
+            {hint}
+          </Text>
         )}
       </View>
       <View style={styles.rowRight}>
@@ -3392,12 +3419,20 @@ function TextRow({
       onPress={onPress}
     >
       <IconSymbol name={icon as any} size={18} color={colors.muted} />
-      <View style={{ flex: 1, flexShrink: 1 }}>
-        <Text style={[styles.rowLabel, { color: colors.foreground }]}>
+      <View style={styles.rowCopy}>
+        <Text
+          style={[styles.rowLabel, { color: colors.foreground }]}
+          allowFontScaling
+        >
           {label}
         </Text>
         {hint ? (
-          <Text style={[styles.rowHint, { color: colors.muted }]}>{hint}</Text>
+          <Text
+            style={[styles.rowHint, { color: colors.muted }]}
+            allowFontScaling
+          >
+            {hint}
+          </Text>
         ) : null}
       </View>
       <View style={styles.rowRight}>
@@ -3426,7 +3461,10 @@ function ToggleRow({
   return (
     <View style={[styles.row, disabled && { opacity: 0.45 }]}>
       <IconSymbol name={icon as any} size={18} color={colors.muted} />
-      <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>
+      <Text
+        style={[styles.rowLabel, styles.rowCopy, { color: colors.foreground }]}
+        allowFontScaling
+      >
         {label}
       </Text>
       <Switch
@@ -3470,9 +3508,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  categoryCopy: { flex: 1, gap: 3 },
-  categoryTitle: { fontSize: 17, fontWeight: "900", lineHeight: 22 },
-  categorySubtitle: { fontSize: 12, lineHeight: 17, fontWeight: "600" },
+  categoryCopy: { flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 3 },
+  categoryTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    lineHeight: 22,
+    flexShrink: 1,
+  },
+  categorySubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    flexShrink: 1,
+  },
   categoryContent: {
     paddingHorizontal: 12,
     paddingBottom: 14,
@@ -3549,10 +3597,17 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 12,
   },
+  rowCopy: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+  },
   rowLabel: { fontSize: 16, fontWeight: "600", lineHeight: 21 },
   rowHint: { fontSize: 13, lineHeight: 18, marginTop: 3 },
   rowRight: {
     flexShrink: 0,
+    maxWidth: "42%",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -3793,7 +3848,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   numericInput: {
-    minWidth: 56,
+    width: 76,
+    minWidth: 76,
+    flexGrow: 0,
+    flexShrink: 0,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 8,

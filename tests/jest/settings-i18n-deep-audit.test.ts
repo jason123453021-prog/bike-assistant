@@ -9,7 +9,10 @@ const settingsSource = fs.readFileSync(
   "utf8",
 );
 
-function getPath(resource: Record<string, unknown>, dottedPath: string): unknown {
+function getPath(
+  resource: Record<string, unknown>,
+  dottedPath: string,
+): unknown {
   return dottedPath.split(".").reduce<unknown>((value, key) => {
     if (!value || typeof value !== "object") return undefined;
     return (value as Record<string, unknown>)[key];
@@ -56,6 +59,35 @@ describe("設定頁深度 i18n 守門", () => {
     }
   });
 
+  it("所有非英文 locale 均提供系統資料、匯出、重設、儀表與 app 名稱的在地化值", () => {
+    const english = LOCALE_RESOURCES["en-US"] as Record<string, unknown>;
+    const visiblePaths = [
+      "settings.systemData",
+      "settingsActions.systemDataTitle",
+      "settingsActions.openHistoryBackupLabel",
+      "settingsActions.settingsManagement",
+      "settingsActions.resetAllLabel",
+      "settingsDetail.smartPowerSaving",
+      "settingsDetail.dimAfterIdle",
+      "settingsDetail.panel",
+      "settingsDetail.expand",
+      "settingsDetail.fieldRideTime",
+      "settingsDetail.fieldSpeed",
+      "settingsDetail.fieldTotalAscent",
+    ];
+    for (const locale of SUPPORTED_LOCALES.filter(
+      (locale) => locale !== "en-US",
+    )) {
+      const resource = LOCALE_RESOURCES[locale] as Record<string, unknown>;
+      expect(getPath(resource, "appName")).toEqual(expect.any(String));
+      for (const visiblePath of visiblePaths) {
+        const localized = getPath(resource, visiblePath);
+        expect(localized).toEqual(expect.any(String));
+        expect(localized).not.toBe(getPath(english, visiblePath));
+      }
+    }
+  });
+
   it("使用者列出的設定標籤與說明不再以繁中硬編碼輸出", () => {
     const deprecatedVisibleLiterals = [
       'title="個人資料"',
@@ -71,8 +103,8 @@ describe("設定頁深度 i18n 守門", () => {
       'title="地圖互動"',
       'title="導航儀表板欄位"',
       'title="精簡模式欄位"',
-      '單車助手 v{',
-      '拖曳右側☰',
+      "單車助手 v{",
+      "拖曳右側☰",
     ];
 
     for (const literal of deprecatedVisibleLiterals) {
@@ -84,7 +116,9 @@ describe("設定頁深度 i18n 守門", () => {
   });
 
   it("補給、個人資料與秒數動態文字使用 i18next 插值而非字串拼接", () => {
-    expect(settingsSource).toContain('t("settingsDetail.scienceCarbohydrateHint", {');
+    expect(settingsSource).toContain(
+      't("settingsDetail.scienceCarbohydrateHint", {',
+    );
     expect(settingsSource).toContain('t("settingsDetail.autoMetrics", {');
     expect(settingsSource).toContain('t("settingsDetail.repeatHint", {');
     expect(settingsSource).toContain('t("settingsDetail.supplyTimeSummary", {');
@@ -92,5 +126,14 @@ describe("設定頁深度 i18n 守門", () => {
     expect(settingsSource).not.toMatch(
       /目前依\s*\+|每\s*\+\s*settings\.supplyReminderRepeatSec|單車助手 v\s*\+/,
     );
+  });
+
+  it("設定列文字容器可縮放、最小寬度為零，數值欄不會搶占長文字空間", () => {
+    expect(settingsSource).toContain("rowCopy:");
+    expect(settingsSource).toMatch(/rowCopy:\s*\{[\s\S]*?minWidth:\s*0/);
+    expect(settingsSource).toContain("<View style={styles.rowCopy}>");
+    expect(settingsSource).toMatch(/numericInput:\s*\{[\s\S]*?width:\s*76/);
+    expect(settingsSource).toContain("allowFontScaling");
+    expect(settingsSource).toContain("key={activeLanguage}");
   });
 });

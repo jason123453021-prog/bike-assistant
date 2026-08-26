@@ -1,4 +1,5 @@
 {
+  "appName": "Cycling Assistant",
   "dashboard": {
     "rideTime": "Ride Time",
     "averageSpeed": "Avg Speed",
