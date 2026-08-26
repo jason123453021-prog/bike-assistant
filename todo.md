@@ -2850,3 +2850,4 @@
 - [x] 實作高對比水滴／相機 Marker、點擊資訊卡、選用預覽與「設為導航點／釘選」既有路線整合
 - [x] 補齊所有支援語系的設定、類別、資訊卡與導航動作文案，並新增單元與 Maestro E2E 回歸流程
 - [ ] 確認 GitHub Android Emulator 的 POI 設定頁 artifact 與 1.0.101／versionCode 10101 APK artifact（run 32984432667／32984433920 目前等待 GitHub runner）
+- [ ] GitHub runner 恢復後，重新核對或重跑 POI 圖層 Android Emulator E2E 與 1.0.101 APK artifact；本輪依使用者選擇先以完整本機 QA 交付
