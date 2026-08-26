@@ -22,7 +22,11 @@ const baseInput = {
 describe("smart hydration factors", () => {
   it("uses rider body size, FTP-derived intensity, terrain grade, weather, wind, daylight, and rainfall inputs", () => {
     const baseline = calculateSweatLoss({ ...baseInput, gradePct: 0 });
-    const climb = calculateSweatLoss({ ...baseInput, gradePct: 8, ascentPerInterval: 8 });
+    const climb = calculateSweatLoss({
+      ...baseInput,
+      gradePct: 8,
+      ascentPerInterval: 8,
+    });
     const coolWetNight = calculateSweatLoss({
       ...baseInput,
       gradePct: -6,
@@ -35,23 +39,44 @@ describe("smart hydration factors", () => {
     });
 
     expect(climb.sweatRatePerHour).toBeGreaterThan(baseline.sweatRatePerHour);
-    expect(coolWetNight.sweatRatePerHour).toBeLessThan(baseline.sweatRatePerHour);
+    expect(coolWetNight.sweatRatePerHour).toBeLessThan(
+      baseline.sweatRatePerHour,
+    );
   });
 
-  it("shortens smart hydration intervals as a session becomes prolonged while retaining micro-sip tolerance", () => {
+  it("維持補水量耐受範圍，且不讓騎乘時長改變補水倒數", () => {
     const basePlan = createSupplyPlan({
-      mode: "smart", calorieThresholdKcal: 300, waterThresholdMl: 500, elapsedSec: 30 * 60,
-      riderWeightKg: 70, ftpW: 240, intensityFactor: 0.8, sweatRatePerHour: 900, environmentLoad: 0.55, weatherAvailable: true,
+      mode: "smart",
+      calorieThresholdKcal: 300,
+      waterThresholdMl: 500,
+      elapsedSec: 30 * 60,
+      riderWeightKg: 70,
+      ftpW: 240,
+      intensityFactor: 0.8,
+      sweatRatePerHour: 900,
+      environmentLoad: 0.55,
+      weatherAvailable: true,
     });
     const longPlan = createSupplyPlan({
-      mode: "smart", calorieThresholdKcal: 300, waterThresholdMl: 500, elapsedSec: 3 * 60 * 60,
-      riderWeightKg: 70, ftpW: 240, intensityFactor: 0.8, sweatRatePerHour: 900, environmentLoad: 0.55, weatherAvailable: true,
+      mode: "smart",
+      calorieThresholdKcal: 300,
+      waterThresholdMl: 500,
+      elapsedSec: 3 * 60 * 60,
+      riderWeightKg: 70,
+      ftpW: 240,
+      intensityFactor: 0.8,
+      sweatRatePerHour: 900,
+      environmentLoad: 0.55,
+      weatherAvailable: true,
     });
 
-    expect(longPlan.waterTriggerMl).toBeLessThanOrEqual(basePlan.waterTriggerMl);
+    expect(longPlan.waterTriggerMl).toBeLessThanOrEqual(
+      basePlan.waterTriggerMl,
+    );
     expect(longPlan.waterRecommendationMl).toBe(basePlan.waterRecommendationMl);
     expect(longPlan.waterRecommendationMl).toBeGreaterThanOrEqual(150);
     expect(longPlan.waterRecommendationMl).toBeLessThanOrEqual(250);
-    expect(longPlan.reason).toContain("長時間騎乘");
+    expect(longPlan.waterCountdownSec).toBe(basePlan.waterCountdownSec);
+    expect(longPlan.reason).toContain("補水間隔僅依溫度");
   });
 });

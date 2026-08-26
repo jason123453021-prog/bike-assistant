@@ -63,14 +63,17 @@ function runTwelveKilometers(intervalM: number) {
     anchor: createAutoLapAnchor(BASE_TOTALS),
     previousTotals: BASE_TOTALS,
   };
-  return advanceAutoLapMilestones({
-    elapsedSec: 3_600,
-    distanceM: 12_000,
-    ascentM: 240,
-    descentM: 180,
-    powerWorkJ: 720_000,
-    powerSampleDurationSec: 3_600,
-  }, state);
+  return advanceAutoLapMilestones(
+    {
+      elapsedSec: 3_600,
+      distanceM: 12_000,
+      ascentM: 240,
+      descentM: 180,
+      powerWorkJ: 720_000,
+      powerSampleDurationSec: 3_600,
+    },
+    state,
+  );
 }
 
 describe("規格書核心紀錄與 GPS 整合守門", () => {
@@ -103,7 +106,10 @@ describe("規格書核心紀錄與 GPS 整合守門", () => {
       pauseAfterSec: 10,
       resumeAtOrAboveKmh: 1.8,
     });
-    expect(stillPaused).toMatchObject({ paused: true, movingTimeIncrementSec: 0 });
+    expect(stillPaused).toMatchObject({
+      paused: true,
+      movingTimeIncrementSec: 0,
+    });
 
     const resumed = advanceBackgroundAutoPause({
       paused: stillPaused.paused,
@@ -116,7 +122,11 @@ describe("規格書核心紀錄與 GPS 整合守門", () => {
       pauseAfterSec: 10,
       resumeAtOrAboveKmh: 1.8,
     });
-    expect(resumed).toMatchObject({ paused: false, accumulatedLowSpeedSec: 0, movingTimeIncrementSec: 5 });
+    expect(resumed).toMatchObject({
+      paused: false,
+      accumulatedLowSpeedSec: 0,
+      movingTimeIncrementSec: 5,
+    });
   });
 
   it("牆鐘 duration 在暫停區間持續前進，而 moving time 只接受自動暫停前與恢復後的可信區間", () => {
@@ -125,8 +135,14 @@ describe("規格書核心紀錄與 GPS 整合守門", () => {
       { intervalSec: 15, movingTimeIncrementSec: 0 },
       { intervalSec: 5, movingTimeIncrementSec: 5 },
     ];
-    const durationSec = intervals.reduce((total, item) => total + item.intervalSec, 0);
-    const movingTimeSec = intervals.reduce((total, item) => total + item.movingTimeIncrementSec, 0);
+    const durationSec = intervals.reduce(
+      (total, item) => total + item.intervalSec,
+      0,
+    );
+    const movingTimeSec = intervals.reduce(
+      (total, item) => total + item.movingTimeIncrementSec,
+      0,
+    );
     expect(durationSec).toBe(30);
     expect(movingTimeSec).toBe(15);
     expect(movingTimeSec).toBeLessThan(durationSec);
@@ -136,12 +152,19 @@ describe("規格書核心紀錄與 GPS 整合守門", () => {
     [1_000, 12, 1_000],
     [5_000, 2, 5_000],
     [10_000, 1, 10_000],
-  ])("12 km 軌跡在 %i m 設定下產生 %i 個精準 %i m 自動分圈", (intervalM, count, expectedDistanceM) => {
-    const result = runTwelveKilometers(intervalM);
-    expect(result.completedLaps).toHaveLength(count);
-    expect(result.completedLaps.map((lap) => lap.distanceM)).toEqual(Array(count).fill(expectedDistanceM));
-    expect(result.completedLaps.every((lap) => lap.source === "auto")).toBe(true);
-  });
+  ])(
+    "12 km 軌跡在 %i m 設定下產生 %i 個精準 %i m 自動分圈",
+    (intervalM, count, expectedDistanceM) => {
+      const result = runTwelveKilometers(intervalM);
+      expect(result.completedLaps).toHaveLength(count);
+      expect(result.completedLaps.map((lap) => lap.distanceM)).toEqual(
+        Array(count).fill(expectedDistanceM),
+      );
+      expect(result.completedLaps.every((lap) => lap.source === "auto")).toBe(
+        true,
+      );
+    },
+  );
 });
 
 describe("規格書純數學 COG 與路口提示守門", () => {
@@ -158,16 +181,22 @@ describe("規格書純數學 COG 與路口提示守門", () => {
   });
 
   it("以 GPX 向量正確區分右轉與左轉，並在 100 m／50 m 門檻提供喚醒與語音資料", () => {
-    const rightTurn = findNextRouteTurn([
-      { lat: 0, lon: 0 },
-      { lat: 0.00045, lon: 0 },
-      { lat: 0.00045, lon: 0.00045 },
-    ], 0);
-    const leftTurn = findNextRouteTurn([
-      { lat: 0, lon: 0 },
-      { lat: 0.00045, lon: 0 },
-      { lat: 0.00045, lon: -0.00045 },
-    ], 0);
+    const rightTurn = findNextRouteTurn(
+      [
+        { lat: 0, lon: 0 },
+        { lat: 0.00045, lon: 0 },
+        { lat: 0.00045, lon: 0.00045 },
+      ],
+      0,
+    );
+    const leftTurn = findNextRouteTurn(
+      [
+        { lat: 0, lon: 0 },
+        { lat: 0.00045, lon: 0 },
+        { lat: 0.00045, lon: -0.00045 },
+      ],
+      0,
+    );
     expect(rightTurn).toMatchObject({ direction: "right" });
     expect(leftTurn).toMatchObject({ direction: "left" });
     expect(shouldWakeForUpcomingTurn(rightTurn)).toBe(true);
@@ -179,18 +208,34 @@ describe("規格書純數學 COG 與路口提示守門", () => {
 describe("規格書智慧補給與補水守門", () => {
   it("Date.now() 絕對時間倒數在 GPS 自動暫停期間仍持續遞減", () => {
     const startedAtMs = 1_700_000_000_000;
-    const countdown = createSmartSupplyCountdown(BASE_SUPPLY_PLAN, 0, startedAtMs);
-    expect(smartSupplyCountdownRemainingSec(countdown, "water", startedAtMs + 90_000)).toBe(1_110);
+    const countdown = createSmartSupplyCountdown(
+      BASE_SUPPLY_PLAN,
+      0,
+      startedAtMs,
+    );
+    expect(
+      smartSupplyCountdownRemainingSec(
+        countdown,
+        "water",
+        startedAtMs + 90_000,
+      ),
+    ).toBe(1_110);
     // 此處不改變 ride elapsed，模擬 GPS 自動暫停；倒數仍由 absolute dueAtMs 計算。
-    expect(smartSupplyCountdownRemainingSec(countdown, "water", startedAtMs + 300_000)).toBe(900);
+    expect(
+      smartSupplyCountdownRemainingSec(
+        countdown,
+        "water",
+        startedAtMs + 300_000,
+      ),
+    ).toBe(900);
   });
 
-  it("暫停補償僅套用下輪，使用 0.4 係數且最多延長 5 分鐘", () => {
+  it("暫停補償僅套用下輪能量提醒，補水維持溫濕度對應間隔", () => {
     expect(calculatePausedRecoveryExtensionSec(600)).toBe(240);
     expect(calculatePausedRecoveryExtensionSec(10_000)).toBe(300);
     const adjusted = applyPausedRecoveryToNextSupplyPlan(BASE_SUPPLY_PLAN, 600);
     expect(adjusted.energyCountdownSec).toBe(3_840);
-    expect(adjusted.waterCountdownSec).toBe(1_440);
+    expect(adjusted.waterCountdownSec).toBe(1_200);
     expect(adjusted.reason).toContain("下一輪");
   });
 
@@ -199,7 +244,12 @@ describe("規格書智慧補給與補水守門", () => {
     const pendingWeather = new Promise<null>(() => undefined);
     const resultPromise = awaitHydrationInputs({
       weatherPromise: pendingWeather,
-      sensorPromise: Promise.resolve({ elapsedSec: 0, powerW: 0, speedKmh: 0, sweatRatePerHour: 500 }),
+      sensorPromise: Promise.resolve({
+        elapsedSec: 0,
+        powerW: 0,
+        speedKmh: 0,
+        sweatRatePerHour: 500,
+      }),
       timeoutMs: HYDRATION_DATA_TIMEOUT_MS,
     });
     await jest.advanceTimersByTimeAsync(HYDRATION_DATA_TIMEOUT_MS);
@@ -212,9 +262,14 @@ describe("規格書智慧補給與補水守門", () => {
 
 describe("產品程式碼 GPS COG 防回退守門", () => {
   it("地圖流程不讀取硬體 heading、羅盤或裝置方向 API", () => {
-    const mapSource = fs.readFileSync(path.resolve(process.cwd(), "app/(tabs)/map.tsx"), "utf8");
+    const mapSource = fs.readFileSync(
+      path.resolve(process.cwd(), "app/(tabs)/map.tsx"),
+      "utf8",
+    );
     expect(mapSource).toContain("calculateCourseOverGround");
     expect(mapSource).toContain("resolveNavigationCog");
-    expect(mapSource).not.toMatch(/coords\.heading|Magnetometer|DeviceOrientation/);
+    expect(mapSource).not.toMatch(
+      /coords\.heading|Magnetometer|DeviceOrientation/,
+    );
   });
 });

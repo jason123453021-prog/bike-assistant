@@ -14,10 +14,13 @@ export interface LiveElevationChange {
   acceptedAltitudeM?: number;
 }
 
-/** 11 個樣本移動平均，優先濾除手機 GPS 的垂直跳動。 */
-export const LIVE_ELEVATION_SMOOTHING_WINDOW = 11;
-/** 平滑後持續跨越 5 m 才確認為有效爬升／下降。 */
-export const LIVE_ELEVATION_DEADBAND_M = 5;
+/** 7 個樣本移動平均，在維持反應性的前提下濾除手機 GPS 的垂直跳動。 */
+export const LIVE_ELEVATION_SMOOTHING_WINDOW = 7;
+/**
+ * 純 GPS 高度需跨越 10 m 才確認為有效爬升／下降。
+ * 這與公開 DEM/GPS 校正常見的保守門檻方向一致，避免垂直雜訊重複累加。
+ */
+export const LIVE_ELEVATION_DEADBAND_M = 10;
 export const LIVE_ELEVATION_MIN_DISTANCE_M = 3;
 
 export function createLiveElevationFilterState(): LiveElevationFilterState {
@@ -31,18 +34,24 @@ export function acceptLiveElevationDelta(
 ): LiveElevationChange {
   if (!Number.isFinite(altitudeM)) return { ascentM: 0, descentM: 0 };
   const altitude = Number(altitudeM);
-  const recentAltitudesM = state.recentAltitudesM ?? (state.recentAltitudesM = []);
+  const recentAltitudesM =
+    state.recentAltitudesM ?? (state.recentAltitudesM = []);
   recentAltitudesM.push(altitude);
-  if (recentAltitudesM.length > LIVE_ELEVATION_SMOOTHING_WINDOW) recentAltitudesM.shift();
-  const smoothedAltitude = recentAltitudesM.reduce((total, value) => total + value, 0) / recentAltitudesM.length;
+  if (recentAltitudesM.length > LIVE_ELEVATION_SMOOTHING_WINDOW)
+    recentAltitudesM.shift();
+  const smoothedAltitude =
+    recentAltitudesM.reduce((total, value) => total + value, 0) /
+    recentAltitudesM.length;
   if (state.anchorAltitudeM === null) {
     state.anchorAltitudeM = smoothedAltitude;
     return { ascentM: 0, descentM: 0, acceptedAltitudeM: smoothedAltitude };
   }
-  if (distanceM < LIVE_ELEVATION_MIN_DISTANCE_M) return { ascentM: 0, descentM: 0 };
+  if (distanceM < LIVE_ELEVATION_MIN_DISTANCE_M)
+    return { ascentM: 0, descentM: 0 };
 
   const delta = smoothedAltitude - state.anchorAltitudeM;
-  if (Math.abs(delta) < LIVE_ELEVATION_DEADBAND_M) return { ascentM: 0, descentM: 0 };
+  if (Math.abs(delta) < LIVE_ELEVATION_DEADBAND_M)
+    return { ascentM: 0, descentM: 0 };
 
   // 越過死區後才將新高度確認為可信平台；爬升、下降與最高／最低海拔共用此資料流。
   state.anchorAltitudeM = smoothedAltitude;
@@ -63,9 +72,18 @@ export function acceptLiveElevationChange(
 }
 
 /** 虛擬功率並非量測值；以 FTP 為主的保守上限避免 GPS／坡度尖峰污染最大功率。 */
-export function clampVirtualPowerForRider(powerW: number, ftpW: number): number {
-  const ceiling = Math.min(650, Math.max(250, Math.round(Math.max(1, ftpW) * 2.5)));
-  return Math.max(0, Math.min(ceiling, Math.round(Number.isFinite(powerW) ? powerW : 0)));
+export function clampVirtualPowerForRider(
+  powerW: number,
+  ftpW: number,
+): number {
+  const ceiling = Math.min(
+    650,
+    Math.max(250, Math.round(Math.max(1, ftpW) * 2.5)),
+  );
+  return Math.max(
+    0,
+    Math.min(ceiling, Math.round(Number.isFinite(powerW) ? powerW : 0)),
+  );
 }
 
 /**
@@ -78,12 +96,17 @@ export function isTrustworthyVirtualPowerPeak(
   distanceM: number,
   intervalSec: number,
 ): boolean {
-  const ceiling = Math.min(650, Math.max(250, Math.round(Math.max(1, ftpW) * 2.5)));
-  return Number.isFinite(powerW)
-    && powerW > 0
-    && powerW < ceiling * 0.98
-    && Number.isFinite(distanceM)
-    && distanceM >= 0.5
-    && Number.isFinite(intervalSec)
-    && intervalSec >= 1;
+  const ceiling = Math.min(
+    650,
+    Math.max(250, Math.round(Math.max(1, ftpW) * 2.5)),
+  );
+  return (
+    Number.isFinite(powerW) &&
+    powerW > 0 &&
+    powerW < ceiling * 0.98 &&
+    Number.isFinite(distanceM) &&
+    distanceM >= 0.5 &&
+    Number.isFinite(intervalSec) &&
+    intervalSec >= 1
+  );
 }

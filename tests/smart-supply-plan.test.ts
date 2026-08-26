@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createSupplyPlan, resolveCarbohydrateHourlyLimit } from "../lib/smart-supply-plan";
+import {
+  createSupplyPlan,
+  resolveCarbohydrateHourlyLimit,
+} from "../lib/smart-supply-plan";
 
 const baseInput = {
   calorieThresholdKcal: 360,
@@ -25,7 +28,7 @@ describe("smart supply plan", () => {
     expect(plan.waterRecommendationMl).toBeGreaterThanOrEqual(150);
   });
 
-  it("raises each micro-sip amount under high intensity and heat stress without exceeding tolerance", () => {
+  it("提高汗率時增加每次補水量，但不以強度或熱負荷改變未提供溫濕度的補水倒數", () => {
     const mild = createSupplyPlan({ ...baseInput, mode: "smart" });
     const heatStress = createSupplyPlan({
       ...baseInput,
@@ -37,19 +40,28 @@ describe("smart supply plan", () => {
 
     expect(heatStress.calorieTriggerKcal).toBeLessThan(mild.calorieTriggerKcal);
     expect(heatStress.waterTriggerMl).toBeGreaterThan(mild.waterTriggerMl);
-    expect(heatStress.energyRecommendationKcal).toBeGreaterThanOrEqual(mild.energyRecommendationKcal);
-    expect(heatStress.waterRecommendationMl).toBeGreaterThan(mild.waterRecommendationMl);
+    expect(heatStress.energyRecommendationKcal).toBeGreaterThanOrEqual(
+      mild.energyRecommendationKcal,
+    );
+    expect(heatStress.waterRecommendationMl).toBeGreaterThan(
+      mild.waterRecommendationMl,
+    );
     expect(heatStress.carbohydrateRecommendationG).toBeLessThanOrEqual(90);
     expect(heatStress.waterRecommendationMl).toBeLessThanOrEqual(250);
     expect(heatStress.waterRecommendationMl).toBeGreaterThanOrEqual(150);
     expect(heatStress.waterTriggerMl).toBeLessThanOrEqual(250);
     expect(heatStress.waterTriggerMl).toBeGreaterThanOrEqual(100);
-    expect(heatStress.waterCountdownSec).toBeLessThan(mild.waterCountdownSec);
-    expect(heatStress.energyCountdownSec).toBeLessThanOrEqual(mild.energyCountdownSec);
+    expect(heatStress.waterCountdownSec).toBe(mild.waterCountdownSec);
+    expect(heatStress.energyCountdownSec).toBeLessThanOrEqual(
+      mild.energyCountdownSec,
+    );
   });
 
   it("keeps smart triggers independent from any manual custom thresholds", () => {
-    const normalManualValues = createSupplyPlan({ ...baseInput, mode: "smart" });
+    const normalManualValues = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+    });
     const invalidManualValues = createSupplyPlan({
       ...baseInput,
       mode: "smart",
@@ -57,23 +69,46 @@ describe("smart supply plan", () => {
       waterThresholdMl: 300_000,
     });
 
-    expect(invalidManualValues.calorieTriggerKcal).toBe(normalManualValues.calorieTriggerKcal);
-    expect(invalidManualValues.waterTriggerMl).toBe(normalManualValues.waterTriggerMl);
-    expect(invalidManualValues.energyRecommendationKcal).toBe(normalManualValues.energyRecommendationKcal);
-    expect(invalidManualValues.waterRecommendationMl).toBe(normalManualValues.waterRecommendationMl);
+    expect(invalidManualValues.calorieTriggerKcal).toBe(
+      normalManualValues.calorieTriggerKcal,
+    );
+    expect(invalidManualValues.waterTriggerMl).toBe(
+      normalManualValues.waterTriggerMl,
+    );
+    expect(invalidManualValues.energyRecommendationKcal).toBe(
+      normalManualValues.energyRecommendationKcal,
+    );
+    expect(invalidManualValues.waterRecommendationMl).toBe(
+      normalManualValues.waterRecommendationMl,
+    );
   });
 
   it("scales automatic carbohydrate guidance by duration and intensity without user-entered targets", () => {
-    const shortEasy = createSupplyPlan({ ...baseInput, mode: "smart", elapsedSec: 30 * 60, intensityFactor: 0.5 });
-    const longHard = createSupplyPlan({ ...baseInput, mode: "smart", elapsedSec: 4 * 60 * 60, intensityFactor: 1.05, environmentLoad: 0.8 });
+    const shortEasy = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 30 * 60,
+      intensityFactor: 0.5,
+    });
+    const longHard = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 4 * 60 * 60,
+      intensityFactor: 1.05,
+      environmentLoad: 0.8,
+    });
 
     expect(shortEasy.carbohydrateRecommendationG).toBe(0);
     expect(longHard.carbohydrateRecommendationG).toBe(50);
-    expect(longHard.carbohydrateRecommendationG).toBeLessThanOrEqual(longHard.carbohydrateHourlyLimitG);
+    expect(longHard.carbohydrateRecommendationG).toBeLessThanOrEqual(
+      longHard.carbohydrateHourlyLimitG,
+    );
     expect(longHard.carbohydrateHourlyLimitMode).toBe("science");
     expect(longHard.reason).toContain("全自動智慧計畫");
     expect(shortEasy.energyCountdownSec).toBeGreaterThanOrEqual(40 * 60);
-    expect(longHard.energyCountdownSec).toBeLessThan(shortEasy.energyCountdownSec);
+    expect(longHard.energyCountdownSec).toBeLessThan(
+      shortEasy.energyCountdownSec,
+    );
     expect(longHard.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
     expect(longHard.waterCountdownSec).toBeLessThanOrEqual(30 * 60);
   });
@@ -119,10 +154,12 @@ describe("smart supply plan", () => {
     expect(temperate.waterCountdownSec).toBeLessThanOrEqual(20 * 60);
     expect(hotHardLong.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
     expect(hotHardLong.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
-    expect(hotHardLong.waterCountdownSec).toBeLessThan(temperate.waterCountdownSec);
+    expect(hotHardLong.waterCountdownSec).toBeLessThan(
+      temperate.waterCountdownSec,
+    );
   });
 
-  it("首輪只採環境與預設汗率，首輪斷網則採 10 分鐘安全值", () => {
+  it("補水倒數只採溫濕度；斷網採固定安全中位值", () => {
     const humidFirstRound = createSupplyPlan({
       ...baseInput,
       mode: "smart",
@@ -149,7 +186,36 @@ describe("smart supply plan", () => {
 
     expect(humidFirstRound.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
     expect(humidFirstRound.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
-    expect(offlineFirstRound.waterCountdownSec).toBe(10 * 60);
+    expect(offlineFirstRound.waterCountdownSec).toBe(15 * 60);
+  });
+
+  it("不讓強度、汗率、時長、暫停前環境負荷或天氣代碼改變相同溫濕度的補水倒數", () => {
+    const coolEasy = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 10 * 60,
+      intensityFactor: 0.35,
+      sweatRatePerHour: 350,
+      environmentLoad: 0,
+      temperatureC: 27,
+      humidityPct: 88,
+      weatherCode: 0,
+    });
+    const hotHardLong = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 4 * 60 * 60,
+      intensityFactor: 1.2,
+      sweatRatePerHour: 1_800,
+      environmentLoad: 1,
+      temperatureC: 27,
+      humidityPct: 88,
+      weatherCode: 99,
+    });
+
+    expect(coolEasy.waterCountdownSec).toBe(hotHardLong.waterCountdownSec);
+    expect(coolEasy.waterCountdownSec).toBeLessThanOrEqual(15 * 60);
+    expect(coolEasy.waterCountdownSec).toBeGreaterThanOrEqual(10 * 60);
   });
 
   it("uses the user-selected carbohydrate per serving to schedule the next energy countdown", () => {
@@ -164,15 +230,29 @@ describe("smart supply plan", () => {
       energyServingCarbohydrateG: 50,
     });
 
-    expect(largeServing.energyCountdownSec).toBeGreaterThan(smallServing.energyCountdownSec);
+    expect(largeServing.energyCountdownSec).toBeGreaterThan(
+      smallServing.energyCountdownSec,
+    );
     expect(smallServing.reason).toContain("單包 20 g 碳水");
     expect(largeServing.reason).toContain("單包 50 g 碳水");
   });
 
   it("uses body mass for a conservative scientific hourly ceiling without forcing extra intake", () => {
-    const lightRider = resolveCarbohydrateHourlyLimit({ riderWeightKg: 50, energyCarbohydrateHourlyLimitMode: "science" });
-    const largerRider = resolveCarbohydrateHourlyLimit({ riderWeightKg: 90, energyCarbohydrateHourlyLimitMode: "science" });
-    const shortEasy = createSupplyPlan({ ...baseInput, mode: "smart", elapsedSec: 30 * 60, intensityFactor: 0.5, riderWeightKg: 90 });
+    const lightRider = resolveCarbohydrateHourlyLimit({
+      riderWeightKg: 50,
+      energyCarbohydrateHourlyLimitMode: "science",
+    });
+    const largerRider = resolveCarbohydrateHourlyLimit({
+      riderWeightKg: 90,
+      energyCarbohydrateHourlyLimitMode: "science",
+    });
+    const shortEasy = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      elapsedSec: 30 * 60,
+      intensityFactor: 0.5,
+      riderWeightKg: 90,
+    });
 
     expect(lightRider.gramsPerHour).toBe(35);
     expect(largerRider.gramsPerHour).toBe(65);
@@ -199,10 +279,14 @@ describe("smart supply plan", () => {
   });
 
   it("uses an explainable offline fallback when environment data is unavailable", () => {
-    const plan = createSupplyPlan({ ...baseInput, mode: "smart", weatherAvailable: false });
+    const plan = createSupplyPlan({
+      ...baseInput,
+      mode: "smart",
+      weatherAvailable: false,
+    });
 
     expect(plan.source).toBe("smart-offline-fallback");
-    expect(plan.reason).toContain("本機環境基準");
+    expect(plan.reason).toContain("補水間隔僅依溫度");
     expect(plan.calorieTriggerKcal).toBeGreaterThan(0);
     expect(plan.waterTriggerMl).toBeGreaterThan(0);
   });

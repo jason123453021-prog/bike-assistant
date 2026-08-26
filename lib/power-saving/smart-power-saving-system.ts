@@ -1,18 +1,23 @@
-import { reportRecoverableIssue } from '../release-safe-log';
+import { reportRecoverableIssue } from "../release-safe-log";
 
 // 動態導入 expo-brightness 以避免編譯錯誤
 let setBrightnessAsync: (brightness: number) => Promise<void> = async () => {};
 let getBrightnessAsync: () => Promise<number> = async () => 0.8;
+let useSystemBrightnessAsync: () => Promise<void> = async () => {};
+let getSystemBrightnessAsync: () => Promise<number> = async () => 0.8;
 
 try {
-  const brightness = require('expo-brightness');
+  const brightness = require("expo-brightness");
   setBrightnessAsync = brightness.setBrightnessAsync;
   getBrightnessAsync = brightness.getBrightnessAsync;
+  useSystemBrightnessAsync = brightness.useSystemBrightnessAsync;
+  getSystemBrightnessAsync = brightness.getSystemBrightnessAsync;
 } catch (e) {
-  reportRecoverableIssue('[PowerSaving] expo-brightness not available');
+  reportRecoverableIssue("[PowerSaving] expo-brightness not available");
 }
-import { useEffect, useRef, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useRef, useCallback } from "react";
+import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface PowerSavingSettings {
   enabled: boolean;
@@ -32,7 +37,7 @@ function createDefaultSettings(): PowerSavingSettings {
   return { ...DEFAULT_SETTINGS };
 }
 
-const STORAGE_KEY = 'power_saving_settings';
+const STORAGE_KEY = "power_saving_settings";
 
 export class SmartPowerSavingManager {
   private static instance: SmartPowerSavingManager;
@@ -64,7 +69,7 @@ export class SmartPowerSavingManager {
         this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
       }
     } catch (error) {
-      reportRecoverableIssue('[PowerSaving] Failed to load settings', error);
+      reportRecoverableIssue("[PowerSaving] Failed to load settings", error);
     }
     return this.settings;
   }
@@ -74,7 +79,7 @@ export class SmartPowerSavingManager {
       this.settings = { ...this.settings, ...newSettings };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
     } catch (error) {
-      reportRecoverableIssue('[PowerSaving] Failed to save settings', error);
+      reportRecoverableIssue("[PowerSaving] Failed to save settings", error);
     }
   }
 
@@ -87,7 +92,7 @@ export class SmartPowerSavingManager {
       await this.wakeUp();
       return next;
     } catch (error) {
-      reportRecoverableIssue('[PowerSaving] Failed to reset settings', error);
+      reportRecoverableIssue("[PowerSaving] Failed to reset settings", error);
       throw error;
     }
   }
@@ -101,7 +106,12 @@ export class SmartPowerSavingManager {
       clearTimeout(this.inactivityTimer);
     }
 
-    if (!this.rideSessionActive || !this.settings.enabled || this.brightnessHolds.size > 0) return;
+    if (
+      !this.rideSessionActive ||
+      !this.settings.enabled ||
+      this.brightnessHolds.size > 0
+    )
+      return;
 
     this.inactivityTimer = setTimeout(() => {
       this.enterPowerSavingMode();
@@ -115,11 +125,15 @@ export class SmartPowerSavingManager {
     try {
       this.originalBrightness = await getBrightnessAsync();
       // 若手勢或補給彈窗在讀取亮度期間已喚醒，不能再把螢幕調暗。
-      if (!this.isInPowerSavingMode || session !== this.brightnessSession) return;
+      if (!this.isInPowerSavingMode || session !== this.brightnessSession)
+        return;
       await setBrightnessAsync(this.settings.minBrightness);
       this.notifyListeners(true);
     } catch (error) {
-      reportRecoverableIssue('[PowerSaving] Failed to enter power saving mode', error);
+      reportRecoverableIssue(
+        "[PowerSaving] Failed to enter power saving mode",
+        error,
+      );
     }
   }
 
@@ -129,9 +143,18 @@ export class SmartPowerSavingManager {
     this.isInPowerSavingMode = false;
     this.notifyListeners(false);
     try {
-      await setBrightnessAsync(this.originalBrightness);
+      if (Platform.OS === "android") {
+        // 先讀取系統目前亮度，再撤銷 activity 覆寫；若使用者開啟自動亮度，環境光感測器會立刻重新接管。
+        await getSystemBrightnessAsync();
+        await useSystemBrightnessAsync();
+      } else {
+        await setBrightnessAsync(this.originalBrightness);
+      }
     } catch (error) {
-      reportRecoverableIssue('[PowerSaving] Failed to exit power saving mode', error);
+      reportRecoverableIssue(
+        "[PowerSaving] Failed to exit power saving mode",
+        error,
+      );
     }
   }
 
@@ -155,7 +178,8 @@ export class SmartPowerSavingManager {
   /** 只有最後一個亮屏保持解除後，才重新開始調暗倒數。 */
   releaseBrightnessHold(key: string) {
     this.brightnessHolds.delete(key);
-    if (this.rideSessionActive && this.brightnessHolds.size === 0) this.resetInactivityTimer();
+    if (this.rideSessionActive && this.brightnessHolds.size === 0)
+      this.resetInactivityTimer();
   }
 
   onUserInteraction() {
@@ -176,7 +200,7 @@ export class SmartPowerSavingManager {
   }
 
   private notifyListeners(isActive: boolean) {
-    this.listeners.forEach(listener => listener(isActive));
+    this.listeners.forEach((listener) => listener(isActive));
   }
 
   start() {

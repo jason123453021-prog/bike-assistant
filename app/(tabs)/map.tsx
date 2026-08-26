@@ -97,7 +97,6 @@ import {
 import {
   calculatePower,
   calcAirDensity,
-  calcGrade,
   DEFAULT_ROAD_BIKE_MASS_KG,
   haversineDistance,
   formatDuration,
@@ -204,6 +203,7 @@ import {
   type AutoLapTotals,
 } from "@/lib/auto-lap-milestones";
 import { SmartPowerSavingManager } from "@/lib/power-saving/smart-power-saving-system";
+import { setRideImmersiveMode } from "@/lib/ride-immersive-mode";
 import {
   getDueSupplyIntervals,
   type SupplyIntervalKind,
@@ -604,7 +604,8 @@ export default function MapScreen() {
   const prevAltRef = useRef<number | null>(null);
   const prevPosRef = useRef<{ lat: number; lon: number } | null>(null);
   const liveElevationFilterRef = useRef(createLiveElevationFilterState());
-  // 坡度平滑：7 點滑動平均，消除 GPS 高度抖動
+  const liveGradeRef = useRef(0);
+  // 坡度平滑：小型滑動平均，消除 GPS 高度抖動但保留爬坡反應。
   const gradeWindowRef = useRef<number[]>([]);
 
   // 天氣
@@ -669,6 +670,13 @@ export default function MapScreen() {
   const touchGuardHoldTimerRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
+  const touchGuardHoldSafetyTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const touchGuardPointerActiveRef = useRef(false);
+  const touchGuardInitialLockTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   const touchGuardRelockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -923,6 +931,8 @@ export default function MapScreen() {
         setFollowUser(true);
         setNearestIdx(0);
         arrivedRef.current = false;
+        // 路線啟動後優先顯示使用者目前位置，而非停留在選點或整段路線的縮放畫面。
+        requestAnimationFrame(() => recenterForLocationMode());
       };
 
       if (
@@ -949,7 +959,12 @@ export default function MapScreen() {
         ],
       );
     },
-    [clearSharedRoute, pinnedNavigationLayers.length, sharedRoute],
+    [
+      clearSharedRoute,
+      pinnedNavigationLayers.length,
+      recenterForLocationMode,
+      sharedRoute,
+    ],
   );
 
   const selectPinAddressDestination = useCallback(
@@ -1830,6 +1845,11 @@ export default function MapScreen() {
       clearInterval(touchGuardHoldTimerRef.current);
       touchGuardHoldTimerRef.current = null;
     }
+    if (touchGuardHoldSafetyTimerRef.current) {
+      clearTimeout(touchGuardHoldSafetyTimerRef.current);
+      touchGuardHoldSafetyTimerRef.current = null;
+    }
+    touchGuardPointerActiveRef.current = false;
     touchGuardHoldStartedAtRef.current = null;
     setTouchGuardHoldProgress(0);
   }, []);
@@ -1851,20 +1871,60 @@ export default function MapScreen() {
     }, settings.touchGuardAutoRelockSec * 1000);
   }, [isActive, settings.touchGuardAutoRelockSec, settings.touchGuardEnabled]);
 
+  useEffect(() => {
+    if (touchGuardInitialLockTimerRef.current) {
+      clearTimeout(touchGuardInitialLockTimerRef.current);
+      touchGuardInitialLockTimerRef.current = null;
+    }
+    resetTouchGuardHoldProgress();
+    if (!isActive || !settings.touchGuardEnabled) {
+      setTouchGuardEnabled(false);
+      return;
+    }
+
+    // 開始騎乘後即使尚未取得穩定 GPS 或切換頁面，仍依設定的閒置時間確實上鎖。
+    setTouchGuardEnabled(false);
+    touchGuardInitialLockTimerRef.current = setTimeout(() => {
+      setTouchGuardEnabled(true);
+      touchGuardInitialLockTimerRef.current = null;
+    }, settings.touchGuardAutoRelockSec * 1000);
+    return () => {
+      if (touchGuardInitialLockTimerRef.current) {
+        clearTimeout(touchGuardInitialLockTimerRef.current);
+        touchGuardInitialLockTimerRef.current = null;
+      }
+    };
+  }, [
+    isActive,
+    resetTouchGuardHoldProgress,
+    settings.touchGuardAutoRelockSec,
+    settings.touchGuardEnabled,
+  ]);
+
   const beginTouchGuardHoldProgress = useCallback(() => {
     if (!touchGuardEnabled || !isActive) return;
+    if (touchGuardPointerActiveRef.current) return;
     resetTouchGuardHoldProgress();
+    touchGuardPointerActiveRef.current = true;
     touchGuardHoldStartedAtRef.current = Date.now();
     setTouchGuardHoldProgress(0.001);
     touchGuardHoldTimerRef.current = setInterval(() => {
       const startedAt = touchGuardHoldStartedAtRef.current;
-      if (!startedAt) return;
+      if (!startedAt || !touchGuardPointerActiveRef.current) {
+        resetTouchGuardHoldProgress();
+        return;
+      }
       const progress = Math.min(
         1,
         (Date.now() - startedAt) / settings.touchGuardUnlockHoldMs,
       );
       setTouchGuardHoldProgress(progress);
     }, 33);
+    // 原生 pointer-cancel 漏失時仍會清除進度，避免 UI 停在 100%「長按中」。
+    touchGuardHoldSafetyTimerRef.current = setTimeout(
+      resetTouchGuardHoldProgress,
+      settings.touchGuardUnlockHoldMs + 350,
+    );
   }, [
     isActive,
     resetTouchGuardHoldProgress,
@@ -1913,6 +1973,11 @@ export default function MapScreen() {
       clearInterval(touchGuardHoldTimerRef.current);
       touchGuardHoldTimerRef.current = null;
     }
+    if (touchGuardHoldSafetyTimerRef.current) {
+      clearTimeout(touchGuardHoldSafetyTimerRef.current);
+      touchGuardHoldSafetyTimerRef.current = null;
+    }
+    touchGuardPointerActiveRef.current = false;
     touchGuardHoldStartedAtRef.current = null;
     setTouchGuardHoldProgress(1);
     if (settings.vibrationEnabled) vibrateLight();
@@ -1929,6 +1994,8 @@ export default function MapScreen() {
   useEffect(
     () => () => {
       resetTouchGuardHoldProgress();
+      if (touchGuardInitialLockTimerRef.current)
+        clearTimeout(touchGuardInitialLockTimerRef.current);
       if (touchGuardRelockTimerRef.current)
         clearTimeout(touchGuardRelockTimerRef.current);
       touchGuardUnlockSuccessOpacity.stopAnimation();
@@ -1947,6 +2014,14 @@ export default function MapScreen() {
     else manager.stop();
     return () => manager.stop();
   }, [isActive]);
+
+  useEffect(() => {
+    const shouldUseImmersiveMode = isActive && isAppForeground;
+    void setRideImmersiveMode(shouldUseImmersiveMode);
+    return () => {
+      void setRideImmersiveMode(false);
+    };
+  }, [isActive, isAppForeground]);
 
   const hasPendingSupplyModal =
     settings.supplyReminderEnabled &&
@@ -3118,10 +3193,11 @@ export default function MapScreen() {
               prevPosRef.current = { lat: latitude, lon: longitude };
               prevAltRef.current = altitude ?? null;
               gradeWindowRef.current = [];
+              liveGradeRef.current = 0;
             }
           }
 
-          // 即時坡度：最小距離 10m、異常値過濾、7 點滑動平均
+          // 即時坡度：6 m 最小區間、±20% 離群限制與 5 點滑動平均，兼顧反應性與 GPS 雜訊保護。
           if (
             prevPosRef.current &&
             prevAltRef.current !== null &&
@@ -3133,17 +3209,19 @@ export default function MapScreen() {
               latitude,
               longitude,
             );
-            if (d >= 10) {
+            if (d >= 6) {
               const rawGrade = ((altitude - prevAltRef.current) / d) * 100;
-              // 過濾 GPS 异常値（超過 ±30% 視為誤差）
-              if (Math.abs(rawGrade) <= 30) {
+              // 過濾 GPS 異常值，避免單點海拔跳動污染功率與儀表。
+              if (Math.abs(rawGrade) <= 20) {
                 gradeWindowRef.current.push(rawGrade);
-                if (gradeWindowRef.current.length > 7)
+                if (gradeWindowRef.current.length > 5)
                   gradeWindowRef.current.shift();
                 const smoothed =
                   gradeWindowRef.current.reduce((a, b) => a + b, 0) /
                   gradeWindowRef.current.length;
-                setCurrentGrade(Math.round(smoothed * 10) / 10);
+                const nextGrade = Math.round(smoothed * 10) / 10;
+                liveGradeRef.current = nextGrade;
+                setCurrentGrade(nextGrade);
               }
               // 更新參考點（僅在距離足夠時更新）
               prevPosRef.current = { lat: latitude, lon: longitude };
@@ -3198,7 +3276,8 @@ export default function MapScreen() {
           }
 
           // ─── 騎乘計算 ─────────────────────────────────────────────────────
-          let grade = 0;
+          // 功率與 UI 讀取同一個已平滑、已限幅的即時坡度，不直接使用相鄰 GPS 原始高度差。
+          let grade = liveGradeRef.current;
           let distanceM = 0;
           const previousLocation = lastLocationRef.current;
           const statisticsIntervalSec = !trackPointDecision.segmentStart
@@ -3226,15 +3305,12 @@ export default function MapScreen() {
               impliedSpeedKmh <= 110
             ) {
               distanceM = candidateDistanceM;
-              const altDiff =
-                (altitude ?? 0) -
-                (lastLocationRef.current.coords.altitude ?? 0);
-              grade = calcGrade(altDiff, distanceM);
             }
           }
           if (trackPointDecision.segmentStart) {
             // 背景／定位中斷後開啟新資料段，不能用舊段高度跨距離推導爬升或下降。
             liveElevationFilterRef.current = createLiveElevationFilterState();
+            liveGradeRef.current = 0;
           }
           const elevationDelta = acceptLiveElevationDelta(
             liveElevationFilterRef.current,
@@ -3783,6 +3859,7 @@ export default function MapScreen() {
     prevAltRef.current = null;
     prevPosRef.current = null;
     liveElevationFilterRef.current = createLiveElevationFilterState();
+    liveGradeRef.current = 0;
     powerWindowRef.current = [];
     gradeWindowRef.current = [];
     environmentSummaryRef.current = {
@@ -3800,7 +3877,7 @@ export default function MapScreen() {
     arrivedRef.current = false;
     setMapRideActive(true);
     selectLocationCameraMode("heading-up");
-    setTouchGuardEnabled(settings.touchGuardEnabled);
+    setTouchGuardEnabled(false);
     setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
     recoverySessionRef.current = createNewRideSession();
     lastRecoverySnapshotAtRef.current = Date.now();
@@ -4207,6 +4284,7 @@ export default function MapScreen() {
       prevAltRef.current = null;
       prevPosRef.current = null;
       liveElevationFilterRef.current = createLiveElevationFilterState();
+      liveGradeRef.current = 0;
       cogSamplesRef.current = [];
       lastLocationRef.current = null;
       lastAcceptedTrackPointRef.current = null;
@@ -5042,6 +5120,7 @@ export default function MapScreen() {
             }}
             onPressOut={resetTouchGuardHoldProgress}
             onResponderTerminate={resetTouchGuardHoldProgress}
+            onTouchCancel={resetTouchGuardHoldProgress}
             onLongPress={() => {
               completeTouchGuardUnlock();
             }}
@@ -5952,6 +6031,8 @@ export default function MapScreen() {
           style={styles.touchGuard}
           onPressIn={beginTouchGuardHoldProgress}
           onPressOut={resetTouchGuardHoldProgress}
+          onResponderTerminate={resetTouchGuardHoldProgress}
+          onTouchCancel={resetTouchGuardHoldProgress}
           onLongPress={() => {
             completeTouchGuardUnlock();
           }}

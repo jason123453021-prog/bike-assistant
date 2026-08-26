@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const managerSource = readFileSync(
   resolve(process.cwd(), "lib/power-saving/smart-power-saving-system.ts"),
   "utf8",
-);
+).replace(/\s+/g, " ");
 const mapSource = readFileSync(
   resolve(process.cwd(), "app/(tabs)/map.tsx"),
   "utf8",

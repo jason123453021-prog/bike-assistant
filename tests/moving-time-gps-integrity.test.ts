@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const rideContextSource = readFileSync("lib/ride-context.tsx", "utf8");
+const rideContextSource = readFileSync("lib/ride-context.tsx", "utf8").replace(
+  /\s+/g,
+  " ",
+);
 const mapSource = readFileSync("app/(tabs)/map.tsx", "utf8").replace(
   /\s+/g,
   " ",
@@ -39,8 +42,9 @@ describe("可信 GPS 移動時間資料鏈", () => {
       "const elapsedDurationSec = state.startTime",
     );
     expect(rideContextSource).toContain(
-      "const pausedForActivitySec = Math.max(0, elapsedDurationSec - state.elapsed);",
+      "const pausedForActivitySec = Math.max(",
     );
+    expect(rideContextSource).toContain("elapsedDurationSec - state.elapsed,");
   });
 
   it("自動暫停恢復時不遺失第一個可信移動點，且保留暫停期間的原始 GPS 時間戳", () => {
