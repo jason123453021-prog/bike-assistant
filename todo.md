@@ -2819,4 +2819,4 @@
 - [x] 依 Strava 公開說明重新核對坡度與海拔濾波的可比較原則，明確記錄無氣壓計／無 DEM 時不可保證與 Strava 修正值完全相同的邊界
 - [x] 稽核地圖自由模式按鈕的實心高對比背景、陰影與圖示色彩，確認深淺主題皆可辨識
 - [x] 掃描 app 與 components 的使用者可見硬編碼字串，擴充 13 語系翻譯鍵與插值守門，完成活動摘要與核心畫面切換驗證
-- [ ] 新增回歸測試、完成完整品質驗證與 GitHub Android APK artifact 建置，提供新版下載網址
+- [x] 新增回歸測試、完成完整品質驗證與 GitHub Android APK artifact 建置，提供新版下載網址（1.0.96／versionCode 10096；GitHub run 32924925460，artifact 9591534727，28,512,501 bytes，未過期；Jest、Vitest 127 檔／446 tests、TypeScript、Lint、Expo config 與差異檢查均通過）
