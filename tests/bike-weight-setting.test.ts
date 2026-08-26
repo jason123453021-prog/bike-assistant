@@ -58,8 +58,8 @@ describe("自行車重量設定", () => {
   });
 
   it("在設定頁顯示輸入入口，並將值傳入即時、背景與 GPX 路線資料鏈", () => {
-    expect(settingsSource).toContain("自行車重量");
-    expect(settingsSource).toContain("可設定 3–35 kg");
+    expect(settingsSource).toContain('t("settingsDetail.bikeWeight")');
+    expect(settingsSource).toContain('t("settingsDetail.bikeWeightHint")');
     expect(settingsSource).toMatch(/openEdit\(\s*"bikeWeight"/);
     expect(mapSource).toContain(
       "bikeMassKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG",

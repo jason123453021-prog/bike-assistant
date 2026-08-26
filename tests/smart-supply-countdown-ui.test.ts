@@ -198,8 +198,8 @@ describe("smart supply countdown UI", () => {
   });
 
   it("uses one reminder interval setting while exposing no preview or feedback test controls", () => {
-    expect(settingsSource).toContain("未關閉時重複提醒間隔");
-    expect(settingsSource).toContain("0 = 停用");
+    expect(settingsSource).toContain('label={t("settingsDetail.repeatReminder")}');
+    expect(settingsSource).toContain('t("settingsDetail.repeatEdit")');
     expect(settingsSource).not.toContain("calorieRepeatUntilDismissed");
     expect(settingsSource).not.toContain("waterRepeatUntilDismissed");
     expect(settingsSource).not.toContain("PauseOnDownhill");
@@ -225,13 +225,13 @@ describe("smart supply countdown UI", () => {
   });
 
   it("offers 0, 30, and 60 second reminder interval quick choices while retaining manual editing", () => {
-    expect(settingsSource).toContain("快速設定");
+    expect(settingsSource).toContain('t("settingsDetail.quickSet")');
     expect(settingsSource).toContain("[0, 30, 60].map");
     expect(settingsSource).toMatch(
       /void\s+updateSettings\(\{\s*supplyReminderRepeatSec:\s*seconds,?\s*}\)/,
     );
     expect(settingsSource).toMatch(/openEdit\(\s*"supplyReminderRepeatSec"/);
-    expect(settingsSource).toContain("關閉補給重複提醒");
+    expect(settingsSource).toContain('t("settingsDetail.disableRepeats")');
   });
 
   it("provides a master supply switch that stops foreground and background reminders while preserving user preferences", () => {
@@ -240,7 +240,9 @@ describe("smart supply countdown UI", () => {
     expect(settingsContextSource).toContain(
       "supplyReminderEnabled: saved.supplyReminderEnabled !== false",
     );
-    expect(settingsSource).toContain("啟用補給與補水提醒");
+    expect(settingsSource).toContain(
+      'label={t("settingsDetail.enableSupplyReminders")}',
+    );
     expect(settingsSource).toContain("disabled={supplyControlsDisabled}");
     expect(settingsSource).toContain(
       "const supplyControlsDisabled = !settings.supplyReminderEnabled",

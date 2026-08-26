@@ -67,7 +67,7 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
       'title={t("settingsActions.systemDataTitle")}',
     );
     expect(settingsSource).toContain("LayoutAnimation.configureNext");
-    expect(settingsSource).toContain("外觀主題");
+    expect(settingsSource).toContain('t("settingsDetail.appearanceTheme")');
     expect(settingsSource).not.toContain(
       't("settingsActions.clearCacheLabel")',
     );
@@ -102,7 +102,7 @@ describe("全域 Lap 設定與設定頁 Accordion", () => {
   });
 
   it("提供可本機保存的閒置歸位時間，並套用到手動地圖操作後的自動置中計時", () => {
-    expect(settingsSource).toContain("閒置歸位時間");
+    expect(settingsSource).toContain('t("settingsDetail.idleRecenter")');
     expect(settingsSource).toContain('testID="idle-recenter-time-slider"');
     expect(settingsSource).toContain("updateSettings({ autoRecenterSec");
     expect(mapSource).toContain("settings.autoRecenterSec * 1000");

@@ -17,11 +17,15 @@ const routeSource = readFileSync(
 
 describe("單次能量補給碳水設定", () => {
   it("在智慧補給區清楚顯示目前份量，並提供 10–100 g 的設定入口", () => {
-    expect(settingsSource).toContain("每份能量補給目前為");
-    expect(settingsSource).toContain("智慧能量補給");
-    expect(settingsSource).toContain("智慧補水");
-    expect(settingsSource).toContain("單次能量補給碳水");
-    expect(settingsSource).toContain("可設定 10–100 g");
+    expect(settingsSource).toContain('t("settingsDetail.smartBothHint", {');
+    expect(settingsSource).toContain('t("settingsDetail.smartEnergy")');
+    expect(settingsSource).toContain('t("settingsDetail.smartHydration")');
+    expect(settingsSource).toContain(
+      't("settingsDetail.servingCarbohydrate")',
+    );
+    expect(settingsSource).toContain(
+      't("settingsDetail.servingCarbohydrateHint")',
+    );
     expect(settingsSource).toMatch(/openEdit\(\s*"energyServingCarbohydrateG"/);
   });
 

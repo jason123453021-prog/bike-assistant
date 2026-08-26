@@ -346,19 +346,19 @@ export default function SettingsScreen() {
   }, [settings.simplifiedModeFieldOrder]);
 
   const SIMP_FIELD_LABELS: Record<SimplifiedFieldKey, string> = {
-    showDirection: "方向指引",
-    showRemaining: "剩餘距離",
-    showSpeed: "速度",
-    showDistance: "距離",
-    showElapsed: "騎乘時間",
-    showCurrentTime: "現在時間",
-    showGrade: "坡度",
-    showPower: "功率",
-    showAvgSpeed: "均速",
-    showCalories: "卡路里",
-    showPausedTime: "暫停時間",
-    showTotalAscent: "累計爬升",
-    showCurrentAltitude: "目前海拔",
+    showDirection: t("settingsDetail.fieldDirection"),
+    showRemaining: t("settingsDetail.fieldRemaining"),
+    showSpeed: t("settingsDetail.fieldSpeed"),
+    showDistance: t("settingsDetail.fieldDistance"),
+    showElapsed: t("settingsDetail.fieldRideTime"),
+    showCurrentTime: t("settingsDetail.fieldCurrentTime"),
+    showGrade: t("settingsDetail.fieldGrade"),
+    showPower: t("settingsDetail.fieldPower"),
+    showAvgSpeed: t("settingsDetail.fieldAvgSpeed"),
+    showCalories: t("settingsDetail.fieldCalories"),
+    showPausedTime: t("settingsDetail.fieldPausedTime"),
+    showTotalAscent: t("settingsDetail.fieldTotalAscent"),
+    showCurrentAltitude: t("settingsDetail.fieldCurrentAltitude"),
   };
 
   const makeSimpDragResponder = (idx: number) =>
@@ -406,17 +406,17 @@ export default function SettingsScreen() {
     });
 
   const FIELD_LABELS: Record<NormalFieldKey, string> = {
-    showElapsed: "騎乘時間",
-    showSpeed: "速度",
-    showDistance: "距離",
-    showGrade: "坡度",
-    showPower: "功率",
-    showAvgSpeed: "均速",
-    showCalories: "卡路里",
-    showPausedTime: "暫停時間",
-    showTotalAscent: "累計爬升",
-    showCurrentAltitude: "目前海拔",
-    showGradeDistribution: "坡度分布",
+    showElapsed: t("settingsDetail.fieldRideTime"),
+    showSpeed: t("settingsDetail.fieldSpeed"),
+    showDistance: t("settingsDetail.fieldDistance"),
+    showGrade: t("settingsDetail.fieldGrade"),
+    showPower: t("settingsDetail.fieldPower"),
+    showAvgSpeed: t("settingsDetail.fieldAvgSpeed"),
+    showCalories: t("settingsDetail.fieldCalories"),
+    showPausedTime: t("settingsDetail.fieldPausedTime"),
+    showTotalAscent: t("settingsDetail.fieldTotalAscent"),
+    showCurrentAltitude: t("settingsDetail.fieldCurrentAltitude"),
+    showGradeDistribution: t("settingsDetail.fieldGradeDistribution"),
   };
 
   const makeDragResponder = (idx: number) =>
@@ -695,7 +695,7 @@ export default function SettingsScreen() {
 
           {/* ── 個人資料 ── */}
           <SectionHeader
-            title="個人資料"
+            title={t("settingsDetail.personalProfile")}
             colors={colors}
             onToggle={() => toggleSection("personal")}
             collapsed={collapsedSections["personal"]}
@@ -704,39 +704,44 @@ export default function SettingsScreen() {
             <View style={[styles.section, { borderColor: colors.border }]}>
               <TextRow
                 icon="calendar"
-                label="生日"
-                value={settings.birthday ?? "尚未設定"}
+                label={t("settingsDetail.birthday")}
+                value={settings.birthday ?? t("settingsDetail.notSet")}
                 colors={colors}
                 hint={
                   settings.birthday
-                    ? `目前 ${currentAge} 歲，App 會在生日後自動更新`
-                    : "僅需設定一次；用於自動推定年齡與心率基準"
+                    ? t("settingsDetail.birthdaySetHint", { age: currentAge })
+                    : t("settingsDetail.birthdayUnsetHint")
                 }
                 onPress={openBirthdayEdit}
               />
               <Divider colors={colors} />
               <NumberRow
                 icon="person.fill"
-                label="體重"
+                label={t("settingsDetail.weight")}
                 value={settings.weight}
                 unit="kg"
                 colors={colors}
                 onPress={() =>
-                  openEdit("weight", "體重", settings.weight, "kg")
+                  openEdit(
+                    "weight",
+                    t("settingsDetail.weight"),
+                    settings.weight,
+                    "kg",
+                  )
                 }
               />
               <Divider colors={colors} />
               <NumberRow
                 icon="bicycle"
-                label="自行車重量"
+                label={t("settingsDetail.bikeWeight")}
                 value={settings.bikeWeight}
                 unit="kg"
                 colors={colors}
-                hint="可設定 3–35 kg；會套用至即時功率、卡路里、背景追蹤與路線預估"
+                hint={t("settingsDetail.bikeWeightHint")}
                 onPress={() =>
                   openEdit(
                     "bikeWeight",
-                    "自行車重量（含隨車裝備）",
+                    t("settingsDetail.bikeWeightEdit"),
                     settings.bikeWeight,
                     "kg",
                   )
@@ -745,38 +750,46 @@ export default function SettingsScreen() {
               <Divider colors={colors} />
               <NumberRow
                 icon="arrow.up"
-                label="身高"
+                label={t("settingsDetail.height")}
                 value={settings.height}
                 unit="cm"
                 colors={colors}
                 onPress={() =>
-                  openEdit("height", "身高", settings.height, "cm")
+                  openEdit(
+                    "height",
+                    t("settingsDetail.height"),
+                    settings.height,
+                    "cm",
+                  )
                 }
               />
               <Divider colors={colors} />
               <View style={styles.autoMetricsNote}>
                 <Text style={[styles.rowHint, { color: colors.muted }]}>
-                  以下訓練與身體數據均由 App
-                  以本機騎乘資料自動推定；不需要逐項填寫。
+                  {t("settingsDetail.autoMetricsIntro")}
                 </Text>
               </View>
               <Divider colors={colors} />
               <View style={styles.autoMetricValues}>
                 <Text style={[styles.rowLabel, { color: colors.foreground }]}>
-                  App 自動推定
+                  {t("settingsDetail.appEstimated")}
                 </Text>
                 <Text style={[styles.rowHint, { color: colors.muted }]}>
-                  FTP {autoPersonalMetrics.ftpW} W · 最大心率{" "}
-                  {autoPersonalMetrics.maxHeartRate} bpm · 心率基準{" "}
-                  {autoPersonalMetrics.restingHeartRate} bpm
+                  {t("settingsDetail.autoMetrics", {
+                    ftp: autoPersonalMetrics.ftpW,
+                    maxHeartRate: autoPersonalMetrics.maxHeartRate,
+                    restingHeartRate: autoPersonalMetrics.restingHeartRate,
+                  })}
                 </Text>
                 <Text style={[styles.rowHint, { color: colors.muted }]}>
-                  RPE 會在每次騎乘結束後依強度、時間、爬升與環境自動產生。
+                  {t("settingsDetail.rpeHint")}
                 </Text>
                 <Text style={[styles.rowHint, { color: colors.muted }]}>
                   {autoPersonalMetrics.sourceRideCount
-                    ? `依 ${autoPersonalMetrics.sourceRideCount} 次有效本機騎乘更新`
-                    : "尚無足夠功率歷史，暫用安全基準並持續校正"}
+                    ? t("settingsDetail.metricsFromRides", {
+                        count: autoPersonalMetrics.sourceRideCount,
+                      })
+                    : t("settingsDetail.metricsFallback")}
                 </Text>
               </View>
             </View>
@@ -784,7 +797,7 @@ export default function SettingsScreen() {
 
           {/* ── 背景 GPS 精度 ── */}
           <SectionHeader
-            title="背景 GPS 精度"
+            title={t("settingsDetail.backgroundGpsAccuracy")}
             colors={colors}
             onToggle={() => toggleSection("gpsAccuracy")}
             collapsed={collapsedSections["gpsAccuracy"]}
@@ -795,7 +808,7 @@ export default function SettingsScreen() {
                 style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}
               >
                 <Text style={{ color: colors.muted, fontSize: 12 }}>
-                  此選項會在騎乘中重啟背景定位任務。高精度更耗電但軌跡更精確；靜止自動暫停與低電量保護時會暫時降級。
+                  {t("settingsDetail.backgroundGpsHint")}
                 </Text>
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   {(["power_saving", "standard", "high_accuracy"] as const).map(
@@ -834,10 +847,10 @@ export default function SettingsScreen() {
                           }}
                         >
                           {level === "power_saving"
-                            ? "🔋 省電"
+                            ? t("settingsDetail.gpsPowerSaving")
                             : level === "standard"
-                              ? "⚖️ 標準"
-                              : "📡 高精度"}
+                              ? t("settingsDetail.gpsStandard")
+                              : t("settingsDetail.gpsHighAccuracy")}
                         </Text>
                         <Text
                           style={{
@@ -876,7 +889,7 @@ export default function SettingsScreen() {
         >
           {/* ── 補給提醒 ── */}
           <SectionHeader
-            title="補給提醒"
+            title={t("settingsDetail.supplyReminders")}
             colors={colors}
             onToggle={() => toggleSection("supply")}
             collapsed={collapsedSections["supply"]}
@@ -885,7 +898,7 @@ export default function SettingsScreen() {
             <View style={[styles.section, { borderColor: colors.border }]}>
               <ToggleRow
                 icon="bell.badge.fill"
-                label="啟用補給與補水提醒"
+                label={t("settingsDetail.enableSupplyReminders")}
                 value={settings.supplyReminderEnabled}
                 colors={colors}
                 onToggle={(enabled) =>
@@ -897,14 +910,14 @@ export default function SettingsScreen() {
                   style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}
                 >
                   {settings.supplyReminderEnabled
-                    ? "啟用後會依智慧、手動與自訂規則安排補給與補水提醒。"
-                    : "已關閉所有補給與補水提醒；倒數、彈窗、通知、語音、音效、震動與重複提醒均已停止，以下設定暫時不可調整。"}
+                    ? t("settingsDetail.supplyEnabledHint")
+                    : t("settingsDetail.supplyDisabledHint")}
                 </Text>
               </View>
               <Divider colors={colors} />
               <ToggleRow
                 icon="flame.fill"
-                label="智慧能量補給"
+                label={t("settingsDetail.smartEnergy")}
                 value={settings.smartEnergySupplyEnabled}
                 colors={colors}
                 disabled={supplyControlsDisabled}
@@ -922,7 +935,7 @@ export default function SettingsScreen() {
               />
               <ToggleRow
                 icon="drop.fill"
-                label="智慧補水"
+                label={t("settingsDetail.smartHydration")}
                 value={settings.smartWaterSupplyEnabled}
                 colors={colors}
                 disabled={supplyControlsDisabled}
@@ -944,28 +957,32 @@ export default function SettingsScreen() {
                 >
                   {settings.smartEnergySupplyEnabled &&
                   settings.smartWaterSupplyEnabled
-                    ? `能量與補水皆採智慧倒數；系統會依 FTP、體重、騎乘強度、時間、坡度與環境重排下一輪。每份能量補給目前為 ${settings.energyServingCarbohydrateG} g 碳水。`
+                    ? t("settingsDetail.smartBothHint", {
+                        serving: settings.energyServingCarbohydrateG,
+                      })
                     : settings.smartEnergySupplyEnabled
-                      ? `僅能量採智慧倒數；每份能量補給目前為 ${settings.energyServingCarbohydrateG} g 碳水。補水可在下方選擇手動時間或距離規則。`
+                      ? t("settingsDetail.smartEnergyHint", {
+                          serving: settings.energyServingCarbohydrateG,
+                        })
                       : settings.smartWaterSupplyEnabled
-                        ? "僅補水採智慧倒數；能量可在下方選擇手動時間或距離規則。"
-                        : "智慧能量與智慧補水均已關閉；可在下方各自選擇手動時間或距離規則。"}
+                        ? t("settingsDetail.smartWaterHint")
+                        : t("settingsDetail.smartOffHint")}
                 </Text>
               </View>
               <Divider colors={colors} />
               <NumberRow
                 icon="flame.fill"
-                label="單次能量補給碳水"
+                label={t("settingsDetail.servingCarbohydrate")}
                 value={settings.energyServingCarbohydrateG}
                 unit="g"
                 colors={colors}
                 iconColor="#D97706"
-                hint="可設定 10–100 g；智慧能量倒數與路線攜帶份數會依此份量調整"
+                hint={t("settingsDetail.servingCarbohydrateHint")}
                 disabled={supplyControlsDisabled}
                 onPress={() =>
                   openEdit(
                     "energyServingCarbohydrateG",
-                    "單包能量補給碳水克數",
+                    t("settingsDetail.servingCarbohydrateEdit"),
                     settings.energyServingCarbohydrateG,
                     "g",
                   )
@@ -974,7 +991,7 @@ export default function SettingsScreen() {
               <Divider colors={colors} />
               <ToggleRow
                 icon="chart.bar.fill"
-                label="每小時碳水採科學建議"
+                label={t("settingsDetail.scienceCarbohydrate")}
                 value={settings.energyCarbohydrateHourlyLimitMode === "science"}
                 colors={colors}
                 disabled={supplyControlsDisabled}
@@ -988,15 +1005,19 @@ export default function SettingsScreen() {
               />
               <NumberRow
                 icon="chart.bar.fill"
-                label="每小時碳水上限"
+                label={t("settingsDetail.hourlyCarbohydrateLimit")}
                 value={effectiveCarbohydrateHourlyLimitG}
                 unit="g/h"
                 colors={colors}
                 iconColor="#D97706"
                 hint={
                   settings.energyCarbohydrateHourlyLimitMode === "science"
-                    ? `目前依 ${settings.weight} kg 推導為 ${effectiveCarbohydrateHourlyLimitG} g/h（約 0.7 g/kg/h，最高 90 g/h）；可關閉上方開關改為手動設定`
-                    : "可設定 20–90 g/h；單次碳水克數與此上限共同計算智慧能量倒數"
+                    ? t("settingsDetail.scienceCarbohydrateHint", {
+                        weight: settings.weight,
+                        rate: effectiveCarbohydrateHourlyLimitG,
+                        perKg: "0.7",
+                      })
+                    : t("settingsDetail.manualCarbohydrateHint")
                 }
                 disabled={
                   supplyControlsDisabled ||
@@ -1005,7 +1026,7 @@ export default function SettingsScreen() {
                 onPress={() =>
                   openEdit(
                     "energyCarbohydrateHourlyLimitG",
-                    "每小時碳水上限",
+                    t("settingsDetail.hourlyCarbohydrateLimit"),
                     settings.energyCarbohydrateHourlyLimitG,
                     "g/h",
                   )
@@ -1019,11 +1040,14 @@ export default function SettingsScreen() {
                       { color: colors.muted },
                     ]}
                   >
-                    智慧計算
+                    {t("settingsDetail.smartCalculation")}
                   </Text>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`依體重智慧計算並套用每小時 ${smartCarbohydrateHourlySuggestionG} g 碳水上限`}
+                    accessibilityLabel={t(
+                      "settingsDetail.applyHourlyLimitA11y",
+                      { rate: smartCarbohydrateHourlySuggestionG },
+                    )}
                     disabled={supplyControlsDisabled}
                     onPress={() =>
                       void updateSettings({
@@ -1053,7 +1077,9 @@ export default function SettingsScreen() {
                         fontWeight: "800",
                       }}
                     >
-                      套用 {smartCarbohydrateHourlySuggestionG} g/h
+                      {t("settingsDetail.applyHourlyLimit", {
+                        rate: smartCarbohydrateHourlySuggestionG,
+                      })}
                     </Text>
                   </Pressable>
                 </View>
@@ -1069,7 +1095,7 @@ export default function SettingsScreen() {
                       lineHeight: 18,
                     }}
                   >
-                    已啟用智慧的類別會依下一次倒數到期提醒；未啟用智慧的類別可使用下方固定時間／距離規則，兩者不會重複或衝突通知。
+                    {t("settingsDetail.smartRuleNotice")}
                   </Text>
                 </View>
               )}
@@ -1084,7 +1110,7 @@ export default function SettingsScreen() {
                           { color: colors.foreground },
                         ]}
                       >
-                        能量提醒
+                        {t("settingsDetail.energyReminders")}
                       </Text>
                       <Text
                         style={[
@@ -1092,13 +1118,13 @@ export default function SettingsScreen() {
                           { color: colors.muted },
                         ]}
                       >
-                        能量可分別依時間或距離提醒
+                        {t("settingsDetail.energyRuleHint")}
                       </Text>
                     </View>
                   </View>
                   <ToggleRow
                     icon="clock.fill"
-                    label="能量：按時間提醒"
+                    label={t("settingsDetail.energyByTime")}
                     value={settings.supplyEnergyTimeIntervalEnabled}
                     colors={colors}
                     disabled={supplyControlsDisabled}
@@ -1114,26 +1140,26 @@ export default function SettingsScreen() {
                   {settings.supplyEnergyTimeIntervalEnabled && (
                     <NumberRow
                       icon="clock.fill"
-                      label="能量時間間隔"
+                      label={t("settingsDetail.energyTimeInterval")}
                       value={settings.supplyEnergyTimeIntervalMinutes}
-                      unit="分鐘"
+                      unit={t("settingsDetail.minutes")}
                       colors={colors}
                       iconColor="#D97706"
-                      hint="確認能量補給後重新計時"
+                      hint={t("settingsDetail.restartEnergyTimer")}
                       disabled={supplyControlsDisabled}
                       onPress={() =>
                         openEdit(
                           "supplyEnergyTimeIntervalMinutes",
-                          "能量時間提醒間隔",
+                          t("settingsDetail.energyTimeEdit"),
                           settings.supplyEnergyTimeIntervalMinutes,
-                          "分鐘",
+                          t("settingsDetail.minutes"),
                         )
                       }
                     />
                   )}
                   <ToggleRow
                     icon="location.fill"
-                    label="能量：按距離提醒"
+                    label={t("settingsDetail.energyByDistance")}
                     value={settings.supplyEnergyDistanceIntervalEnabled}
                     colors={colors}
                     disabled={supplyControlsDisabled}
@@ -1149,17 +1175,17 @@ export default function SettingsScreen() {
                   {settings.supplyEnergyDistanceIntervalEnabled && (
                     <NumberRow
                       icon="location.fill"
-                      label="能量距離間隔"
+                      label={t("settingsDetail.energyDistanceInterval")}
                       value={settings.supplyEnergyDistanceIntervalKm}
                       unit="km"
                       colors={colors}
                       iconColor="#D97706"
-                      hint="確認能量補給後重新累計距離"
+                      hint={t("settingsDetail.restartEnergyDistance")}
                       disabled={supplyControlsDisabled}
                       onPress={() =>
                         openEdit(
                           "supplyEnergyDistanceIntervalKm",
-                          "能量距離提醒間隔",
+                          t("settingsDetail.energyDistanceEdit"),
                           settings.supplyEnergyDistanceIntervalKm,
                           "km",
                         )
@@ -1180,7 +1206,7 @@ export default function SettingsScreen() {
                           { color: colors.foreground },
                         ]}
                       >
-                        補水提醒
+                        {t("settingsDetail.waterReminders")}
                       </Text>
                       <Text
                         style={[
@@ -1188,13 +1214,13 @@ export default function SettingsScreen() {
                           { color: colors.muted },
                         ]}
                       >
-                        補水可分別依時間或距離提醒
+                        {t("settingsDetail.waterRuleHint")}
                       </Text>
                     </View>
                   </View>
                   <ToggleRow
                     icon="clock.fill"
-                    label="補水：按時間提醒"
+                    label={t("settingsDetail.waterByTime")}
                     value={settings.supplyWaterTimeIntervalEnabled}
                     colors={colors}
                     disabled={supplyControlsDisabled}
@@ -1210,26 +1236,26 @@ export default function SettingsScreen() {
                   {settings.supplyWaterTimeIntervalEnabled && (
                     <NumberRow
                       icon="clock.fill"
-                      label="補水時間間隔"
+                      label={t("settingsDetail.waterTimeInterval")}
                       value={settings.supplyWaterTimeIntervalMinutes}
-                      unit="分鐘"
+                      unit={t("settingsDetail.minutes")}
                       colors={colors}
                       iconColor="#0284C7"
-                      hint="確認補水後重新計時"
+                      hint={t("settingsDetail.restartWaterTimer")}
                       disabled={supplyControlsDisabled}
                       onPress={() =>
                         openEdit(
                           "supplyWaterTimeIntervalMinutes",
-                          "補水時間提醒間隔",
+                          t("settingsDetail.waterTimeEdit"),
                           settings.supplyWaterTimeIntervalMinutes,
-                          "分鐘",
+                          t("settingsDetail.minutes"),
                         )
                       }
                     />
                   )}
                   <ToggleRow
                     icon="location.fill"
-                    label="補水：按距離提醒"
+                    label={t("settingsDetail.waterByDistance")}
                     value={settings.supplyWaterDistanceIntervalEnabled}
                     colors={colors}
                     disabled={supplyControlsDisabled}
@@ -1245,17 +1271,17 @@ export default function SettingsScreen() {
                   {settings.supplyWaterDistanceIntervalEnabled && (
                     <NumberRow
                       icon="location.fill"
-                      label="補水距離間隔"
+                      label={t("settingsDetail.waterDistanceInterval")}
                       value={settings.supplyWaterDistanceIntervalKm}
                       unit="km"
                       colors={colors}
                       iconColor="#0284C7"
-                      hint="確認補水後重新累計距離"
+                      hint={t("settingsDetail.restartWaterDistance")}
                       disabled={supplyControlsDisabled}
                       onPress={() =>
                         openEdit(
                           "supplyWaterDistanceIntervalKm",
-                          "補水距離提醒間隔",
+                          t("settingsDetail.waterDistanceEdit"),
                           settings.supplyWaterDistanceIntervalKm,
                           "km",
                         )
@@ -1267,23 +1293,25 @@ export default function SettingsScreen() {
               <Divider colors={colors} />
               <NumberRow
                 icon="bell.badge.fill"
-                label="未關閉時重複提醒間隔"
+                label={t("settingsDetail.repeatReminder")}
                 value={settings.supplyReminderRepeatSec}
-                unit="秒"
+                unit={t("settingsDetail.seconds")}
                 colors={colors}
                 iconColor={colors.primary}
                 hint={
                   settings.supplyReminderRepeatSec === 0
-                    ? "已關閉重複提醒"
-                    : `彈窗未確認時，每 ${settings.supplyReminderRepeatSec} 秒重複提醒一次`
+                    ? t("settingsDetail.repeatOffHint")
+                    : t("settingsDetail.repeatHint", {
+                        seconds: settings.supplyReminderRepeatSec,
+                      })
                 }
                 disabled={supplyControlsDisabled}
                 onPress={() =>
                   openEdit(
                     "supplyReminderRepeatSec",
-                    "重複提醒間隔（秒，0 = 停用）",
+                    t("settingsDetail.repeatEdit"),
                     settings.supplyReminderRepeatSec,
-                    "秒",
+                    t("settingsDetail.seconds"),
                   )
                 }
               />
@@ -1294,7 +1322,7 @@ export default function SettingsScreen() {
                     { color: colors.muted },
                   ]}
                 >
-                  快速設定
+                  {t("settingsDetail.quickSet")}
                 </Text>
                 {[0, 30, 60].map((seconds) => {
                   const selected = settings.supplyReminderRepeatSec === seconds;
@@ -1308,8 +1336,8 @@ export default function SettingsScreen() {
                       }}
                       accessibilityLabel={
                         seconds === 0
-                          ? "關閉補給重複提醒"
-                          : `每 ${seconds} 秒重複提醒`
+                          ? t("settingsDetail.disableRepeats")
+                          : t("settingsDetail.repeatEvery", { seconds })
                       }
                       disabled={supplyControlsDisabled}
                       onPress={() =>
@@ -1348,7 +1376,9 @@ export default function SettingsScreen() {
                           fontWeight: "800",
                         }}
                       >
-                        {seconds === 0 ? "關閉" : `${seconds} 秒`}
+                        {seconds === 0
+                          ? t("settingsDetail.off")
+                          : t("settingsDetail.repeatEvery", { seconds })}
                       </Text>
                     </Pressable>
                   );
@@ -1359,7 +1389,7 @@ export default function SettingsScreen() {
 
           {/* ── 自訂補給品清單 ── */}
           <SectionHeader
-            title="自訂補給品"
+            title={t("settingsDetail.customSupply")}
             colors={colors}
             onToggle={() => toggleSection("customSupply")}
             collapsed={collapsedSections["customSupply"]}
@@ -1376,7 +1406,7 @@ export default function SettingsScreen() {
               {settings.supplyItems.length === 0 ? (
                 <View style={{ padding: 16, alignItems: "center" }}>
                   <Text style={{ color: colors.muted, fontSize: 14 }}>
-                    沒有自訂補給品
+                    {t("settingsDetail.noCustomSupply")}
                   </Text>
                 </View>
               ) : (
@@ -1419,12 +1449,18 @@ export default function SettingsScreen() {
                               ]}
                             >
                               {item.target === "water"
-                                ? "補水共用提醒"
-                                : "能量共用提醒"}{" "}
+                                ? t("settingsDetail.sharedWaterReminder")
+                                : t("settingsDetail.sharedEnergyReminder")}{" "}
                               •{" "}
                               {item.triggerType === "time"
-                                ? `每 ${item.triggerHours || 0}h ${item.triggerMinutes || 0}m ${item.triggerSeconds || 0}s`
-                                : `每 ${item.triggerValue} 公里`}
+                                ? t("settingsDetail.supplyTimeSummary", {
+                                    hours: item.triggerHours || 0,
+                                    minutes: item.triggerMinutes || 0,
+                                    seconds: item.triggerSeconds || 0,
+                                  })
+                                : t("settingsDetail.supplyDistanceSummary", {
+                                    distance: item.triggerValue,
+                                  })}
                             </Text>
                           </Pressable>
                         </View>
@@ -1472,7 +1508,7 @@ export default function SettingsScreen() {
                   color={colors.primary}
                 />
                 <Text style={[styles.rowLabel, { color: colors.primary }]}>
-                  新增補給品
+                  {t("settingsDetail.addSupply")}
                 </Text>
               </Pressable>
             </View>
@@ -1480,7 +1516,7 @@ export default function SettingsScreen() {
 
           {/* ── 回饋設定 ── */}
           <SectionHeader
-            title="回饋設定"
+            title={t("settingsDetail.feedback")}
             colors={colors}
             onToggle={() => toggleSection("feedback")}
             collapsed={collapsedSections["feedback"]}
@@ -1489,7 +1525,7 @@ export default function SettingsScreen() {
             <View style={[styles.section, { borderColor: colors.border }]}>
               <ToggleRow
                 icon="iphone.radiowaves.left.and.right"
-                label="震動回饋"
+                label={t("settingsDetail.vibration")}
                 value={settings.vibrationEnabled}
                 colors={colors}
                 onToggle={(v) => updateSettings({ vibrationEnabled: v })}
@@ -1497,7 +1533,7 @@ export default function SettingsScreen() {
               <Divider colors={colors} />
               <ToggleRow
                 icon="speaker.wave.2.fill"
-                label="TTS 語音播報"
+                label={t("settingsDetail.tts")}
                 value={settings.ttsEnabled}
                 colors={colors}
                 onToggle={(v) => updateSettings({ ttsEnabled: v })}
@@ -1505,7 +1541,7 @@ export default function SettingsScreen() {
               <Divider colors={colors} />
               <ToggleRow
                 icon="music.note"
-                label="音效提醒"
+                label={t("settingsDetail.sound")}
                 value={settings.soundEnabled}
                 colors={colors}
                 onToggle={(v) => updateSettings({ soundEnabled: v })}
@@ -1513,7 +1549,7 @@ export default function SettingsScreen() {
               <Divider colors={colors} />
               <ToggleRow
                 icon="bell.fill"
-                label="通知提醒"
+                label={t("settingsDetail.notifications")}
                 value={settings.notificationEnabled}
                 colors={colors}
                 onToggle={(v) => updateSettings({ notificationEnabled: v })}
@@ -1525,7 +1561,7 @@ export default function SettingsScreen() {
         <SettingsCategory
           icon="moon.fill"
           title={t("settings.displayAppearance")}
-          subtitle="主題、螢幕常亮、省電與儀表版面"
+          subtitle={t("settingsDetail.displayAppearanceHint")}
           colors={colors}
           expanded={Boolean(openCategories.display)}
           onPress={() => toggleCategory("display")}
@@ -1537,17 +1573,17 @@ export default function SettingsScreen() {
             ]}
           >
             <Text style={[styles.rowLabel, { color: colors.foreground }]}>
-              外觀主題
+              {t("settingsDetail.appearanceTheme")}
             </Text>
             <Text style={[styles.rowHint, { color: colors.muted }]}>
-              選擇淺色、深色或讓 App 跟隨手機系統主題。
+              {t("settingsDetail.appearanceThemeHint")}
             </Text>
             <View style={styles.lapModeOptions}>
               {(
                 [
-                  { key: "system", label: "跟隨系統" },
-                  { key: "light", label: "淺色" },
-                  { key: "dark", label: "深色" },
+                  { key: "system", label: t("settingsDetail.themeSystem") },
+                  { key: "light", label: t("settingsDetail.themeLight") },
+                  { key: "dark", label: t("settingsDetail.themeDark") },
                 ] as const
               ).map(({ key, label }) => {
                 const selected = settings.appearanceMode === key;
@@ -1585,7 +1621,7 @@ export default function SettingsScreen() {
           </View>
           {/* ── 智慧省電模式 ── */}
           <SectionHeader
-            title="智慧省電模式"
+            title={t("settingsDetail.smartPowerSaving")}
             colors={colors}
             onToggle={() => toggleSection("powerSaving")}
             collapsed={collapsedSections["powerSaving"]}
@@ -1594,7 +1630,7 @@ export default function SettingsScreen() {
             <View style={[styles.section, { borderColor: colors.border }]}>
               <ToggleRow
                 icon="moon.fill"
-                label="自動省電模式"
+                label={t("settingsDetail.autoPowerSaving")}
                 value={powerSavingSettings.enabled}
                 colors={colors}
                 onToggle={(enabled) => {
@@ -1606,10 +1642,10 @@ export default function SettingsScreen() {
                 <IconSymbol name="moon.fill" size={18} color={colors.muted} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.rowLabel, { color: colors.foreground }]}>
-                    無操作後自動調暗
+                    {t("settingsDetail.dimAfterIdle")}
                   </Text>
                   <Text style={[styles.rowHint, { color: colors.muted }]}>
-                    觸控、轉彎提示或補給提醒會立即恢復亮度
+                    {t("settingsDetail.dimAfterIdleHint")}
                   </Text>
                 </View>
                 <TextInput
@@ -1635,7 +1671,7 @@ export default function SettingsScreen() {
                     { color: colors.muted, marginLeft: 6 },
                   ]}
                 >
-                  秒
+                  {t("settingsDetail.seconds")}
                 </Text>
               </View>
               <Divider colors={colors} />
@@ -1647,10 +1683,10 @@ export default function SettingsScreen() {
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.rowLabel, { color: colors.foreground }]}>
-                    靜止後切換省電監測
+                    {t("settingsDetail.idlePowerMonitoring")}
                   </Text>
                   <Text style={[styles.rowHint, { color: colors.muted }]}>
-                    偵測到重新移動時會自動恢復完整定位
+                    {t("settingsDetail.idlePowerMonitoringHint")}
                   </Text>
                 </View>
                 <TextInput
@@ -1676,7 +1712,7 @@ export default function SettingsScreen() {
                     { color: colors.muted, marginLeft: 6 },
                   ]}
                 >
-                  秒
+                  {t("settingsDetail.seconds")}
                 </Text>
               </View>
             </View>
@@ -1684,7 +1720,7 @@ export default function SettingsScreen() {
 
           {/* ── 騎乘防誤觸 ── */}
           <SectionHeader
-            title="騎乘防誤觸"
+            title={t("settingsDetail.touchGuard")}
             colors={colors}
             onToggle={() => toggleSection("touchGuard")}
             collapsed={collapsedSections["touchGuard"]}
@@ -1693,7 +1729,7 @@ export default function SettingsScreen() {
             <View style={[styles.section, { borderColor: colors.border }]}>
               <ToggleRow
                 icon="lock.fill"
-                label="騎乘時自動鎖定觸控"
+                label={t("settingsDetail.autoLockTouch")}
                 value={settings.touchGuardEnabled}
                 colors={colors}
                 onToggle={(enabled) =>
@@ -1705,10 +1741,10 @@ export default function SettingsScreen() {
                 <IconSymbol name="lock.fill" size={18} color={colors.muted} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.rowLabel, { color: colors.foreground }]}>
-                    長按解除時間
+                    {t("settingsDetail.unlockHold")}
                   </Text>
                   <Text style={[styles.rowHint, { color: colors.muted }]}>
-                    預設 400 毫秒；選擇常用解除時間
+                    {t("settingsDetail.unlockHoldHint")}
                   </Text>
                   <View style={styles.touchGuardPresetRow}>
                     {TOUCH_GUARD_UNLOCK_HOLD_PRESETS.map((milliseconds) => {
@@ -1764,18 +1800,18 @@ export default function SettingsScreen() {
               <Divider colors={colors} />
               <NumberRow
                 icon="lock.fill"
-                label="解鎖後自動重新鎖定"
+                label={t("settingsDetail.autoRelock")}
                 value={settings.touchGuardAutoRelockSec}
-                unit="秒"
+                unit={t("settingsDetail.seconds")}
                 colors={colors}
-                hint="騎乘中解除觸控鎖定後，會在此時間後自動重新鎖定"
+                hint={t("settingsDetail.autoRelockHint")}
                 disabled={!settings.touchGuardEnabled}
                 onPress={() =>
                   openEdit(
                     "touchGuardAutoRelockSec",
-                    "解鎖後自動重新鎖定時間",
+                    t("settingsDetail.autoRelock"),
                     settings.touchGuardAutoRelockSec,
-                    "秒",
+                    t("settingsDetail.seconds"),
                   )
                 }
               />
@@ -1784,7 +1820,7 @@ export default function SettingsScreen() {
 
           {/* ── 精簡導航模式 ── */}
           <SectionHeader
-            title="精簡導航模式"
+            title={t("settingsDetail.simplifiedNavigation")}
             colors={colors}
             onToggle={() => toggleSection("simplified")}
             collapsed={collapsedSections["simplified"]}
@@ -1799,7 +1835,7 @@ export default function SettingsScreen() {
                     { color: colors.foreground, flex: 1 },
                   ]}
                 >
-                  模式選擇
+                  {t("settingsDetail.modeSelection")}
                 </Text>
                 <View style={{ flexDirection: "row", gap: 6 }}>
                   {(["off", "manual", "auto"] as const).map((mode) => (
@@ -1835,10 +1871,10 @@ export default function SettingsScreen() {
                         ]}
                       >
                         {mode === "off"
-                          ? "關閉"
+                          ? t("settingsDetail.off")
                           : mode === "manual"
-                            ? "手動"
-                            : "自動"}
+                            ? t("settingsDetail.manual")
+                            : t("settingsDetail.automatic")}
                       </Text>
                     </Pressable>
                   ))}
@@ -1871,7 +1907,7 @@ export default function SettingsScreen() {
                         <Text
                           style={{ fontSize: 15, color: colors.foreground }}
                         >
-                          自動開啟閒置時間
+                          {t("settingsDetail.simplifiedIdle")}
                         </Text>
                       </View>
                       <Text
@@ -1881,7 +1917,9 @@ export default function SettingsScreen() {
                           color: colors.primary,
                         }}
                       >
-                        {settings.simplifiedNavIdleSec ?? 30} 秒
+                        {t("settingsDetail.repeatEvery", {
+                          seconds: settings.simplifiedNavIdleSec ?? 30,
+                        })}
                       </Text>
                     </View>
                     <Slider
@@ -1904,10 +1942,10 @@ export default function SettingsScreen() {
                       }}
                     >
                       <Text style={{ fontSize: 11, color: colors.muted }}>
-                        10 秒
+                        {t("settingsDetail.repeatEvery", { seconds: 10 })}
                       </Text>
                       <Text style={{ fontSize: 11, color: colors.muted }}>
-                        120 秒
+                        {t("settingsDetail.repeatEvery", { seconds: 120 })}
                       </Text>
                     </View>
                     <Text
@@ -1917,7 +1955,7 @@ export default function SettingsScreen() {
                         marginTop: 4,
                       }}
                     >
-                      騎乘中閒置此時間後自動進入精簡模式
+                      {t("settingsDetail.simplifiedIdleHint")}
                     </Text>
                   </View>
                 </>
@@ -1927,7 +1965,7 @@ export default function SettingsScreen() {
 
           {/* ── 地圖互動 ── */}
           <SectionHeader
-            title="地圖互動"
+            title={t("settingsDetail.mapInteraction")}
             colors={colors}
             onToggle={() => toggleSection("mapInteraction")}
             collapsed={collapsedSections["mapInteraction"]}
@@ -1945,7 +1983,7 @@ export default function SettingsScreen() {
                 >
                   <View style={{ flex: 1, paddingRight: 12 }}>
                     <Text style={{ fontSize: 15, color: colors.foreground }}>
-                      閒置歸位時間
+                      {t("settingsDetail.idleRecenter")}
                     </Text>
                     <Text
                       style={{
@@ -1954,7 +1992,7 @@ export default function SettingsScreen() {
                         marginTop: 3,
                       }}
                     >
-                      拖動或雙指旋轉地圖後，等待此時間才自動置中。設定會保存在本機，並依目前定位模式保留朝前、自由或正北方向。
+                      {t("settingsDetail.idleRecenterHint")}
                     </Text>
                   </View>
                   <Text
@@ -1964,7 +2002,9 @@ export default function SettingsScreen() {
                       color: colors.primary,
                     }}
                   >
-                    {settings.autoRecenterSec} 秒
+                    {t("settingsDetail.repeatEvery", {
+                      seconds: settings.autoRecenterSec,
+                    })}
                   </Text>
                 </View>
                 <Slider
@@ -1988,10 +2028,10 @@ export default function SettingsScreen() {
                   }}
                 >
                   <Text style={{ fontSize: 11, color: colors.muted }}>
-                    3 秒
+                    {t("settingsDetail.repeatEvery", { seconds: 3 })}
                   </Text>
                   <Text style={{ fontSize: 11, color: colors.muted }}>
-                    60 秒
+                    {t("settingsDetail.repeatEvery", { seconds: 60 })}
                   </Text>
                 </View>
               </View>
@@ -2007,7 +2047,10 @@ export default function SettingsScreen() {
               marginBottom: 4 /* internal spacing */,
             }}
           >
-            <SectionHeader title="導航儀表板欄位" colors={colors} />
+            <SectionHeader
+              title={t("settingsDetail.navigationDashboardFields")}
+              colors={colors}
+            />
             <Pressable
               onPress={() => {
                 LayoutAnimation.configureNext(
@@ -2025,7 +2068,7 @@ export default function SettingsScreen() {
               ]}
             >
               <Text style={{ fontSize: 12, color: colors.muted }}>
-                恢復預設
+                {t("settingsDetail.restoreDefaults")}
               </Text>
             </Pressable>
           </View>
@@ -2037,7 +2080,7 @@ export default function SettingsScreen() {
               paddingHorizontal: 4,
             }}
           >
-            拖曳右側☰按鈕可調整顯示順序，前 6 格在收縮面板顯示
+            {t("settingsDetail.dragDashboardFields", { count: 6 })}
           </Text>
           <View style={[styles.section, { borderColor: colors.border }]}>
             {dragOrder.map((key, idx) => {
@@ -2086,7 +2129,9 @@ export default function SettingsScreen() {
                           : { color: colors.muted },
                       ]}
                     >
-                      {idx < 6 ? "面板" : "展開"}
+                      {idx < 6
+                        ? t("settingsDetail.panel")
+                        : t("settingsDetail.expand")}
                     </Text>
                     <View {...responder.panHandlers} style={styles.dragHandle}>
                       <Text
@@ -2112,7 +2157,7 @@ export default function SettingsScreen() {
                           ]}
                         />
                         <Text style={styles.panelDividerLabel}>
-                          ↑ 面板區  展開區 ↓
+                          {t("settingsDetail.panelDivider")}
                         </Text>
                         <View
                           style={[
@@ -2145,7 +2190,10 @@ export default function SettingsScreen() {
                     marginBottom: 4 /* internal spacing */,
                   }}
                 >
-                  <SectionHeader title="精簡模式欄位" colors={colors} />
+                  <SectionHeader
+                    title={t("settingsDetail.compactFields")}
+                    colors={colors}
+                  />
                   <Pressable
                     onPress={() => {
                       LayoutAnimation.configureNext(
@@ -2167,7 +2215,7 @@ export default function SettingsScreen() {
                     ]}
                   >
                     <Text style={{ fontSize: 12, color: colors.muted }}>
-                      恢復預設
+                      {t("settingsDetail.restoreDefaults")}
                     </Text>
                   </Pressable>
                 </View>
@@ -2181,7 +2229,7 @@ export default function SettingsScreen() {
                   }}
                 >
                   <Text style={{ fontSize: 11, color: colors.muted, flex: 1 }}>
-                    拖曳右側☰可調整顯示順序，最多開啟 3 個欄位
+                    {t("settingsDetail.dragCompactFields", { count: 3 })}
                   </Text>
                   <Text
                     style={[
@@ -2493,7 +2541,9 @@ export default function SettingsScreen() {
             }}
           >
             <Text style={{ fontSize: 12, color: colors.muted }}>
-              單車助手 v{Constants.expoConfig?.version ?? "1.0.1"}
+              {t("settingsDetail.appVersion", {
+                version: Constants.expoConfig?.version ?? "1.0.1",
+              })}
             </Text>
           </View>
         </SettingsCategory>

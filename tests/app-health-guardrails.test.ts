@@ -43,7 +43,7 @@ describe("app health guardrails", () => {
 
   it("uses only the three touch-guard quick choices instead of a free-form time input", () => {
     expect(settingsSource).toContain("TOUCH_GUARD_UNLOCK_HOLD_PRESETS.map");
-    expect(settingsSource).toContain("預設 400 毫秒；選擇常用解除時間");
+    expect(settingsSource).toContain('t("settingsDetail.unlockHoldHint")');
     expect(settingsSource).not.toContain("touchGuardUnlockHoldDraft");
     expect(settingsSource).not.toContain("commitTouchGuardUnlockHoldMs");
   });

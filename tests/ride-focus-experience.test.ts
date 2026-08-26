@@ -28,7 +28,7 @@ describe("rider-focus experience guards", () => {
   it("uses configurable automatic relock after guard unlock", () => {
     expect(settingsContextSource).toContain("touchGuardAutoRelockSec: number");
     expect(settingsContextSource).toContain("touchGuardAutoRelockSec: 3");
-    expect(settingsSource).toContain("解鎖後自動重新鎖定");
+    expect(settingsSource).toContain('t("settingsDetail.autoRelock")');
     expect(mapSource).toContain("settings.touchGuardAutoRelockSec * 1000");
   });
 
@@ -50,7 +50,9 @@ describe("rider-focus experience guards", () => {
   });
 
   it("uses a shared carbohydrate serving setting for live and route supply plans", () => {
-    expect(settingsSource).toContain("單包能量補給碳水");
+    expect(settingsSource).toContain(
+      't("settingsDetail.servingCarbohydrate")',
+    );
     expect(settingsContextSource).toContain(
       "energyServingCarbohydrateG: number",
     );

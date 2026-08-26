@@ -21,8 +21,10 @@ const backgroundSource = readFileSync(
 
 describe("smart supply priority", () => {
   it("turns off only the matching fixed interval reminders when each smart channel is enabled", () => {
-    expect(settingsSource).toContain('label="智慧能量補給"');
-    expect(settingsSource).toContain('label="智慧補水"');
+    expect(settingsSource).toContain('label={t("settingsDetail.smartEnergy")}');
+    expect(settingsSource).toContain(
+      'label={t("settingsDetail.smartHydration")}',
+    );
     expect(settingsSource).toContain("smartEnergySupplyEnabled: enabled");
     expect(settingsSource).toContain("smartWaterSupplyEnabled: enabled");
     expect(settingsSource).toContain("supplyEnergyTimeIntervalEnabled: false");
@@ -63,9 +65,9 @@ describe("smart supply priority", () => {
   });
 
   it("explains independent smart channels and removes threshold editors", () => {
-    expect(settingsSource).toContain("能量與補水皆採智慧倒數");
-    expect(settingsSource).toContain("僅能量採智慧倒數");
-    expect(settingsSource).toContain("僅補水採智慧倒數");
+    expect(settingsSource).toContain('t("settingsDetail.smartBothHint", {');
+    expect(settingsSource).toContain('t("settingsDetail.smartEnergyHint", {');
+    expect(settingsSource).toContain('t("settingsDetail.smartWaterHint")');
     expect(settingsSource).not.toContain("能量門檻基準");
     expect(settingsSource).not.toContain("汗液流失提醒閾值");
   });

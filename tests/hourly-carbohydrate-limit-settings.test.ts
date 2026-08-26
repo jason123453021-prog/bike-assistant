@@ -31,13 +31,17 @@ describe("hourly carbohydrate limit setting integration", () => {
   });
 
   it("renders both the scientific switch and a safe manual input range", () => {
-    expect(settingsScreenSource).toContain("每小時碳水採科學建議");
-    expect(settingsScreenSource).toContain("每小時碳水上限");
+    expect(settingsScreenSource).toContain(
+      't("settingsDetail.scienceCarbohydrate")',
+    );
+    expect(settingsScreenSource).toContain(
+      't("settingsDetail.hourlyCarbohydrateLimit")',
+    );
     expect(settingsScreenSource).toContain(
       "Math.min(90, Math.max(20, Math.round(num)))",
     );
     expect(settingsScreenSource).toContain(
-      "目前依 ${settings.weight} kg 推導為 ${effectiveCarbohydrateHourlyLimitG} g/h",
+      't("settingsDetail.scienceCarbohydrateHint", {',
     );
   });
 
@@ -45,9 +49,9 @@ describe("hourly carbohydrate limit setting integration", () => {
     expect(settingsScreenSource).toContain(
       'settings.energyCarbohydrateHourlyLimitMode === "manual"',
     );
-    expect(settingsScreenSource).toContain("智慧計算");
+    expect(settingsScreenSource).toContain('t("settingsDetail.smartCalculation")');
     expect(settingsScreenSource).toContain(
-      "套用 {smartCarbohydrateHourlySuggestionG} g/h",
+      't("settingsDetail.applyHourlyLimit", {',
     );
     expect(settingsScreenSource).toContain(
       'energyCarbohydrateHourlyLimitMode: "science"',
