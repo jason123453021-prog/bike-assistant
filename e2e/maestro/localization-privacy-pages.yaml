@@ -19,7 +19,12 @@ name: ${LOCALE_NAME} navigation, RTL, and privacy policy screenshots
       text: "System & Data"
     direction: DOWN
     timeout: 30000
-- tapOn: "System & Data"
+- runFlow:
+    when:
+      notVisible:
+        id: "settings-language-selector"
+    commands:
+      - tapOn: "System & Data"
 - scrollUntilVisible:
     element:
       id: "settings-language-selector"

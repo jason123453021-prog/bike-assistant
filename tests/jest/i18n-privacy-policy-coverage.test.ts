@@ -82,5 +82,6 @@ describe("隱私政策 i18n 與 RTL 守門", () => {
     expect(rootLayout).toContain('<Stack.Screen name="privacy"');
     expect(maestroFlow).toContain('openLink: "manus20260617://privacy"');
     expect(maestroFlow).toContain('id: "settings-language-selector"');
+    expect(maestroFlow).toContain("notVisible:");
   });
 });
