@@ -2827,4 +2827,4 @@
 - [x] 將路線分析頁所有標題、說明、卡片、GPX 匯入、天氣與載入狀態抽取為 13 語系翻譯鍵，移除英文硬編碼
 - [x] 修復路線分析天氣失敗提示的跨語系洩漏，改採當前 locale 的 interpolation fallback 並禁止日文常數流入韓文或其他語系
 - [x] 補齊日文與其他 locale 的儀表設定欄位、Panel、Expand、系統資料、GPX 匯出、設定管理與重設文案，防止英文回退
-- [x] 建立 app／components 使用者可見 JSX 字串的 TypeScript AST 掃描與 13 語系 fallback 回歸守門，完成品質驗證與新版 Android APK artifact
+- [x] 建立 app／components 使用者可見 JSX 字串的 TypeScript AST 掃描與 13 語系 fallback 回歸守門，完成品質驗證與新版 Android APK artifact（1.0.98／versionCode 10098；GitHub run 32934209260，artifact 9594558827，28,574,668 bytes，未過期；Jest、Vitest 127 檔／446 tests、TypeScript、Lint、Expo config 與差異檢查均通過）
