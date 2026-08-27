@@ -16,7 +16,7 @@ Release Candidate 的可自動驗證項目已完成並通過。本機品質守�
 | 程式與邏輯品質 | 通過 | Jest 16/89、Vitest 130/462、TypeScript、Expo Lint、設定解析與 diff 檢查成功。 |
 | Android 15 BOOT_COMPLETED／FGS 風險 | 最終 AAB 通過 | 初次 bundle 暴露 Gradle 合併缺口後，改以 `tools:node="replace"` 覆寫兩個 Expo receiver；最終封裝 AAB binary manifest guard 成功。 |
 | 正式 AAB／簽署 | 通過 | GitHub run `33037338529` success；package、版本、upload key 憑證和必要 location FGS permissions 已核對。 |
-| Play Console AAB 接受度 | 未驗證 | 尚未上傳，upload key 是否已被 Console 接受仍須實際草稿上傳。 |
+| Play Console AAB 接受度 | 已驗證，有 1 則警告 | production 草稿預覽已接受 upload key 並解析 10102／1.0.102；唯一警告為停止支援 389 部舊版支援裝置。 |
 | 商店資訊與資產 | 部分備妥、待核准 | icon 1/1、Feature Graphic 1/1、手機截圖 5/8 已存在；文字內容與 1.0.102／Local-first 邊界不完全相符。 |
 | Data Safety／敏感權限／隱私政策 | 未完成 Console／法務核對 | app 內顯眼告知已實作並測試；但 Console 表單與法律核准不可自動推論。 |
 | 實體 Android／OEM／語系視覺 | 未執行 | 未跑 E2E；沒有把模擬或靜態測試誤列為實機驗證。 |
@@ -53,7 +53,7 @@ Release Candidate 的可自動驗證項目已完成並通過。本機品質守�
 | 天氣成功路徑與離線 fallback | 路線／天氣資料、i18n fallback 與 offline non-blocking guards | 容錯邏輯通過 | 公開天氣服務實際可用性、速率限制與弱網行為。 |
 | 自動省電、系統亮度交還、觸控鎖與幽靈進度條 | `supply-modal-brightness-hold.test.ts`、`touch-guard-cancel-ui.test.ts`、背景／省電守門 | 狀態邏輯通過 | 系統自動亮度、真實 touch pointer、不同 OEM 省電限制。 |
 | 13 locale、fallback、防跨語系洩漏與長字串／RTL | i18n audit、`i18n-rtl-layout-resilience.test.ts`、visible JSX 掃描與通知／匯出翻譯守門 | 字典與靜態布局規則通過 | 日、韓、Arabic 的實體 Android 200% 字體逐頁校對。 |
-| Target SDK、AAB、版本遞增、簽署與 location FGS | Android release config／signing／boot receiver tests，最終 GitHub workflow／AAB binary manifest guard | 通過 | Play Console 實際接受 upload key／AAB 與 policy pre-check。 |
+| Target SDK、AAB、版本遞增、簽署與 location FGS | Android release config／signing／boot receiver tests，最終 GitHub workflow／AAB binary manifest guard | 通過 | Play Console 已接受 upload key／AAB；仍須完成 Data Safety 與敏感權限聲明。 |
 | 背景定位顯眼告知 | `ride-permission-readiness.test.ts`、`ride-start-location-readiness.test.ts`，開始騎乘與設定頁同意前守門 | 程式流程與 13 語系文案通過 | Android 系統授權流程及 Play 審查判定。 |
 | 離線啟動、地圖與騎乘容錯 | `address-navigation-offline-nonblocking.test.ts`、背景騎乘與本機通知相容性守門 | 失敗降級邏輯通過 | 真實無網路、快取 tile 與各 OEM 網路回復行為。 |
 | 512×512 icon、Feature Graphic、手機／平板截圖、隱私政策 | 既有 Console 表單唯讀檢視與 app config URL 靜態守門 | 部分備妥 | Feature Graphic／截圖是否為當前版、平板與多語系素材、Console Privacy Policy URL、Data Safety、內容分級與法律核准。 |
@@ -73,11 +73,12 @@ Release Candidate 的可自動驗證項目已完成並通過。本機品質守�
 
 ## Play Console 唯讀核對與上架缺口
 
-目前帳戶已確認能存取此 app。最新正式版仍是 `bike-assistant-v1_0_89`（versionCode `10089`，100% rollout）；另有一份未命名正式版草稿，範圍 172 個國家／地區，未列出本輪 AAB。舊版 1.0.89 的技術品質頁面顯示 BOOT_COMPLETED FGS、無邊框 API 和大型螢幕提醒；最終 AAB 已在 workflow 層消除 BOOT_COMPLETED action，但後兩項以及 Play 對最終 AAB 的實際掃描仍須在草稿上傳後確認。
+目前帳戶已確認能存取此 app。最新正式版仍是 `bike-assistant-v1_0_89`（versionCode `10089`，100% rollout）；既有未命名 production 草稿可處理本輪 AAB。舊版 1.0.89 的技術品質頁面顯示 BOOT_COMPLETED FGS、無邊框 API 和大型螢幕提醒；最終 AAB 已在 workflow 層消除 BOOT_COMPLETED action，且 Play 已實際接受本輪 bundle，未顯示該前景服務錯誤。無邊框 API、大型螢幕，以及表單與法務項目仍須另行核對。
 
 | 提交前項目 | 狀態 | 下一步 |
 |---|---|---|
-| 最終 AAB 上傳／upload key 接受 | 未進行 | 需先取得使用者確認，將 AAB 上傳到既有正式版草稿後讀取 Play pre-check。 |
+| 最終 AAB 上傳／upload key 接受 | 已驗證 | 使用者授權下，AAB 已上傳至 production 草稿預覽；Play 已接受 upload key 並解析 10102／1.0.102，但依範圍未按儲存。 |
+| Release pre-check | 1 則警告 | 停止支援 389 部前一版支援的裝置；須決定是否接受此相容性範圍，再儲存草稿或進一步送審。 |
 | 發布軌道與範圍 | 未確認 | 使用者須在「只上傳草稿」、「送交審查」或「正式 100% 推出」中明確選擇。 |
 | 商店文字 | 待產品／法務核准 | 以 `google-play-store-listing-draft-1.0.102-zh-TW.md` 取代不相符的「隊友遙測／自動重算」描述。 |
 | 圖像素材 | 部分存在 | 既有 icon 1/1、Feature Graphic 1/1、手機截圖 5/8；須確認反映 1.0.102，並補齊／核准平板與多語系策略。 |
@@ -85,6 +86,12 @@ Release Candidate 的可自動驗證項目已完成並通過。本機品質守�
 | 隱私權政策 | URL 配置存在，法律核准待完成 | 合格律師須確認背景／前景位置、POI viewport、30 分鐘快取與所有翻譯文本。 |
 | 內容分級／測試軌道規定 | 未核對 | 在 Console 確認是否有 closed testing 或帳戶層級條件。 |
 | 實體 Android／OEM 驗證 | 未進行 | 在實機驗證位置、通知 action、背景復原、觸控鎖、沉浸模式及 200% RTL 排版。 |
+
+### Play Console 草稿上傳的實際結果
+
+經使用者明確選擇「A」後，最終 AAB 已成功傳輸、最佳化並附加到既有 production release 7 的預覽。Google Play 識別為 `10102 (1.0.102)`，確認 min API 24+、target SDK 36、4 種螢幕版面配置、2 個 ABI 和 4 項必要功能；因此 **upload key 已被接受，版本碼沒有衝突，AAB 也未被 BOOT_COMPLETED 問題阻擋**。
+
+預覽頁唯一警告是 389 部先前支援裝置將不再支援：手機減少 62、平板減少 258、電視減少 1、車內裝置減少 6、Chromebook 減少 62；另新增手機 1 台與車內裝置 1 台。Google Play 未在此頁顯示 background FGS、target SDK 或版本碼錯誤。使用者授權僅限草稿上傳與 pre-check，因此**沒有點選「儲存」、沒有加入版本資訊、沒有提交審查，也沒有發布**。
 
 ## 參考資料
 

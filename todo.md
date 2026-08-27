@@ -2873,5 +2873,7 @@
 - [ ] 在所有可交付條件齊備後，請使用者確認 Google Play 正式提交範圍與版本軌道；未確認前不提交、不發布
 - [x] 將背景定位的目的、資料類型與騎乘結束後停止追蹤，做成使用前可理解的 app 內顯眼告知與確認流程，並加入 i18n／回歸守門
 - [x] 處理並排除 1.0.102 AAB 的 `BOOT_COMPLETED` receiver Android 15 受限制前景服務風險，並以重建的封裝 AAB binary manifest 驗證
-- [ ] 將最終 1.0.102 AAB 上傳至 Play Console 既有草稿後，讀取 Play 的實際 pre-check 與 upload key 接受結果；未獲使用者確認前不執行
+- [x] 將最終 1.0.102 AAB 上傳至 Play Console 既有草稿後，讀取 Play 的實際 pre-check 與 upload key 接受結果；未獲使用者確認前不執行
+- [x] 依使用者選擇 A，僅上傳 1.0.102／10102 最終 AAB 至既有正式版草稿並記錄 Play pre-check；不送審、不發布、不變更商店資訊
+- [ ] 由產品負責人決定是否接受 1.0.102 停止支援 389 部既有支援裝置的唯一 Play pre-check 警告；未確認前不儲存草稿、不送審、不發布
 - [ ] 校正 Google Play 預設商店資訊中不符合現行 Local-first 功能邊界的「隊友遙測／自動重算回歸指引」文案，並由產品與法務確認後再儲存
