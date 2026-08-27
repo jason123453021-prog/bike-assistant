@@ -9,14 +9,14 @@
 
 Release Candidate 的可自動驗證項目已完成並通過。本機品質守門為 Jest **16 suites／89 tests**、Vitest **130 files／462 tests**、TypeScript、Expo Lint、Expo config 解析及 `git diff --check` 全數成功。最終 GitHub workflow 亦成功建置受保護 upload key 簽署的 `.aab`，並直接檢查**封裝完成 AAB** 的 binary manifest 不含 `BOOT_COMPLETED`、`REBOOT` 或各類 quick boot action。
 
-不過，**尚未將此 AAB 上傳至 Play Console、未送審、未發布**。商店公開文案仍有需修正的 Local-first 功能描述，Data Safety、Sensitive app permissions、內容分級及 Console 隱私權政策欄位尚未逐題核對，且隱私權政策／日韓阿語法律文字仍為草案。因此現況是「可交付 AAB 已備妥、外部上架條件尚未全部確認」，而非「已上架」。
+使用者確認接受裝置相容性變動後，**AAB 已儲存至 production 草稿並成功送交 Google Play 審查**。這不代表已公開上架或完成推出：審查結果、任何後續要求及實際對使用者推出仍取決於 Google Play。商店公開文案仍有需修正的 Local-first 功能描述；Data Safety、Sensitive app permissions、內容分級及 Console 隱私權政策欄位雖未逐題唯讀核對，仍不應在沒有直接證據下推定為已核准；隱私權政策／日韓阿語法律文字也仍為草案。
 
 | 範圍 | 最終狀態 | 證據／限制 |
 |---|---|---|
 | 程式與邏輯品質 | 通過 | Jest 16/89、Vitest 130/462、TypeScript、Expo Lint、設定解析與 diff 檢查成功。 |
 | Android 15 BOOT_COMPLETED／FGS 風險 | 最終 AAB 通過 | 初次 bundle 暴露 Gradle 合併缺口後，改以 `tools:node="replace"` 覆寫兩個 Expo receiver；最終封裝 AAB binary manifest guard 成功。 |
 | 正式 AAB／簽署 | 通過 | GitHub run `33037338529` success；package、版本、upload key 憑證和必要 location FGS permissions 已核對。 |
-| Play Console AAB 接受度 | 已驗證，有 1 則警告 | production 草稿預覽已接受 upload key 並解析 10102／1.0.102；唯一警告為停止支援 389 部舊版支援裝置。 |
+| Play Console AAB／審查提交 | 已提交審查 | production 草稿接受 upload key 並解析 10102／1.0.102；使用者接受唯一 389 部裝置警告後，Console 確認「已將 1 項變更送審」。 |
 | 商店資訊與資產 | 部分備妥、待核准 | icon 1/1、Feature Graphic 1/1、手機截圖 5/8 已存在；文字內容與 1.0.102／Local-first 邊界不完全相符。 |
 | Data Safety／敏感權限／隱私政策 | 未完成 Console／法務核對 | app 內顯眼告知已實作並測試；但 Console 表單與法律核准不可自動推論。 |
 | 實體 Android／OEM／語系視覺 | 未執行 | 未跑 E2E；沒有把模擬或靜態測試誤列為實機驗證。 |
@@ -77,12 +77,12 @@ Release Candidate 的可自動驗證項目已完成並通過。本機品質守�
 
 | 提交前項目 | 狀態 | 下一步 |
 |---|---|---|
-| 最終 AAB 上傳／upload key 接受 | 已驗證 | 使用者授權下，AAB 已上傳至 production 草稿預覽；Play 已接受 upload key 並解析 10102／1.0.102，但依範圍未按儲存。 |
-| Release pre-check | 1 則警告 | 停止支援 389 部前一版支援的裝置；須決定是否接受此相容性範圍，再儲存草稿或進一步送審。 |
-| 發布軌道與範圍 | 未確認 | 使用者須在「只上傳草稿」、「送交審查」或「正式 100% 推出」中明確選擇。 |
+| 最終 AAB 上傳／upload key 接受 | 已驗證 | AAB 已附加至 production 草稿，Play 已接受 upload key 並解析 10102／1.0.102。 |
+| Release pre-check | 警告已由使用者接受 | 停止支援 389 部前一版支援的裝置；使用者已明確確認接受並同意繼續。 |
+| 發布軌道與範圍 | 已送審 | production track、172 個國家／地區與 100% 推出配置已隨唯一變更送審；尚未發布。 |
 | 商店文字 | 待產品／法務核准 | 以 `google-play-store-listing-draft-1.0.102-zh-TW.md` 取代不相符的「隊友遙測／自動重算」描述。 |
 | 圖像素材 | 部分存在 | 既有 icon 1/1、Feature Graphic 1/1、手機截圖 5/8；須確認反映 1.0.102，並補齊／核准平板與多語系策略。 |
-| Data Safety／FGS 聲明／背景位置聲明 | 未唯讀核對 | 依最終 manifest 與實際資料流逐題填寫；不應以本機測試推定答案。 |
+| Data Safety／FGS 聲明／背景位置聲明 | 未逐題唯讀核對 | 不應以本機測試推定答案或法律核准；若 Play 要求補件，應以最終 manifest 與實際資料流逐題回應。 |
 | 隱私權政策 | URL 配置存在，法律核准待完成 | 合格律師須確認背景／前景位置、POI viewport、30 分鐘快取與所有翻譯文本。 |
 | 內容分級／測試軌道規定 | 未核對 | 在 Console 確認是否有 closed testing 或帳戶層級條件。 |
 | 實體 Android／OEM 驗證 | 未進行 | 在實機驗證位置、通知 action、背景復原、觸控鎖、沉浸模式及 200% RTL 排版。 |
@@ -91,7 +91,7 @@ Release Candidate 的可自動驗證項目已完成並通過。本機品質守�
 
 經使用者明確選擇「A」後，最終 AAB 已成功傳輸、最佳化並附加到既有 production release 7 的預覽。Google Play 識別為 `10102 (1.0.102)`，確認 min API 24+、target SDK 36、4 種螢幕版面配置、2 個 ABI 和 4 項必要功能；因此 **upload key 已被接受，版本碼沒有衝突，AAB 也未被 BOOT_COMPLETED 問題阻擋**。
 
-預覽頁唯一警告是 389 部先前支援裝置將不再支援：手機減少 62、平板減少 258、電視減少 1、車內裝置減少 6、Chromebook 減少 62；另新增手機 1 台與車內裝置 1 台。Google Play 未在此頁顯示 background FGS、target SDK 或版本碼錯誤。使用者授權僅限草稿上傳與 pre-check，因此**沒有點選「儲存」、沒有加入版本資訊、沒有提交審查，也沒有發布**。
+預覽頁唯一警告是 389 部先前支援裝置將不再支援：手機減少 62、平板減少 258、電視減少 1、車內裝置減少 6、Chromebook 減少 62；另新增手機 1 台與車內裝置 1 台。Google Play 未在此頁顯示 background FGS、target SDK 或版本碼錯誤。使用者明確接受警告後，production 草稿已儲存並以 100% 推出配置、172 個國家／地區送交審查。Console 顯示「已將 1 項變更送審」；**這是審查提交，並非已發布或已向使用者推出。**
 
 ## 參考資料
 
