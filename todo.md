@@ -2914,3 +2914,8 @@
 - [x] 重新核對 Google Play Default zh-TW 商店資訊審查與 Data Safety 草稿的現行 Console 狀態，記錄任何審查通知或阻擋訊息
 - [ ] 在發布平台恢復後，重新發布並驗證公開隱私權頁顯示 2026-08-27 政策；在此之前不得提交 Data Safety 最終聲明
 - [x] 保存跳過公開發布後的可追溯 checkpoint，交付商店資訊審查監控與 Data Safety 後續條件
+- [ ] 依使用者要求完成 Google Play 上架後續：先核對 production、商店資訊審查與 Data Safety 的即時狀態，僅推進已具備真實且可佐證資料的項目
+- [ ] 在公開隱私權頁仍為 2026-08-13 舊版且 Data Safety 用途、分享、處理、暫時處理與必要性尚未逐題確認時，不得跳過或以不實內容送出 Data Safety；需先取得負責人對事實答案的確認
+- [x] 重新以公開 Google Play 商店頁核對 `com.jason123453021.bikeassistant`：單車助手已可公開取得；production 1.0.102／10102 無待按下的發布動作
+- [ ] 等待 Google 處理已送交的 Default zh-TW 商店資訊審查；如收到補件或結果通知，再依通知內容處理
+- [x] 依使用者選擇 A，記錄本輪以 production 1.0.102／10102 已公開可下載為完成標準；不送出 Data Safety，保留其草稿與公開政策部署缺口供後續處理
