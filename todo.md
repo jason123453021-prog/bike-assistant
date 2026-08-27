@@ -2933,3 +2933,11 @@
 - [x] 依 Google Play 10102 版本資訊主頁建議，檢查並啟用適用的 release R8 最佳化，確保 Expo 原生模組與反射必要規則不受影響
 - [x] 完成三項 Google Play 建議修正後，建立遞增 Android AAB、執行本機 QC並取得 Google Play 寫入範圍確認（1.0.104／10104；GitHub run 33067369663 成功；SHA-256 `b486f13933d76cff609a735aa89aaeff0d2b38a25f81eeb794f9ce5a21e78c5c`）
 - [ ] 取得使用者對 1.0.104／10104 Google Play 寫入範圍的確認：僅上傳並儲存正式版草稿，或在 pre-check 無新阻擋時送交 Google 審查；不修改 Data Safety 與既有商店資訊審查
+
+- [ ] 依使用者明確授權 B，將 1.0.104／10104 上傳 Google Play 正式版、執行 pre-check；若無新阻擋則送交 Google 審查；不修改 Data Safety 與既有商店資訊審查
+
+- [ ] 在使用者接手操作後重新完成 1.0.104／10104 AAB 檔案選取與 Google Play 正式版上傳；若仍遭瀏覽器欄位阻擋，記錄失敗原因並維持未送審狀態
+
+- [ ] Google Play 拒絕 1.0.104／10104：錯誤為「版本代碼 10104 已經使用過了」；需將 Android versionCode 遞增為下一個未使用值 10105（版本 1.0.105）、重新執行 QC 與受保護 AAB 建置後再上傳
+
+- [ ] Google Play 已拒絕 1.0.104／10104，原因是 versionCode 已使用；改用 1.0.105／10105 重新執行本機 QC、受保護 AAB 建置、上傳、pre-check 與送審
