@@ -21,22 +21,56 @@ const TARGET_RECEIVERS = new Set([
   "expo.modules.taskManager.TaskBroadcastReceiver",
 ]);
 
-function removeBootCompletedActions(androidManifest) {
-  const application = androidManifest?.manifest?.application?.[0];
-  const receivers = application?.receiver ?? [];
+const RECEIVER_ACTIONS = {
+  "expo.modules.notifications.service.NotificationsService": [
+    "expo.modules.notifications.NOTIFICATION_EVENT",
+    "android.intent.action.MY_PACKAGE_REPLACED",
+  ],
+  "expo.modules.taskManager.TaskBroadcastReceiver": [
+    "expo.modules.taskManager.TaskBroadcastReceiver.INTENT_ACTION",
+    "android.intent.action.MY_PACKAGE_REPLACED",
+  ],
+};
 
-  receivers
-    .filter((receiver) => TARGET_RECEIVERS.has(receiver?.$?.["android:name"]))
-    .forEach((receiver) => {
-      receiver["intent-filter"] = (receiver["intent-filter"] ?? [])
-        .map((intentFilter) => ({
-          ...intentFilter,
-          action: (intentFilter.action ?? []).filter(
-            (action) => !BOOT_ACTIONS.has(action?.$?.["android:name"]),
-          ),
-        }))
-        .filter((intentFilter) => (intentFilter.action ?? []).length > 0);
-    });
+function createReceiverOverride(name) {
+  return {
+    $: {
+      "android:name": name,
+      "android:enabled": "true",
+      "android:exported": "false",
+      // intent-filter elements never match by default, so this high-priority receiver
+      // must replace the lower-priority library receiver as a whole.
+      "tools:node": "replace",
+    },
+    "intent-filter": [
+      {
+        $: { "android:priority": "-1" },
+        action: RECEIVER_ACTIONS[name].map((action) => ({
+          $: { "android:name": action },
+        })),
+      },
+    ],
+  };
+}
+
+function removeBootCompletedActions(androidManifest) {
+  const manifest = androidManifest?.manifest;
+  const application = manifest?.application?.[0];
+  if (!manifest || !application) return androidManifest;
+
+  manifest.$ = {
+    ...(manifest.$ ?? {}),
+    "xmlns:tools": "http://schemas.android.com/tools",
+  };
+
+  const untouchedReceivers = (application.receiver ?? []).filter(
+    (receiver) => !TARGET_RECEIVERS.has(receiver?.$?.["android:name"]),
+  );
+
+  application.receiver = [
+    ...untouchedReceivers,
+    ...[...TARGET_RECEIVERS].map(createReceiverOverride),
+  ];
 
   return androidManifest;
 }

@@ -28,6 +28,7 @@ const BOOT_ACTIONS = [
 function buildManifestFixture() {
   return {
     manifest: {
+      $: {},
       application: [
         {
           receiver: [
@@ -117,6 +118,7 @@ describe("Android 15 BOOT_COMPLETED release guard", () => {
       '"android.permission.RECEIVE_BOOT_COMPLETED"',
     );
     expect(workflowSource).toContain("驗證 Android 15 前景服務開機限制");
+    expect(workflowSource).toContain("驗證封裝 AAB 未含受限制開機 action");
     expect(workflowSource).toContain("BOOT_COMPLETED|REBOOT|QUICKBOOT_POWERON");
     expect(workflowSource).toContain(
       "android.permission.FOREGROUND_SERVICE_LOCATION",
@@ -138,9 +140,11 @@ describe("Android 15 BOOT_COMPLETED release guard", () => {
 
     expect(notificationActions).toEqual([
       "expo.modules.notifications.NOTIFICATION_EVENT",
+      "android.intent.action.MY_PACKAGE_REPLACED",
     ]);
     expect(taskActions).toEqual([
       "expo.modules.taskManager.TaskBroadcastReceiver.INTENT_ACTION",
+      "android.intent.action.MY_PACKAGE_REPLACED",
     ]);
     expect(
       BOOT_ACTIONS.some((action) => notificationActions?.includes(action)),
@@ -157,5 +161,30 @@ describe("Android 15 BOOT_COMPLETED release guard", () => {
     expect(receiverActions(manifest, "example.UnrelatedReceiver")).toEqual([
       "android.intent.action.BOOT_COMPLETED",
     ]);
+  });
+
+  it("uses a high-priority receiver replacement because library intent filters otherwise merge as unique elements", () => {
+    const manifest = buildManifestFixture();
+    removeBootCompletedActions(manifest);
+
+    expect(manifest.manifest.$).toMatchObject({
+      "xmlns:tools": "http://schemas.android.com/tools",
+    });
+    const notificationReceiver = manifest.manifest.application[0].receiver.find(
+      (entry) =>
+        entry.$["android:name"] ===
+        "expo.modules.notifications.service.NotificationsService",
+    );
+    const taskReceiver = manifest.manifest.application[0].receiver.find(
+      (entry) =>
+        entry.$["android:name"] ===
+        "expo.modules.taskManager.TaskBroadcastReceiver",
+    );
+    expect(
+      (notificationReceiver?.$ as Record<string, string>)["tools:node"],
+    ).toBe("replace");
+    expect((taskReceiver?.$ as Record<string, string>)["tools:node"]).toBe(
+      "replace",
+    );
   });
 });

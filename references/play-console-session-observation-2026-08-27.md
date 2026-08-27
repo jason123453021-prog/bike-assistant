@@ -30,4 +30,6 @@
 
 於嘗試開啟「由 Google Play 保護」總覽以查閱應用程式內容時，Console 連線以 `ERR_CONNECTION_CLOSED` 中斷。這不是商店核准或拒絕回應；截至中斷前，Data Safety、Sensitive app permissions、內容分級及 Console 隱私權政策欄位仍未完成唯讀核對，亦未對任何表單輸入、儲存、上傳、送審或發布。
 
+連線恢復後已成功讀取「由 Google Play 保護」總覽。該頁顯示 package `com.jason123453021.bikeassistant` 為「良好保護」、已啟用自動防護 1 項服務與 Play 商店防護措施 6 項服務；但這是保護功能總覽，未顯示 Data Safety、Sensitive app permissions、內容分級或隱私權政策欄位的逐題答案，不能作為這些表單已完成的證據。未修改任何保護服務或其他 Console 資料。
+
 截至此紀錄，尚未進入版本軌道詳情，故仍未驗證活躍 bundle 的實際 versionCode、是否存在可用的 production 草稿、AAB 上傳金鑰接受狀態、Data Safety、Sensitive app permissions、商店素材或隱私權政策欄位。尚未上傳、送審或發布任何 1.0.102 AAB。

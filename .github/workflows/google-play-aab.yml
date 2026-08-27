@@ -81,6 +81,15 @@ jobs:
         working-directory: android
         run: ./gradlew bundleRelease --no-daemon --stacktrace
 
+      - name: 驗證封裝 AAB 未含受限制開機 action
+        run: |
+          aab="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
+          test -n "$aab"
+          if unzip -p "$aab" base/manifest/AndroidManifest.xml | grep -aoE '[[:print:]]{3,}' | grep -E 'android.intent.action.(BOOT_COMPLETED|REBOOT|QUICKBOOT_POWERON)|com.htc.intent.action.QUICKBOOT_POWERON'; then
+            echo "Packaged AAB still contains a boot receiver action that may launch a restricted foreground service." >&2
+            exit 1
+          fi
+
       - name: 上傳 Google Play AAB artifact
         uses: actions/upload-artifact@v4
         with:

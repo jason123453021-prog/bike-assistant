@@ -10,7 +10,7 @@
 | 商店預覽資產 | Play Console 的 Main store listing 管理 icon、短說明、Feature Graphic、截圖與可選預覽影片；所有資產及文字須符合 Developer Program Policies。 | 專案內有 launcher icon；Feature Graphic、商店截圖、短說明與商店 metadata 是否已在 Console 填寫待確認。 |
 | 對外提交 | 上架會使版本／商店資訊成為對外可見或可供審核的內容。 | 需在 bundle、商店資料、安全性表單、隱私政策與發布軌道均確認後，由使用者明確核准才可提交。 |
 
-| Android 15 開機 receiver 與前景服務 | Target Android 15 以上時，`BOOT_COMPLETED` receiver 不得啟動 `dataSync`、`camera`、`mediaPlayback`、`phoneCall`、`mediaProjection` 或 `microphone` 類型前景服務；違反時系統會拋出 `ForegroundServiceStartNotAllowedException`。 | 初輪 1.0.102 AAB 的 manifest 仍可見 Expo Notifications／Task Manager 的 BOOT_COMPLETED action，且 Play Console 舊版 1.0.89 已顯示該風險。已新增最終 manifest plugin，僅移除這些 receiver 的開機 action、保留 app 內事件；本機 `expo prebuild` 產物已確認不存在四種 boot action，仍保有 location FGS 必要權限。下一輪正式 AAB 與 Play 預先檢查仍須再驗證。 |
+| Android 15 開機 receiver 與前景服務 | Target Android 15 以上時，`BOOT_COMPLETED` receiver 不得啟動 `dataSync`、`camera`、`mediaPlayback`、`phoneCall`、`mediaProjection` 或 `microphone` 類型前景服務；違反時系統會拋出 `ForegroundServiceStartNotAllowedException`。 | 第二次 1.0.102 AAB 仍可見 Expo Notifications／Task Manager 的 BOOT_COMPLETED action；確認單純在 Expo prebuild 移除 action 不足，因 Gradle 會合併 library `intent-filter`。現已改用同名 receiver 的 `tools:node="replace"` 規則，保留 app 內事件與套件更新事件、移除開機 action，並加入封裝 AAB binary manifest 守門。本機 prebuild 已通過；仍須以新 AAB 與 Play 預先檢查確認。 |
 
 ## Play Console 唯讀預檢（2026-08-27）
 
