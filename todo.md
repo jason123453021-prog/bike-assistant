@@ -2867,8 +2867,10 @@
 ## Release Candidate 完整 QC 與 Google Play 上架準備（2026-08-27）
 
 - [ ] 將使用者提供的地圖、導航、POI、補給、數據、GPX、系統控制與 i18n 清單逐項映射至可執行測試與人工驗收限制
-- [ ] 補齊或強化可自動驗證的 Play release 守門：AAB、version metadata、簽署／manifest、定位前景服務、離線容錯、隱私 URL 與資料揭露
-- [ ] 執行完整本機 QC 與 Android release AAB 建置驗證，保存可追溯報告
+- [x] 補齊或強化可自動驗證的 Play release 守門：AAB、version metadata、簽署／manifest、定位前景服務、離線容錯、隱私 URL 與資料揭露
+- [x] 執行完整本機 QC 與 Android release AAB 建置驗證，保存可追溯報告
 - [ ] 盤點 Play Console 商店資訊、Feature Graphic、裝置截圖、法律審閱與實體裝置驗證等不可由程式碼自動確認的缺口
 - [ ] 在所有可交付條件齊備後，請使用者確認 Google Play 正式提交範圍與版本軌道；未確認前不提交、不發布
 - [x] 將背景定位的目的、資料類型與騎乘結束後停止追蹤，做成使用前可理解的 app 內顯眼告知與確認流程，並加入 i18n／回歸守門
+- [ ] 處理或明確排除 1.0.102 AAB 仍含 `BOOT_COMPLETED` receiver 所引發的 Android 15 受限制前景服務風險，並以重建 AAB 與 Play 預先檢查驗證
+- [ ] 校正 Google Play 預設商店資訊中不符合現行 Local-first 功能邊界的「隊友遙測／自動重算回歸指引」文案，並由產品與法務確認後再儲存

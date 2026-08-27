@@ -205,6 +205,9 @@ const config: ExpoConfig = {
         position: "relative",
       },
     ],
+    // 保留 app 內本機通知與 Task Manager 事件，但不允許任何套件在裝置開機時重啟服務。
+    // 此 plugin 必須位於 Expo 內建 plugin 之後，才能從最終 Android manifest 移除 BOOT_COMPLETED 類 action。
+    "./plugins/with-remove-boot-completed-receivers.cjs",
   ],
   experiments: {
     typedRoutes: true,
