@@ -2906,3 +2906,11 @@
 - [x] 依使用者確認儲存 Data Safety 資料類型草稿：移除帳戶／名稱／電子郵件／概略位置舊聲明，僅保留精確位置；未進入用途、處理方式、預覽或最終提交
 - [x] 依使用者確認，將 Default zh-TW 的短／完整說明、6 張手機截圖與 Feature Graphic 送交 Google Play 審查；AI 生成或編輯素材已如實標示
 - [ ] 釐清並修復公開隱私權頁仍顯示 2026-08-13 舊版內容的部署落差，確認 2026-08-27 Local-first 資料流與 POI 快取政策公開可見後，才進行 Data Safety 最終提交
+- [ ] 比對公開 `bikeassist-bdbkimdc.manus.space/privacy`、目前工作樹與最近 checkpoint 的版本來源，定位隱私權頁為何仍回傳 2026-08-13 舊內容
+- [ ] 修復公開隱私權頁部署來源並驗證頁面顯示 2026-08-27、線上地圖／天氣／路徑／POI 資料流與最多 30 分鐘本機快取說明
+- [ ] 記錄公開政策回查結果與 Default zh-TW 商店資訊的 Google Play 審查狀態；Data Safety 用途／處理／預覽／提交維持等待律師核准
+- [ ] 完成部署修正後進行差異檢查、checkpoint 與可回溯交付；不提交 Data Safety 或變更已上架 production 配置
+- [x] 依使用者要求跳過卡住的 Manus 公開網站發布工作；不再等待「正在發布…」狀態完成
+- [x] 重新核對 Google Play Default zh-TW 商店資訊審查與 Data Safety 草稿的現行 Console 狀態，記錄任何審查通知或阻擋訊息
+- [ ] 在發布平台恢復後，重新發布並驗證公開隱私權頁顯示 2026-08-27 政策；在此之前不得提交 Data Safety 最終聲明
+- [x] 保存跳過公開發布後的可追溯 checkpoint，交付商店資訊審查監控與 Data Safety 後續條件
