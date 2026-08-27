@@ -2863,3 +2863,12 @@
 - [x] 後續功能或修正先完成本機 QC，再觸發／確認 GitHub Android APK workflow 並提供 artifact 下載連結
 - [x] E2E 不再是交付前置；除非使用者明確要求，僅保留為可選的後續回歸工作
 - [x] 對 1.0.102／versionCode 10102 完成完整本機 QC，僅建置 GitHub Android APK artifact 並交付下載連結（不執行 E2E；run 33025190933／artifact 9628504469，`app-release.apk` 53,697,831 bytes）
+
+## Release Candidate 完整 QC 與 Google Play 上架準備（2026-08-27）
+
+- [ ] 將使用者提供的地圖、導航、POI、補給、數據、GPX、系統控制與 i18n 清單逐項映射至可執行測試與人工驗收限制
+- [ ] 補齊或強化可自動驗證的 Play release 守門：AAB、version metadata、簽署／manifest、定位前景服務、離線容錯、隱私 URL 與資料揭露
+- [ ] 執行完整本機 QC 與 Android release AAB 建置驗證，保存可追溯報告
+- [ ] 盤點 Play Console 商店資訊、Feature Graphic、裝置截圖、法律審閱與實體裝置驗證等不可由程式碼自動確認的缺口
+- [ ] 在所有可交付條件齊備後，請使用者確認 Google Play 正式提交範圍與版本軌道；未確認前不提交、不發布
+- [x] 將背景定位的目的、資料類型與騎乘結束後停止追蹤，做成使用前可理解的 app 內顯眼告知與確認流程，並加入 i18n／回歸守門

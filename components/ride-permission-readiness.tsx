@@ -14,8 +14,13 @@ import {
   type ComponentProps,
 } from "react";
 
+import { BackgroundLocationDisclosure } from "@/components/background-location-disclosure";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import {
+  hasAcceptedBackgroundLocationDisclosure,
+  recordBackgroundLocationDisclosureAcceptance,
+} from "@/lib/background-location-disclosure";
 import {
   PermissionsManager,
   type PermissionStatus,
@@ -62,6 +67,8 @@ export function RidePermissionReadiness() {
   const { t } = useTranslation();
   const [statuses, setStatuses] = useState<PermissionStatus[]>([]);
   const [opening, setOpening] = useState<PermissionType | null>(null);
+  const [locationDisclosureVisible, setLocationDisclosureVisible] =
+    useState(false);
 
   const refresh = useCallback(async () => {
     const next = await PermissionsManager.getAllPermissionStatuses();
@@ -101,6 +108,26 @@ export function RidePermissionReadiness() {
       }
     },
     [refresh],
+  );
+
+  const requestLocationWithDisclosure = useCallback(async () => {
+    if (await hasAcceptedBackgroundLocationDisclosure()) {
+      void openSetup("location");
+      return;
+    }
+    setLocationDisclosureVisible(true);
+  }, [openSetup]);
+
+  const handleLocationDisclosureDecision = useCallback(
+    (accepted: boolean) => {
+      setLocationDisclosureVisible(false);
+      if (!accepted) return;
+      void (async () => {
+        await recordBackgroundLocationDisclosureAcceptance();
+        await openSetup("location");
+      })();
+    },
+    [openSetup],
   );
 
   if (Platform.OS === "web") return null;
@@ -177,6 +204,10 @@ export function RidePermissionReadiness() {
               accessibilityLabel={`${t(item.setupLabelKey)} ${t(item.titleKey)}`}
               disabled={isOpening}
               onPress={() => {
+                if (item.type === "location") {
+                  void requestLocationWithDisclosure();
+                  return;
+                }
                 void openSetup(item.type);
               }}
               style={({ pressed }) => [
@@ -204,6 +235,10 @@ export function RidePermissionReadiness() {
       <Text style={[styles.note, { color: colors.muted }]}>
         {t("permissions.batteryNote")}
       </Text>
+      <BackgroundLocationDisclosure
+        visible={locationDisclosureVisible}
+        onDecision={handleLocationDisclosureDecision}
+      />
     </View>
   );
 }

@@ -17,8 +17,11 @@ describe("ride start location readiness", () => {
     expect(source).toContain("開始騎乘需要精確定位權限");
   });
 
-  it("keeps the foreground ride usable but reports when background tracking cannot start", () => {
-    expect(source).toContain("const backgroundTrackingStarted = await startBackgroundLocationTracking");
+  it("keeps the foreground ride usable and requests background tracking only after a disclosure decision", () => {
+    expect(source).toContain("await requestBackgroundLocationDisclosure()");
+    expect(source).toContain("const backgroundTrackingStarted =");
+    expect(source).toContain("backgroundLocationDisclosureAcceptedRef.current &&");
+    expect(source).toContain("await startBackgroundLocationTracking");
     expect(source).toContain("背景騎乘未啟用");
     expect(source).toContain("允許背景定位與電池不受限制");
   });

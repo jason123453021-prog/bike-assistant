@@ -177,6 +177,7 @@ import {
   type GpsAccuracyLevel,
 } from "@/lib/background-location";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { BackgroundLocationDisclosure } from "@/components/background-location-disclosure";
 import { SupplyModal } from "@/components/supply-modal";
 import { RideSummaryModal } from "@/components/ride-summary-modal";
 import { SimplifiedNavOverlay } from "@/components/simplified-nav-overlay";
@@ -201,6 +202,10 @@ import {
 } from "@/lib/auto-lap-milestones";
 import { SmartPowerSavingManager } from "@/lib/power-saving/smart-power-saving-system";
 import { setRideImmersiveMode } from "@/lib/ride-immersive-mode";
+import {
+  hasAcceptedBackgroundLocationDisclosure,
+  recordBackgroundLocationDisclosureAcceptance,
+} from "@/lib/background-location-disclosure";
 import {
   getDueSupplyIntervals,
   type SupplyIntervalKind,
@@ -400,6 +405,14 @@ export default function MapScreen() {
   const locationCameraModeRef = useRef<LocationCameraMode>("heading-up");
   const programmaticBearingUntilRef = useRef(0);
   const [touchGuardEnabled, setTouchGuardEnabled] = useState(false);
+  const [
+    backgroundLocationDisclosureVisible,
+    setBackgroundLocationDisclosureVisible,
+  ] = useState(false);
+  const backgroundLocationDisclosureResolverRef = useRef<
+    ((accepted: boolean) => void) | null
+  >(null);
+  const backgroundLocationDisclosureAcceptedRef = useRef(false);
   const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
   const autoLapMilestoneStateRef = useRef<AutoLapMilestoneState | null>(null);
   const autoRecenterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -415,6 +428,31 @@ export default function MapScreen() {
     currentPosRef.current = currentPos;
   }, [currentPos]);
 
+  const requestBackgroundLocationDisclosure = useCallback(async () => {
+    if (await hasAcceptedBackgroundLocationDisclosure()) {
+      backgroundLocationDisclosureAcceptedRef.current = true;
+      return true;
+    }
+    return new Promise<boolean>((resolve) => {
+      backgroundLocationDisclosureResolverRef.current = resolve;
+      setBackgroundLocationDisclosureVisible(true);
+    });
+  }, []);
+
+  const handleBackgroundLocationDisclosureDecision = useCallback(
+    (accepted: boolean) => {
+      setBackgroundLocationDisclosureVisible(false);
+      if (accepted) {
+        backgroundLocationDisclosureAcceptedRef.current = true;
+        void recordBackgroundLocationDisclosureAcceptance();
+      }
+      const resolve = backgroundLocationDisclosureResolverRef.current;
+      backgroundLocationDisclosureResolverRef.current = null;
+      resolve?.(accepted);
+    },
+    [],
+  );
+
   const poiInitialLatitude = currentPos?.lat;
   const poiInitialLongitude = currentPos?.lon;
 
@@ -426,11 +464,7 @@ export default function MapScreen() {
         showWaterRefillSpots: settings.showWaterRefillSpots,
         showPhotoScenicSpots: settings.showPhotoScenicSpots,
       }),
-    [
-      poiMarkers,
-      settings.showPhotoScenicSpots,
-      settings.showWaterRefillSpots,
-    ],
+    [poiMarkers, settings.showPhotoScenicSpots, settings.showWaterRefillSpots],
   );
 
   const loadPoiMarkersForBounds = useCallback(
@@ -2958,10 +2992,12 @@ export default function MapScreen() {
         ? { lat: currentPosRef.current.lat, lon: currentPosRef.current.lon }
         : null;
       setRideLocationTrackingMode("idle_monitor");
-      void setBackgroundLocationTrackingMode(
-        settings.gpsAccuracy || "standard",
-        "idle_monitor",
-      );
+      if (backgroundLocationDisclosureAcceptedRef.current) {
+        void setBackgroundLocationTrackingMode(
+          settings.gpsAccuracy || "standard",
+          "idle_monitor",
+        );
+      }
     }, delayMs);
 
     return () => {
@@ -3043,10 +3079,12 @@ export default function MapScreen() {
               pausedAtRef.current = null;
               setRideLocationTrackingMode("full");
               dispatch({ type: "RESUME" });
-              void setBackgroundLocationTrackingMode(
-                settings.gpsAccuracy || "standard",
-                "full",
-              );
+              if (backgroundLocationDisclosureAcceptedRef.current) {
+                void setBackgroundLocationTrackingMode(
+                  settings.gpsAccuracy || "standard",
+                  "full",
+                );
+              }
             }
             return;
           }
@@ -3902,6 +3940,12 @@ export default function MapScreen() {
         );
         return;
       }
+
+      const backgroundLocationDisclosureAccepted =
+        await requestBackgroundLocationDisclosure();
+      if (!backgroundLocationDisclosureAccepted) {
+        backgroundLocationDisclosureAcceptedRef.current = false;
+      }
     } catch {
       Alert.alert("無法確認定位狀態", "請確認定位服務與權限後再試一次。");
       return;
@@ -4122,10 +4166,15 @@ export default function MapScreen() {
     });
     lastBackgroundCountdownSnapshotRef.current = "";
     syncSmartSupplyCountdown(smartSupplyCountdownRef.current);
-    const backgroundTrackingStarted = await startBackgroundLocationTracking(
-      settings.gpsAccuracy || "standard",
-    );
-    if (!backgroundTrackingStarted) {
+    const backgroundTrackingStarted =
+      backgroundLocationDisclosureAcceptedRef.current &&
+      (await startBackgroundLocationTracking(
+        settings.gpsAccuracy || "standard",
+      ));
+    if (
+      backgroundLocationDisclosureAcceptedRef.current &&
+      !backgroundTrackingStarted
+    ) {
       Alert.alert(
         "背景騎乘未啟用",
         "目前會在 App 開啟時持續記錄；若鎖定螢幕或切到背景，請在系統設定允許背景定位與電池不受限制，以維持完整軌跡。",
@@ -4159,6 +4208,7 @@ export default function MapScreen() {
     updateWeather,
     calorieAnim,
     waterAnim,
+    requestBackgroundLocationDisclosure,
   ]);
 
   useEffect(() => {
@@ -4730,7 +4780,11 @@ export default function MapScreen() {
   useEffect(() => {
     const currentAccuracy: GpsAccuracyLevel =
       settings.gpsAccuracy || "standard";
-    if (mapRideActive && currentAccuracy !== prevGpsAccuracyRef.current) {
+    if (
+      mapRideActive &&
+      backgroundLocationDisclosureAcceptedRef.current &&
+      currentAccuracy !== prevGpsAccuracyRef.current
+    ) {
       prevGpsAccuracyRef.current = currentAccuracy;
       (async () => {
         await stopBackgroundLocationTracking();
@@ -4744,7 +4798,12 @@ export default function MapScreen() {
   // ─── 電量低自動降級 GPS 精度 ──────────────────────────────────────────────────────
   const batteryDegradedRef = useRef(false);
   useEffect(() => {
-    if (!mapRideActive || Platform.OS === "web") return;
+    if (
+      !mapRideActive ||
+      Platform.OS === "web" ||
+      !backgroundLocationDisclosureAcceptedRef.current
+    )
+      return;
     let cancelled = false;
     const checkBattery = async () => {
       try {
@@ -5057,9 +5116,13 @@ export default function MapScreen() {
                   setMapRideActive(true);
                   setShowRecoveryAlert(false);
                   setRecoverySnapshot(null);
-                  startBackgroundLocationTracking(
-                    settings.gpsAccuracy || "standard",
-                  );
+                  void (async () => {
+                    if (await requestBackgroundLocationDisclosure()) {
+                      await startBackgroundLocationTracking(
+                        settings.gpsAccuracy || "standard",
+                      );
+                    }
+                  })();
                 }
               }}
             >
@@ -5289,7 +5352,9 @@ export default function MapScreen() {
                 fontWeight: "800",
               }}
             >
-              {touchGuardEnabled ? t("audit.touchGuardOn") : t("audit.touchGuardOff")}
+              {touchGuardEnabled
+                ? t("audit.touchGuardOn")
+                : t("audit.touchGuardOff")}
             </Text>
             <Text
               style={[
@@ -6057,7 +6122,10 @@ export default function MapScreen() {
           >
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text
-                style={[styles.poiCardTitle, { textAlign: isRTL ? "right" : "left" }]}
+                style={[
+                  styles.poiCardTitle,
+                  { textAlign: isRTL ? "right" : "left" },
+                ]}
                 numberOfLines={2}
               >
                 {selectedPoi.name}
@@ -6068,7 +6136,9 @@ export default function MapScreen() {
                   {
                     alignSelf: isRTL ? "flex-end" : "flex-start",
                     backgroundColor:
-                      selectedPoi.kind === "water_refill" ? "#0A84FF" : "#FF9500",
+                      selectedPoi.kind === "water_refill"
+                        ? "#0A84FF"
+                        : "#FF9500",
                   },
                 ]}
               >
@@ -6428,6 +6498,10 @@ export default function MapScreen() {
           <Text style={styles.touchGuardUnlockSuccessCheck}>✓</Text>
         </Animated.View>
       )}
+      <BackgroundLocationDisclosure
+        visible={backgroundLocationDisclosureVisible}
+        onDecision={handleBackgroundLocationDisclosureDecision}
+      />
     </View>
   );
 }
