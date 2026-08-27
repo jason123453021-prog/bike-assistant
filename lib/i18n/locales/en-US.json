@@ -379,7 +379,7 @@
     "retry": "Try again",
     "privacyPolicy": "Privacy policy",
     "back": "Back",
-    "privacyUpdated": "Last updated: August 13, 2026",
+    "privacyUpdated": "Last updated: August 27, 2026",
     "privacyCopyright": "© 2026 Cycling Assistant. All rights reserved."
   },
   "detail": {
@@ -554,7 +554,7 @@
     "sections": {
       "introduction": {
         "title": "1. Introduction",
-        "body": "Bike Assistant uses a Local-First design. This policy explains how the App processes, stores, and deletes data on your device. The App does not provide accounts, social features, friends, cloud synchronization, or remote push-notification services."
+        "body": "Bike Assistant uses a Local-first design. This policy explains how the App processes, stores, and deletes data on your device, and what data transfer can occur when you actively use online map, weather, route, or POI features. The App does not provide accounts, social features, friends, cloud synchronization, or remote push-notification services."
       },
       "collection": {
         "title": "2. Data we collect",
@@ -562,11 +562,11 @@
       },
       "use": {
         "title": "3. How data is used",
-        "body": "Data is used only for on-device GPS navigation, ride recording, power and expenditure estimates, supply reminders, activity analysis, and GPX export. Ride notifications are local notifications; the App does not register for or receive remote push notifications."
+        "body": "Location, ride, personal, and activity data is used for on-device GPS maps, ride recording, power and expenditure estimates, supply reminders, activity analysis, and GPX export. Ride notifications are local notifications; the App does not register for or receive remote push notifications. See section 5 for processing used by features you actively access online."
       },
       "storage": {
         "title": "4. Storage and retention",
-        "body": "Ride records, GPX files, settings, media, and crash-recovery snapshots are stored on your device. Data is retained until you delete activities, clear the cache, or uninstall the App. The App does not automatically upload or synchronize this data across devices."
+        "body": "Ride records, GPX files, settings, media, and crash-recovery snapshots are stored on your device. Ride and media data is retained until you delete it in the App, clear the related cache, or uninstall the App; POI query results are cached for up to 30 minutes. The App does not automatically upload or synchronize ride data, media, or settings across devices."
       },
       "sharing": {
         "title": "5. Data sharing",
@@ -594,7 +594,7 @@
       },
       "changes": {
         "title": "11. Changes to this policy",
-        "body": "We may update this privacy policy from time to time. For material changes, we will notify you through the App. Your continued use of the App indicates acceptance of the updated policy."
+        "body": "We may update this privacy policy when features or legal requirements change. The updated text and last-updated date will appear on this page; please review it before using new features."
       },
       "contact": {
         "title": "12. Contact us",

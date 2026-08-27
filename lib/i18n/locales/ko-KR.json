@@ -199,7 +199,7 @@
   },
   "audit": {
     "privacyPolicy": "개인정보 처리방침",
-    "privacyUpdated": "최종 업데이트: 2026년 8월 26일",
+    "privacyUpdated": "최종 업데이트: 2026년 8월 27일",
     "privacyCopyright": "© 2026 Bike Assistant. All rights reserved.",
     "recoveryTitle": "미완료 라이딩 감지",
     "recoveryDescription": "라이딩 시간 {{time}}, 거리 {{distance}} km",
@@ -326,7 +326,7 @@
       },
       "changes": {
         "title": "본 정책의 변경",
-        "body": "당사는 본 개인정보 보호정책을 수시로 업데이트할 수 있습니다. 중대한 변경 사항은 App을 통해 알려드리겠습니다. App을 계속 사용하면 업데이트된 정책에 동의하는 것으로 간주됩니다."
+        "body": "기능 또는 법적 요구사항이 변경되면 본 개인정보처리방침을 업데이트할 수 있습니다. 업데이트된 내용과 최종 업데이트 날짜는 이 페이지에 표시됩니다. 새 기능을 사용하기 전에 다시 확인해 주세요."
       },
       "contact": {
         "title": "12. 문의하기",

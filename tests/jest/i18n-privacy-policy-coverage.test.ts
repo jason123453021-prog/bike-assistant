@@ -62,6 +62,34 @@ describe("隱私政策 i18n 與 RTL 守門", () => {
     expect(privacyScreen).toContain("PRIVACY_SECTION_KEYS.map");
   });
 
+  it("公開隱私政策不含佔位符，且繁中／英文事實基準揭露 POI 查詢與本機快取", () => {
+    for (const locale of ["zh-TW", "en-US", "ja-JP", "ko-KR", "ar-SA"]) {
+      const source = fs.readFileSync(
+        path.join(rootDir, "lib/i18n/locales", `${locale}.json`),
+        "utf8",
+      );
+      expect(source).not.toContain("PRIVACYTOKEN");
+    }
+
+    const zhTw = JSON.parse(
+      fs.readFileSync(
+        path.join(rootDir, "lib/i18n/locales/zh-TW.json"),
+        "utf8",
+      ),
+    );
+    const enUs = JSON.parse(
+      fs.readFileSync(
+        path.join(rootDir, "lib/i18n/locales/en-US.json"),
+        "utf8",
+      ),
+    );
+
+    expect(zhTw.privacy.sections.sharing.body).toContain("POI");
+    expect(zhTw.privacy.sections.sharing.body).toContain("30 分鐘");
+    expect(enUs.privacy.sections.sharing.body).toContain("POI");
+    expect(enUs.privacy.sections.sharing.body).toContain("30 minutes");
+  });
+
   it("設定頁與根路由提供可及的隱私政策入口", () => {
     const settings = fs.readFileSync(
       path.join(rootDir, "app/(tabs)/settings.tsx"),
