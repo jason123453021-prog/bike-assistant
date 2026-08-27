@@ -27,7 +27,6 @@ import {
   Animated,
   AppState,
   Dimensions,
-  Image,
   Modal,
   PanResponder,
   Platform,
@@ -50,6 +49,7 @@ import { Accelerometer } from "expo-sensors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
+import { Image } from "expo-image";
 import Svg, { Circle } from "react-native-svg";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/i18n/language-provider";
@@ -6202,8 +6202,13 @@ export default function MapScreen() {
               accessibilityLabel={t("poiLayers.previewImage", {
                 name: selectedPoi.name,
               })}
-              resizeMode="cover"
+              allowDownscaling
+              cachePolicy="disk"
+              contentFit="cover"
+              enforceEarlyResizing
+              recyclingKey={selectedPoi.id}
               style={styles.poiPreviewImage}
+              transition={150}
             />
           ) : null}
           <View style={styles.poiCardBody}>

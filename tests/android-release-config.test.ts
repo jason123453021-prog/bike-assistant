@@ -29,6 +29,12 @@ describe("Android 15/16 release configuration", () => {
     expect(configSource).toContain('"expo-asset"');
   });
 
+  it("uses native Android 15/16 edge-to-edge without deprecated navigation-bar color or position configuration", () => {
+    expect(configSource).toContain("edgeToEdgeEnabled: true");
+    expect(configSource).not.toContain('"expo-navigation-bar"');
+    expect(packageSource).not.toContain('"expo-navigation-bar"');
+  });
+
   it("keeps the Expo SDK 54 new architecture enabled for Reanimated 4", () => {
     expect(configSource).toContain("newArchEnabled: true");
     expect(packageSource).toContain('"react-native-reanimated"');

@@ -25,7 +25,7 @@ const config: ExpoConfig = {
   slug: env.appSlug,
   owner: "jason1234530",
   // Google Play 現行正式版為 1.0.102／10102；每個更新 bundle 都必須提高 versionCode。
-  version: "1.0.103",
+  version: "1.0.104",
   // Android 16 會忽略大螢幕的強制方向；改採自適應視窗與 Safe Area 佈局。
   orientation: "default",
   icon: "./assets/images/icon.png",
@@ -55,7 +55,7 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    versionCode: 10103,
+    versionCode: 10104,
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
@@ -194,17 +194,6 @@ const config: ExpoConfig = {
         },
       },
     ],
-    [
-      "expo-navigation-bar",
-      {
-        backgroundColor: "#0D0D0D",
-        barStyle: "light",
-        borderColor: "#0D0D0D",
-        visibility: "visible",
-        behavior: "inset-swipe",
-        position: "relative",
-      },
-    ],
     // 保留 app 內本機通知與 Task Manager 事件，但不允許任何套件在裝置開機時重啟服務。
     // 此 plugin 必須位於 Expo 內建 plugin 之後，才能從最終 Android manifest 移除 BOOT_COMPLETED 類 action。
     "./plugins/with-remove-boot-completed-receivers.cjs",
@@ -223,7 +212,7 @@ const config: ExpoConfig = {
   },
   // 正式 AAB 與 EAS Update 使用固定 runtime；Expo Go 開發 manifest 則採 SDK 相容 runtime，
   // 避免 Expo Go 將正式版 1.0.95 當成不相容的已安裝原生 runtime 而拒絕下載遠端 bundle。
-  runtimeVersion: isProductionEasBuild ? "1.0.103" : undefined,
+  runtimeVersion: isProductionEasBuild ? "1.0.104" : undefined,
 };
 
 export default config;
