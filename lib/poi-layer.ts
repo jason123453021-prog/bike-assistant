@@ -52,6 +52,16 @@ type OverpassElement = {
 const POI_CACHE_PREFIX = "@bike_poi_layer_v1:";
 const POI_CACHE_TTL_MS = 30 * 60 * 1000;
 const MAX_POI_PER_VIEWPORT = 240;
+const POI_REQUEST_TIMEOUT_MS = 8_000;
+
+/**
+ * 公開 Overpass 執行個體可能短暫限流或離線；依序嘗試兩個全球資料端點，
+ * 仍維持 30 分鐘裝置端快取，避免在地圖移動時反覆發送相同查詢。
+ */
+export const POI_OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+] as const;
 
 function asFiniteCoordinate(value: unknown): number | null {
   const numeric = Number(value);
@@ -78,7 +88,7 @@ export function buildPoiOverpassQuery(bounds: PoiBounds): string {
   const east = Math.max(bounds.southWest.lon, bounds.northEast.lon);
   const box = `${south},${west},${north},${east}`;
 
-  return `[out:json][timeout:18];
+  return `[out:json][timeout:8];
 (
   nwr["amenity"="drinking_water"](${box});
   nwr["amenity"="water_point"](${box});
@@ -232,6 +242,55 @@ async function writeCachedPoiLayer(cacheKey: string, markers: PoiMarker[]): Prom
   }
 }
 
+type PoiFetchResponse = { elements?: OverpassElement[] };
+
+async function fetchPoiPayload(
+  endpoint: string,
+  query: string,
+  fetchImpl: typeof fetch,
+): Promise<PoiFetchResponse> {
+  const controller =
+    typeof AbortController === "undefined" ? null : new AbortController();
+  const timeout = controller
+    ? setTimeout(() => controller.abort(), POI_REQUEST_TIMEOUT_MS)
+    : null;
+  try {
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        "X-Bike-Assistant-Client": "mobile-poi-layer/1",
+      },
+      body: `data=${encodeURIComponent(query)}`,
+      signal: controller?.signal,
+    });
+    if (!response.ok) throw new Error(`POI request failed: ${response.status}`);
+    return (await response.json()) as PoiFetchResponse;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+/** 依序使用可用的公開 POI 來源；只有所有來源失敗時才向 UI 回報失敗。 */
+export async function fetchPoiPayloadWithFallback(
+  query: string,
+  fetchImpl: typeof fetch = fetch,
+  endpoints: readonly string[] = POI_OVERPASS_ENDPOINTS,
+): Promise<PoiFetchResponse> {
+  let lastError: unknown = null;
+  for (const endpoint of endpoints) {
+    try {
+      return await fetchPoiPayload(endpoint, query, fetchImpl);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("All POI sources are temporarily unavailable");
+}
+
 export async function loadPoiMarkers(
   bounds: PoiBounds,
   fetchImpl: typeof fetch = fetch,
@@ -240,13 +299,10 @@ export async function loadPoiMarkers(
   const cached = await readCachedPoiLayer(cacheKey);
   if (cached) return cached;
 
-  const response = await fetchImpl("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-    body: `data=${encodeURIComponent(buildPoiOverpassQuery(bounds))}`,
-  });
-  if (!response.ok) throw new Error(`POI request failed: ${response.status}`);
-  const payload = (await response.json()) as { elements?: OverpassElement[] };
+  const payload = await fetchPoiPayloadWithFallback(
+    buildPoiOverpassQuery(bounds),
+    fetchImpl,
+  );
   const markers = parseOverpassPoiElements(payload.elements ?? []);
   await writeCachedPoiLayer(cacheKey, markers);
   return markers;

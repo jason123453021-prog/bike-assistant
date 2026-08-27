@@ -443,10 +443,10 @@
     "waterVoice": "請補給水分"
   },
   "audit": {
-    "recoveryTitle": "偵測到未完成的騎程",
+    "recoveryTitle": "偵測到未完成的騎乘",
     "recoveryDescription": "騎乘時間 {{time}}，距離 {{distance}} km",
     "resumeRide": "繼續騎乘",
-    "newRide": "新騎程",
+    "newRide": "新騎乘",
     "addressPlaceholder": "輸入地址、地標或商家",
     "search": "搜尋",
     "searching": "搜尋中…",
@@ -454,7 +454,7 @@
     "candidate": "候選 {{index}} · {{latitude}}, {{longitude}}",
     "recentSearches": "最近搜尋",
     "paused": "已暫停",
-    "finishRide": "結束騎程",
+    "finishRide": "結束騎乘",
     "collapsePanel": "向下滑動以收合",
     "expandPanel": "向上滑動以顯示更多",
     "chooseSport": "選擇運動",
@@ -503,14 +503,14 @@
     "fixedThreshold": "固定門檻",
     "smartCalculation": "智慧計算",
     "localEnvironmentBaseline": "當地環境基準值",
-    "noConfirmedSupply": "此騎程未記錄任何已確認的補給或補水。",
+    "noConfirmedSupply": "此騎乘未記錄任何已確認的補給或補水。",
     "localPhotoTimeline": "本地照片時間軸",
     "localPhotoTimelineHint": "僅會加入你明確選取的照片，不會讀取或上傳整個相簿。",
     "addPhoto": "新增照片",
-    "noRidePhotos": "此騎程尚未加入任何照片。",
+    "noRidePhotos": "此騎乘尚未加入任何照片。",
     "remove": "移除",
     "routeStatistics": "路線統計",
-    "rideCount": "騎程次數",
+    "rideCount": "騎乘次數",
     "averageSpeed": "平均速度",
     "bestSpeed": "最高速度",
     "bestTime": "最佳時間",
@@ -548,7 +548,7 @@
     "privacyPolicy": "隱私權政策",
     "back": "返回",
     "privacyUpdated": "最後更新日期：2026 年 8 月 27 日",
-    "privacyCopyright": "© 2026單車助理。版權所有。"
+    "privacyCopyright": "© 2026 單車助手。版權所有。"
   },
   "privacy": {
     "sections": {

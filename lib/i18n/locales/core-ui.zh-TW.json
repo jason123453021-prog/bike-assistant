@@ -4,7 +4,7 @@
     "averageSpeed": "平均速度",
     "currentAltitude": "目前高度",
     "maxPower": "最大功率",
-    "totalAscent": "爬升總和",
+    "totalAscent": "總爬升",
     "pausedTime": "暫停時間",
     "gradeDistribution": "坡度分佈",
     "energyCountdown": "補給倒數",
@@ -104,8 +104,8 @@
     "waterDistanceEdit": "補水距離提醒間隔",
     "restartWaterTimer": "確認補水後重新計時。",
     "restartWaterDistance": "確認補水後重新計距。",
-    "minutes": "min",
-    "seconds": "sec",
+    "minutes": "分鐘",
+    "seconds": "秒",
     "repeatReminder": "對話未確認時重複提醒",
     "repeatOffHint": "重複提醒已關閉。",
     "repeatHint": "對話未確認時，每 {{seconds}} 秒重複提醒。",
@@ -121,7 +121,7 @@
     "supplyTimeSummary": "每 {{hours}}h {{minutes}}m {{seconds}}s",
     "supplyDistanceSummary": "每 {{distance}} km",
     "addSupply": "新增補給項目",
-    "feedback": "反饋",
+    "feedback": "回饋",
     "vibration": "振動回饋",
     "tts": "TTS 語音提示",
     "sound": "聲音提醒",
@@ -130,7 +130,7 @@
     "appearanceTheme": "外觀主題",
     "appearanceThemeHint": "選擇亮色、深色或跟隨系統主題。",
     "themeSystem": "系統預設",
-    "themeLight": "亮色",
+    "themeLight": "淺色",
     "themeDark": "深色",
     "smartPowerSaving": "智慧省電",
     "autoPowerSaving": "自動省電",
@@ -151,13 +151,13 @@
     "simplifiedIdle": "自動啟用簡化模式的閒置時間",
     "simplifiedIdleHint": "騎乘閒置達此時長後進入簡化模式。",
     "mapInteraction": "地圖互動",
-    "idleRecenter": "閒置重置中心時間",
+    "idleRecenter": "閒置後自動置中時間",
     "idleRecenterHint": "以兩指平移或旋轉地圖後，等待此時長再自動回到中心。設定會保存在本機，並保留目前的朝向模式（朝前、自由或北上）。",
     "navigationDashboardFields": "導航儀表板欄位",
     "compactFields": "精簡模式欄位",
     "restoreDefaults": "還原預設值",
-    "dragDashboardFields": "拖曳右側三線把手以更改順序。前 {{count}} 個欄位會顯示在精簡面板。",
-    "dragCompactFields": "拖曳右側三線把手以更改順序。最多啟用 {{count}} 個欄位。",
+    "dragDashboardFields": "拖曳右側三槓把手以更改順序。前 {{count}} 個欄位會顯示在精簡面板。",
+    "dragCompactFields": "拖曳右側三槓把手以更改順序。最多啟用 {{count}} 個欄位。",
     "panel": "面板",
     "expand": "展開",
     "panelDivider": "↑ 面板 · 已展開 ↓",
@@ -175,7 +175,7 @@
     "fieldTotalAscent": "總爬升",
     "fieldCurrentAltitude": "目前高度",
     "fieldGradeDistribution": "坡度分佈",
-    "appVersion": "單車助理 v{{version}}"
+    "appVersion": "單車助手 v{{version}}"
   },
   "routes": {
     "airDensity": "天氣連動空氣密度（{{temperature}}°C）",
@@ -237,5 +237,5 @@
     "shareAveragePower": "均功率：{{power}}（{{source}}）",
     "shareMaxPower": "最大功率：{{power}}"
   },
-  "appName": "單車助理"
+  "appName": "單車助手"
 }

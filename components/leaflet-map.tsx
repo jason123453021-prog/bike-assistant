@@ -211,7 +211,7 @@ const LEAFLET_HTML = `<!DOCTYPE html>
     // Init map (with leaflet-rotate plugin)
 var map = L.map('map', {
   zoomControl: false,
-  attributionControl: false,
+  attributionControl: true,
   tap: true,
   dragging: true,
   touchZoom: true,
@@ -226,11 +226,11 @@ var map = L.map('map', {
 var currentBearing = 0;
 var headingUpMode = false;
 
-// Tile layer: CartoDB Voyager (bright roads, good contrast for cycling)
-var baseTileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+// OpenStreetMap 標準道路圖磚不需要 Carto API key，避免圖上出現 API key 錯誤浮水印。
+var baseTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 var baseTileLayer = L.tileLayer(baseTileUrl, {
   maxZoom: 19,
-  subdomains: 'abcd',
+  attribution: '&copy; OpenStreetMap contributors',
 }).addTo(map);
 
 function refreshBaseTiles() {
@@ -494,6 +494,16 @@ map.on('drag', function() {
   }
 });
 
+function postMapMoveEnd() {
+  if (!window.ReactNativeWebView) return;
+  var bounds = map.getBounds();
+  window.ReactNativeWebView.postMessage(JSON.stringify({
+    type: 'mapMoveEnd',
+    northEast: { lat: bounds.getNorthEast().lat, lon: bounds.getNorthEast().lng },
+    southWest: { lat: bounds.getSouthWest().lat, lon: bounds.getSouthWest().lng }
+  }));
+}
+
 map.on('dragend', function() {
   var center = map.getCenter();
   if (window.ReactNativeWebView && centerPinMarker) {
@@ -503,27 +513,14 @@ map.on('dragend', function() {
       lon: center.lng
     }));
   }
-  if (window.ReactNativeWebView) {
-    var bounds = map.getBounds();
-    window.ReactNativeWebView.postMessage(JSON.stringify({
-      type: 'mapMoveEnd',
-      northEast: { lat: bounds.getNorthEast().lat, lon: bounds.getNorthEast().lng },
-      southWest: { lat: bounds.getSouthWest().lat, lon: bounds.getSouthWest().lng }
-    }));
-  }
 });
 
 map.on('zoomend', function() {
   renderPoiMarkers();
-  if (window.ReactNativeWebView) {
-    var bounds = map.getBounds();
-    window.ReactNativeWebView.postMessage(JSON.stringify({
-      type: 'mapMoveEnd',
-      northEast: { lat: bounds.getNorthEast().lat, lon: bounds.getNorthEast().lng },
-      southWest: { lat: bounds.getSouthWest().lat, lon: bounds.getSouthWest().lng }
-    }));
-  }
 });
+
+// moveend 同時涵蓋初始相機、GPS 自動置中、GPX fitBounds、手動平移與縮放。
+map.on('moveend', postMapMoveEnd);
 
 // 定位更新與置中只移動相機，不旋轉地圖；此事件僅回報使用者雙指旋轉的結果。
 map.on('rotateend', function() {
@@ -805,6 +802,7 @@ window.addEventListener('message', function(e) { handleMessage(e.data); });
 setTimeout(function() {
   if (window.ReactNativeWebView) {
     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
+    postMapMoveEnd();
   }
 }, 300);
 </script>

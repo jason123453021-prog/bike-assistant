@@ -24,8 +24,8 @@ const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
   owner: "jason1234530",
-  // Google Play 現行正式版已使用 10089／1.0.89；每個更新 bundle 都必須提高 versionCode。
-  version: "1.0.102",
+  // Google Play 現行正式版為 1.0.102／10102；每個更新 bundle 都必須提高 versionCode。
+  version: "1.0.103",
   // Android 16 會忽略大螢幕的強制方向；改採自適應視窗與 Safe Area 佈局。
   orientation: "default",
   icon: "./assets/images/icon.png",
@@ -55,7 +55,7 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    versionCode: 10102,
+    versionCode: 10103,
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
@@ -223,7 +223,7 @@ const config: ExpoConfig = {
   },
   // 正式 AAB 與 EAS Update 使用固定 runtime；Expo Go 開發 manifest 則採 SDK 相容 runtime，
   // 避免 Expo Go 將正式版 1.0.95 當成不相容的已安裝原生 runtime 而拒絕下載遠端 bundle。
-  runtimeVersion: isProductionEasBuild ? "1.0.102" : undefined,
+  runtimeVersion: isProductionEasBuild ? "1.0.103" : undefined,
 };
 
 export default config;

@@ -35,6 +35,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type GestureResponderEvent,
   useWindowDimensions,
   View,
   Vibration,
@@ -240,6 +241,11 @@ import {
   type PoiBounds,
   type PoiMarker,
 } from "@/lib/poi-layer";
+import { shouldRefreshPoiForBounds } from "@/lib/poi-map-refresh";
+import {
+  canStartTouchGuardHold,
+  hasCompletedTouchGuardHold,
+} from "@/lib/touch-guard";
 import {
   hasReliableRideMovement,
   shouldScheduleTouchGuardRelock,
@@ -267,6 +273,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const AUTO_PAUSE_RESUME_THRESHOLD = 1.8; // 0.5 m/s，與單車低速移動門檻一致
 const WEATHER_INTERVAL = 10 * 60 * 1000;
 const LOCATION_INTERVAL_SEC = 3;
+const POI_FAILED_REQUEST_COOLDOWN_MS = 30_000;
 
 type CustomSupplyTracker = {
   lastTriggerTime: number;
@@ -377,7 +384,8 @@ export default function MapScreen() {
   const [poiMarkers, setPoiMarkers] = useState<PoiMarker[]>([]);
   const [selectedPoi, setSelectedPoi] = useState<PoiMarker | null>(null);
   const poiRequestIdRef = useRef(0);
-  const poiBoundsRef = useRef<PoiBounds | null>(null);
+  const lastLoadedPoiBoundsRef = useRef<PoiBounds | null>(null);
+  const lastPoiRequestAttemptAtRef = useRef(0);
   const currentPosRef = useRef<{
     lat: number;
     lon: number;
@@ -478,13 +486,21 @@ export default function MapScreen() {
       const lonSpan = Math.abs(bounds.northEast.lon - bounds.southWest.lon);
       // 全球或洲際縮放不直接發送超大 Overpass 查詢；保留已快取的地區資料並由 Leaflet 聚合。
       if (latSpan > 0.3 || lonSpan > 0.3) return;
+      if (!shouldRefreshPoiForBounds(lastLoadedPoiBoundsRef.current, bounds)) {
+        return;
+      }
+      const nowMs = Date.now();
+      if (nowMs - lastPoiRequestAttemptAtRef.current < POI_FAILED_REQUEST_COOLDOWN_MS) {
+        return;
+      }
 
       const requestId = ++poiRequestIdRef.current;
-      poiBoundsRef.current = bounds;
+      lastPoiRequestAttemptAtRef.current = nowMs;
       try {
         const nextMarkers = await loadPoiMarkers(bounds);
         if (requestId === poiRequestIdRef.current) {
           setPoiMarkers(nextMarkers);
+          lastLoadedPoiBoundsRef.current = bounds;
         }
       } catch {
         // 網路暫時不可用時保留已快取／已顯示的 POI，不影響導航與騎乘。
@@ -497,6 +513,8 @@ export default function MapScreen() {
     if (poiLayersEnabled || !poiMarkers.length) return;
     setPoiMarkers([]);
     setSelectedPoi(null);
+    lastLoadedPoiBoundsRef.current = null;
+    lastPoiRequestAttemptAtRef.current = 0;
   }, [poiLayersEnabled, poiMarkers.length]);
 
   useEffect(() => {
@@ -790,6 +808,7 @@ export default function MapScreen() {
     typeof setTimeout
   > | null>(null);
   const touchGuardPointerActiveRef = useRef(false);
+  const touchGuardPointerIdRef = useRef<number | null>(null);
   const touchGuardInitialLockTimerRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null);
@@ -2019,6 +2038,7 @@ export default function MapScreen() {
       touchGuardHoldSafetyTimerRef.current = null;
     }
     touchGuardPointerActiveRef.current = false;
+    touchGuardPointerIdRef.current = null;
     touchGuardHoldStartedAtRef.current = null;
     setTouchGuardHoldProgress(0);
   }, []);
@@ -2070,11 +2090,29 @@ export default function MapScreen() {
     settings.touchGuardEnabled,
   ]);
 
-  const beginTouchGuardHoldProgress = useCallback(() => {
-    if (!touchGuardEnabled || !isActive) return;
+  const beginTouchGuardHoldProgress = useCallback((event: GestureResponderEvent) => {
+    const nativeEvent = event.nativeEvent;
+    const pointerIdentifier = Number(
+      nativeEvent.identifier ?? nativeEvent.changedTouches?.[0]?.identifier,
+    );
+    const activeTouchCount = nativeEvent.touches?.length ?? 0;
+    if (
+      !canStartTouchGuardHold({
+        isLocked: touchGuardEnabled,
+        isRideActive: isActive,
+        activeTouchCount,
+        pointerIdentifier: Number.isFinite(pointerIdentifier)
+          ? pointerIdentifier
+          : null,
+      })
+    ) {
+      resetTouchGuardHoldProgress();
+      return;
+    }
     if (touchGuardPointerActiveRef.current) return;
     resetTouchGuardHoldProgress();
     touchGuardPointerActiveRef.current = true;
+    touchGuardPointerIdRef.current = pointerIdentifier;
     touchGuardHoldStartedAtRef.current = Date.now();
     setTouchGuardHoldProgress(0.001);
     touchGuardHoldTimerRef.current = setInterval(() => {
@@ -2137,18 +2175,19 @@ export default function MapScreen() {
   }, [touchGuardUnlockSuccessOpacity, touchGuardUnlockSuccessScale]);
 
   const completeTouchGuardUnlock = useCallback(() => {
-    if (!touchGuardEnabled) return;
-    if (touchGuardHoldTimerRef.current) {
-      clearInterval(touchGuardHoldTimerRef.current);
-      touchGuardHoldTimerRef.current = null;
+    if (
+      !hasCompletedTouchGuardHold({
+        pointerActive: touchGuardPointerActiveRef.current,
+        pointerIdentifier: touchGuardPointerIdRef.current,
+        startedAtMs: touchGuardHoldStartedAtRef.current,
+        nowMs: Date.now(),
+        requiredHoldMs: settings.touchGuardUnlockHoldMs,
+      })
+    ) {
+      resetTouchGuardHoldProgress();
+      return;
     }
-    if (touchGuardHoldSafetyTimerRef.current) {
-      clearTimeout(touchGuardHoldSafetyTimerRef.current);
-      touchGuardHoldSafetyTimerRef.current = null;
-    }
-    touchGuardPointerActiveRef.current = false;
-    touchGuardHoldStartedAtRef.current = null;
-    setTouchGuardHoldProgress(1);
+    resetTouchGuardHoldProgress();
     if (settings.vibrationEnabled) vibrateLight();
     showTouchGuardUnlockSuccessFeedback();
     setTouchGuardEnabled(false);
@@ -2157,7 +2196,8 @@ export default function MapScreen() {
     scheduleTouchGuardRelock,
     settings.vibrationEnabled,
     showTouchGuardUnlockSuccessFeedback,
-    touchGuardEnabled,
+    settings.touchGuardUnlockHoldMs,
+    resetTouchGuardHoldProgress,
   ]);
 
   useEffect(
@@ -5334,8 +5374,8 @@ export default function MapScreen() {
             onPress={() => {
               if (!touchGuardEnabled) setTouchGuardEnabled(true);
             }}
-            onPressIn={() => {
-              if (touchGuardEnabled) beginTouchGuardHoldProgress();
+            onPressIn={(event) => {
+              if (touchGuardEnabled) beginTouchGuardHoldProgress(event);
             }}
             onPressOut={resetTouchGuardHoldProgress}
             onResponderTerminate={resetTouchGuardHoldProgress}
@@ -6447,7 +6487,7 @@ export default function MapScreen() {
                 })}
               </Text>
             </Animated.View>
-            {touchGuardHoldProgress > 0 && (
+            {touchGuardPointerActiveRef.current && touchGuardHoldProgress > 0 && (
               <View style={styles.touchGuardProgressRing}>
                 <Svg width={56} height={56} viewBox="0 0 56 56">
                   <Circle
