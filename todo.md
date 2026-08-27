@@ -2931,4 +2931,5 @@
 - [x] 依 Google Play 10102 版本資訊主頁建議，盤點並修正淘汰的 Android 無邊框／Edge-to-Edge API 或參數，維持 Android 15／16 相容性
 - [x] 依 Google Play 10102 版本資訊主頁建議，盤點高記憶體點陣圖與解碼路徑，將可安全縮放、快取與釋放的影像操作納入回歸驗證
 - [x] 依 Google Play 10102 版本資訊主頁建議，檢查並啟用適用的 release R8 最佳化，確保 Expo 原生模組與反射必要規則不受影響
-- [ ] 完成三項 Google Play 建議修正後，建立遞增 Android AAB、執行本機 QC 並取得 Google Play 寫入範圍確認
+- [x] 完成三項 Google Play 建議修正後，建立遞增 Android AAB、執行本機 QC並取得 Google Play 寫入範圍確認（1.0.104／10104；GitHub run 33067369663 成功；SHA-256 `b486f13933d76cff609a735aa89aaeff0d2b38a25f81eeb794f9ce5a21e78c5c`）
+- [ ] 取得使用者對 1.0.104／10104 Google Play 寫入範圍的確認：僅上傳並儲存正式版草稿，或在 pre-check 無新阻擋時送交 Google 審查；不修改 Data Safety 與既有商店資訊審查

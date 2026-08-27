@@ -14,6 +14,8 @@ Google Play 對 `1.0.102／10102` 顯示三項建議：Android 無邊框 API／�
 
 預計上傳版本為 `1.0.104／10104`，package 維持 `com.jason123453021.bikeassistant`。新版本只涵蓋上述相容性與記憶體改善，不修改 Data Safety、公開隱私權頁、商店文案、截圖或既有正式版。上傳後仍需要讀取 Google Play pre-check，才能確認 Play 是否不再針對前版的三個建議顯示提醒。
 
+GitHub 受保護 upload key 工作流程已完成 [run 33067369663](https://github.com/jason123453021-prog/bike-assistant/actions/runs/33067369663)，並產出 versionCode `10104` 的 AAB。封裝檔 SHA-256 為 `b486f13933d76cff609a735aa89aaeff0d2b38a25f81eeb794f9ce5a21e78c5c`；archive 可辨識 `Bike Assistant Upload Key` 的 SHA-384 with RSA、4096-bit 簽署憑證。這只證實候選產物已建置，不代表 Play Console 已接受或處理該版本。
+
 ## References
 
 [1]: https://developer.android.com/develop/ui/views/layout/edge-to-edge "Android Developers: Display content edge-to-edge in views"
