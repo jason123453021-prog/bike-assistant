@@ -2879,9 +2879,13 @@
 - [x] 依使用者明確確認接受 389 部裝置相容性變動，儲存 1.0.102／10102 的既有正式版草稿
 - [x] 依使用者明確授權送交 Google Play 審查；正式版 1.0.102／10102 已儲存且 Console 已確認「已將 1 項變更送審」，未自行宣稱已發布
 - [ ] 校正 Google Play 預設商店資訊中不符合現行 Local-first 功能邊界的「隊友遙測／自動重算回歸指引」文案，並由產品與法務確認後再儲存
-- [ ] 盤點並重寫 Google Play 商店短／完整說明、更新內容與宣傳素材，突顯已實作的 Local-first 騎乘記錄、智慧補給、地圖 POI 與多語系體驗
-- [ ] 製作符合 Google Play 規格且不誇大功能的 Feature Graphic 與手機截圖宣傳素材，完成視覺與尺寸驗證
-- [ ] 經使用者核准後才將新的商店文字與圖片更新至 Play Console；不得影響已送審的 1.0.102 production release
+- [x] 盤點並重寫 Google Play 商店短／完整說明、更新內容與宣傳素材，突顯已實作的 Local-first 騎乘記錄、智慧補給、地圖 POI 與多語系體驗
+- [x] 製作符合 Google Play 規格且不誇大功能的 Feature Graphic 與手機截圖宣傳素材，完成視覺與尺寸驗證
+- [x] 經使用者核准後才將新的商店文字與圖片更新至 Play Console；未影響已送審的 1.0.102 production release
 - [x] 完成 Google Play 繁中商店文案草案 v2：移除隊友遙測、OSRM 與自動重算等失效主張，改以 Local-first、即時騎乘儀表、GPX、COG 地圖、POI、補給提醒及 13 語系為核心價值
 - [x] 完成既有商店素材唯讀盤點：確認 Feature Graphic 與五張舊截圖均為舊版素材，且第一張包含不再支援的好友／共享功能，不能原樣沿用
 - [x] 產出並驗證新的 Google Play Feature Graphic：1024 × 500 px、無 alpha RGB PNG、約 1.0 MB，聚焦騎乘記錄、路線、補水與 POI，未包含誇大或未實作功能
+- [x] 製作一套六張以現行 Local-first 功能為準的 Google Play 關鍵畫面素材：即時儀表、COG 地圖、智慧補給、GPX、POI 與本機優先／多語系
+- [x] 驗證六張關鍵功能素材符合 9:16、1440 × 2560 px、3.2–4.4 MB 與功能事實邊界；不得含好友、即時共享、OSRM、自動重算或轉彎語音
+- [x] 依使用者本次授權，在保留 1.0.102 production 審查不變的前提下，將新 Feature Graphic、關鍵功能圖片與 v2 文案儲存至預設繁中商店資訊草稿
+- [x] 讀取 Google Play Console 的商店資訊草稿結果：Console 確認已儲存變更及草稿；未點擊下一步，故未觸發本次商店資訊的獨立審查提交
