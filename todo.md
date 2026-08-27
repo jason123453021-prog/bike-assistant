@@ -2862,3 +2862,4 @@
 
 - [x] 後續功能或修正先完成本機 QC，再觸發／確認 GitHub Android APK workflow 並提供 artifact 下載連結
 - [x] E2E 不再是交付前置；除非使用者明確要求，僅保留為可選的後續回歸工作
+- [x] 對 1.0.102／versionCode 10102 完成完整本機 QC，僅建置 GitHub Android APK artifact 並交付下載連結（不執行 E2E；run 33025190933／artifact 9628504469，`app-release.apk` 53,697,831 bytes）
