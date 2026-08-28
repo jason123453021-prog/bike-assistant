@@ -1,0 +1,106 @@
+--- fetch/axios calls ---
+lib/map-pinning/map-pinning-manager.ts:66:      const response = await fetch(url);
+lib/route-service.ts:257:    const response = await fetch(url, { signal: controller.signal });
+lib/route-service.ts:320:    const response = await fetch(url, {
+lib/weather-service.ts:44:    const response = await fetch(url, { signal: controller.signal });
+lib/model-update-service.ts:80:      const response = await fetch(manifestUrl, {
+--- offline guards ---
+app/(tabs)/map.tsx:498:        try { alertPlayer.pause(); } catch {}
+app/(tabs)/map.tsx:696:    } catch {
+app/(tabs)/map.tsx:697:      Alert.alert("地址搜尋暫時不可用", "請確認網路與定位服務後再試；離線時仍可直接移動地圖，以中心圖釘選擇目的地。");
+app/(tabs)/map.tsx:762:    try { alertPlayer.pause(); } catch {}
+app/(tabs)/map.tsx:1282:        try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1332:            try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1402:        try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1415:              try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1469:      try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:1491:          try { alertPlayer.seekTo(0); alertPlayer.play(); } catch {}
+app/(tabs)/map.tsx:2223:    } catch {
+app/(tabs)/map.tsx:2360:    } catch {
+app/(tabs)/map.tsx:2452:                source: environmentSummary.hadLiveWeather ? "live-weather" : "offline-fallback",
+app/(tabs)/map.tsx:2520:          } catch {
+app/(tabs)/map.tsx:2530:          } catch {
+app/(tabs)/map.tsx:2728:      } catch { /* 忽略電量讀取失敗 */ }
+app/(tabs)/navigate.tsx:126:  // 離線天氣備用：保留上次成功取得的天氣資料
+app/(tabs)/navigate.tsx:128:  // 是否為離線備用天氣
+app/(tabs)/navigate.tsx:148:          // 離線時保留上次資料
+app/(tabs)/navigate.tsx:152:      } catch {
+app/(tabs)/navigate.tsx:174:    } catch {
+app/(tabs)/navigate.tsx:331:                <Text style={[styles.weatherFetching, { color: colors.warning }]}>離線備用</Text>
+app/(tabs)/navigate.tsx:423:                  <Text style={[styles.routeConfirmNotice, { color: colors.muted }]}>不含休息、路口、交通、實際風況與路況；此為離線規劃參考。</Text>
+app/(tabs)/settings.tsx:173:              } catch {
+app/privacy.tsx:51:          {`App 僅在裝置上處理下列資料：\n\n【位置與路線資料】\n• GPS 位置、海拔、速度與行進方向\n• 騎乘軌跡與已匯入的 GPX 路線\n\n用途：目前位置顯示、離線騎乘紀錄、背景追蹤、路線預覽與導航。\n\n【個人與活動資料】\n• 生日、身高、體重及本機推定的生理指標\n• 騎乘時間、距離、爬升、功率、卡路里與補給估算\n• 使用者主動附加的相片、影片與活動備註\n\n用途：產生本機活動分析、補給提醒與個人化估算。App 不建立帳號，也不收集電子郵件、聯絡人或好友資料。`}
+app/privacy.tsx:63:          {`App 沒有好友位置共享、社群功能或雲端資料庫。您可透過 Android 系統分享功能主動匯出 GPX、活動卡片或媒體；分享對象與內容完全由您決定。\n\n若您主動在有網路時使用線上路徑或天氣資訊，App 可能會將路徑計算所需的座標傳送至公開地圖或路徑服務。這些服務不是帳號、追蹤或同步機制；離線功能不依賴它們。`}
+app/ride-detail.tsx:148:    } catch {
+app/ride-detail.tsx:1073:              <Text style={styles.shareBtnText}>離線備份 GPX</Text>
+app/ride-detail.tsx:1237:                  <DetailCell label="計算來源" value={record.calculationProfile.environment.source === "live-weather" ? "當日天氣" : "離線回退"} unit="" />
+app/ride-detail.tsx:1247:                        {entry.source ? ` · ${entry.source === "custom" ? "固定門檻" : entry.source === "smart" ? "智慧計算" : "離線回退"}` : ""}
+lib/_core/manus-runtime.ts:40:  } catch {
+lib/activity-sensor-estimates.ts:47: * 以騎乘強度（相對 FTP）、速度、坡度及已保存環境摘要產生心率與踏頻的離線估算。
+lib/address-search-history.ts:36:  } catch {
+lib/address-search-history.ts:47:  } catch {
+lib/automatic-rpe.ts:23: * 真正 RPE 是使用者感受；此結果僅減少輸入操作並用於離線趨勢分析。
+lib/background-location.ts:72:    } catch {
+lib/background-location.ts:684:  } catch {}
+lib/background-location.ts:714:  } catch {}
+lib/background-location.ts:726:  } catch {}
+lib/background-location.ts:738:  } catch {}
+lib/background-location.ts:754:  } catch {}
+lib/background-location.ts:767:  } catch {}
+lib/background-location.ts:781:  } catch {}
+lib/background-location.ts:805:  } catch {}
+lib/background-location.ts:830:  } catch {}
+lib/background-location.ts:840:  } catch {
+lib/background-location.ts:852:  } catch {
+lib/external-gpx-validation.ts:13:  if (content.length > MAX_GPX_BYTES) throw new Error("GPX 檔案超過 10 MB，為確保離線載入穩定性無法匯入。");
+lib/feedback-service.ts:33:  } catch {}
+lib/feedback-service.ts:40:  } catch {}
+lib/feedback-service.ts:47:  } catch {}
+lib/feedback-service.ts:54:  } catch {}
+lib/feedback-service.ts:61:  } catch {}
+lib/feedback-service.ts:76:  } catch {}
+lib/feedback-service.ts:84:  } catch {}
+lib/feedback-service.ts:155:    } catch {}
+lib/feedback-service.ts:171:  } catch {}
+lib/feedback-service.ts:184:  } catch {
+lib/feedback-service.ts:227:  } catch {}
+lib/feedback-service.ts:238:  } catch {}
+lib/feedback-service.ts:261:  } catch {}
+lib/feedback-service.ts:305:  } catch {}
+lib/feedback-service.ts:330:  } catch {}
+lib/local-ride-media.ts:33:    } catch {
+lib/local-ride-photos.ts:18:  } catch {
+lib/local-ride-photos.ts:49:    } catch {
+lib/permissions-manager.ts:30:    } catch {
+lib/ride-context.tsx:84:    source: "live-weather" | "offline-fallback";
+lib/ride-context.tsx:96:  source?: "smart" | "smart-offline-fallback" | "custom";
+lib/ride-record-normalizer.ts:115:      const source = environmentValue.source === "live-weather" ? "live-weather" : "offline-fallback";
+lib/ride-record-normalizer.ts:141:    const source = item.source === "smart" || item.source === "smart-offline-fallback" || item.source === "custom"
+lib/ride-share-card-svg.ts:79:  <text x="540" y="1815" fill="#6E7783" font-size="22" font-family="sans-serif" text-anchor="middle">由單車助手在此裝置離線產生</text>
+lib/smart-supply-plan.ts:41:  source: "smart" | "smart-offline-fallback" | "custom";
+lib/smart-supply-plan.ts:175:  const source = input.weatherAvailable ? "smart" : "smart-offline-fallback";
+lib/smart-supply-plan.ts:187:    environmentLoad >= 0.4 ? "環境熱負荷提高" : input.weatherAvailable ? "環境負荷穩定" : "離線環境回退",
+lib/sport-metrics.ts:55:/** 讀取目前有效模型，讓下一次啟動驗證過的離線快取可立即帶入導航。 */
+lib/sport-metrics.ts:89: * 以公開坡度耗能曲線的局部近似推導平地等效配速。這是透明的離線估算，非 Strava 的專有 GAP 演算法。
+lib/supply-calibration.ts:40:    source?: "smart" | "smart-offline-fallback" | "custom";
+lib/supply-calibration.ts:72:    && (confirmation.source === "smart" || confirmation.source === "smart-offline-fallback")
+lib/supply-notification-actions.ts:65:  } catch {
+lib/weather-service.ts:71:  } catch {
+lib/model-governance.ts:2: * 離線運動模型治理層。
+lib/model-governance.ts:5: * 學術來源、版本號與回歸測試一併提交，並保留完全離線運作。
+lib/model-governance.ts:28:  updatePolicy: "離線內建資料；僅在來源審核、版本號更新與回歸測試同時通過後更新。",
+lib/model-update-service.ts:22:export type ModelUpdateCheckResult = "throttled" | "offline-fallback" | "unchanged" | "updated" | "rejected";
+lib/model-update-service.ts:52:/** 在任何網路請求前先恢復已驗證快取，確保離線時啟動不會使用未驗證資料。 */
+lib/model-update-service.ts:58:  } catch {
+lib/model-update-service.ts:70:  if (!manifestUrl) return "offline-fallback";
+lib/model-update-service.ts:85:      if (!response.ok) return "offline-fallback";
+lib/model-update-service.ts:95:  } catch {
+lib/model-update-service.ts:96:    return "offline-fallback";
+lib/external-gpx-uri-reader.ts:33:    throw new Error("GPX 檔案超過 10 MB，為確保離線載入穩定性無法匯入。");
+lib/external-gpx-uri-reader.ts:44:      throw new Error("GPX 檔案超過 10 MB，為確保離線載入穩定性無法匯入。");
+lib/external-gpx-uri-reader.ts:48:      throw new Error("GPX 檔案超過 10 MB，為確保離線載入穩定性無法匯入。");
+components/leaflet-map.tsx:958:      } catch {}
+components/ride-summary-modal.tsx:135:    try { await Share.share({ message: msg }); } catch {}
+components/ride-summary-modal.tsx:155:    } catch {
+components/share-card-modal.tsx:65:    } catch {
+components/share-card-modal.tsx:98:    } catch {

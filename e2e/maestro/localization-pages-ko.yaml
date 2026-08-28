@@ -1,0 +1,15 @@
+appId: com.jason123453021.bikeassistant
+name: 한국어 페이지 스크린샷
+---
+- runFlow:
+    file: localization-privacy-pages.yaml
+    env:
+      LOCALE_NAME: "Korean"
+      LANGUAGE_OPTION_ID: ".*language-option-ko-KR"
+      SETTINGS_LABEL: "설정"
+      NAVIGATION_LABEL: "내비"
+      ROUTES_LABEL: "경로"
+      HISTORY_LABEL: "기록"
+      SYSTEM_DATA_LABEL: "시스템 및 데이터"
+      PRIVACY_LABEL: "개인정보 처리방침"
+      SCREENSHOT_PREFIX: "locale-ko"

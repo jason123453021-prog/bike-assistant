@@ -1,0 +1,9 @@
+{
+  "id": "90d8c4ad-9e24-4334-9017-6e60f2be53e0",
+  "createdAt": "2026-08-19T00:22:09.187Z",
+  "launchAsset": {
+    "key": "bundle",
+    "contentType": "application/javascript",
+    "url": "https://8081-iv3gmjf25eviy2j4wd3ph-8f06572a.sg1.manus.computer/node_modules/expo-router/entry.bundle?platform=android&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=app&unstable_transformProfile=hermes-stable"
+  }
+}

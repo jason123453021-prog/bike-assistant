@@ -1,0 +1,15 @@
+appId: com.jason123453021.bikeassistant
+name: لقطات صفحات العربية RTL
+---
+- runFlow:
+    file: localization-privacy-pages.yaml
+    env:
+      LOCALE_NAME: "Arabic"
+      LANGUAGE_OPTION_ID: ".*language-option-ar-SA"
+      SETTINGS_LABEL: "الإعدادات"
+      NAVIGATION_LABEL: "التنقل"
+      ROUTES_LABEL: "المسارات"
+      HISTORY_LABEL: "السجل"
+      SYSTEM_DATA_LABEL: "النظام والبيانات"
+      PRIVACY_LABEL: "سياسة الخصوصية"
+      SCREENSHOT_PREFIX: "locale-ar"

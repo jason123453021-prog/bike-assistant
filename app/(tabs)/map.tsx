@@ -1,0 +1,7917 @@
+/**
+ * 導航頁面（整合版）
+ *
+ * 功能：
+ * - 全螢幕深色 Leaflet 地圖
+ * - 即時位置標記（藍點）
+ * - GPX 路線疊加（從路線頁共享 Context 讀取，紅色軌跡）
+ * - 自由騎乘即時軌跡繪製（綠色）
+ * - 僅以實際騎乘 COG 旋轉的地圖控制（不預測轉彎、不播報語音）
+ * - 底部面板（螢幕下方三分之一）：
+ *     收縮狀態：時間、速度、距離、坡度、功率（六格）
+ *     展開狀態：加入卡路里/水分進度條、補給提醒
+ * - 功率計算、補給提醒
+ * - 天氣資訊（溫度/濕度/相對風向）
+ * - 自動暫停/恢復
+ */
+
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  Alert,
+  Animated,
+  AppState,
+  Dimensions,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  type GestureResponderEvent,
+  useWindowDimensions,
+  View,
+  Vibration,
+} from "react-native";
+import LeafletMapView, {
+  type LeafletMapHandle,
+  type NavigationRouteOverlay,
+} from "@/components/leaflet-map";
+import * as Location from "expo-location";
+import * as Battery from "expo-battery";
+import { Accelerometer } from "expo-sensors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useKeepAwake } from "expo-keep-awake";
+import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
+import { Image } from "expo-image";
+import Svg, { Circle } from "react-native-svg";
+import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/lib/i18n/language-provider";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+
+import { useRide } from "@/lib/ride-context";
+import {
+  buildSportDashboardMetrics,
+  calculateGapPaceSecPerKm,
+  calculateVamMPerHour,
+  estimateSportCalories,
+  getSportTrackingPolicy,
+  smoothSpeedKmh,
+  SPORT_META,
+  type SportType,
+} from "@/lib/sport-metrics";
+import {
+  getModelRevision,
+  subscribeModelUpdates,
+} from "@/lib/model-governance";
+import { deriveAutoPersonalMetrics } from "@/lib/auto-personal-metrics";
+import { calculateAgeFromBirthday } from "@/lib/personal-profile";
+import {
+  useSettings,
+  DEFAULT_FIELD_ORDER,
+  type NormalFieldKey,
+} from "@/lib/settings-context";
+import { useGpx } from "@/lib/gpx-context";
+
+import { type GpxRoute } from "@/lib/gpx-parser";
+import { calculateKilometerMarkers } from "@/lib/kilometer-markers";
+import {
+  vibrateLight,
+  vibrateMedium,
+  vibrateWarning,
+  vibrateSuccess,
+  speakSupplyReminder,
+  scheduleSmartSupplyDueNotification,
+  clearAllSmartSupplyDueNotifications,
+  clearAllSupplyNotifications,
+  showSupplyNotification,
+  cancelRidingNotification,
+  requestNotificationPermission,
+  setRideSpeechSuppressed,
+  stopSpeech,
+} from "@/lib/feedback-service";
+import {
+  calculatePower,
+  calcAirDensity,
+  DEFAULT_ROAD_BIKE_MASS_KG,
+  haversineDistance,
+  formatDuration,
+} from "@/lib/power-calc";
+import {
+  fetchWeather,
+  getHeadwindMs,
+  getRelativeWindInfo,
+  type WeatherData,
+} from "@/lib/weather-service";
+import { fetchBikeRoute } from "@/lib/route-service";
+import {
+  formatNavigationDataFreshness,
+  loadRecentAddressSearches,
+  mergeRecentAddressSearches,
+  saveRecentAddressSearches,
+  type RecentAddressSearch,
+} from "@/lib/address-search-history";
+import {
+  calculateSweatLoss,
+  DEFAULT_HYDRATION_THRESHOLD_ML,
+  formatSweatRate,
+} from "@/lib/hydration-calc";
+import { calculatePersonalizedCalories } from "@/lib/personalized-ride-calculations";
+import { createSupplyPlan, type SupplyPlan } from "@/lib/smart-supply-plan";
+import { buildInitialSupplyPlanInput } from "@/lib/initial-supply-plan";
+import {
+  awaitHydrationInputs,
+  resolveWaterCountdownFallbackDuration,
+  type HydrationSensorSnapshot,
+} from "@/lib/hydration-recalculation";
+import { resolveSmartSupplyChannels } from "@/lib/smart-supply-channels";
+import {
+  createSmartSupplyCountdown,
+  isSmartSupplyCountdownDue,
+  restartSmartSupplyCountdown,
+  smartSupplyCountdownRemainingSec,
+  type SmartSupplyCountdown,
+} from "@/lib/smart-supply-countdown";
+import { deriveAutomaticSweatCalibration } from "@/lib/supply-calibration";
+import { shouldRestoreBackgroundSupplyReminder } from "@/lib/background-supply-recovery";
+import {
+  normalizeAutoPauseSpeedKmh,
+  resolveAutoPauseResumeThresholdKmh,
+} from "@/lib/background-auto-pause";
+import {
+  calculateCourseOverGround,
+  findNearestRoutePoint,
+  resolveNavigationCog,
+  stabilizeCogHeading,
+  type CogPoint,
+} from "@/lib/cog-navigation";
+import {
+  nextLocationCameraMode,
+  resolveLocationCameraInstruction,
+  shouldApplyCogRotation,
+  type LocationCameraMode,
+} from "@/lib/map-location-mode";
+import {
+  startBackgroundLocationTracking,
+  stopBackgroundLocationTracking,
+  setBackgroundLocationTrackingMode,
+  initBackgroundState,
+  getBackgroundTrackPoints,
+  getBackgroundState,
+  updateBackgroundEnvironment,
+  updateBackgroundRiderProfile,
+  updateBackgroundSmartSupplyCountdown,
+  updateBackgroundSmartSupplyChannels,
+  updateBackgroundAutoLapSettings,
+  syncBackgroundRideCheckpoint,
+  setBackgroundSupplyReminderPending,
+  setBackgroundSupplyReminderEnabled,
+  clearBackgroundData,
+  acknowledgeBackgroundSupplyInterval,
+  acknowledgeBackgroundSupplyReminder,
+  type GpsAccuracyLevel,
+} from "@/lib/background-location";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { BackgroundLocationDisclosure } from "@/components/background-location-disclosure";
+import { SupplyModal } from "@/components/supply-modal";
+import { RideSummaryModal } from "@/components/ride-summary-modal";
+import { SimplifiedNavOverlay } from "@/components/simplified-nav-overlay";
+import {
+  addTrackPoint,
+  completeRideSession,
+  createNewRideSession,
+  initializeRideSession,
+  saveRideSessionSnapshot,
+  type RideSession,
+} from "@/lib/ride-recovery/ride-session-recovery";
+import {
+  evaluateTrackPoint,
+  filterTrackPointBatch,
+  type TrackQualityPoint,
+} from "@/lib/track-point-quality";
+import {
+  advanceAutoLapMilestones,
+  createAutoLapAnchor,
+  type AutoLapMilestoneState,
+  type AutoLapTotals,
+} from "@/lib/auto-lap-milestones";
+import { SmartPowerSavingManager } from "@/lib/power-saving/smart-power-saving-system";
+import { setRideImmersiveMode } from "@/lib/ride-immersive-mode";
+import {
+  hasAcceptedBackgroundLocationDisclosure,
+  recordBackgroundLocationDisclosureAcceptance,
+} from "@/lib/background-location-disclosure";
+import {
+  getDueSupplyIntervals,
+  type SupplyIntervalKind,
+  type SupplyIntervalTracker,
+} from "@/lib/supply-interval";
+import {
+  consumeSupplyNotificationActions,
+  scheduleSupplySnooze,
+  subscribeToSupplyNotificationActions,
+  type SupplyNotificationAction,
+  type SupplyNotificationKind,
+} from "@/lib/supply-notification-actions";
+import {
+  applyPinnedNavigationDecision,
+  hasExistingNavigationLayers,
+  type PinnedNavigationLayer,
+} from "@/lib/pinned-navigation-layers";
+import { shouldTrackRideLocation } from "@/lib/ride-tracking-lifecycle";
+import {
+  shouldEnterIdleMonitor,
+  shouldResumeFromIdleMonitor,
+  type RideLocationTrackingMode,
+} from "@/lib/idle-auto-pause";
+import { shouldSuppressRideAudioForSystemInterruption } from "@/lib/ride-audio-interruption";
+import {
+  buildNavigationDashboardSummaryKeys,
+  type NavigationDashboardSummaryKey,
+} from "@/lib/navigation-dashboard-summary";
+import {
+  filterPoiMarkers,
+  loadPoiMarkers,
+  type PoiBounds,
+  type PoiMarker,
+} from "@/lib/poi-layer";
+import { shouldRefreshPoiForBounds } from "@/lib/poi-map-refresh";
+import {
+  canStartTouchGuardHold,
+  hasCompletedTouchGuardHold,
+} from "@/lib/touch-guard";
+import {
+  hasReliableRideMovement,
+  shouldScheduleTouchGuardRelock,
+  shouldZeroLiveRideReadings,
+} from "@/lib/live-ride-readings";
+import {
+  acceptLiveElevationDelta,
+  clampVirtualPowerForRider,
+  createLiveElevationFilterState,
+  isTrustworthyVirtualPowerPeak,
+} from "@/lib/live-elevation-filter";
+import {
+  createRideSummarySnapshot,
+  type RideSummarySnapshot,
+} from "@/lib/ride-summary-snapshot";
+import {
+  resolveStatisticsIntervalSec,
+  resolveStatisticsSpeedMs,
+} from "@/lib/activity-statistics";
+import { reportRecoverableIssue } from "@/lib/release-safe-log";
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+
+// ─── 常數 ─────────────────────────────────────────────────────────────────────
+const AUTO_PAUSE_RESUME_THRESHOLD = 1.8; // 0.5 m/s，與單車低速移動門檻一致
+const WEATHER_INTERVAL = 10 * 60 * 1000;
+const LOCATION_INTERVAL_SEC = 3;
+const POI_FAILED_REQUEST_COOLDOWN_MS = 30_000;
+
+type CustomSupplyTracker = {
+  lastTriggerTime: number;
+  lastTriggerDistance: number;
+  triggered: boolean;
+  dismissTimeoutId: ReturnType<typeof setTimeout> | null;
+  repeatIntervalId: ReturnType<typeof setInterval> | null;
+};
+
+// 底部面板收縮高度；展開高度由字體縮放與內容自適應計算。
+const PANEL_COLLAPSED_H = Math.round(SCREEN_H / 3);
+
+// ─── 工具函數 ─────────────────────────────────────────────────────────────────
+
+function haversine(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ─── 主元件 ───────────────────────────────────────────────────────────────────
+
+export default function MapScreen() {
+  const { t } = useTranslation();
+  const { activeLanguage, isRTL } = useLanguage();
+  const colorScheme = useColorScheme();
+  const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  const dashboardColumnCount = fontScale >= 1.6 ? 2 : 3;
+  const dashboardCellWidth = dashboardColumnCount === 2 ? "50%" : "33.333%";
+  const dashboardCellMinHeight =
+    fontScale >= 1.6 ? 106 : fontScale >= 1.3 ? 86 : 76;
+  const {
+    state,
+    dispatch,
+    saveRecord,
+    updateRideActivity,
+    setSportType,
+    saveSnapshot,
+    clearSnapshot,
+    checkSnapshot,
+  } = useRide();
+  const { settings, updateSettings } = useSettings();
+  const smartSupplyChannels = resolveSmartSupplyChannels(settings);
+  const smartEnergySupplyEnabled = smartSupplyChannels.energy;
+  const smartWaterSupplyEnabled = smartSupplyChannels.water;
+  const { sharedRoute, clearSharedRoute } = useGpx();
+  const autoPersonalMetrics = useMemo(
+    () =>
+      deriveAutoPersonalMetrics(state.records, {
+        ftpW: settings.ftp,
+        age: settings.age,
+        birthday: settings.birthday,
+        maxHeartRate: settings.maxHeartRate,
+        restingHeartRate: settings.restingHeartRate,
+      }),
+    [
+      state.records,
+      settings.age,
+      settings.birthday,
+      settings.ftp,
+      settings.maxHeartRate,
+      settings.restingHeartRate,
+    ],
+  );
+  const estimateFtpW = settings.autoPersonalMetricsEnabled
+    ? autoPersonalMetrics.ftpW
+    : settings.ftp;
+  const estimateAgeYears =
+    calculateAgeFromBirthday(settings.birthday) ?? settings.age;
+
+  useKeepAwake();
+
+  // Audio — 騎乘提示不與電話或其他系統通話混音，讓系統優先處理通話音訊焦點。
+  const alertPlayer = useAudioPlayer(require("../../assets/sounds/alert.mp3"));
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      interruptionMode: "doNotMix",
+      interruptionModeAndroid: "doNotMix",
+      shouldPlayInBackground: false,
+    }).catch(() => {});
+    return () => {
+      alertPlayer.release();
+    };
+  }, [alertPlayer]);
+
+  // 地圖 ref
+  const mapRef = useRef<LeafletMapHandle>(null);
+
+  // 當前位置
+  const [currentPos, setCurrentPos] = useState<{
+    lat: number;
+    lon: number;
+    heading: number;
+  } | null>(null);
+  const [poiMarkers, setPoiMarkers] = useState<PoiMarker[]>([]);
+  const [selectedPoi, setSelectedPoi] = useState<PoiMarker | null>(null);
+  const poiRequestIdRef = useRef(0);
+  const lastLoadedPoiBoundsRef = useRef<PoiBounds | null>(null);
+  const lastPoiRequestAttemptAtRef = useRef(0);
+  const currentPosRef = useRef<{
+    lat: number;
+    lon: number;
+    heading: number;
+  } | null>(null);
+  const [currentClock, setCurrentClock] = useState(() => new Date());
+  const locationSubRef = useRef<Location.LocationSubscription | null>(null);
+  const idlePauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pausedAtRef = useRef<number | null>(null);
+  const idleMonitorLastPositionRef = useRef<{
+    lat: number;
+    lon: number;
+  } | null>(null);
+  const [rideLocationTrackingMode, setRideLocationTrackingMode] =
+    useState<RideLocationTrackingMode>("full");
+  const recoverySessionRef = useRef<RideSession | null>(null);
+  const pendingRecoverySnapshotRef = useRef<RideSession | null>(null);
+  const recoverySnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const lastRecoverySnapshotAtRef = useRef(0);
+  const [followUser, setFollowUser] = useState(true);
+  const [locationCameraMode, setLocationCameraMode] =
+    useState<LocationCameraMode>("heading-up");
+  const locationCameraModeRef = useRef<LocationCameraMode>("heading-up");
+  const programmaticBearingUntilRef = useRef(0);
+  const [touchGuardEnabled, setTouchGuardEnabled] = useState(false);
+  const [
+    backgroundLocationDisclosureVisible,
+    setBackgroundLocationDisclosureVisible,
+  ] = useState(false);
+  const backgroundLocationDisclosureResolverRef = useRef<
+    ((accepted: boolean) => void) | null
+  >(null);
+  const backgroundLocationDisclosureAcceptedRef = useRef(false);
+  const powerSavingManagerRef = useRef(SmartPowerSavingManager.getInstance());
+  const autoLapMilestoneStateRef = useRef<AutoLapMilestoneState | null>(null);
+  const autoRecenterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const routePaddingBottomRef = useRef(PANEL_COLLAPSED_H);
+
+  useEffect(() => {
+    if (!settings.touchGuardEnabled) setTouchGuardEnabled(false);
+  }, [settings.touchGuardEnabled]);
+
+  useEffect(() => {
+    currentPosRef.current = currentPos;
+  }, [currentPos]);
+
+  const requestBackgroundLocationDisclosure = useCallback(async () => {
+    if (await hasAcceptedBackgroundLocationDisclosure()) {
+      backgroundLocationDisclosureAcceptedRef.current = true;
+      return true;
+    }
+    return new Promise<boolean>((resolve) => {
+      backgroundLocationDisclosureResolverRef.current = resolve;
+      setBackgroundLocationDisclosureVisible(true);
+    });
+  }, []);
+
+  const handleBackgroundLocationDisclosureDecision = useCallback(
+    (accepted: boolean) => {
+      setBackgroundLocationDisclosureVisible(false);
+      if (accepted) {
+        backgroundLocationDisclosureAcceptedRef.current = true;
+        void recordBackgroundLocationDisclosureAcceptance();
+      }
+      const resolve = backgroundLocationDisclosureResolverRef.current;
+      backgroundLocationDisclosureResolverRef.current = null;
+      resolve?.(accepted);
+    },
+    [],
+  );
+
+  const poiInitialLatitude = currentPos?.lat;
+  const poiInitialLongitude = currentPos?.lon;
+
+  const poiLayersEnabled =
+    settings.showWaterRefillSpots || settings.showPhotoScenicSpots;
+  const visiblePoiMarkers = useMemo(
+    () =>
+      filterPoiMarkers(poiMarkers, {
+        showWaterRefillSpots: settings.showWaterRefillSpots,
+        showPhotoScenicSpots: settings.showPhotoScenicSpots,
+      }),
+    [poiMarkers, settings.showPhotoScenicSpots, settings.showWaterRefillSpots],
+  );
+
+  const loadPoiMarkersForBounds = useCallback(
+    async (bounds: PoiBounds) => {
+      if (!poiLayersEnabled) {
+        setPoiMarkers([]);
+        setSelectedPoi(null);
+        return;
+      }
+      const latSpan = Math.abs(bounds.northEast.lat - bounds.southWest.lat);
+      const lonSpan = Math.abs(bounds.northEast.lon - bounds.southWest.lon);
+      // 全球或洲際縮放不直接發送超大 Overpass 查詢；保留已快取的地區資料並由 Leaflet 聚合。
+      if (latSpan > 0.3 || lonSpan > 0.3) return;
+      if (!shouldRefreshPoiForBounds(lastLoadedPoiBoundsRef.current, bounds)) {
+        return;
+      }
+      const nowMs = Date.now();
+      if (nowMs - lastPoiRequestAttemptAtRef.current < POI_FAILED_REQUEST_COOLDOWN_MS) {
+        return;
+      }
+
+      const requestId = ++poiRequestIdRef.current;
+      lastPoiRequestAttemptAtRef.current = nowMs;
+      try {
+        const nextMarkers = await loadPoiMarkers(bounds);
+        if (requestId === poiRequestIdRef.current) {
+          setPoiMarkers(nextMarkers);
+          lastLoadedPoiBoundsRef.current = bounds;
+        }
+      } catch {
+        // 網路暫時不可用時保留已快取／已顯示的 POI，不影響導航與騎乘。
+      }
+    },
+    [poiLayersEnabled],
+  );
+
+  useEffect(() => {
+    if (poiLayersEnabled || !poiMarkers.length) return;
+    setPoiMarkers([]);
+    setSelectedPoi(null);
+    lastLoadedPoiBoundsRef.current = null;
+    lastPoiRequestAttemptAtRef.current = 0;
+  }, [poiLayersEnabled, poiMarkers.length]);
+
+  useEffect(() => {
+    if (
+      !poiLayersEnabled ||
+      poiInitialLatitude === undefined ||
+      poiInitialLongitude === undefined
+    ) {
+      return;
+    }
+    void loadPoiMarkersForBounds({
+      southWest: {
+        lat: poiInitialLatitude - 0.025,
+        lon: poiInitialLongitude - 0.025,
+      },
+      northEast: {
+        lat: poiInitialLatitude + 0.025,
+        lon: poiInitialLongitude + 0.025,
+      },
+    });
+  }, [
+    loadPoiMarkersForBounds,
+    poiInitialLatitude,
+    poiInitialLongitude,
+    poiLayersEnabled,
+  ]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentClock(new Date()), 1_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const applyBearingForLocationMode = useCallback(
+    (mode: LocationCameraMode, heading: number) => {
+      const instruction = resolveLocationCameraInstruction(mode, heading);
+      if (instruction.bearing === null) return;
+      programmaticBearingUntilRef.current = Date.now() + 650;
+      mapRef.current?.setBearing(instruction.bearing, instruction.headingUp);
+    },
+    [],
+  );
+
+  const recenterForLocationMode = useCallback(
+    (mode: LocationCameraMode = locationCameraModeRef.current) => {
+      const position = currentPosRef.current;
+      if (!position) return;
+      applyBearingForLocationMode(mode, position.heading);
+      mapRef.current?.animateCamera(
+        { center: { latitude: position.lat, longitude: position.lon } },
+        { duration: 350 },
+      );
+      setFollowUser(true);
+    },
+    [applyBearingForLocationMode],
+  );
+
+  const scheduleAutoRecenter = useCallback(() => {
+    setFollowUser(false);
+    if (autoRecenterTimerRef.current)
+      clearTimeout(autoRecenterTimerRef.current);
+    autoRecenterTimerRef.current = setTimeout(() => {
+      recenterForLocationMode();
+    }, settings.autoRecenterSec * 1000);
+  }, [recenterForLocationMode, settings.autoRecenterSec]);
+
+  useEffect(() => {
+    locationCameraModeRef.current = locationCameraMode;
+  }, [locationCameraMode]);
+
+  const selectLocationCameraMode = useCallback(
+    (nextMode: LocationCameraMode) => {
+      if (autoRecenterTimerRef.current)
+        clearTimeout(autoRecenterTimerRef.current);
+      locationCameraModeRef.current = nextMode;
+      setLocationCameraMode(nextMode);
+      recenterForLocationMode(nextMode);
+    },
+    [recenterForLocationMode],
+  );
+
+  const cycleLocationCameraMode = useCallback(() => {
+    selectLocationCameraMode(
+      nextLocationCameraMode(locationCameraModeRef.current),
+    );
+  }, [selectLocationCameraMode]);
+
+  const flushRecoverySnapshot = useCallback(async () => {
+    if (recoverySnapshotTimerRef.current) {
+      clearTimeout(recoverySnapshotTimerRef.current);
+      recoverySnapshotTimerRef.current = null;
+    }
+    const session = pendingRecoverySnapshotRef.current;
+    if (!session) return;
+    pendingRecoverySnapshotRef.current = null;
+    lastRecoverySnapshotAtRef.current = Date.now();
+    await saveRideSessionSnapshot(session);
+  }, []);
+
+  const queueRecoverySnapshot = useCallback(
+    (session: RideSession) => {
+      pendingRecoverySnapshotRef.current = session;
+      const remainingMs = Math.max(
+        0,
+        3_000 - (Date.now() - lastRecoverySnapshotAtRef.current),
+      );
+      if (remainingMs === 0) {
+        void flushRecoverySnapshot();
+        return;
+      }
+      if (!recoverySnapshotTimerRef.current) {
+        recoverySnapshotTimerRef.current = setTimeout(() => {
+          recoverySnapshotTimerRef.current = null;
+          void flushRecoverySnapshot();
+        }, remainingMs);
+      }
+    },
+    [flushRecoverySnapshot],
+  );
+
+  useEffect(
+    () => () => {
+      if (autoRecenterTimerRef.current)
+        clearTimeout(autoRecenterTimerRef.current);
+      if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+      void flushRecoverySnapshot();
+    },
+    [flushRecoverySnapshot],
+  );
+
+  // 地圖僅在「COG 朝前」模式依可信 GPS 軌跡旋轉；自由／正北模式不讀取羅盤或預測路口。
+
+  // 功率平滑：5 點滑動平均
+  const powerWindowRef = useRef<number[]>([]);
+
+  // 累積連續低速秒數，避免依定位回呼次數而在不同裝置提早暫停。
+  const lowSpeedCountRef = useRef(0);
+  // 無法取得 GPS 速度時以牆鐘時間推進自動暫停，避免 Android 靜止時不送定位回呼。
+  const lastForegroundLocationSampleAtRef = useRef(0);
+  // 速度平滑窗口（用於過濾 GPS 速度抖動）
+  const speedWindowRef = useRef<number[]>([]);
+  const lastValidSpeedRef = useRef<number>(0);
+  const motionStillRef = useRef(true);
+  const hikingPauseSuggestedRef = useRef(false);
+
+  // 崩潰恢復
+  const [showRecoveryAlert, setShowRecoveryAlert] = useState(false);
+  const [recoverySnapshot, setRecoverySnapshot] = useState<Partial<
+    import("@/lib/ride-context").RideState
+  > | null>(null);
+  const [modelRevision, setModelRevision] = useState(getModelRevision);
+  useEffect(() => subscribeModelUpdates(setModelRevision), []);
+  const sportTrackingPolicy = useMemo(
+    () => getSportTrackingPolicy(state.sportType, modelRevision),
+    [modelRevision, state.sportType],
+  );
+
+  // 匯入 GPX 與釘選 OSRM 路徑分開保存，讓使用者可選擇清除或並存顯示。
+  const [pinnedNavigationLayers, setPinnedNavigationLayers] = useState<
+    PinnedNavigationLayer<GpxRoute>[]
+  >([]);
+  const [activeNavigationRoute, setActiveNavigationRoute] =
+    useState<GpxRoute | null>(null);
+  const gpxRoute =
+    activeNavigationRoute ??
+    sharedRoute ??
+    pinnedNavigationLayers[pinnedNavigationLayers.length - 1]?.route ??
+    null;
+  const hasExistingRouteLayers = hasExistingNavigationLayers(
+    Boolean(sharedRoute),
+    pinnedNavigationLayers.length,
+  );
+
+  // 導航狀態
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [nearestIdx, setNearestIdx] = useState(0);
+  const [distToEnd, setDistToEnd] = useState<number | null>(null);
+  const [isOffRoute, setIsOffRoute] = useState(false);
+  const arrivedRef = useRef(false);
+  // 路線服務會比較自行車道優先與一般道路候選路徑，避免不合理繞路。
+  const preferCycleway = true;
+
+  useEffect(() => {
+    if (sharedRoute) setActiveNavigationRoute(sharedRoute);
+  }, [sharedRoute]);
+
+  // 當共享路線更新時，自動適配地圖視角
+  useEffect(() => {
+    if (gpxRoute && gpxRoute.points.length > 0) {
+      setNearestIdx(0);
+      arrivedRef.current = false;
+      const coords = gpxRoute.points.map((p) => ({
+        latitude: p.lat,
+        longitude: p.lon,
+      }));
+      const fitTimer = setTimeout(() => {
+        mapRef.current?.fitToCoordinates(coords, {
+          edgePadding: {
+            top: 80,
+            right: 40,
+            bottom: routePaddingBottomRef.current + 40,
+            left: 40,
+          },
+          animated: true,
+        });
+        setFollowUser(false);
+      }, 400);
+      return () => clearTimeout(fitTimer);
+    } else {
+      setIsNavigating(false);
+      setDistToEnd(null);
+    }
+  }, [gpxRoute]);
+
+  // 即時軌跡
+  const [liveTrail, setLiveTrail] = useState<
+    { latitude: number; longitude: number; segmentStart?: boolean }[]
+  >([]);
+
+  // 坡度
+  const [currentGrade, setCurrentGrade] = useState(0);
+  const prevAltRef = useRef<number | null>(null);
+  const prevPosRef = useRef<{ lat: number; lon: number } | null>(null);
+  const liveElevationFilterRef = useRef(createLiveElevationFilterState());
+  const liveGradeRef = useRef(0);
+  // 坡度平滑：小型滑動平均，消除 GPS 高度抖動但保留爬坡反應。
+  const gradeWindowRef = useRef<number[]>([]);
+
+  // 天氣
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [relativeWindInfo, setRelativeWindInfo] = useState<ReturnType<
+    typeof getRelativeWindInfo
+  > | null>(null);
+  const weatherRef = useRef<WeatherData | null>(null);
+  const weatherTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const windDataRef = useRef<{ speed: number; direction: number }>({
+    speed: 0,
+    direction: 0,
+  });
+  const airDensityRef = useRef<number>(calcAirDensity(25));
+  const environmentSummaryRef = useRef({
+    sampleCount: 0,
+    temperatureTotal: 0,
+    humidityTotal: 0,
+    windSpeedTotal: 0,
+    headwindTotal: 0,
+    precipitationTotal: 0,
+    latestWeatherCode: undefined as number | undefined,
+    hadLiveWeather: false,
+  });
+  const prevSpeedMsRef = useRef<number>(0); // 用於計算加速阻力
+  const headingRef = useRef<number>(0);
+  // 僅保留最近數秒的可信 GPS 點，以 course-over-ground（COG）計算方向；不使用羅盤。
+  const cogSamplesRef = useRef<CogPoint[]>([]);
+  const lastFollowCameraCenterRef = useRef<{ lat: number; lon: number } | null>(
+    null,
+  );
+
+  // 騎乘狀態與背景監聽
+  const [mapRideActive, setMapRideActive] = useState(false);
+  const [isAppForeground, setIsAppForeground] = useState(true);
+
+  useEffect(() => {
+    if (!mapRideActive || !sportTrackingPolicy.autoPause.requiresStillness) {
+      motionStillRef.current = true;
+      return;
+    }
+    let subscription: { remove: () => void } | null = null;
+    let active = true;
+    void (async () => {
+      const available = await Accelerometer.isAvailableAsync();
+      if (!active || !available) return;
+      Accelerometer.setUpdateInterval(500);
+      subscription = Accelerometer.addListener(({ x, y, z }) => {
+        const magnitude = Math.sqrt(x * x + y * y + z * z);
+        // 重力約為 1 g；偏差小於 0.055 g 視為手機靜止。
+        motionStillRef.current = Math.abs(magnitude - 1) < 0.055;
+      });
+    })();
+    return () => {
+      active = false;
+      subscription?.remove();
+    };
+  }, [mapRideActive, sportTrackingPolicy.autoPause.requiresStillness]);
+  const touchGuardHintOpacity = useRef(new Animated.Value(0)).current;
+  const [touchGuardHoldProgress, setTouchGuardHoldProgress] = useState(0);
+  const touchGuardHoldStartedAtRef = useRef<number | null>(null);
+  const touchGuardHoldTimerRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+  const touchGuardHoldSafetyTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const touchGuardPointerActiveRef = useRef(false);
+  const touchGuardPointerIdRef = useRef<number | null>(null);
+  const touchGuardInitialLockTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const touchGuardRelockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const [showTouchGuardUnlockSuccess, setShowTouchGuardUnlockSuccess] =
+    useState(false);
+  const touchGuardUnlockSuccessOpacity = useRef(new Animated.Value(0)).current;
+  const touchGuardUnlockSuccessScale = useRef(new Animated.Value(0.82)).current;
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (
+        nextState.match(/inactive|background/) &&
+        (stateRef.current.status === "active" ||
+          stateRef.current.status === "paused")
+      ) {
+        const currentRide = stateRef.current;
+        const autoLap = autoLapMilestoneStateRef.current;
+        const lastLocation = lastLocationRef.current;
+        void syncBackgroundRideCheckpoint({
+          totalDistanceM: currentRide.distance,
+          movingTimeSec: currentRide.elapsed,
+          totalAscentM: currentRide.totalAscent,
+          totalDescentM: currentRide.totalDescent,
+          powerWorkJ: currentRide.powerWorkJ,
+          powerSampleDurationSec: currentRide.powerSampleDurationSec,
+          maxPowerW: currentRide.maxPower,
+          calories: currentRide.totalCalories,
+          sweatLossMl: currentRide.totalSweatMl,
+          autoPausedSec: currentRide.autoPausedSec,
+          autoLapAnchor: autoLap?.anchor,
+          previousAutoLapTotals: autoLap?.previousTotals,
+          nextAutoLapDistanceM: autoLap?.nextDistanceM,
+          laps: autoLap?.laps,
+          lastLocation: lastLocation
+            ? {
+                latitude: lastLocation.coords.latitude,
+                longitude: lastLocation.coords.longitude,
+                timestamp: lastLocation.timestamp,
+                accuracy: lastLocation.coords.accuracy,
+                altitude: lastLocation.coords.altitude,
+                speed: lastLocation.coords.speed,
+              }
+            : null,
+        });
+      }
+      setIsAppForeground(nextState === "active");
+      const shouldSuppressAudio =
+        shouldSuppressRideAudioForSystemInterruption(nextState);
+      setRideSpeechSuppressed(shouldSuppressAudio);
+      if (shouldSuppressAudio) {
+        void stopSpeech();
+        try {
+          alertPlayer.pause();
+        } catch {}
+      }
+    });
+    return () => {
+      subscription.remove();
+      setRideSpeechSuppressed(false);
+    };
+  }, [alertPlayer]);
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryRecordId, setSummaryRecordId] = useState<string | null>(null);
+  const [summarySnapshot, setSummarySnapshot] =
+    useState<RideSummarySnapshot | null>(null);
+  const nextAutoLapDistanceMRef = useRef<number | null>(null);
+  // 補給提醒分別管理（支援兩種同時顯示）
+  const [calorieAlert, setCalorieAlert] = useState(false);
+  const [waterAlert, setWaterAlert] = useState(false);
+  const [supplyRecommendedMl, setSupplyRecommendedMl] = useState<
+    number | undefined
+  >(undefined);
+  const [supplyRecommendation, setSupplyRecommendation] = useState<
+    SupplyPlan | undefined
+  >(undefined);
+  const [activeSupplyPlan, setActiveSupplyPlan] = useState<
+    SupplyPlan | undefined
+  >(undefined);
+  const [smartSupplyCountdown, setSmartSupplyCountdown] =
+    useState<SmartSupplyCountdown | null>(null);
+  const [smartSupplyCountdownNowMs, setSmartSupplyCountdownNowMs] = useState(
+    () => Date.now(),
+  );
+  const smartSupplyCountdownRef = useRef<SmartSupplyCountdown | null>(null);
+  const lastBackgroundCountdownSnapshotRef = useRef("");
+
+  const syncSmartSupplyCountdown = useCallback(
+    (nextCountdown: SmartSupplyCountdown | null) => {
+      smartSupplyCountdownRef.current = nextCountdown;
+      setSmartSupplyCountdown(nextCountdown);
+      if (!nextCountdown) return;
+      const snapshot = [
+        nextCountdown.calorieDueAtMs,
+        nextCountdown.waterDueAtMs,
+        nextCountdown.calorieDurationSec,
+        nextCountdown.waterDurationSec,
+        supplyRoundPauseRef.current.calorie.pausedAtMs,
+        supplyRoundPauseRef.current.calorie.pausedTotalSec,
+        supplyRoundPauseRef.current.water.pausedAtMs,
+        supplyRoundPauseRef.current.water.pausedTotalSec,
+      ].join(":");
+      if (snapshot !== lastBackgroundCountdownSnapshotRef.current) {
+        lastBackgroundCountdownSnapshotRef.current = snapshot;
+        void updateBackgroundSmartSupplyCountdown({
+          smartCalorieCountdownStartedElapsedSec:
+            nextCountdown.calorieStartedElapsedSec,
+          smartWaterCountdownStartedElapsedSec:
+            nextCountdown.waterStartedElapsedSec,
+          smartCalorieCountdownDurationSec: nextCountdown.calorieDurationSec,
+          smartWaterCountdownDurationSec: nextCountdown.waterDurationSec,
+          smartCalorieCountdownDueAtMs: nextCountdown.calorieDueAtMs,
+          smartWaterCountdownDueAtMs: nextCountdown.waterDueAtMs,
+          smartCalorieCountdownPausedAtMs:
+            supplyRoundPauseRef.current.calorie.pausedAtMs ?? undefined,
+          smartWaterCountdownPausedAtMs:
+            supplyRoundPauseRef.current.water.pausedAtMs ?? undefined,
+          smartCalorieCountdownPausedTotalMs: Math.round(
+            supplyRoundPauseRef.current.calorie.pausedTotalSec * 1_000,
+          ),
+          smartWaterCountdownPausedTotalMs: Math.round(
+            supplyRoundPauseRef.current.water.pausedTotalSec * 1_000,
+          ),
+        });
+        void scheduleSmartSupplyDueNotification(
+          "calorie",
+          nextCountdown.calorieDueAtMs,
+        );
+        void scheduleSmartSupplyDueNotification(
+          "water",
+          nextCountdown.waterDueAtMs,
+        );
+      }
+    },
+    [],
+  );
+
+  const calorieReminderSentRef = useRef(false);
+  const waterReminderSentRef = useRef(false);
+  const notifPermRef = useRef(false);
+  // 重複提醒計時器
+  const supplyRepeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+  // 追蹤尚未確認的補給類型（「稍後」只關閉 Modal，不清除此 ref）
+  const pendingCalorieRef = useRef(false);
+  const pendingWaterRef = useRef(false);
+  const pendingSupplyPlansRef = useRef<
+    Partial<Record<"calorie" | "water", SupplyPlan>>
+  >({});
+  const supplyRoundPauseRef = useRef<
+    Record<
+      "calorie" | "water",
+      { pausedAtMs: number | null; pausedTotalSec: number }
+    >
+  >({
+    calorie: { pausedAtMs: null, pausedTotalSec: 0 },
+    water: { pausedAtMs: null, pausedTotalSec: 0 },
+  });
+  // 背景通知的「已補給」可能與 AppState 回前景快照同時到達；短暫抑制舊快照重開同一 Modal。
+  const backgroundNotificationConfirmationUntilRef = useRef<
+    Record<"calorie" | "water", number>
+  >({ calorie: 0, water: 0 });
+  const supplySnoozedUntilRef = useRef<Record<"calorie" | "water", number>>({
+    calorie: 0,
+    water: 0,
+  });
+  const rideStartLocationRef = useRef<{ lat: number; lon: number } | null>(
+    null,
+  ); // 記錄騎乘開始座標
+
+  // ── 地圖釘選功能（按鈕 + 中心圖釘） ──
+  const [pinSelectMode, setPinSelectMode] = useState(false); // 釘選模式是否啟動
+  const [centerPinLocation, setCenterPinLocation] = useState<{
+    lat: number;
+    lon: number;
+  } | null>(null); // 中心圖釘的位置
+  const [pinnedLocation, setPinnedLocation] = useState<{
+    lat: number;
+    lon: number;
+  } | null>(null);
+  const [pinnedLocationLabel, setPinnedLocationLabel] = useState<string | null>(
+    null,
+  );
+  const [showPinCard, setShowPinCard] = useState(false);
+  const [isFetchingPinRoute, setIsFetchingPinRoute] = useState(false);
+  const [pinRouteInfo, setPinRouteInfo] = useState<{
+    distM: number;
+    durSec: number;
+    polyline: { latitude: number; longitude: number }[];
+  } | null>(null);
+  const [pinAddress, setPinAddress] = useState("");
+  const [isResolvingPinAddress, setIsResolvingPinAddress] = useState(false);
+  const [pinAddressCandidates, setPinAddressCandidates] = useState<
+    RecentAddressSearch[]
+  >([]);
+  const [pinAddressNotice, setPinAddressNotice] = useState<string | null>(null);
+  const [recentAddressSearches, setRecentAddressSearches] = useState<
+    RecentAddressSearch[]
+  >([]);
+  const [lastNavigationDataRefreshAt, setLastNavigationDataRefreshAt] =
+    useState<number | null>(null);
+
+  useEffect(() => {
+    void loadRecentAddressSearches().then(setRecentAddressSearches);
+  }, []);
+
+  const clearAllNavigationLayers = useCallback(
+    (clearRideTrail: boolean | string = false) => {
+      const shouldClearRideTrail = clearRideTrail === true;
+      // 立即通知 Leaflet 清空已繪製圖層與數字標記，避免等待 React state 更新而短暫殘留。
+      mapRef.current?.clearNavigationGraphics(shouldClearRideTrail);
+      clearSharedRoute();
+      setPinnedNavigationLayers([]);
+      setActiveNavigationRoute(null);
+      setNearestIdx(0);
+      setIsNavigating(false);
+      // 清除導航圖層不等於結束騎乘；騎乘中的 GPS、計時與累計資料必須持續。
+      if (
+        stateRef.current.status === "idle" ||
+        stateRef.current.status === "finished"
+      ) {
+        setMapRideActive(false);
+      }
+      setDistToEnd(null);
+      setPinnedLocation(null);
+      setPinnedLocationLabel(null);
+      setCenterPinLocation(null);
+      setShowPinCard(false);
+      setPinRouteInfo(null);
+      arrivedRef.current = false;
+    },
+    [clearSharedRoute],
+  );
+
+  const startPinnedNavigationRoute = useCallback(
+    (route: GpxRoute, announcement: string) => {
+      // 釘選導航以畫面提示呈現；騎乘語音僅保留補給／補水兩種固定短句。
+      void announcement;
+      const nextLayer: PinnedNavigationLayer<GpxRoute> = {
+        id: `pinned-${Date.now()}`,
+        route,
+      };
+      const commitRoute = (clearExisting: boolean) => {
+        if (clearExisting) clearSharedRoute();
+        setPinnedNavigationLayers((previous) =>
+          applyPinnedNavigationDecision(previous, nextLayer, clearExisting),
+        );
+        setActiveNavigationRoute(route);
+        setIsNavigating(true);
+        // 這只啟用地圖追蹤，絕不可 dispatch START／RESET；既有騎乘必須維持原計時與累計。
+        setMapRideActive(true);
+        setFollowUser(true);
+        setNearestIdx(0);
+        arrivedRef.current = false;
+        // 路線啟動後優先顯示使用者目前位置，而非停留在選點或整段路線的縮放畫面。
+        requestAnimationFrame(() => recenterForLocationMode());
+      };
+
+      if (
+        !hasExistingNavigationLayers(
+          Boolean(sharedRoute),
+          pinnedNavigationLayers.length,
+        )
+      ) {
+        commitRoute(false);
+        return;
+      }
+
+      Alert.alert(
+        "清除先前導航路徑？",
+        "地圖已有 GPX 或釘選導航路徑。清除會完整移除所有舊路徑、起訖標記與方向箭頭；保留則新舊路徑會以不同顏色一起顯示。",
+        [
+          { text: "取消", style: "cancel" },
+          { text: "保留並開始", onPress: () => commitRoute(false) },
+          {
+            text: "清除並開始",
+            style: "destructive",
+            onPress: () => commitRoute(true),
+          },
+        ],
+      );
+    },
+    [
+      clearSharedRoute,
+      pinnedNavigationLayers.length,
+      recenterForLocationMode,
+      sharedRoute,
+    ],
+  );
+
+  const selectPinAddressDestination = useCallback(
+    (destination: RecentAddressSearch) => {
+      const nextLocation = {
+        lat: destination.latitude,
+        lon: destination.longitude,
+      };
+      setPinnedLocation(nextLocation);
+      setPinnedLocationLabel(destination.label);
+      setPinAddress(destination.label);
+      setPinRouteInfo(null);
+      setShowPinCard(true);
+      setPinSelectMode(false);
+      setCenterPinLocation(null);
+      setPinAddressCandidates([]);
+      const nextHistory = mergeRecentAddressSearches(recentAddressSearches, {
+        ...destination,
+        usedAt: Date.now(),
+      });
+      setRecentAddressSearches(nextHistory);
+      void saveRecentAddressSearches(nextHistory);
+      mapRef.current?.animateCamera(
+        {
+          center: { latitude: nextLocation.lat, longitude: nextLocation.lon },
+          zoom: 16,
+        },
+        { duration: 360 },
+      );
+    },
+    [recentAddressSearches],
+  );
+
+  const handleRefreshPinMapData = useCallback(() => {
+    mapRef.current?.refreshBaseTiles();
+    setLastNavigationDataRefreshAt(Date.now());
+    setPinRouteInfo(null);
+    Alert.alert(
+      "已請求更新圖資",
+      "地圖已重新向上游請求圖磚。請再按「計算路線」重新取得道路與自行車道資料；臨時施工或短時封路仍可能有延遲，請以現場管制為準。",
+    );
+  }, []);
+
+  const handleResolvePinAddress = useCallback(async () => {
+    const address = pinAddress.trim();
+    if (!address) {
+      Alert.alert("輸入地址", "請輸入目的地地址、地標或店家名稱。");
+      return;
+    }
+    setIsResolvingPinAddress(true);
+    try {
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        const requested = await Location.requestForegroundPermissionsAsync();
+        if (requested.status !== "granted") {
+          Alert.alert(
+            "需要定位權限",
+            "地址導航需要前景定位權限，才能將目的地接入現有導航流程。",
+          );
+          return;
+        }
+      }
+      const results = await Location.geocodeAsync(address);
+      if (!results.length) {
+        setPinAddressCandidates([]);
+        setPinAddressNotice(
+          "找不到地址。請補上城市、區域或門牌；也可直接移動地圖中心圖釘選點。",
+        );
+        return;
+      }
+      const candidates = results.slice(0, 5).map((item) => ({
+        label: address,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        usedAt: Date.now(),
+      }));
+      if (candidates.length === 1) {
+        setPinAddressNotice(null);
+        selectPinAddressDestination(candidates[0]);
+      } else {
+        setPinAddressNotice(null);
+        setPinAddressCandidates(candidates);
+      }
+    } catch {
+      setPinAddressCandidates([]);
+      setPinAddressNotice(
+        "地址搜尋暫時不可用。請確認網路與定位服務；離線時仍可直接移動地圖，以中心圖釘選擇目的地。",
+      );
+    } finally {
+      setIsResolvingPinAddress(false);
+    }
+  }, [pinAddress, selectPinAddressDestination]);
+
+  // ── 自訂補給品追蹤 ──
+  // 記錄每個補給品上次觸發的時間（秒）或距離（公里）
+  const supplyItemsTrackerRef = useRef<Record<string, CustomSupplyTracker>>({});
+  // 追蹤器結構: { lastTriggerTime, lastTriggerDistance, triggered, dismissTimeoutId, repeatIntervalId }
+  // 自訂補給品提醒狀態
+  const [customSupplyAlerts, setCustomSupplyAlerts] = useState<
+    Record<string, boolean>
+  >({});
+  const customSupplyAlertsRef = useRef<Record<string, boolean>>({});
+  const [activeSupplyAlerts, setActiveSupplyAlerts] = useState<string[]>([]);
+  // 手動能量／補水間隔：各自以時間與距離基準追蹤，確認後只重置對應規則。
+  const intervalSupplyTrackerRef = useRef<SupplyIntervalTracker>({
+    "energy-time": 0,
+    "energy-distance": 0,
+    "water-time": 0,
+    "water-distance": 0,
+  });
+  const intervalSupplyAlertsRef = useRef<
+    Partial<Record<SupplyIntervalKind, boolean>>
+  >({});
+  const [intervalSupplyAlerts, setIntervalSupplyAlerts] = useState<
+    Partial<Record<SupplyIntervalKind, boolean>>
+  >({});
+  const intervalSupplyRepeatTimerRef = useRef<ReturnType<
+    typeof setInterval
+  > | null>(null);
+  const intervalSnoozedUntilRef = useRef<
+    Partial<Record<SupplyIntervalKind, number>>
+  >({});
+  const supplyAutoDismissTimersRef = useRef<
+    Partial<Record<"calorie" | "water", ReturnType<typeof setTimeout>>>
+  >({});
+
+  // 清除重複提醒計時器
+  const clearSupplyRepeatTimer = useCallback(() => {
+    if (supplyRepeatTimerRef.current) {
+      clearInterval(supplyRepeatTimerRef.current);
+      supplyRepeatTimerRef.current = null;
+    }
+    pendingCalorieRef.current = false;
+    pendingWaterRef.current = false;
+    pendingSupplyPlansRef.current = {};
+  }, []);
+  const clearIntervalSupplyRepeatTimer = useCallback(() => {
+    if (intervalSupplyRepeatTimerRef.current) {
+      clearInterval(intervalSupplyRepeatTimerRef.current);
+      intervalSupplyRepeatTimerRef.current = null;
+    }
+  }, []);
+  const clearSupplyAutoDismissTimer = useCallback(
+    (type?: "calorie" | "water") => {
+      const types: ("calorie" | "water")[] = type
+        ? [type]
+        : ["calorie", "water"];
+      types.forEach((kind) => {
+        const timer = supplyAutoDismissTimersRef.current[kind];
+        if (timer) clearTimeout(timer);
+        delete supplyAutoDismissTimersRef.current[kind];
+      });
+    },
+    [],
+  );
+
+  const previousSupplyReminderEnabledRef = useRef(
+    settings.supplyReminderEnabled,
+  );
+  const clearAllActiveSupplyReminders = useCallback(() => {
+    clearSupplyRepeatTimer();
+    clearIntervalSupplyRepeatTimer();
+    clearSupplyAutoDismissTimer();
+    Object.values(supplyItemsTrackerRef.current).forEach((tracker) => {
+      if (tracker.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
+      if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+    });
+    customSupplyAlertsRef.current = {};
+    setCustomSupplyAlerts({});
+    setActiveSupplyAlerts([]);
+    intervalSupplyAlertsRef.current = {};
+    setIntervalSupplyAlerts({});
+    intervalSnoozedUntilRef.current = {};
+    setCalorieAlert(false);
+    setWaterAlert(false);
+    setSupplyRecommendedMl(undefined);
+    setSupplyRecommendation(undefined);
+    syncSmartSupplyCountdown(null);
+    calorieReminderSentRef.current = false;
+    waterReminderSentRef.current = false;
+    void stopSpeech();
+    try {
+      alertPlayer.pause();
+    } catch {}
+    Vibration.cancel();
+    void clearAllSupplyNotifications();
+    void setBackgroundSupplyReminderEnabled(false);
+  }, [
+    alertPlayer,
+    clearIntervalSupplyRepeatTimer,
+    clearSupplyAutoDismissTimer,
+    clearSupplyRepeatTimer,
+    syncSmartSupplyCountdown,
+  ]);
+
+  useEffect(
+    () => () => clearSupplyAutoDismissTimer(),
+    [clearSupplyAutoDismissTimer],
+  );
+
+  useEffect(() => {
+    const wasEnabled = previousSupplyReminderEnabledRef.current;
+    if (!settings.supplyReminderEnabled) {
+      clearAllActiveSupplyReminders();
+    } else if (!wasEnabled) {
+      const elapsed = stateRef.current.elapsed;
+      const distanceKm = stateRef.current.distance / 1000;
+      intervalSupplyTrackerRef.current = {
+        "energy-time": elapsed,
+        "energy-distance": distanceKm,
+        "water-time": elapsed,
+        "water-distance": distanceKm,
+      };
+      intervalSnoozedUntilRef.current = {};
+      supplyItemsTrackerRef.current = Object.fromEntries(
+        settings.supplyItems
+          .filter((item) => item.enabled)
+          .map((item) => [
+            item.id,
+            {
+              lastTriggerTime: elapsed,
+              lastTriggerDistance: distanceKm,
+              triggered: false,
+              dismissTimeoutId: null,
+              repeatIntervalId: null,
+            },
+          ]),
+      );
+      void setBackgroundSupplyReminderEnabled(true);
+    }
+    previousSupplyReminderEnabledRef.current = settings.supplyReminderEnabled;
+  }, [
+    clearAllActiveSupplyReminders,
+    settings.supplyItems,
+    settings.supplyReminderEnabled,
+  ]);
+
+  useEffect(() => {
+    if (!mapRideActive) return;
+    void updateBackgroundSmartSupplyChannels({
+      energyEnabled: smartEnergySupplyEnabled,
+      waterEnabled: smartWaterSupplyEnabled,
+    });
+  }, [mapRideActive, smartEnergySupplyEnabled, smartWaterSupplyEnabled]);
+
+  useEffect(() => {
+    if (!mapRideActive) return;
+    void updateBackgroundRiderProfile({
+      weightKg: settings.weight,
+      heightCm: settings.height,
+      ageYears: estimateAgeYears ?? 32,
+      ftpW: estimateFtpW,
+      bikeWeightKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG,
+      sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
+      energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+      energyCarbohydrateHourlyLimitMode:
+        settings.energyCarbohydrateHourlyLimitMode,
+      energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+    });
+  }, [
+    estimateAgeYears,
+    estimateFtpW,
+    mapRideActive,
+    settings.bikeWeight,
+    settings.energyCarbohydrateHourlyLimitG,
+    settings.energyCarbohydrateHourlyLimitMode,
+    settings.energyServingCarbohydrateG,
+    settings.height,
+    settings.sweatRateCalibrationMultiplier,
+    settings.weight,
+  ]);
+
+  useEffect(() => {
+    customSupplyAlertsRef.current = customSupplyAlerts;
+  }, [customSupplyAlerts]);
+
+  useEffect(
+    () => () => {
+      clearSupplyRepeatTimer();
+      clearIntervalSupplyRepeatTimer();
+    },
+    [clearIntervalSupplyRepeatTimer, clearSupplyRepeatTimer],
+  );
+
+  const lastLocationRef = useRef<Location.LocationObject | null>(null);
+  const lastAcceptedTrackPointRef = useRef<TrackQualityPoint | null>(null);
+  const lastBgSyncTsRef = useRef<number>(0); // 背景軌跡去重：記錄上次同步的最大時間戳
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  useEffect(() => {
+    if (
+      state.status === "idle" &&
+      state.sportType !== settings.defaultSportType
+    ) {
+      dispatch({
+        type: "SET_SPORT_TYPE",
+        sportType: settings.defaultSportType,
+      });
+    }
+  }, [dispatch, settings.defaultSportType, state.sportType, state.status]);
+
+  // 進度條動畫
+  const calorieAnim = useRef(new Animated.Value(0)).current;
+  const waterAnim = useRef(new Animated.Value(0)).current;
+
+  const handleConfirmCustomSupply = useCallback(
+    (id: string, type: "time" | "distance") => {
+      customSupplyAlertsRef.current = {
+        ...customSupplyAlertsRef.current,
+        [id]: false,
+      };
+      setCustomSupplyAlerts(customSupplyAlertsRef.current);
+      setActiveSupplyAlerts((prev) => prev.filter((alertId) => alertId !== id));
+      const tracker = supplyItemsTrackerRef.current[id];
+      if (tracker?.dismissTimeoutId) clearTimeout(tracker.dismissTimeoutId);
+      if (tracker?.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+      supplyItemsTrackerRef.current[id] = {
+        lastTriggerTime:
+          type === "time"
+            ? state.elapsed
+            : supplyItemsTrackerRef.current[id]?.lastTriggerTime || 0,
+        lastTriggerDistance:
+          type === "distance"
+            ? state.distance / 1000
+            : supplyItemsTrackerRef.current[id]?.lastTriggerDistance || 0,
+        triggered: false,
+        dismissTimeoutId: null,
+        repeatIntervalId: null,
+      };
+      void clearAllSupplyNotifications();
+      vibrateLight();
+    },
+    [state.elapsed, state.distance],
+  );
+
+  const handleConfirmIntervalSupply = useCallback(
+    (kind: SupplyIntervalKind) => {
+      const current = stateRef.current;
+      if (kind.endsWith("-time"))
+        intervalSupplyTrackerRef.current[kind] = current.elapsed;
+      else intervalSupplyTrackerRef.current[kind] = current.distance / 1000;
+      void acknowledgeBackgroundSupplyInterval(kind);
+
+      const nextAlerts = { ...intervalSupplyAlertsRef.current, [kind]: false };
+      intervalSupplyAlertsRef.current = nextAlerts;
+      setIntervalSupplyAlerts(nextAlerts);
+      if (!Object.values(nextAlerts).some(Boolean))
+        clearIntervalSupplyRepeatTimer();
+      void clearAllSupplyNotifications();
+      if (settings.vibrationEnabled) vibrateSuccess();
+    },
+    [clearIntervalSupplyRepeatTimer, settings.vibrationEnabled],
+  );
+
+  const resolveConfirmedSupplyPlan = useCallback(
+    (kind: "calorie" | "water"): SupplyPlan => {
+      const current = stateRef.current;
+      return (
+        pendingSupplyPlansRef.current[kind] ??
+        supplyRecommendation ??
+        activeSupplyPlan ??
+        createSupplyPlan({
+          mode: settings.supplyCalculationMode,
+          sportType: current.sportType,
+          calorieThresholdKcal: settings.calorieThreshold,
+          waterThresholdMl:
+            settings.waterThreshold > 0
+              ? settings.waterThreshold
+              : DEFAULT_HYDRATION_THRESHOLD_ML,
+          elapsedSec: current.elapsed,
+          riderWeightKg: settings.weight,
+          ftpW: estimateFtpW,
+          intensityFactor:
+            current.sportType === "cycling"
+              ? Math.min(2, current.currentPower / Math.max(1, estimateFtpW))
+              : 1,
+          sweatRatePerHour: current.currentSweatRatePerHour,
+          environmentLoad: 0,
+          weatherAvailable: false,
+          isFirstWaterCountdown: false,
+          energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+          energyCarbohydrateHourlyLimitMode:
+            settings.energyCarbohydrateHourlyLimitMode,
+          energyCarbohydrateHourlyLimitG:
+            settings.energyCarbohydrateHourlyLimitG,
+        })
+      );
+    },
+    [activeSupplyPlan, estimateFtpW, settings, supplyRecommendation],
+  );
+
+  const consumePausedRecoveryForNextRound = useCallback(
+    (kind: "calorie" | "water") => {
+      const nowMs = Date.now();
+      const pauseState = supplyRoundPauseRef.current[kind];
+      if (pauseState.pausedAtMs !== null) {
+        pauseState.pausedTotalSec += Math.max(
+          0,
+          (nowMs - pauseState.pausedAtMs) / 1_000,
+        );
+      }
+      const pausedSec = pauseState.pausedTotalSec;
+      pauseState.pausedTotalSec = 0;
+      pauseState.pausedAtMs =
+        stateRef.current.status === "paused" ? nowMs : null;
+      return pausedSec;
+    },
+    [],
+  );
+
+  const handleConfirmCalorieSupply = useCallback(() => {
+    clearSupplyAutoDismissTimer("calorie");
+    setCalorieAlert(false);
+    const confirmedPlan = resolveConfirmedSupplyPlan("calorie");
+    // 能量倒數依絕對時間持續；v2 不讓本輪暫停時長重排下一輪。
+    consumePausedRecoveryForNextRound("calorie");
+    const nextPlan = confirmedPlan;
+    if (smartEnergySupplyEnabled && smartSupplyCountdownRef.current) {
+      syncSmartSupplyCountdown(
+        restartSmartSupplyCountdown(
+          smartSupplyCountdownRef.current,
+          "calorie",
+          nextPlan,
+          stateRef.current.elapsed,
+        ),
+      );
+    } else {
+      dispatch({ type: "CONSUME_CALORIES" });
+    }
+    dispatch({
+      type: "SUPPLY_CONFIRMED",
+      confirmation: {
+        type: "energy",
+        timestamp: Date.now(),
+        elapsedSec: stateRef.current.elapsed,
+        recommendedEnergyKcal: confirmedPlan?.energyRecommendationKcal,
+        recommendedCarbohydrateG: confirmedPlan?.carbohydrateRecommendationG,
+        source: confirmedPlan?.source,
+        reason: confirmedPlan?.reason,
+      },
+    });
+    calorieAnim.setValue(0);
+    calorieReminderSentRef.current = false;
+    pendingCalorieRef.current = false;
+    delete pendingSupplyPlansRef.current.calorie;
+    const waterStillPending = pendingWaterRef.current || waterAlert;
+    if (!waterStillPending) setSupplyRecommendation(undefined);
+    supplySnoozedUntilRef.current.calorie = 0;
+    void acknowledgeBackgroundSupplyReminder("calorie", {
+      preserveForegroundCountdown: true,
+    });
+    void clearAllSupplyNotifications();
+    if (settings.vibrationEnabled) vibrateSuccess();
+    if (!waterStillPending) clearSupplyRepeatTimer();
+  }, [
+    calorieAnim,
+    clearSupplyAutoDismissTimer,
+    clearSupplyRepeatTimer,
+    consumePausedRecoveryForNextRound,
+    dispatch,
+    resolveConfirmedSupplyPlan,
+    settings.vibrationEnabled,
+    smartEnergySupplyEnabled,
+    syncSmartSupplyCountdown,
+    waterAlert,
+  ]);
+
+  const refreshSmartWaterCountdown = useCallback(
+    async (
+      confirmedPlan: SupplyPlan,
+      previousWaterDurationSec?: number,
+      pausedDuringRoundSec = 0,
+    ) => {
+      const location = lastLocationRef.current;
+      const currentHydrationThresholdMl =
+        settings.waterThreshold > 0
+          ? settings.waterThreshold
+          : DEFAULT_HYDRATION_THRESHOLD_ML;
+      const sensorPromise = Promise.resolve<HydrationSensorSnapshot>({
+        elapsedSec: stateRef.current.elapsed,
+        powerW: stateRef.current.currentPower,
+        speedKmh: stateRef.current.currentSpeed,
+        sweatRatePerHour: stateRef.current.currentSweatRatePerHour,
+        headingDeg: headingRef.current,
+      });
+      const weatherPromise = location
+        ? fetchWeather(location.coords.latitude, location.coords.longitude)
+        : Promise.resolve(weatherRef.current);
+      const input = await awaitHydrationInputs({
+        weatherPromise,
+        sensorPromise,
+      });
+      const countdown = smartSupplyCountdownRef.current;
+      if (!countdown) return;
+
+      if (input.status !== "complete") {
+        setSupplyRecommendation({
+          ...confirmedPlan,
+          waterCountdownSec: resolveWaterCountdownFallbackDuration(
+            previousWaterDurationSec,
+          ),
+          reason: `${confirmedPlan.reason}；資料逾時或不完整，將於下一輪沿用前一輪補水倒數。`,
+        });
+        return;
+      }
+
+      const { weather: nextWeather, sensors } = input;
+      setWeather(nextWeather);
+      weatherRef.current = nextWeather;
+      const headwindMs =
+        typeof sensors.headingDeg === "number"
+          ? getHeadwindMs(
+              sensors.headingDeg,
+              nextWeather.windDirection,
+              nextWeather.windSpeed,
+            )
+          : 0;
+      const sweat = calculateSweatLoss({
+        weightKg: settings.weight,
+        heightCm: settings.height,
+        powerW: sensors.powerW,
+        speedKmh: sensors.speedKmh,
+        ascentPerInterval: 0,
+        gradePct: currentGrade,
+        intervalSec: 60,
+        temperatureC: nextWeather.temperature,
+        humidityPct: nextWeather.humidity,
+        weatherCode: nextWeather.weatherCode,
+        isDaylight: new Date().getHours() >= 6 && new Date().getHours() < 18,
+        ftpW: estimateFtpW,
+        headwindMs,
+        precipitationProb: nextWeather.precipitationProb,
+        ageYears: estimateAgeYears ?? 32,
+        calibrationMultiplier: settings.sweatRateCalibrationMultiplier,
+        environmentSource: "live-weather",
+      });
+      const nextPlan = createSupplyPlan({
+        mode: settings.supplyCalculationMode,
+        sportType: stateRef.current.sportType,
+        calorieThresholdKcal: settings.calorieThreshold,
+        waterThresholdMl: currentHydrationThresholdMl,
+        elapsedSec: sensors.elapsedSec,
+        riderWeightKg: settings.weight,
+        ftpW: estimateFtpW,
+        intensityFactor:
+          stateRef.current.sportType === "cycling"
+            ? Math.min(2, sensors.powerW / Math.max(1, estimateFtpW))
+            : 1,
+        sweatRatePerHour: sweat.sweatRatePerHour || sensors.sweatRatePerHour,
+        environmentLoad: sweat.environmentLoad,
+        weatherAvailable: true,
+        temperatureC: nextWeather.temperature,
+        humidityPct: nextWeather.humidity,
+        weatherCode: nextWeather.weatherCode,
+        gradePct: currentGrade,
+        pausedDuringRoundSec,
+        isFirstWaterCountdown: false,
+        energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+        energyCarbohydrateHourlyLimitMode:
+          settings.energyCarbohydrateHourlyLimitMode,
+        energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+      });
+      setActiveSupplyPlan(nextPlan);
+      setSupplyRecommendation(nextPlan);
+      syncSmartSupplyCountdown(
+        restartSmartSupplyCountdown(
+          countdown,
+          "water",
+          nextPlan,
+          stateRef.current.elapsed,
+        ),
+      );
+    },
+    [
+      currentGrade,
+      estimateAgeYears,
+      estimateFtpW,
+      settings,
+      syncSmartSupplyCountdown,
+    ],
+  );
+
+  const handleConfirmWaterSupply = useCallback(() => {
+    clearSupplyAutoDismissTimer("water");
+    setWaterAlert(false);
+    setSupplyRecommendedMl(undefined);
+    const confirmedPlan = resolveConfirmedSupplyPlan("water");
+    const pausedDuringRoundSec = consumePausedRecoveryForNextRound("water");
+    if (smartWaterSupplyEnabled && smartSupplyCountdownRef.current) {
+      const previousWaterDurationSec =
+        smartSupplyCountdownRef.current.waterDurationSec;
+      const weather = weatherRef.current;
+      const current = stateRef.current;
+      const nextPlan = createSupplyPlan({
+        mode: settings.supplyCalculationMode,
+        sportType: current.sportType,
+        calorieThresholdKcal: settings.calorieThreshold,
+        waterThresholdMl:
+          settings.waterThreshold > 0
+            ? settings.waterThreshold
+            : DEFAULT_HYDRATION_THRESHOLD_ML,
+        elapsedSec: current.elapsed,
+        riderWeightKg: settings.weight,
+        ftpW: estimateFtpW,
+        intensityFactor:
+          current.sportType === "cycling"
+            ? Math.min(2, current.currentPower / Math.max(1, estimateFtpW))
+            : 1,
+        sweatRatePerHour: current.currentSweatRatePerHour,
+        environmentLoad: 0,
+        weatherAvailable: Boolean(weather),
+        temperatureC: weather?.temperature,
+        humidityPct: weather?.humidity,
+        weatherCode: weather?.weatherCode,
+        gradePct: currentGrade,
+        pausedDuringRoundSec,
+        isFirstWaterCountdown: false,
+        energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+        energyCarbohydrateHourlyLimitMode:
+          settings.energyCarbohydrateHourlyLimitMode,
+        energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+      });
+      syncSmartSupplyCountdown(
+        restartSmartSupplyCountdown(
+          smartSupplyCountdownRef.current,
+          "water",
+          nextPlan,
+          stateRef.current.elapsed,
+        ),
+      );
+      void refreshSmartWaterCountdown(
+        confirmedPlan,
+        previousWaterDurationSec,
+        pausedDuringRoundSec,
+      );
+    } else {
+      dispatch({ type: "CONSUME_WATER" });
+    }
+    dispatch({
+      type: "SUPPLY_CONFIRMED",
+      confirmation: {
+        type: "water",
+        timestamp: Date.now(),
+        elapsedSec: stateRef.current.elapsed,
+        recommendedWaterMl:
+          confirmedPlan?.waterRecommendationMl ?? supplyRecommendedMl,
+        source: confirmedPlan?.source,
+        reason: confirmedPlan?.reason,
+      },
+    });
+    waterAnim.setValue(0);
+    waterReminderSentRef.current = false;
+    pendingWaterRef.current = false;
+    delete pendingSupplyPlansRef.current.water;
+    const calorieStillPending = pendingCalorieRef.current || calorieAlert;
+    if (!calorieStillPending) setSupplyRecommendation(undefined);
+    supplySnoozedUntilRef.current.water = 0;
+    void acknowledgeBackgroundSupplyReminder("water", {
+      preserveForegroundCountdown: true,
+    });
+    void clearAllSupplyNotifications();
+    if (settings.vibrationEnabled) vibrateSuccess();
+    if (!calorieStillPending) clearSupplyRepeatTimer();
+  }, [
+    calorieAlert,
+    clearSupplyAutoDismissTimer,
+    clearSupplyRepeatTimer,
+    consumePausedRecoveryForNextRound,
+    currentGrade,
+    dispatch,
+    estimateFtpW,
+    refreshSmartWaterCountdown,
+    resolveConfirmedSupplyPlan,
+    settings.calorieThreshold,
+    settings.energyCarbohydrateHourlyLimitG,
+    settings.energyCarbohydrateHourlyLimitMode,
+    settings.energyServingCarbohydrateG,
+    settings.supplyCalculationMode,
+    settings.vibrationEnabled,
+    settings.waterThreshold,
+    settings.weight,
+    smartWaterSupplyEnabled,
+    supplyRecommendedMl,
+    syncSmartSupplyCountdown,
+    waterAnim,
+  ]);
+
+  const handleSnoozeSupply = useCallback(
+    (
+      kind: SupplyNotificationKind,
+      customItemId?: string,
+      notificationsAlreadyCleared = false,
+    ) => {
+      if (
+        (kind === "calorie" && smartEnergySupplyEnabled) ||
+        (kind === "water" && smartWaterSupplyEnabled)
+      )
+        return;
+      const until = Date.now() + 5 * 60 * 1000;
+      if (kind === "calorie" || kind === "water") {
+        clearSupplyAutoDismissTimer(kind);
+        supplySnoozedUntilRef.current[kind] = until;
+        if (kind === "calorie") setCalorieAlert(false);
+        else setWaterAlert(false);
+        if (supplyRepeatTimerRef.current) {
+          clearInterval(supplyRepeatTimerRef.current);
+          supplyRepeatTimerRef.current = null;
+        }
+      } else if (kind === "custom-energy" || kind === "custom-water") {
+        if (customItemId) {
+          customSupplyAlertsRef.current = {
+            ...customSupplyAlertsRef.current,
+            [customItemId]: false,
+          };
+          setCustomSupplyAlerts(customSupplyAlertsRef.current);
+          setActiveSupplyAlerts((current) =>
+            current.filter((id) => id !== customItemId),
+          );
+          const tracker = supplyItemsTrackerRef.current[customItemId];
+          if (tracker?.repeatIntervalId)
+            clearInterval(tracker.repeatIntervalId);
+        }
+      } else {
+        const intervalKind = kind.replace(
+          "interval-",
+          "",
+        ) as SupplyIntervalKind;
+        intervalSnoozedUntilRef.current[intervalKind] = until;
+        const nextAlerts = {
+          ...intervalSupplyAlertsRef.current,
+          [intervalKind]: false,
+        };
+        intervalSupplyAlertsRef.current = nextAlerts;
+        setIntervalSupplyAlerts(nextAlerts);
+        clearIntervalSupplyRepeatTimer();
+      }
+      if (notificationsAlreadyCleared) {
+        void scheduleSupplySnooze(kind);
+      } else {
+        void clearAllSupplyNotifications().finally(() => {
+          void scheduleSupplySnooze(kind);
+        });
+      }
+    },
+    [
+      clearIntervalSupplyRepeatTimer,
+      clearSupplyAutoDismissTimer,
+      smartEnergySupplyEnabled,
+      smartWaterSupplyEnabled,
+    ],
+  );
+
+  const processSupplyNotificationAction = useCallback(
+    (action: SupplyNotificationAction) => {
+      if (!settings.supplyReminderEnabled) return;
+      if (action.action === "open") {
+        // 使用者點擊通知時只回復待確認 UI；不得視為已補給、稍後提醒或重新開始倒數。
+        setTouchGuardEnabled(false);
+        if (action.kind === "calorie") {
+          calorieReminderSentRef.current = true;
+          pendingCalorieRef.current = true;
+          setCalorieAlert(true);
+          return;
+        }
+        if (action.kind === "water") {
+          waterReminderSentRef.current = true;
+          pendingWaterRef.current = true;
+          setWaterAlert(true);
+          return;
+        }
+        if (action.kind === "custom-energy" || action.kind === "custom-water") {
+          const item = settings.supplyItems.find(
+            (candidate) => candidate.id === action.customItemId,
+          );
+          if (!item) return;
+          customSupplyAlertsRef.current = {
+            ...customSupplyAlertsRef.current,
+            [item.id]: true,
+          };
+          setCustomSupplyAlerts(customSupplyAlertsRef.current);
+          setActiveSupplyAlerts((current) =>
+            current.includes(item.id) ? current : [...current, item.id],
+          );
+          return;
+        }
+        const intervalKind = action.kind.replace(
+          "interval-",
+          "",
+        ) as SupplyIntervalKind;
+        const nextAlerts = {
+          ...intervalSupplyAlertsRef.current,
+          [intervalKind]: true,
+        };
+        intervalSupplyAlertsRef.current = nextAlerts;
+        setIntervalSupplyAlerts(nextAlerts);
+        return;
+      }
+      if (action.action === "snooze") {
+        handleSnoozeSupply(action.kind, action.customItemId);
+        return;
+      }
+      if (action.kind === "calorie") {
+        backgroundNotificationConfirmationUntilRef.current.calorie =
+          Date.now() + 15_000;
+        handleConfirmCalorieSupply();
+      } else if (action.kind === "water") {
+        backgroundNotificationConfirmationUntilRef.current.water =
+          Date.now() + 15_000;
+        handleConfirmWaterSupply();
+      } else if (
+        action.kind === "custom-energy" ||
+        action.kind === "custom-water"
+      ) {
+        const item = settings.supplyItems.find(
+          (candidate) => candidate.id === action.customItemId,
+        );
+        if (item) handleConfirmCustomSupply(item.id, item.triggerType);
+      } else
+        handleConfirmIntervalSupply(
+          action.kind.replace("interval-", "") as SupplyIntervalKind,
+        );
+    },
+    [
+      handleConfirmCalorieSupply,
+      handleConfirmCustomSupply,
+      handleConfirmIntervalSupply,
+      handleConfirmWaterSupply,
+      handleSnoozeSupply,
+      settings.supplyItems,
+      settings.supplyReminderEnabled,
+    ],
+  );
+
+  useEffect(() => {
+    const processQueuedActions = async () => {
+      const actions = await consumeSupplyNotificationActions();
+      actions.forEach(processSupplyNotificationAction);
+    };
+    void processQueuedActions();
+    return subscribeToSupplyNotificationActions(() => {
+      void processQueuedActions();
+    });
+  }, [processSupplyNotificationAction]);
+
+  const sortedActiveAlerts = useMemo(() => {
+    return [...activeSupplyAlerts].sort((a, b) => {
+      const indexA = settings.supplyItems.findIndex((item) => item.id === a);
+      const indexB = settings.supplyItems.findIndex((item) => item.id === b);
+      return indexA - indexB;
+    });
+  }, [activeSupplyAlerts, settings.supplyItems]);
+
+  // 精簡導航模式
+  const [simplifiedNavVisible, setSimplifiedNavVisible] = useState(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastInteractionRef = useRef<number>(Date.now());
+
+  const isRiding = state.status === "active";
+  const isPaused = state.status === "paused";
+  const isActive = isRiding || isPaused;
+  useEffect(() => {
+    if (!isActive || !smartSupplyCountdown) return;
+    setSmartSupplyCountdownNowMs(Date.now());
+    const timer = setInterval(
+      () => setSmartSupplyCountdownNowMs(Date.now()),
+      1_000,
+    );
+    return () => clearInterval(timer);
+  }, [isActive, smartSupplyCountdown]);
+  useEffect(() => {
+    const nowMs = Date.now();
+    if (isPaused) {
+      for (const kind of ["calorie", "water"] as const) {
+        supplyRoundPauseRef.current[kind].pausedAtMs ??= nowMs;
+      }
+      return;
+    }
+    for (const kind of ["calorie", "water"] as const) {
+      const pauseState = supplyRoundPauseRef.current[kind];
+      if (pauseState.pausedAtMs !== null) {
+        pauseState.pausedTotalSec += Math.max(
+          0,
+          (nowMs - pauseState.pausedAtMs) / 1_000,
+        );
+        pauseState.pausedAtMs = null;
+      }
+    }
+    void updateBackgroundSmartSupplyCountdown({
+      smartCalorieCountdownPausedAtMs:
+        supplyRoundPauseRef.current.calorie.pausedAtMs ?? undefined,
+      smartWaterCountdownPausedAtMs:
+        supplyRoundPauseRef.current.water.pausedAtMs ?? undefined,
+      smartCalorieCountdownPausedTotalMs: Math.round(
+        supplyRoundPauseRef.current.calorie.pausedTotalSec * 1_000,
+      ),
+      smartWaterCountdownPausedTotalMs: Math.round(
+        supplyRoundPauseRef.current.water.pausedTotalSec * 1_000,
+      ),
+    });
+  }, [isPaused]);
+  const touchGuardHoldLabel =
+    settings.touchGuardUnlockHoldMs >= 1000
+      ? `${(settings.touchGuardUnlockHoldMs / 1000).toFixed(settings.touchGuardUnlockHoldMs % 1000 === 0 ? 0 : 1)} 秒`
+      : `${settings.touchGuardUnlockHoldMs} 毫秒`;
+
+  useEffect(() => {
+    touchGuardHintOpacity.stopAnimation();
+    touchGuardHintOpacity.setValue(0);
+    if (!touchGuardEnabled || !isActive) return;
+
+    const animation = Animated.sequence([
+      Animated.timing(touchGuardHintOpacity, {
+        toValue: 1,
+        duration: 160,
+        useNativeDriver: true,
+      }),
+      Animated.delay(1400),
+      Animated.timing(touchGuardHintOpacity, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [isActive, touchGuardEnabled, touchGuardHintOpacity]);
+
+  const resetTouchGuardHoldProgress = useCallback(() => {
+    if (touchGuardHoldTimerRef.current) {
+      clearInterval(touchGuardHoldTimerRef.current);
+      touchGuardHoldTimerRef.current = null;
+    }
+    if (touchGuardHoldSafetyTimerRef.current) {
+      clearTimeout(touchGuardHoldSafetyTimerRef.current);
+      touchGuardHoldSafetyTimerRef.current = null;
+    }
+    touchGuardPointerActiveRef.current = false;
+    touchGuardPointerIdRef.current = null;
+    touchGuardHoldStartedAtRef.current = null;
+    setTouchGuardHoldProgress(0);
+  }, []);
+
+  useEffect(() => {
+    if (!isAppForeground) resetTouchGuardHoldProgress();
+  }, [isAppForeground, resetTouchGuardHoldProgress]);
+
+  const scheduleTouchGuardRelock = useCallback(() => {
+    if (touchGuardRelockTimerRef.current) {
+      clearTimeout(touchGuardRelockTimerRef.current);
+      touchGuardRelockTimerRef.current = null;
+    }
+    if (!shouldScheduleTouchGuardRelock(settings.touchGuardEnabled, isActive))
+      return;
+    touchGuardRelockTimerRef.current = setTimeout(() => {
+      setTouchGuardEnabled(true);
+      touchGuardRelockTimerRef.current = null;
+    }, settings.touchGuardAutoRelockSec * 1000);
+  }, [isActive, settings.touchGuardAutoRelockSec, settings.touchGuardEnabled]);
+
+  useEffect(() => {
+    if (touchGuardInitialLockTimerRef.current) {
+      clearTimeout(touchGuardInitialLockTimerRef.current);
+      touchGuardInitialLockTimerRef.current = null;
+    }
+    resetTouchGuardHoldProgress();
+    if (!isActive || !settings.touchGuardEnabled) {
+      setTouchGuardEnabled(false);
+      return;
+    }
+
+    // 開始騎乘後即使尚未取得穩定 GPS 或切換頁面，仍依設定的閒置時間確實上鎖。
+    setTouchGuardEnabled(false);
+    touchGuardInitialLockTimerRef.current = setTimeout(() => {
+      setTouchGuardEnabled(true);
+      touchGuardInitialLockTimerRef.current = null;
+    }, settings.touchGuardAutoRelockSec * 1000);
+    return () => {
+      if (touchGuardInitialLockTimerRef.current) {
+        clearTimeout(touchGuardInitialLockTimerRef.current);
+        touchGuardInitialLockTimerRef.current = null;
+      }
+    };
+  }, [
+    isActive,
+    resetTouchGuardHoldProgress,
+    settings.touchGuardAutoRelockSec,
+    settings.touchGuardEnabled,
+  ]);
+
+  const beginTouchGuardHoldProgress = useCallback((event: GestureResponderEvent) => {
+    const nativeEvent = event.nativeEvent;
+    const pointerIdentifier = Number(
+      nativeEvent.identifier ?? nativeEvent.changedTouches?.[0]?.identifier,
+    );
+    const activeTouchCount = nativeEvent.touches?.length ?? 0;
+    if (
+      !canStartTouchGuardHold({
+        isLocked: touchGuardEnabled,
+        isRideActive: isActive,
+        activeTouchCount,
+        pointerIdentifier: Number.isFinite(pointerIdentifier)
+          ? pointerIdentifier
+          : null,
+      })
+    ) {
+      resetTouchGuardHoldProgress();
+      return;
+    }
+    if (touchGuardPointerActiveRef.current) return;
+    resetTouchGuardHoldProgress();
+    touchGuardPointerActiveRef.current = true;
+    touchGuardPointerIdRef.current = pointerIdentifier;
+    touchGuardHoldStartedAtRef.current = Date.now();
+    setTouchGuardHoldProgress(0.001);
+    touchGuardHoldTimerRef.current = setInterval(() => {
+      const startedAt = touchGuardHoldStartedAtRef.current;
+      if (!startedAt || !touchGuardPointerActiveRef.current) {
+        resetTouchGuardHoldProgress();
+        return;
+      }
+      const progress = Math.min(
+        1,
+        (Date.now() - startedAt) / settings.touchGuardUnlockHoldMs,
+      );
+      setTouchGuardHoldProgress(progress);
+    }, 33);
+    // 原生 pointer-cancel 漏失時仍會清除進度，避免 UI 停在 100%「長按中」。
+    touchGuardHoldSafetyTimerRef.current = setTimeout(
+      resetTouchGuardHoldProgress,
+      settings.touchGuardUnlockHoldMs + 350,
+    );
+  }, [
+    isActive,
+    resetTouchGuardHoldProgress,
+    settings.touchGuardUnlockHoldMs,
+    touchGuardEnabled,
+  ]);
+
+  const showTouchGuardUnlockSuccessFeedback = useCallback(() => {
+    touchGuardUnlockSuccessOpacity.stopAnimation();
+    touchGuardUnlockSuccessScale.stopAnimation();
+    touchGuardUnlockSuccessOpacity.setValue(0);
+    touchGuardUnlockSuccessScale.setValue(0.82);
+    setShowTouchGuardUnlockSuccess(true);
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(touchGuardUnlockSuccessOpacity, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(touchGuardUnlockSuccessScale, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.delay(420),
+      Animated.parallel([
+        Animated.timing(touchGuardUnlockSuccessOpacity, {
+          toValue: 0,
+          duration: 260,
+          useNativeDriver: true,
+        }),
+        Animated.timing(touchGuardUnlockSuccessScale, {
+          toValue: 1.08,
+          duration: 260,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(() => setShowTouchGuardUnlockSuccess(false));
+  }, [touchGuardUnlockSuccessOpacity, touchGuardUnlockSuccessScale]);
+
+  const completeTouchGuardUnlock = useCallback(() => {
+    if (
+      !hasCompletedTouchGuardHold({
+        pointerActive: touchGuardPointerActiveRef.current,
+        pointerIdentifier: touchGuardPointerIdRef.current,
+        startedAtMs: touchGuardHoldStartedAtRef.current,
+        nowMs: Date.now(),
+        requiredHoldMs: settings.touchGuardUnlockHoldMs,
+      })
+    ) {
+      resetTouchGuardHoldProgress();
+      return;
+    }
+    resetTouchGuardHoldProgress();
+    if (settings.vibrationEnabled) vibrateLight();
+    showTouchGuardUnlockSuccessFeedback();
+    setTouchGuardEnabled(false);
+    scheduleTouchGuardRelock();
+  }, [
+    scheduleTouchGuardRelock,
+    settings.vibrationEnabled,
+    showTouchGuardUnlockSuccessFeedback,
+    settings.touchGuardUnlockHoldMs,
+    resetTouchGuardHoldProgress,
+  ]);
+
+  useEffect(
+    () => () => {
+      resetTouchGuardHoldProgress();
+      if (touchGuardInitialLockTimerRef.current)
+        clearTimeout(touchGuardInitialLockTimerRef.current);
+      if (touchGuardRelockTimerRef.current)
+        clearTimeout(touchGuardRelockTimerRef.current);
+      touchGuardUnlockSuccessOpacity.stopAnimation();
+      touchGuardUnlockSuccessScale.stopAnimation();
+    },
+    [
+      resetTouchGuardHoldProgress,
+      touchGuardUnlockSuccessOpacity,
+      touchGuardUnlockSuccessScale,
+    ],
+  );
+
+  useEffect(() => {
+    const manager = powerSavingManagerRef.current;
+    if (isActive) manager.start();
+    else manager.stop();
+    return () => manager.stop();
+  }, [isActive]);
+
+  useEffect(() => {
+    const shouldUseImmersiveMode = isActive && isAppForeground;
+    void setRideImmersiveMode(shouldUseImmersiveMode);
+    return () => {
+      void setRideImmersiveMode(false);
+    };
+  }, [isActive, isAppForeground]);
+
+  const hasPendingSupplyModal =
+    settings.supplyReminderEnabled &&
+    (calorieAlert ||
+      waterAlert ||
+      activeSupplyAlerts.length > 0 ||
+      Object.values(intervalSupplyAlerts).some(Boolean));
+
+  useEffect(() => {
+    const manager = powerSavingManagerRef.current;
+    const holdKey = "supply-confirmation-modal";
+    if (hasPendingSupplyModal) {
+      // 補給彈窗等待確認期間，保持正常亮度且不啟動調暗倒數。
+      void manager.holdBrightness(holdKey);
+    } else {
+      // 能量、補水、手動與自訂提醒均已確認／關閉後才恢復調暗計時。
+      manager.releaseBrightnessHold(holdKey);
+    }
+    return () => manager.releaseBrightnessHold(holdKey);
+  }, [hasPendingSupplyModal]);
+
+  const hydrationThresholdMl =
+    settings.waterThreshold > 0
+      ? settings.waterThreshold
+      : DEFAULT_HYDRATION_THRESHOLD_ML;
+  const fallbackSupplyPlan = useMemo(
+    () =>
+      createSupplyPlan({
+        mode: settings.supplyCalculationMode,
+        sportType: state.sportType,
+        calorieThresholdKcal: settings.calorieThreshold,
+        waterThresholdMl: hydrationThresholdMl,
+        elapsedSec: state.elapsed,
+        riderWeightKg: settings.weight,
+        ftpW: estimateFtpW,
+        intensityFactor:
+          state.currentPower > 0
+            ? Math.min(2, state.currentPower / Math.max(1, estimateFtpW))
+            : 0.65,
+        sweatRatePerHour: state.currentSweatRatePerHour || 550,
+        environmentLoad: Math.min(
+          1,
+          Math.max(0, ((state.currentSweatRatePerHour || 550) - 550) / 1_000),
+        ),
+        weatherAvailable: false,
+        energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+        energyCarbohydrateHourlyLimitMode:
+          settings.energyCarbohydrateHourlyLimitMode,
+        energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+      }),
+    [
+      estimateFtpW,
+      hydrationThresholdMl,
+      settings.calorieThreshold,
+      settings.energyCarbohydrateHourlyLimitG,
+      settings.energyCarbohydrateHourlyLimitMode,
+      settings.energyServingCarbohydrateG,
+      settings.supplyCalculationMode,
+      settings.weight,
+      state.currentPower,
+      state.currentSweatRatePerHour,
+      state.elapsed,
+      state.sportType,
+    ],
+  );
+  const dashboardSupplyPlan = activeSupplyPlan ?? fallbackSupplyPlan;
+
+  // ─── 底部面板滑桿 ─────────────────────────────────────────────────────────────
+  const [panelExpanded, setPanelExpanded] = useState(false);
+  const [sportPickerVisible, setSportPickerVisible] = useState(false);
+  const [sportPickerQuery, setSportPickerQuery] = useState("");
+  // ── 儀表板欄位排序：依 normalModeFieldOrder 排序，只顯示已啟用的欄位 ──
+  const orderedEnabledFields = useMemo(() => {
+    const f = settings.normalModeFields;
+    const order: NormalFieldKey[] =
+      settings.normalModeFieldOrder ?? DEFAULT_FIELD_ORDER;
+    return order.filter((key) => f?.[key] ?? false);
+  }, [settings.normalModeFields, settings.normalModeFieldOrder]);
+
+  // 前6格顯示在收縮面板，第7格以上移至展開區
+  const DASH_PANEL_MAX = 6;
+  const dashPanelFields = useMemo(
+    () => orderedEnabledFields.slice(0, DASH_PANEL_MAX),
+    [orderedEnabledFields],
+  );
+  const dashOverflowFields = useMemo(
+    () => orderedEnabledFields.slice(DASH_PANEL_MAX),
+    [orderedEnabledFields],
+  );
+  const dashboardSummaryKeys = useMemo(
+    () => buildNavigationDashboardSummaryKeys(dashPanelFields),
+    [dashPanelFields],
+  );
+  const dashFieldCount = dashPanelFields.length;
+
+  // 200% 字體時改為兩欄，並預留多行標籤與數值的高度，避免截斷。
+  const cellHeight = fontScale >= 1.6 ? 106 : fontScale >= 1.3 ? 86 : 60;
+  const headerHeight = fontScale >= 1.6 ? 112 : fontScale >= 1.3 ? 96 : 80;
+  const controlHeight = fontScale >= 1.6 ? 84 : 64;
+  const dashRows = Math.ceil(dashFieldCount / dashboardColumnCount) || 1;
+  const dashGridH = dashRows * cellHeight;
+  const collapsedPanelLimit = Math.round(
+    SCREEN_H * (fontScale >= 1.6 ? 0.54 : fontScale >= 1.3 ? 0.44 : 1 / 3),
+  );
+  const expandedPanelHeight = Math.round(
+    SCREEN_H * (fontScale >= 1.6 ? 0.82 : fontScale >= 1.3 ? 0.72 : 0.62),
+  );
+  const dynamicCollapsedH = Math.min(
+    headerHeight + dashGridH + controlHeight,
+    collapsedPanelLimit,
+  );
+  routePaddingBottomRef.current = dynamicCollapsedH;
+  const sportPickerOptions = useMemo(() => {
+    const query = sportPickerQuery.trim().toLowerCase();
+    return (Object.keys(SPORT_META) as SportType[]).filter((type) => {
+      const meta = SPORT_META[type];
+      return (
+        !query ||
+        meta.label.toLowerCase().includes(query) ||
+        type.includes(query)
+      );
+    });
+  }, [sportPickerQuery]);
+
+  const panelAnim = useRef(new Animated.Value(dynamicCollapsedH)).current;
+  const prevCollapsedH = useRef(dynamicCollapsedH);
+
+  // 當欄位數變化時，若面板未展開則更新動畫值
+  useEffect(() => {
+    if (!panelExpanded && dynamicCollapsedH !== prevCollapsedH.current) {
+      prevCollapsedH.current = dynamicCollapsedH;
+      Animated.timing(panelAnim, {
+        toValue: dynamicCollapsedH,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [dynamicCollapsedH, panelExpanded, panelAnim]);
+
+  const togglePanel = useCallback(
+    (expand: boolean) => {
+      setPanelExpanded(expand);
+      Animated.timing(panelAnim, {
+        toValue: expand ? expandedPanelHeight : dynamicCollapsedH,
+        duration: 280,
+        useNativeDriver: false,
+      }).start();
+    },
+    [panelAnim, dynamicCollapsedH, expandedPanelHeight],
+  );
+
+  // 面板手勢（整個面板區域可上拉/下滑）
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy < -30) togglePanel(true);
+        else if (gs.dy > 30) togglePanel(false);
+      },
+    }),
+  ).current;
+
+  // ─── 天氣更新 ────────────────────────────────────────────────────────────────
+  const updateWeather = useCallback(async (lat: number, lon: number) => {
+    const w = await fetchWeather(lat, lon);
+    if (w) {
+      setWeather(w);
+      weatherRef.current = w;
+      windDataRef.current = {
+        speed: w.windSpeed / 3.6,
+        direction: w.windDirection,
+      };
+      airDensityRef.current = calcAirDensity(w.temperature);
+      setRelativeWindInfo(
+        getRelativeWindInfo(headingRef.current, w.windDirection, w.windSpeed),
+      );
+      void updateBackgroundEnvironment({
+        temperatureC: w.temperature,
+        humidityPct: w.humidity,
+        windSpeedKmh: w.windSpeed,
+        windDirection: w.windDirection,
+        weatherCode: w.weatherCode,
+        precipitationProb: w.precipitationProb,
+      });
+    }
+  }, []);
+
+  const resolveInitialWeather = useCallback(
+    async (
+      latitude: number,
+      longitude: number,
+    ): Promise<WeatherData | null> => {
+      if (weatherRef.current) return weatherRef.current;
+      const weatherWithinStartBudget = await Promise.race<WeatherData | null>([
+        fetchWeather(latitude, longitude),
+        // 首輪倒數只建立一次；稍微延長預取時限，優先讓已啟動的暖熱／高濕天氣資料參與首次計算。
+        new Promise((resolve) => setTimeout(() => resolve(null), 1_500)),
+      ]);
+      if (!weatherWithinStartBudget) return null;
+      setWeather(weatherWithinStartBudget);
+      weatherRef.current = weatherWithinStartBudget;
+      windDataRef.current = {
+        speed: weatherWithinStartBudget.windSpeed / 3.6,
+        direction: weatherWithinStartBudget.windDirection,
+      };
+      airDensityRef.current = calcAirDensity(
+        weatherWithinStartBudget.temperature,
+        weatherWithinStartBudget.humidity,
+      );
+      return weatherWithinStartBudget;
+    },
+    [],
+  );
+
+  const speakPlannedSupplyReminder = useCallback(
+    (type: "calorie" | "water") => {
+      if (!settings.ttsEnabled) return;
+      void speakSupplyReminder(type, true);
+    },
+    [settings.ttsEnabled],
+  );
+
+  // ─── 補給提醒 ────────────────────────────────────────────────────────────────
+  const triggerSupplyReminder = useCallback(
+    async (type: "calorie" | "water", recommendation?: SupplyPlan) => {
+      if (!settings.supplyReminderEnabled) return;
+      if (supplySnoozedUntilRef.current[type] > Date.now()) return;
+      powerSavingManagerRef.current.onSupplyReminder();
+      setTouchGuardEnabled(false);
+      if (type === "calorie") {
+        pendingCalorieRef.current = true;
+        setCalorieAlert(true);
+      } else {
+        pendingWaterRef.current = true;
+        setWaterAlert(true);
+        if (recommendation?.waterRecommendationMl)
+          setSupplyRecommendedMl(recommendation.waterRecommendationMl);
+      }
+      if (recommendation) setSupplyRecommendation(recommendation);
+      if (recommendation) pendingSupplyPlansRef.current[type] = recommendation;
+      if (
+        type === "calorie" ? smartEnergySupplyEnabled : smartWaterSupplyEnabled
+      )
+        void setBackgroundSupplyReminderPending(type, true);
+      if (settings.vibrationEnabled) vibrateWarning();
+      speakPlannedSupplyReminder(type);
+      if (settings.soundEnabled) {
+        try {
+          alertPlayer.seekTo(0);
+          alertPlayer.play();
+        } catch {}
+      }
+      if (settings.notificationEnabled) {
+        void showSupplyNotification(
+          type,
+          (
+            type === "calorie"
+              ? smartEnergySupplyEnabled
+              : smartWaterSupplyEnabled
+          )
+            ? undefined
+            : recommendation
+              ? {
+                  energyKcal: recommendation.energyRecommendationKcal,
+                  carbohydrateG: recommendation.carbohydrateRecommendationG,
+                  waterMl: recommendation.waterRecommendationMl,
+                  reason: recommendation.reason,
+                }
+              : undefined,
+        );
+      }
+
+      // 單次提醒自動關閉功能
+      const autoDismissSeconds =
+        type === "calorie"
+          ? settings.calorieAutoDismissSeconds
+          : settings.waterAutoDismissSeconds;
+      if (
+        !(type === "calorie"
+          ? smartEnergySupplyEnabled
+          : smartWaterSupplyEnabled) &&
+        autoDismissSeconds &&
+        autoDismissSeconds > 0
+      ) {
+        clearSupplyAutoDismissTimer(type);
+        const autoDismissTimer = setTimeout(() => {
+          delete supplyAutoDismissTimersRef.current[type];
+          if (type === "calorie") {
+            setCalorieAlert(false);
+            pendingCalorieRef.current = false;
+            delete pendingSupplyPlansRef.current.calorie;
+          } else {
+            setWaterAlert(false);
+            pendingWaterRef.current = false;
+            delete pendingSupplyPlansRef.current.water;
+          }
+        }, autoDismissSeconds * 1000);
+        supplyAutoDismissTimersRef.current[type] = autoDismissTimer;
+      }
+
+      // 唯一的重複提醒間隔：0 代表關閉，正值同時套用能量與補水。
+      const repeatSec = settings.supplyReminderRepeatSec ?? 60;
+      if (repeatSec > 0 && !supplyRepeatTimerRef.current) {
+        supplyRepeatTimerRef.current = setInterval(() => {
+          // 使用 pendingRef 判斷（「稍後」關閉 Modal 不會清除此 ref）
+          const now = Date.now();
+          const caloriePending =
+            pendingCalorieRef.current &&
+            supplySnoozedUntilRef.current.calorie <= now;
+          const waterPending =
+            pendingWaterRef.current &&
+            supplySnoozedUntilRef.current.water <= now;
+          if (!caloriePending && !waterPending) {
+            clearSupplyRepeatTimer();
+            return;
+          }
+          // 重新顯示 Modal
+          if (caloriePending) setCalorieAlert(true);
+          if (waterPending) setWaterAlert(true);
+          // 重複音效與語音
+          if (caloriePending) {
+            speakPlannedSupplyReminder("calorie");
+          } else if (waterPending) {
+            speakPlannedSupplyReminder("water");
+          }
+          if (settings.vibrationEnabled) vibrateWarning();
+          if (settings.soundEnabled) {
+            try {
+              alertPlayer.seekTo(0);
+              alertPlayer.play();
+            } catch {}
+          }
+        }, repeatSec * 1000);
+      }
+    },
+    [
+      settings,
+      alertPlayer,
+      clearSupplyAutoDismissTimer,
+      clearSupplyRepeatTimer,
+      smartEnergySupplyEnabled,
+      smartWaterSupplyEnabled,
+      speakPlannedSupplyReminder,
+    ],
+  );
+
+  // GPS 位置回呼可能在手動暫停、室內或訊號中斷時停止；此每秒檢查仍以鎖定的
+  // Date.now() 到期點觸發前景提醒，且由 sent／pending ref 防止與 GPS 回呼重複彈窗。
+  useEffect(() => {
+    const countdown = smartSupplyCountdownRef.current;
+    if (!isActive || !settings.supplyReminderEnabled || !countdown) return;
+    const recommendation = activeSupplyPlan ?? supplyRecommendation;
+    if (
+      smartEnergySupplyEnabled &&
+      isSmartSupplyCountdownDue(
+        countdown,
+        "calorie",
+        smartSupplyCountdownNowMs,
+      ) &&
+      !calorieReminderSentRef.current &&
+      !pendingCalorieRef.current
+    ) {
+      calorieReminderSentRef.current = true;
+      void triggerSupplyReminder("calorie", recommendation);
+    }
+    if (
+      smartWaterSupplyEnabled &&
+      isSmartSupplyCountdownDue(
+        countdown,
+        "water",
+        smartSupplyCountdownNowMs,
+      ) &&
+      !waterReminderSentRef.current &&
+      !pendingWaterRef.current
+    ) {
+      waterReminderSentRef.current = true;
+      void triggerSupplyReminder("water", recommendation);
+    }
+  }, [
+    activeSupplyPlan,
+    isActive,
+    settings.supplyReminderEnabled,
+    smartEnergySupplyEnabled,
+    smartSupplyCountdownNowMs,
+    smartWaterSupplyEnabled,
+    supplyRecommendation,
+    triggerSupplyReminder,
+  ]);
+
+  // ─── 自訂補給品觸發邏輯 ────────────────────────────────────────────────────────
+  const triggerCustomSupplyReminder = useCallback(
+    async (supplyItem: any) => {
+      if (!settings.supplyReminderEnabled) return;
+      if (!supplyItem.enabled) return;
+      const target = supplyItem.target === "water" ? "water" : "calorie";
+
+      // 初始化追蹤器
+      if (!supplyItemsTrackerRef.current[supplyItem.id]) {
+        supplyItemsTrackerRef.current[supplyItem.id] = {
+          lastTriggerTime: 0,
+          lastTriggerDistance: 0,
+          triggered: false,
+          dismissTimeoutId: null,
+          repeatIntervalId: null,
+        };
+      }
+
+      const tracker = supplyItemsTrackerRef.current[supplyItem.id];
+      const currentTime = stateRef.current.elapsed;
+      const currentDistance = stateRef.current.distance / 1000;
+
+      // 根據觸發方式檢查是否應該觸發
+      let shouldTrigger = false;
+      if (supplyItem.triggerType === "time") {
+        const targetSec =
+          (supplyItem.triggerHours || 0) * 3600 +
+          (supplyItem.triggerMinutes || 0) * 60 +
+          (supplyItem.triggerSeconds || 0);
+        if (targetSec > 0) {
+          shouldTrigger = currentTime - tracker.lastTriggerTime >= targetSec;
+        }
+      } else if (supplyItem.triggerType === "distance") {
+        shouldTrigger =
+          currentDistance - tracker.lastTriggerDistance >=
+          supplyItem.triggerValue;
+      }
+
+      if (!shouldTrigger) return;
+
+      // 同一品項待確認時不重複建立彈窗；重複提醒交由共用間隔處理。
+      if (customSupplyAlertsRef.current[supplyItem.id]) {
+        return;
+      }
+
+      // 觸發提醒
+      customSupplyAlertsRef.current = {
+        ...customSupplyAlertsRef.current,
+        [supplyItem.id]: true,
+      };
+      setCustomSupplyAlerts(customSupplyAlertsRef.current);
+      setActiveSupplyAlerts((prev) => {
+        if (!prev.includes(supplyItem.id)) {
+          return [...prev, supplyItem.id];
+        }
+        return prev;
+      });
+      tracker.triggered = true;
+
+      // 更新觸發時間/距離
+      if (supplyItem.triggerType === "time") {
+        tracker.lastTriggerTime = currentTime;
+      } else {
+        tracker.lastTriggerDistance = currentDistance;
+      }
+
+      // 播放回饋
+      if (settings.vibrationEnabled) vibrateWarning();
+      if (settings.ttsEnabled) void speakSupplyReminder(target, true);
+      if (settings.soundEnabled) {
+        try {
+          alertPlayer.seekTo(0);
+          alertPlayer.play();
+        } catch {}
+      }
+      if (settings.notificationEnabled)
+        void showSupplyNotification(
+          target === "calorie" ? "custom-energy" : "custom-water",
+          undefined,
+          supplyItem.id,
+        );
+
+      // 使用唯一的全域重複間隔；0 代表關閉。
+      const repeatSec = settings.supplyReminderRepeatSec ?? 60;
+      if (repeatSec > 0) {
+        if (tracker.repeatIntervalId) clearInterval(tracker.repeatIntervalId);
+        tracker.repeatIntervalId = setInterval(() => {
+          if (customSupplyAlertsRef.current[supplyItem.id]) {
+            if (settings.vibrationEnabled) vibrateWarning();
+            if (settings.ttsEnabled) void speakSupplyReminder(target, true);
+            if (settings.soundEnabled) {
+              try {
+                alertPlayer.seekTo(0);
+                alertPlayer.play();
+              } catch {}
+            }
+          } else {
+            if (tracker.repeatIntervalId) {
+              clearInterval(tracker.repeatIntervalId);
+              tracker.repeatIntervalId = null;
+            }
+          }
+        }, repeatSec * 1000);
+      }
+    },
+    [settings, alertPlayer],
+  );
+
+  const triggerIntervalSupplyReminder = useCallback(() => {
+    if (!settings.supplyReminderEnabled) return;
+    const current = stateRef.current;
+    if (current.status !== "active") return;
+
+    const dueKinds = getDueSupplyIntervals(
+      {
+        energy: {
+          timeEnabled: smartEnergySupplyEnabled
+            ? false
+            : settings.supplyEnergyTimeIntervalEnabled,
+          timeMinutes: settings.supplyEnergyTimeIntervalMinutes,
+          distanceEnabled: smartEnergySupplyEnabled
+            ? false
+            : settings.supplyEnergyDistanceIntervalEnabled,
+          distanceKm: settings.supplyEnergyDistanceIntervalKm,
+        },
+        water: {
+          timeEnabled: smartWaterSupplyEnabled
+            ? false
+            : settings.supplyWaterTimeIntervalEnabled,
+          timeMinutes: settings.supplyWaterTimeIntervalMinutes,
+          distanceEnabled: smartWaterSupplyEnabled
+            ? false
+            : settings.supplyWaterDistanceIntervalEnabled,
+          distanceKm: settings.supplyWaterDistanceIntervalKm,
+        },
+      },
+      intervalSupplyTrackerRef.current,
+      current.elapsed,
+      current.distance / 1000,
+      (
+        Object.keys(intervalSupplyTrackerRef.current) as SupplyIntervalKind[]
+      ).reduce<Partial<Record<SupplyIntervalKind, boolean>>>(
+        (alerts, kind) => ({
+          ...alerts,
+          [kind]: Boolean(
+            intervalSupplyAlertsRef.current[kind] ||
+            (intervalSnoozedUntilRef.current[kind] ?? 0) > Date.now(),
+          ),
+        }),
+        {},
+      ),
+    );
+    if (dueKinds.length === 0) return;
+
+    const nextAlerts = { ...intervalSupplyAlertsRef.current };
+    dueKinds.forEach((kind) => {
+      nextAlerts[kind] = true;
+    });
+    intervalSupplyAlertsRef.current = nextAlerts;
+    setIntervalSupplyAlerts(nextAlerts);
+    powerSavingManagerRef.current.onSupplyReminder();
+    setTouchGuardEnabled(false);
+    if (settings.vibrationEnabled) vibrateWarning();
+    const dueTargets = new Set(
+      dueKinds.map((kind) =>
+        kind.startsWith("energy-") ? "calorie" : "water",
+      ),
+    );
+    if (settings.ttsEnabled)
+      dueTargets.forEach((target) => {
+        void speakSupplyReminder(target, true);
+      });
+    if (settings.soundEnabled) {
+      try {
+        alertPlayer.seekTo(0);
+        alertPlayer.play();
+      } catch {}
+    }
+    if (settings.notificationEnabled)
+      dueKinds.forEach((kind) => {
+        void showSupplyNotification(`interval-${kind}`);
+      });
+
+    const repeatSec = settings.supplyReminderRepeatSec;
+    if (repeatSec > 0 && !intervalSupplyRepeatTimerRef.current) {
+      intervalSupplyRepeatTimerRef.current = setInterval(() => {
+        const alerts = intervalSupplyAlertsRef.current;
+        const pendingKinds = (
+          Object.keys(intervalSupplyTrackerRef.current) as SupplyIntervalKind[]
+        ).filter(
+          (kind) =>
+            alerts[kind] &&
+            (intervalSnoozedUntilRef.current[kind] ?? 0) <= Date.now(),
+        );
+        if (pendingKinds.length === 0) {
+          clearIntervalSupplyRepeatTimer();
+          return;
+        }
+        if (settings.vibrationEnabled) vibrateWarning();
+        if (settings.ttsEnabled) {
+          const targets = new Set(
+            pendingKinds.map((kind) =>
+              kind.startsWith("energy-") ? "calorie" : "water",
+            ),
+          );
+          targets.forEach((target) => {
+            void speakSupplyReminder(target, true);
+          });
+        }
+        if (settings.soundEnabled) {
+          try {
+            alertPlayer.seekTo(0);
+            alertPlayer.play();
+          } catch {}
+        }
+      }, repeatSec * 1000);
+    }
+  }, [
+    alertPlayer,
+    clearIntervalSupplyRepeatTimer,
+    settings,
+    smartEnergySupplyEnabled,
+    smartWaterSupplyEnabled,
+  ]);
+
+  useEffect(() => {
+    if (state.status !== "active") return;
+    const checkInterval = setInterval(triggerIntervalSupplyReminder, 10_000);
+    return () => clearInterval(checkInterval);
+  }, [state.status, triggerIntervalSupplyReminder]);
+
+  useEffect(
+    () => () => clearIntervalSupplyRepeatTimer(),
+    [clearIntervalSupplyRepeatTimer],
+  );
+
+  // ─── 計時器 ──────────────────────────────────────────────────────────────────
+  const startTimeRef = useRef<number>(0);
+  const pausedElapsedRef = useRef<number>(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (state.status === "active") {
+      startTimeRef.current = Date.now() - pausedElapsedRef.current * 1000;
+      timerRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        dispatch({ type: "TICK", elapsed });
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      if (state.status === "paused") {
+        pausedElapsedRef.current = stateRef.current.elapsed;
+        timerRef.current = setInterval(() => {
+          dispatch({ type: "PAUSE_TICK" });
+        }, 1000);
+      }
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [dispatch, state.status]);
+
+  // ─── 崩潰恢復檢查 ──────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const contextSnapshot = await checkSnapshot();
+      const persistentSession = await initializeRideSession();
+      const backgroundState = await getBackgroundState();
+      if (
+        persistentSession?.isActive &&
+        persistentSession.trackPoints.length > 0
+      ) {
+        recoverySessionRef.current = persistentSession;
+        const recoveredRoute = persistentSession.trackPoints.map((point) => ({
+          latitude: point.latitude,
+          longitude: point.longitude,
+          altitude: point.altitude ?? 0,
+          speed: point.speed ?? 0,
+          timestamp: point.timestamp,
+          segmentStart: point.segmentStart,
+        }));
+        const lastPoint = persistentSession.trackPoints.at(-1);
+        const restoredLaps = backgroundState?.laps?.length
+          ? backgroundState.laps
+          : Array.isArray(contextSnapshot?.laps)
+            ? contextSnapshot.laps
+            : [];
+        const restoredLapAnchor = backgroundState?.autoLapAnchor
+          ? {
+              ...backgroundState.autoLapAnchor,
+              routePointIndex: recoveredRoute.length,
+            }
+          : contextSnapshot?.lapAnchor;
+        if (backgroundState?.autoLapAnchor) {
+          autoLapMilestoneStateRef.current = {
+            enabled: backgroundState.autoLapEnabled === true,
+            intervalM:
+              Math.max(0, backgroundState.autoLapDistanceKm ?? 0) * 1_000,
+            nextDistanceM: backgroundState.nextAutoLapDistanceM ?? null,
+            laps: restoredLaps,
+            anchor: backgroundState.autoLapAnchor,
+            previousTotals: backgroundState.previousAutoLapTotals ?? {
+              elapsedSec: backgroundState.movingTimeSec ?? 0,
+              distanceM: backgroundState.totalDistanceM,
+              ascentM: backgroundState.totalAscentM ?? 0,
+              descentM: backgroundState.totalDescentM ?? 0,
+              powerWorkJ: backgroundState.powerWorkJ ?? 0,
+              powerSampleDurationSec:
+                backgroundState.powerSampleDurationSec ?? 0,
+            },
+          };
+        }
+        lastAcceptedTrackPointRef.current = lastPoint
+          ? {
+              latitude: lastPoint.latitude,
+              longitude: lastPoint.longitude,
+              timestamp: lastPoint.timestamp,
+              accuracy: lastPoint.accuracy,
+              speed: lastPoint.speed,
+            }
+          : null;
+        dispatch({
+          type: "RESTORE",
+          snapshot: {
+            elapsed: Math.round(persistentSession.stats.totalTime / 1000),
+            distance: persistentSession.stats.totalDistance,
+            totalAscent: persistentSession.stats.totalElevationGain,
+            route: recoveredRoute,
+            currentAltitude: lastPoint?.altitude ?? 0,
+            currentSpeed: (lastPoint?.speed ?? 0) * 3.6,
+            calories: persistentSession.stats.caloriesBurned,
+            totalCalories: persistentSession.stats.caloriesBurned,
+            totalSweatMl: persistentSession.stats.waterLoss,
+            sweatSinceLastRefill: persistentSession.stats.waterLoss,
+            laps: restoredLaps,
+            lapAnchor: restoredLapAnchor,
+          },
+        });
+        lastBgSyncTsRef.current = lastPoint?.timestamp ?? 0;
+        nextAutoLapDistanceMRef.current =
+          backgroundState?.nextAutoLapDistanceM ?? null;
+        setLiveTrail(
+          recoveredRoute.map((point) => ({
+            latitude: point.latitude,
+            longitude: point.longitude,
+            segmentStart: point.segmentStart,
+          })),
+        );
+        setMapRideActive(true);
+        return;
+      }
+      if (
+        contextSnapshot &&
+        contextSnapshot.elapsed &&
+        contextSnapshot.elapsed > 30
+      ) {
+        setRecoverySnapshot(contextSnapshot);
+        setShowRecoveryAlert(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── 靜止逾時後切換為低功耗監測；重新移動由低頻 GPS 自動恢復完整紀錄 ───────────────
+  useEffect(() => {
+    const canMonitorIdle =
+      mapRideActive &&
+      state.status === "paused" &&
+      settings.idleAutoPauseEnabled;
+
+    if (!canMonitorIdle) {
+      if (state.status === "active") pausedAtRef.current = null;
+      if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+      idlePauseTimerRef.current = null;
+      return;
+    }
+
+    if (pausedAtRef.current === null) pausedAtRef.current = Date.now();
+    if (rideLocationTrackingMode === "idle_monitor") return;
+
+    const pausedAtMs = pausedAtRef.current;
+    const delayMs = Math.max(
+      0,
+      settings.idleAutoPauseSeconds * 1000 - (Date.now() - pausedAtMs),
+    );
+    idlePauseTimerRef.current = setTimeout(() => {
+      if (
+        !shouldEnterIdleMonitor(
+          {
+            enabled: settings.idleAutoPauseEnabled,
+            idleTimeoutSeconds: settings.idleAutoPauseSeconds,
+          },
+          true,
+          pausedAtMs,
+          Date.now(),
+        )
+      )
+        return;
+
+      locationSubRef.current?.remove();
+      locationSubRef.current = null;
+      idleMonitorLastPositionRef.current = currentPosRef.current
+        ? { lat: currentPosRef.current.lat, lon: currentPosRef.current.lon }
+        : null;
+      setRideLocationTrackingMode("idle_monitor");
+      if (backgroundLocationDisclosureAcceptedRef.current) {
+        void setBackgroundLocationTrackingMode(
+          settings.gpsAccuracy || "standard",
+          "idle_monitor",
+        );
+      }
+    }, delayMs);
+
+    return () => {
+      if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+      idlePauseTimerRef.current = null;
+    };
+  }, [
+    mapRideActive,
+    rideLocationTrackingMode,
+    settings.gpsAccuracy,
+    settings.idleAutoPauseEnabled,
+    settings.idleAutoPauseSeconds,
+    settings.ttsEnabled,
+    state.status,
+  ]);
+
+  // ─── GPS 訂閱 ──────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    // 依據 lifecycle 規則：未開始騎乘時僅在 App 前台定位（支援釘選導航與目前位置）；
+    // 開始騎乘後不論前台、背景或鎖屏皆持續定位紀錄軌跡。
+    if (!shouldTrackRideLocation(mapRideActive, isAppForeground)) {
+      locationSubRef.current?.remove();
+      locationSubRef.current = null;
+      return;
+    }
+    let active = true;
+    let locationSubscription: Location.LocationSubscription | null = null;
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      notifPermRef.current = await requestNotificationPermission();
+
+      const isIdleMonitor = rideLocationTrackingMode === "idle_monitor";
+      const sub = await Location.watchPositionAsync(
+        {
+          accuracy: isIdleMonitor
+            ? Location.Accuracy.Balanced
+            : Location.Accuracy.BestForNavigation,
+          timeInterval: isIdleMonitor ? 60_000 : LOCATION_INTERVAL_SEC * 1000,
+          distanceInterval: isIdleMonitor
+            ? 18
+            : sportTrackingPolicy.gpsDistanceIntervalM,
+        },
+        (loc) => {
+          if (!active) return;
+          const { latitude, longitude, altitude, speed } = loc.coords;
+          const speedKmhRaw = (speed ?? 0) * 3.6;
+
+          const trackPointDecision = mapRideActive
+            ? evaluateTrackPoint(lastAcceptedTrackPointRef.current, {
+                latitude,
+                longitude,
+                timestamp: loc.timestamp,
+                accuracy: loc.coords.accuracy,
+                speed,
+              })
+            : { accepted: true, segmentStart: false };
+          if (mapRideActive && !trackPointDecision.accepted) return;
+          if (mapRideActive) {
+            lastAcceptedTrackPointRef.current = {
+              latitude,
+              longitude,
+              timestamp: loc.timestamp,
+              accuracy: loc.coords.accuracy,
+              speed,
+            };
+          }
+
+          if (isIdleMonitor) {
+            const previous = idleMonitorLastPositionRef.current;
+            const movementM = previous
+              ? haversine(previous.lat, previous.lon, latitude, longitude)
+              : 0;
+            idleMonitorLastPositionRef.current = {
+              lat: latitude,
+              lon: longitude,
+            };
+            if (shouldResumeFromIdleMonitor(speedKmhRaw, movementM)) {
+              pausedAtRef.current = null;
+              setRideLocationTrackingMode("full");
+              dispatch({ type: "RESUME" });
+              if (backgroundLocationDisclosureAcceptedRef.current) {
+                void setBackgroundLocationTrackingMode(
+                  settings.gpsAccuracy || "standard",
+                  "full",
+                );
+              }
+            }
+            return;
+          }
+
+          // ── 純 GPS COG 航向 ───────────────────────────────────────────────────
+          // 最近三秒的連續軌跡向量是唯一方向來源；低速／無位移時維持上一次穩定航向，
+          // 絕不混入任何硬體方位或羅盤資料。
+          const locationAccuracyM = loc.coords.accuracy;
+          if (
+            locationAccuracyM !== null &&
+            locationAccuracyM !== undefined &&
+            locationAccuracyM <= 35
+          ) {
+            cogSamplesRef.current.push({
+              lat: latitude,
+              lon: longitude,
+              timestamp: loc.timestamp,
+              accuracyM: locationAccuracyM,
+            });
+            cogSamplesRef.current = cogSamplesRef.current.filter(
+              (sample) => sample.timestamp >= loc.timestamp - 10_000,
+            );
+          }
+          const freeRideCog = calculateCourseOverGround(cogSamplesRef.current);
+          const routeCog =
+            isNavigating && gpxRoute
+              ? resolveNavigationCog({
+                  position: { lat: latitude, lon: longitude },
+                  route: gpxRoute.points,
+                  fallbackCog: freeRideCog,
+                })
+              : { heading: freeRideCog, onTrack: false, nearestIndex: null };
+          if (isNavigating && gpxRoute) setIsOffRoute(!routeCog.onTrack);
+          const candidateHeading = routeCog.heading;
+          const hdg =
+            candidateHeading === null
+              ? headingRef.current
+              : stabilizeCogHeading(headingRef.current, candidateHeading);
+          headingRef.current = hdg;
+          setCurrentPos({ lat: latitude, lon: longitude, heading: hdg });
+          if (
+            followUser &&
+            candidateHeading !== null &&
+            shouldApplyCogRotation(locationCameraModeRef.current)
+          ) {
+            requestAnimationFrame(() => {
+              applyBearingForLocationMode("heading-up", hdg);
+            });
+          }
+          if (
+            followUser &&
+            (locationAccuracyM ?? Number.POSITIVE_INFINITY) <= 35
+          ) {
+            const previousCenter = lastFollowCameraCenterRef.current;
+            const movementSinceCamera = previousCenter
+              ? haversineDistance(
+                  previousCenter.lat,
+                  previousCenter.lon,
+                  latitude,
+                  longitude,
+                )
+              : Number.POSITIVE_INFINITY;
+            if (movementSinceCamera >= 8) {
+              lastFollowCameraCenterRef.current = {
+                lat: latitude,
+                lon: longitude,
+              };
+              mapRef.current?.animateCamera(
+                { center: { latitude, longitude }, zoom: 17 },
+                { duration: 280 },
+              );
+            }
+          }
+
+          const wd = windDataRef.current;
+          if (wd.speed > 0) {
+            setRelativeWindInfo(
+              getRelativeWindInfo(hdg, wd.direction, wd.speed * 3.6),
+            );
+          }
+
+          lastForegroundLocationSampleAtRef.current = Date.now();
+          const speedKmh = normalizeAutoPauseSpeedKmh(Number(speed) * 3.6);
+          const currentState = stateRef.current;
+
+          // ── 自動暫停/恢復（改進版本）──────────────────────────────────────────────
+          // 1. GPS 漂移過濾：距離小於 3m 時視為漂移，保持上一個有效速度
+          // 2. 速度平滑：使用 5 點滑動平均過濾速度抖動
+          // 3. 連續計數：需連續 4 次低速才暫停
+          // 4. 不對稱閾值：暫停 1.5 km/h，恢復 3 km/h（避免頻繁切換）
+
+          const displacementM = prevPosRef.current
+            ? haversine(
+                prevPosRef.current.lat,
+                prevPosRef.current.lon,
+                latitude,
+                longitude,
+              )
+            : null;
+          const driftFilterM = sportTrackingPolicy.stationaryDriftThresholdM;
+          const governedAutoPausePolicy = getSportTrackingPolicy(
+            currentState.sportType,
+          ).autoPause;
+          const autoPausePolicy = governedAutoPausePolicy;
+          const shouldZeroReadings =
+            mapRideActive &&
+            shouldZeroLiveRideReadings({
+              rawSpeedKmh: speedKmh,
+              displacementM,
+              accuracyM: loc.coords.accuracy,
+              motionStill: motionStillRef.current,
+              pauseThresholdKmh: autoPausePolicy.speedBelowKmh,
+              driftThresholdM: driftFilterM,
+            });
+          const hasReliableMovement = hasReliableRideMovement({
+            speedKmh,
+            distanceM: displacementM,
+            accuracyM: loc.coords.accuracy,
+          });
+          const autoPauseSampleSec = Math.min(
+            5,
+            Math.max(
+              1,
+              resolveStatisticsIntervalSec(
+                lastLocationRef.current?.timestamp ?? null,
+                loc.timestamp,
+                10,
+              ) || LOCATION_INTERVAL_SEC,
+            ),
+          );
+          let smoothedSpeed = speedKmh;
+
+          // GPS 漂移過濾
+          if (prevPosRef.current) {
+            if (shouldZeroReadings) {
+              // 停紅燈或室內時的定位漂移不可延續上一筆速度。
+              smoothedSpeed = 0;
+              lastValidSpeedRef.current = 0;
+            } else {
+              // 有效移動，更新有效速度
+              lastValidSpeedRef.current = speedKmh;
+            }
+          }
+
+          // 速度平滑（5 點滑動平均）
+          speedWindowRef.current.push(smoothedSpeed);
+          const sportSpeedWindowSize =
+            stateRef.current.sportType === "running" ||
+            stateRef.current.sportType === "trail_running"
+              ? 3
+              : 5;
+          if (speedWindowRef.current.length > sportSpeedWindowSize)
+            speedWindowRef.current.shift();
+          const avgSpeed =
+            speedWindowRef.current.reduce((a, b) => a + b, 0) /
+            speedWindowRef.current.length;
+
+          // 自動暫停/恢復邏輯
+          let resumedFromAutomaticPause = false;
+          const autoPauseEnabledForSport =
+            currentState.sportType !== "cycling" ||
+            settings.idleAutoPauseEnabled;
+          const autoPauseResumeThresholdKmh =
+            resolveAutoPauseResumeThresholdKmh(
+              autoPausePolicy.speedBelowKmh,
+              AUTO_PAUSE_RESUME_THRESHOLD,
+            );
+          if (currentState.status === "active") {
+            const satisfiesStillness =
+              !autoPausePolicy.requiresStillness || motionStillRef.current;
+            const isBelowPauseThreshold =
+              speedKmh < autoPausePolicy.speedBelowKmh;
+            if (
+              autoPauseEnabledForSport &&
+              autoPausePolicy.mode === "automatic" &&
+              !hasReliableMovement &&
+              isBelowPauseThreshold &&
+              satisfiesStillness
+            ) {
+              lowSpeedCountRef.current += autoPauseSampleSec;
+              if (lowSpeedCountRef.current >= autoPausePolicy.stillForSeconds) {
+                lowSpeedCountRef.current = 0;
+                pausedElapsedRef.current = currentState.elapsed;
+                dispatch({ type: "PAUSE", source: "automatic" });
+                // 暫停不刪除已通過品質檢核的原始 GPS 點；僅禁止其進入移動統計。
+                dispatch({
+                  type: "LOCATION_UPDATE",
+                  point: {
+                    latitude,
+                    longitude,
+                    altitude: altitude ?? 0,
+                    speed: speed ?? 0,
+                    timestamp: loc.timestamp,
+                    recordedDuringPause: true,
+                  },
+                  power: 0,
+                  calories: 0,
+                  ascent: 0,
+                });
+                const pausedRecoverySession = recoverySessionRef.current;
+                if (pausedRecoverySession) {
+                  addTrackPoint(
+                    pausedRecoverySession,
+                    {
+                      timestamp: loc.timestamp,
+                      latitude,
+                      longitude,
+                      altitude: altitude ?? undefined,
+                      speed: speed ?? undefined,
+                      accuracy: loc.coords.accuracy ?? undefined,
+                      heading: hdg,
+                      recordedDuringPause: true,
+                    },
+                    pausedRecoverySession.trackPoints.at(-1),
+                  );
+                  queueRecoverySnapshot(pausedRecoverySession);
+                }
+                dispatch({ type: "LIVE_READINGS_STATIONARY" });
+                if (settings.vibrationEnabled) vibrateMedium();
+                return;
+              }
+            } else if (
+              autoPausePolicy.mode === "suggest" &&
+              avgSpeed < autoPausePolicy.speedBelowKmh
+            ) {
+              lowSpeedCountRef.current += autoPauseSampleSec;
+              if (
+                lowSpeedCountRef.current >= autoPausePolicy.stillForSeconds &&
+                !hikingPauseSuggestedRef.current
+              ) {
+                hikingPauseSuggestedRef.current = true;
+                Alert.alert(
+                  "登山停留提示",
+                  "已偵測到長時間低速停留。登山模式不會自動暫停；若正在休息，可手動暫停以保持移動時間精確。",
+                );
+              }
+            } else if (speedKmh >= autoPauseResumeThresholdKmh) {
+              lowSpeedCountRef.current = 0;
+              hikingPauseSuggestedRef.current = false;
+            }
+          } else if (
+            currentState.status === "paused" &&
+            autoPauseEnabledForSport &&
+            autoPausePolicy.mode === "automatic" &&
+            hasReliableMovement &&
+            speedKmh >= autoPauseResumeThresholdKmh
+          ) {
+            lowSpeedCountRef.current = 0;
+            dispatch({ type: "RESUME" });
+            // reducer 狀態在此回呼內尚未更新；必須讓本次可信點繼續進入統計，
+            // 不能因恢復而遺失第一個有效移動 GPS 區間。
+            resumedFromAutomaticPause = true;
+          }
+
+          if (shouldZeroReadings) {
+            // 不追加軌跡、不更新距離／均速／爬升／卡路里；只讓即時速度與功率安全歸零。
+            powerWindowRef.current = [];
+            prevSpeedMsRef.current = 0;
+            // 每一筆靜止樣本都前移距離參考點，避免 GPS 漂移累積到門檻後被誤認為真正騎乘。
+            lastLocationRef.current = loc;
+            prevPosRef.current = { lat: latitude, lon: longitude };
+            prevAltRef.current = altitude ?? null;
+            setCurrentGrade(0);
+            dispatch({ type: "LIVE_READINGS_STATIONARY" });
+            return;
+          }
+
+          // 即時軌跡
+          if (mapRideActive) {
+            setLiveTrail((prev) => [
+              ...prev,
+              {
+                latitude,
+                longitude,
+                segmentStart: trackPointDecision.segmentStart || undefined,
+              },
+            ]);
+            if (trackPointDecision.segmentStart) {
+              prevPosRef.current = { lat: latitude, lon: longitude };
+              prevAltRef.current = altitude ?? null;
+              gradeWindowRef.current = [];
+              liveGradeRef.current = 0;
+            }
+          }
+
+          // 即時坡度：6 m 最小區間、±20% 離群限制與 5 點滑動平均，兼顧反應性與 GPS 雜訊保護。
+          if (
+            prevPosRef.current &&
+            prevAltRef.current !== null &&
+            altitude !== null
+          ) {
+            const d = haversine(
+              prevPosRef.current.lat,
+              prevPosRef.current.lon,
+              latitude,
+              longitude,
+            );
+            if (d >= 6) {
+              const rawGrade = ((altitude - prevAltRef.current) / d) * 100;
+              // 過濾 GPS 異常值，避免單點海拔跳動污染功率與儀表。
+              if (Math.abs(rawGrade) <= 20) {
+                gradeWindowRef.current.push(rawGrade);
+                if (gradeWindowRef.current.length > 5)
+                  gradeWindowRef.current.shift();
+                const smoothed =
+                  gradeWindowRef.current.reduce((a, b) => a + b, 0) /
+                  gradeWindowRef.current.length;
+                const nextGrade = Math.round(smoothed * 10) / 10;
+                liveGradeRef.current = nextGrade;
+                setCurrentGrade(nextGrade);
+              }
+              // 更新參考點（僅在距離足夠時更新）
+              prevPosRef.current = { lat: latitude, lon: longitude };
+              if (altitude !== null) prevAltRef.current = altitude;
+            }
+          } else {
+            // 初始化參考點
+            prevPosRef.current = { lat: latitude, lon: longitude };
+            if (altitude !== null) prevAltRef.current = altitude;
+          }
+
+          // GPX 導航
+          if (isNavigating && gpxRoute && gpxRoute.points.length > 0) {
+            updateRouteProgress(latitude, longitude);
+          }
+
+          // 軌跡點始終記錄，其他數據僅在 active 狀態下更新
+          if (currentState.status !== "active" && !resumedFromAutomaticPause) {
+            dispatch({
+              type: "LOCATION_UPDATE",
+              point: {
+                latitude,
+                longitude,
+                altitude: altitude ?? 0,
+                speed: speed ?? 0,
+                timestamp: loc.timestamp,
+                recordedDuringPause: true,
+              },
+              power: 0,
+              calories: 0,
+              ascent: 0,
+            });
+            const pausedRecoverySession = recoverySessionRef.current;
+            if (pausedRecoverySession) {
+              addTrackPoint(
+                pausedRecoverySession,
+                {
+                  timestamp: loc.timestamp,
+                  latitude,
+                  longitude,
+                  altitude: altitude ?? undefined,
+                  speed: speed ?? undefined,
+                  accuracy: loc.coords.accuracy ?? undefined,
+                  heading: hdg,
+                  recordedDuringPause: true,
+                },
+                pausedRecoverySession.trackPoints.at(-1),
+              );
+              queueRecoverySnapshot(pausedRecoverySession);
+            }
+            return;
+          }
+
+          // ─── 騎乘計算 ─────────────────────────────────────────────────────
+          // 功率與 UI 讀取同一個已平滑、已限幅的即時坡度，不直接使用相鄰 GPS 原始高度差。
+          let grade = liveGradeRef.current;
+          let distanceM = 0;
+          const previousLocation = lastLocationRef.current;
+          const statisticsIntervalSec = !trackPointDecision.segmentStart
+            ? resolveStatisticsIntervalSec(
+                previousLocation?.timestamp ?? null,
+                loc.timestamp,
+              )
+            : 0;
+          if (
+            !trackPointDecision.segmentStart &&
+            lastLocationRef.current &&
+            statisticsIntervalSec > 0
+          ) {
+            const candidateDistanceM = haversineDistance(
+              lastLocationRef.current.coords.latitude,
+              lastLocationRef.current.coords.longitude,
+              latitude,
+              longitude,
+            );
+            const impliedSpeedKmh =
+              (candidateDistanceM / statisticsIntervalSec) * 3.6;
+            if (
+              Number.isFinite(candidateDistanceM) &&
+              candidateDistanceM >= 0.5 &&
+              impliedSpeedKmh <= 110
+            ) {
+              distanceM = candidateDistanceM;
+            }
+          }
+          if (trackPointDecision.segmentStart) {
+            // 背景／定位中斷後開啟新資料段，不能用舊段高度跨距離推導爬升或下降。
+            liveElevationFilterRef.current = createLiveElevationFilterState();
+            liveGradeRef.current = 0;
+          }
+          const elevationDelta = acceptLiveElevationDelta(
+            liveElevationFilterRef.current,
+            altitude,
+            distanceM,
+          );
+          const ascent = elevationDelta.ascentM;
+          lastLocationRef.current = loc;
+
+          const headwindMs = getHeadwindMs(
+            headingRef.current,
+            windDataRef.current.direction,
+            windDataRef.current.speed * 3.6,
+          );
+          const currentWeather = weatherRef.current;
+          if (currentWeather) {
+            const summary = environmentSummaryRef.current;
+            summary.sampleCount += 1;
+            summary.temperatureTotal += currentWeather.temperature;
+            summary.humidityTotal += currentWeather.humidity;
+            summary.windSpeedTotal += currentWeather.windSpeed;
+            summary.headwindTotal += headwindMs;
+            summary.precipitationTotal += currentWeather.precipitationProb;
+            summary.latestWeatherCode = currentWeather.weatherCode;
+            summary.hadLiveWeather = true;
+          }
+          // 功率、卡路里與平均功率積分使用同一條已接受的距離／時間資料鏈，
+          // 不讓單筆 GPS 原始速度飆點將虛擬功率及消耗量放大。
+          const currentSpeedMs = resolveStatisticsSpeedMs({
+            acceptedDistanceM: distanceM,
+            intervalSec: statisticsIntervalSec,
+            rawSpeedMs: speed,
+          });
+          const statisticsSpeedKmh = currentSpeedMs * 3.6;
+          // 只有同時通過 GPS 位移／精度與速度門檻的區間才能進入移動時間、距離、
+          // 功率及熱量統計。原始點仍保留到 route，以供 GPX/FIT 匯出與後續重算。
+          const countMovingTime =
+            statisticsIntervalSec > 0 &&
+            hasReliableMovement &&
+            statisticsSpeedKmh >= autoPausePolicy.speedBelowKmh;
+          const movingStatisticsIntervalSec = countMovingTime
+            ? statisticsIntervalSec
+            : 0;
+          const isCyclingSport = currentState.sportType === "cycling";
+          const rawPower = isCyclingSport
+            ? calculatePower({
+                speedMs: currentSpeedMs,
+                prevSpeedMs: prevSpeedMsRef.current,
+                intervalSec: movingStatisticsIntervalSec,
+                gradePct: grade,
+                windSpeedMs: headwindMs,
+                riderMassKg: settings.weight,
+                bikeMassKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG,
+                airDensityKgM3: airDensityRef.current,
+              })
+            : 0;
+          const boundedVirtualPower = clampVirtualPowerForRider(
+            rawPower,
+            estimateFtpW,
+          );
+          prevSpeedMsRef.current = currentSpeedMs;
+          if (isCyclingSport) powerWindowRef.current.push(boundedVirtualPower);
+          if (powerWindowRef.current.length > 5) powerWindowRef.current.shift();
+          const power = isCyclingSport
+            ? Math.round(
+                powerWindowRef.current.reduce((a, b) => a + b, 0) /
+                  Math.max(1, powerWindowRef.current.length),
+              )
+            : 0;
+          const maxPowerCandidate =
+            isCyclingSport &&
+            powerWindowRef.current.length >= 3 &&
+            isTrustworthyVirtualPowerPeak(
+              power,
+              estimateFtpW,
+              distanceM,
+              statisticsIntervalSec,
+            )
+              ? power
+              : 0;
+          const calIncrement = isCyclingSport
+            ? calculatePersonalizedCalories({
+                powerW: power,
+                hasMeasuredPower: power > 0,
+                speedKmh: statisticsSpeedKmh,
+                gradePct: grade,
+                riderWeightKg: settings.weight,
+                ftpW: estimateFtpW,
+                intervalSec: movingStatisticsIntervalSec,
+                temperatureC: currentWeather?.temperature,
+                humidityPct: currentWeather?.humidity,
+                weatherCode: currentWeather?.weatherCode,
+                precipitationProb: currentWeather?.precipitationProb,
+                headwindMs,
+              }).kcal
+            : estimateSportCalories({
+                sportType: currentState.sportType,
+                weightKg: settings.weight,
+                durationSec: movingStatisticsIntervalSec,
+                speedKmh: statisticsSpeedKmh,
+                gradePct: grade,
+                vamMPerHour: sportVam,
+              });
+
+          dispatch({
+            type: "LOCATION_UPDATE",
+            point: {
+              latitude,
+              longitude,
+              altitude: altitude ?? 0,
+              speed: speed ?? 0,
+              timestamp: loc.timestamp,
+              segmentStart: trackPointDecision.segmentStart || undefined,
+            },
+            power,
+            calories: calIncrement,
+            ascent,
+            descent: elevationDelta.descentM,
+            acceptedElevationM: elevationDelta.acceptedAltitudeM,
+            distanceM,
+            intervalSec: statisticsIntervalSec,
+            countMovingTime,
+            powerSource: isCyclingSport ? "estimated" : "unavailable",
+            caloriesSource: isCyclingSport ? "power-estimate" : "met-estimate",
+            maxPowerCandidate,
+          });
+
+          const sweatResult = calculateSweatLoss({
+            weightKg: settings.weight,
+            heightCm: settings.height,
+            powerW: power,
+            speedKmh,
+            ascentPerInterval: ascent,
+            gradePct: grade,
+            intervalSec: movingStatisticsIntervalSec,
+            temperatureC: currentWeather?.temperature ?? 20,
+            humidityPct: currentWeather?.humidity ?? 60,
+            weatherCode: currentWeather?.weatherCode ?? 3,
+            isDaylight: currentWeather
+              ? new Date().getHours() >= 6 && new Date().getHours() < 18
+              : false,
+            ftpW: estimateFtpW,
+            headwindMs: currentWeather ? headwindMs : 0,
+            precipitationProb: currentWeather?.precipitationProb ?? 0,
+            ageYears: estimateAgeYears ?? 32,
+            calibrationMultiplier: settings.sweatRateCalibrationMultiplier,
+            environmentSource: currentWeather
+              ? "live-weather"
+              : "offline-baseline",
+          });
+          dispatch({
+            type: "SWEAT_UPDATE",
+            sweatLossMl: sweatResult.sweatLossMl,
+            sweatRatePerHour: sweatResult.sweatRatePerHour,
+            intensityLabel: sweatResult.intensityLabel,
+          });
+
+          const recoverySession = recoverySessionRef.current;
+          if (recoverySession) {
+            const trackPoint = {
+              timestamp: loc.timestamp ?? Date.now(),
+              latitude,
+              longitude,
+              altitude: altitude ?? undefined,
+              speed: speed ?? undefined,
+              accuracy: loc.coords.accuracy ?? undefined,
+              heading: hdg,
+              segmentStart: trackPointDecision.segmentStart || undefined,
+            };
+            addTrackPoint(
+              recoverySession,
+              trackPoint,
+              recoverySession.trackPoints.at(-1),
+            );
+            recoverySession.stats.caloriesBurned += calIncrement;
+            recoverySession.stats.waterLoss += sweatResult.sweatLossMl;
+            queueRecoverySnapshot(recoverySession);
+          }
+
+          const supplyPlan = createSupplyPlan({
+            mode: settings.supplyCalculationMode,
+            sportType: currentState.sportType,
+            calorieThresholdKcal: settings.calorieThreshold,
+            waterThresholdMl: hydrationThresholdMl,
+            elapsedSec: currentState.elapsed,
+            riderWeightKg: settings.weight,
+            ftpW: estimateFtpW,
+            intensityFactor: isCyclingSport
+              ? Math.min(2, power / Math.max(1, estimateFtpW))
+              : 1,
+            sweatRatePerHour: sweatResult.sweatRatePerHour,
+            environmentLoad: sweatResult.environmentLoad,
+            weatherAvailable: Boolean(currentWeather),
+            temperatureC: currentWeather?.temperature,
+            humidityPct: currentWeather?.humidity,
+            weatherCode: currentWeather?.weatherCode,
+            isFirstWaterCountdown: false,
+            energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+            energyCarbohydrateHourlyLimitMode:
+              settings.energyCarbohydrateHourlyLimitMode,
+            energyCarbohydrateHourlyLimitG:
+              settings.energyCarbohydrateHourlyLimitG,
+          });
+          setActiveSupplyPlan(supplyPlan);
+          const isSmartEnergyMode =
+            settings.supplyReminderEnabled && smartEnergySupplyEnabled;
+          const isSmartWaterMode =
+            settings.supplyReminderEnabled && smartWaterSupplyEnabled;
+          const hasSmartSupplyChannel = isSmartEnergyMode || isSmartWaterMode;
+          const currentCountdown = smartSupplyCountdownRef.current;
+          // 倒數建立後保持固定，不能隨環境、功率或天氣更新而延後／提前。
+          // 只有使用者按下「已補給／已補水」時才會建立該類別的新一輪倒數。
+          if (hasSmartSupplyChannel && !currentCountdown) {
+            const nowMs = Date.now();
+            for (const kind of ["calorie", "water"] as const) {
+              supplyRoundPauseRef.current[kind] = {
+                pausedAtMs: isPaused ? nowMs : null,
+                pausedTotalSec: 0,
+              };
+            }
+          }
+          const nextCountdown = hasSmartSupplyChannel
+            ? (currentCountdown ??
+              createSmartSupplyCountdown(supplyPlan, currentState.elapsed))
+            : null;
+          if (hasSmartSupplyChannel && nextCountdown) {
+            syncSmartSupplyCountdown(nextCountdown);
+          }
+          const newCalories = currentState.calories + calIncrement;
+          const newSweatSince =
+            currentState.sweatSinceLastRefill + sweatResult.sweatLossMl;
+          const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(
+            nextCountdown,
+            "calorie",
+          );
+          const smartWaterRemainingSec = smartSupplyCountdownRemainingSec(
+            nextCountdown,
+            "water",
+          );
+          const manualEnergyKind: SupplyIntervalKind | null =
+            settings.supplyReminderEnabled && !isSmartEnergyMode
+              ? settings.supplyEnergyTimeIntervalEnabled
+                ? "energy-time"
+                : settings.supplyEnergyDistanceIntervalEnabled
+                  ? "energy-distance"
+                  : null
+              : null;
+          const manualWaterKind: SupplyIntervalKind | null =
+            settings.supplyReminderEnabled && !isSmartWaterMode
+              ? settings.supplyWaterTimeIntervalEnabled
+                ? "water-time"
+                : settings.supplyWaterDistanceIntervalEnabled
+                  ? "water-distance"
+                  : null
+              : null;
+          const manualEnergyProgress =
+            manualEnergyKind === "energy-time"
+              ? (currentState.elapsed -
+                  (intervalSupplyTrackerRef.current[manualEnergyKind] ?? 0)) /
+                Math.max(1, settings.supplyEnergyTimeIntervalMinutes * 60)
+              : manualEnergyKind === "energy-distance"
+                ? (currentState.distance / 1000 -
+                    (intervalSupplyTrackerRef.current[manualEnergyKind] ?? 0)) /
+                  Math.max(0.1, settings.supplyEnergyDistanceIntervalKm)
+                : 0;
+          const manualWaterProgress =
+            manualWaterKind === "water-time"
+              ? (currentState.elapsed -
+                  (intervalSupplyTrackerRef.current[manualWaterKind] ?? 0)) /
+                Math.max(1, settings.supplyWaterTimeIntervalMinutes * 60)
+              : manualWaterKind === "water-distance"
+                ? (currentState.distance / 1000 -
+                    (intervalSupplyTrackerRef.current[manualWaterKind] ?? 0)) /
+                  Math.max(0.1, settings.supplyWaterDistanceIntervalKm)
+                : 0;
+          const calPct =
+            isSmartEnergyMode && nextCountdown
+              ? Math.min(
+                  1,
+                  1 -
+                    Math.max(0, smartCalorieRemainingSec ?? 0) /
+                      Math.max(1, nextCountdown.calorieDurationSec),
+                )
+              : manualEnergyKind
+                ? Math.min(1, Math.max(0, manualEnergyProgress))
+                : Math.min(1, newCalories / supplyPlan.calorieTriggerKcal);
+          const waterPct =
+            isSmartWaterMode && nextCountdown
+              ? Math.min(
+                  1,
+                  1 -
+                    Math.max(0, smartWaterRemainingSec ?? 0) /
+                      Math.max(1, nextCountdown.waterDurationSec),
+                )
+              : manualWaterKind
+                ? Math.min(1, Math.max(0, manualWaterProgress))
+                : Math.min(1, newSweatSince / supplyPlan.waterTriggerMl);
+
+          Animated.timing(calorieAnim, {
+            toValue: calPct,
+            duration: 500,
+            useNativeDriver: false,
+          }).start();
+          Animated.timing(waterAnim, {
+            toValue: waterPct,
+            duration: 500,
+            useNativeDriver: false,
+          }).start();
+
+          // 智慧模式改由倒數到期觸發；提醒不因坡度而被延後或抑制。
+          const calorieDue =
+            settings.supplyReminderEnabled &&
+            isSmartEnergyMode &&
+            isSmartSupplyCountdownDue(nextCountdown, "calorie");
+          if (
+            calorieDue &&
+            !calorieReminderSentRef.current &&
+            !pendingCalorieRef.current
+          ) {
+            calorieReminderSentRef.current = true;
+            triggerSupplyReminder("calorie", supplyPlan);
+          }
+
+          const waterDue =
+            settings.supplyReminderEnabled &&
+            isSmartWaterMode &&
+            isSmartSupplyCountdownDue(nextCountdown, "water");
+          if (
+            waterDue &&
+            !waterReminderSentRef.current &&
+            !pendingWaterRef.current
+          ) {
+            waterReminderSentRef.current = true;
+            triggerSupplyReminder("water", supplyPlan);
+          }
+
+          // ── 自訂補給品觸發 ──
+          if (
+            settings.supplyReminderEnabled &&
+            settings.supplyItems &&
+            settings.supplyItems.length > 0
+          ) {
+            for (const supplyItem of settings.supplyItems) {
+              triggerCustomSupplyReminder(supplyItem);
+            }
+          }
+          triggerIntervalSupplyReminder();
+
+          if (
+            notifPermRef.current &&
+            settings.notificationEnabled &&
+            currentState.elapsed % 30 === 0
+          ) {
+          }
+        },
+      );
+      if (!active) {
+        sub.remove();
+        return;
+      }
+      locationSubscription = sub;
+      locationSubRef.current = sub;
+    })();
+
+    return () => {
+      active = false;
+      locationSubscription?.remove();
+      if (locationSubRef.current === locationSubscription)
+        locationSubRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    applyBearingForLocationMode,
+    followUser,
+    mapRideActive,
+    isNavigating,
+    gpxRoute,
+    rideLocationTrackingMode,
+    settings,
+  ]);
+
+  // Android 在室內、靜止或尚未鎖定 GPS 時可能完全不送出 speed 樣本。無樣本滿足既有
+  // 靜止時間後，直接以 0 km/h 進入自動暫停；不依賴距離大於 0 或下一次定位回呼。
+  useEffect(() => {
+    if (!mapRideActive) return;
+    lastForegroundLocationSampleAtRef.current = Date.now();
+    const watchdog = setInterval(() => {
+      const current = stateRef.current;
+      const policy = getSportTrackingPolicy(current.sportType).autoPause;
+      const autoPauseEnabledForSport =
+        current.sportType !== "cycling" || settings.idleAutoPauseEnabled;
+      if (
+        current.status !== "active" ||
+        !autoPauseEnabledForSport ||
+        policy.mode !== "automatic"
+      )
+        return;
+      if (
+        Date.now() - lastForegroundLocationSampleAtRef.current <
+        policy.stillForSeconds * 1_000
+      )
+        return;
+
+      lowSpeedCountRef.current = 0;
+      pausedElapsedRef.current = current.elapsed;
+      dispatch({ type: "PAUSE", source: "automatic" });
+      dispatch({ type: "LIVE_READINGS_STATIONARY" });
+      if (settings.vibrationEnabled) vibrateMedium();
+    }, 1_000);
+    return () => clearInterval(watchdog);
+  }, [
+    dispatch,
+    mapRideActive,
+    settings.idleAutoPauseEnabled,
+    settings.vibrationEnabled,
+  ]);
+
+  // ─── GPX 路線進度 ────────────────────────────────────────────────────────────
+  // 僅保留已走過路段與剩餘距離的資料；不從 GPX 推導轉彎、上方提示或語音。
+  const updateRouteProgress = useCallback(
+    (lat: number, lon: number) => {
+      if (!gpxRoute) return;
+      const points = gpxRoute.points;
+      const nearest = findNearestRoutePoint({ lat, lon }, points);
+      setNearestIdx(nearest?.index ?? 0);
+      const endPoint = points[points.length - 1];
+      if (endPoint)
+        setDistToEnd(haversine(lat, lon, endPoint.lat, endPoint.lon));
+    },
+    [gpxRoute],
+  );
+
+  // ─── 開始/停止騎乘 ────────────────────────────────────────────────────────────
+  const handleStart = useCallback(async () => {
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert(
+          "定位服務未開啟",
+          "請先在手機系統設定開啟定位服務，再開始騎乘紀錄。",
+        );
+        return;
+      }
+      const foregroundPermission =
+        await Location.getForegroundPermissionsAsync();
+      const permission =
+        foregroundPermission.status === "granted"
+          ? foregroundPermission
+          : await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        Alert.alert(
+          "需要定位權限",
+          "開始騎乘需要精確定位權限，才能記錄距離、速度與軌跡。您可在系統設定中隨時重新開啟。",
+        );
+        return;
+      }
+
+      const backgroundLocationDisclosureAccepted =
+        await requestBackgroundLocationDisclosure();
+      if (!backgroundLocationDisclosureAccepted) {
+        backgroundLocationDisclosureAcceptedRef.current = false;
+      }
+    } catch {
+      Alert.alert("無法確認定位狀態", "請確認定位服務與權限後再試一次。");
+      return;
+    }
+    const initialKnownLocation = await Location.getLastKnownPositionAsync({
+      maxAge: 2 * 60 * 1000,
+      requiredAccuracy: 100,
+    }).catch(() => null);
+    const initialWeather = initialKnownLocation
+      ? await resolveInitialWeather(
+          initialKnownLocation.coords.latitude,
+          initialKnownLocation.coords.longitude,
+        )
+      : weatherRef.current;
+    if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+    idlePauseTimerRef.current = null;
+    pausedAtRef.current = null;
+    idleMonitorLastPositionRef.current = null;
+    setRideLocationTrackingMode("full");
+    pausedElapsedRef.current = 0;
+    dispatch({ type: "START", hydrationThresholdMl });
+    const initialAutoLapTotals: AutoLapTotals = {
+      elapsedSec: 0,
+      distanceM: 0,
+      ascentM: 0,
+      descentM: 0,
+      powerWorkJ: 0,
+      powerSampleDurationSec: 0,
+    };
+    const initialAutoLapIntervalM = Math.max(
+      0,
+      settings.autoLapDistanceKm * 1_000,
+    );
+    autoLapMilestoneStateRef.current = {
+      enabled: settings.lapEnabled,
+      intervalM: initialAutoLapIntervalM,
+      nextDistanceM:
+        settings.lapEnabled && initialAutoLapIntervalM > 0
+          ? initialAutoLapIntervalM
+          : null,
+      laps: [],
+      anchor: createAutoLapAnchor(initialAutoLapTotals),
+      previousTotals: initialAutoLapTotals,
+    };
+    calorieReminderSentRef.current = false;
+    waterReminderSentRef.current = false;
+    // 首輪直接使用可信快取位置、快取／短時限天氣與物理功率推導；資料不足時才回退離線基準。
+    // 後續 GPS／天氣僅更新建議量，不重設已建立的倒數。
+    const initialSupplyPlanInput = buildInitialSupplyPlanInput({
+      mode: settings.supplyCalculationMode,
+      sportType: state.sportType,
+      calorieThresholdKcal: settings.calorieThreshold,
+      waterThresholdMl: hydrationThresholdMl,
+      riderWeightKg: settings.weight,
+      riderHeightCm: settings.height,
+      riderAgeYears: estimateAgeYears ?? 32,
+      bikeWeightKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG,
+      ftpW: estimateFtpW,
+      sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
+      energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+      energyCarbohydrateHourlyLimitMode:
+        settings.energyCarbohydrateHourlyLimitMode,
+      energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+      snapshot: {
+        speedMs: initialKnownLocation?.coords.speed,
+        headingDeg: headingRef.current,
+        gradePct: currentGrade,
+        weather: initialWeather,
+      },
+    });
+    const initialSupplyPlan = createSupplyPlan(initialSupplyPlanInput);
+    setActiveSupplyPlan(initialSupplyPlan);
+    lastBackgroundCountdownSnapshotRef.current = "";
+    syncSmartSupplyCountdown(null);
+    if (
+      settings.supplyReminderEnabled &&
+      (smartEnergySupplyEnabled || smartWaterSupplyEnabled)
+    ) {
+      syncSmartSupplyCountdown(
+        createSmartSupplyCountdown(initialSupplyPlan, 0),
+      );
+    }
+    calorieAnim.setValue(0);
+    waterAnim.setValue(0);
+    lastLocationRef.current = null;
+    lastAcceptedTrackPointRef.current = null;
+    lastBgSyncTsRef.current = 0;
+    setLiveTrail([]);
+    setCurrentGrade(0);
+    prevAltRef.current = null;
+    prevPosRef.current = null;
+    liveElevationFilterRef.current = createLiveElevationFilterState();
+    liveGradeRef.current = 0;
+    powerWindowRef.current = [];
+    gradeWindowRef.current = [];
+    environmentSummaryRef.current = {
+      sampleCount: 0,
+      temperatureTotal: 0,
+      humidityTotal: 0,
+      windSpeedTotal: 0,
+      headwindTotal: 0,
+      precipitationTotal: 0,
+      latestWeatherCode: undefined,
+      hadLiveWeather: false,
+    };
+    lowSpeedCountRef.current = 0;
+    nextAutoLapDistanceMRef.current = null;
+    arrivedRef.current = false;
+    setMapRideActive(true);
+    selectLocationCameraMode("heading-up");
+    setTouchGuardEnabled(false);
+    setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
+    recoverySessionRef.current = createNewRideSession();
+    lastRecoverySnapshotAtRef.current = Date.now();
+    void saveRideSessionSnapshot(recoverySessionRef.current);
+
+    // 記錄騎乘開始座標（用於「回起點」功能）
+    if (currentPos) {
+      rideStartLocationRef.current = {
+        lat: currentPos.lat,
+        lon: currentPos.lon,
+      };
+    }
+
+    // 初始化自訂補給品追蹤器
+    supplyItemsTrackerRef.current = {};
+    settings.supplyItems
+      .filter((s) => s.enabled)
+      .forEach((item) => {
+        supplyItemsTrackerRef.current[item.id] = {
+          lastTriggerTime: 0,
+          lastTriggerDistance: 0,
+          triggered: false,
+          dismissTimeoutId: null,
+          repeatIntervalId: null,
+        };
+      });
+    intervalSupplyTrackerRef.current = {
+      "energy-time": 0,
+      "energy-distance": 0,
+      "water-time": 0,
+      "water-distance": 0,
+    };
+    intervalSupplyAlertsRef.current = {};
+    setIntervalSupplyAlerts({});
+    clearIntervalSupplyRepeatTimer();
+
+    if (gpxRoute) {
+      setIsNavigating(true);
+    }
+
+    // 初始化背景狀態（確保背景中能計算距離和觸發補給提醒）
+    const lastPos =
+      initialKnownLocation ?? (await Location.getLastKnownPositionAsync());
+    await initBackgroundState({
+      calorieThreshold: settings.calorieThreshold,
+      waterThreshold: hydrationThresholdMl,
+      supplyCalculationMode: settings.supplyCalculationMode,
+      smartEnergySupplyEnabled,
+      smartWaterSupplyEnabled,
+      supplyReminderEnabled: settings.supplyReminderEnabled,
+      notificationLocale: activeLanguage,
+      sportType: state.sportType,
+      autoLapEnabled: settings.lapEnabled,
+      autoLapDistanceKm: settings.autoLapDistanceKm,
+      autoPauseEnabled:
+        state.sportType !== "cycling" || settings.idleAutoPauseEnabled,
+      autoPauseSpeedBelowKmh: getSportTrackingPolicy(state.sportType).autoPause
+        .speedBelowKmh,
+      autoPauseStillForSeconds: getSportTrackingPolicy(state.sportType)
+        .autoPause.stillForSeconds,
+      autoPauseResumeAtOrAboveKmh: Math.max(
+        AUTO_PAUSE_RESUME_THRESHOLD,
+        getSportTrackingPolicy(state.sportType).autoPause.speedBelowKmh + 0.5,
+      ),
+      currentLat: lastPos?.coords.latitude ?? 0,
+      currentLon: lastPos?.coords.longitude ?? 0,
+      currentTimestamp: lastPos?.timestamp,
+      currentAccuracy: lastPos?.coords.accuracy,
+      supplyEnergyTimeIntervalEnabled: smartEnergySupplyEnabled
+        ? false
+        : settings.supplyEnergyTimeIntervalEnabled,
+      supplyEnergyTimeIntervalMinutes: settings.supplyEnergyTimeIntervalMinutes,
+      supplyEnergyDistanceIntervalEnabled: smartEnergySupplyEnabled
+        ? false
+        : settings.supplyEnergyDistanceIntervalEnabled,
+      supplyEnergyDistanceIntervalKm: settings.supplyEnergyDistanceIntervalKm,
+      supplyWaterTimeIntervalEnabled: smartWaterSupplyEnabled
+        ? false
+        : settings.supplyWaterTimeIntervalEnabled,
+      supplyWaterTimeIntervalMinutes: settings.supplyWaterTimeIntervalMinutes,
+      supplyWaterDistanceIntervalEnabled: smartWaterSupplyEnabled
+        ? false
+        : settings.supplyWaterDistanceIntervalEnabled,
+      supplyWaterDistanceIntervalKm: settings.supplyWaterDistanceIntervalKm,
+      riderProfile: {
+        weightKg: settings.weight,
+        heightCm: settings.height,
+        ageYears: estimateAgeYears ?? 32,
+        ftpW: estimateFtpW,
+        bikeWeightKg: settings.bikeWeight ?? 10,
+        sweatRateCalibrationMultiplier: settings.sweatRateCalibrationMultiplier,
+        energyServingCarbohydrateG: settings.energyServingCarbohydrateG,
+        energyCarbohydrateHourlyLimitMode:
+          settings.energyCarbohydrateHourlyLimitMode,
+        energyCarbohydrateHourlyLimitG: settings.energyCarbohydrateHourlyLimitG,
+      },
+      environment: weatherRef.current
+        ? {
+            temperatureC: weatherRef.current.temperature,
+            humidityPct: weatherRef.current.humidity,
+            windSpeedKmh: weatherRef.current.windSpeed,
+            windDirection: weatherRef.current.windDirection,
+            weatherCode: weatherRef.current.weatherCode,
+            precipitationProb: weatherRef.current.precipitationProb,
+          }
+        : undefined,
+    });
+    lastBackgroundCountdownSnapshotRef.current = "";
+    syncSmartSupplyCountdown(smartSupplyCountdownRef.current);
+    const backgroundTrackingStarted =
+      backgroundLocationDisclosureAcceptedRef.current &&
+      (await startBackgroundLocationTracking(
+        settings.gpsAccuracy || "standard",
+      ));
+    if (
+      backgroundLocationDisclosureAcceptedRef.current &&
+      !backgroundTrackingStarted
+    ) {
+      Alert.alert(
+        "背景騎乘未啟用",
+        "目前會在 App 開啟時持續記錄；若鎖定螢幕或切到背景，請在系統設定允許背景定位與電池不受限制，以維持完整軌跡。",
+      );
+    }
+
+    const loc =
+      initialKnownLocation ?? (await Location.getLastKnownPositionAsync());
+    if (loc) updateWeather(loc.coords.latitude, loc.coords.longitude);
+    weatherTimerRef.current = setInterval(async () => {
+      const l = await Location.getLastKnownPositionAsync();
+      if (l) updateWeather(l.coords.latitude, l.coords.longitude);
+    }, WEATHER_INTERVAL);
+  }, [
+    activeLanguage,
+    clearIntervalSupplyRepeatTimer,
+    currentGrade,
+    currentPos,
+    dispatch,
+    estimateAgeYears,
+    estimateFtpW,
+    hydrationThresholdMl,
+    gpxRoute,
+    resolveInitialWeather,
+    settings,
+    smartEnergySupplyEnabled,
+    smartWaterSupplyEnabled,
+    selectLocationCameraMode,
+    state.sportType,
+    syncSmartSupplyCountdown,
+    updateWeather,
+    calorieAnim,
+    waterAnim,
+    requestBackgroundLocationDisclosure,
+  ]);
+
+  useEffect(() => {
+    if (!mapRideActive) return;
+    void updateBackgroundAutoLapSettings({
+      enabled: settings.lapEnabled,
+      distanceKm: settings.autoLapDistanceKm,
+    });
+  }, [mapRideActive, settings.autoLapDistanceKm, settings.lapEnabled]);
+
+  const handlePause = useCallback(() => {
+    pausedElapsedRef.current = state.elapsed;
+    dispatch({ type: "PAUSE" });
+  }, [dispatch, state.elapsed]);
+
+  const handleResume = useCallback(() => {
+    dispatch({ type: "RESUME" });
+  }, [dispatch]);
+
+  const handleSelectSportType = useCallback(
+    (sportType: SportType) => {
+      if (state.status === "active" || state.status === "paused") {
+        Alert.alert(
+          "活動進行中",
+          "請先結束目前活動，再選擇不同運動模式，以維持本次紀錄的統計一致。 ",
+        );
+        return;
+      }
+      // 先更新即時 state，讓 Bottom Sheet 關閉後儀表板圖示與名稱立即同步；
+      // 同步持久化為預設值，避免 idle 狀態的預設運動 effect 將選擇覆寫回去。
+      setSportType(sportType);
+      void updateSettings({ defaultSportType: sportType });
+      setSportPickerQuery("");
+      setSportPickerVisible(false);
+    },
+    [setSportType, state.status, updateSettings],
+  );
+
+  useEffect(() => {
+    if (state.status !== "active") {
+      autoLapMilestoneStateRef.current = null;
+      nextAutoLapDistanceMRef.current = null;
+      return;
+    }
+    const intervalM = Math.max(0, settings.autoLapDistanceKm * 1_000);
+    const totals: AutoLapTotals = {
+      elapsedSec: state.elapsed,
+      distanceM: state.distance,
+      ascentM: state.totalAscent,
+      descentM: state.totalDescent,
+      powerWorkJ: state.powerWorkJ,
+      powerSampleDurationSec: state.powerSampleDurationSec,
+    };
+    const prior = autoLapMilestoneStateRef.current;
+    const configurationChanged =
+      !prior ||
+      prior.enabled !== settings.lapEnabled ||
+      prior.intervalM !== intervalM;
+    const milestoneState: AutoLapMilestoneState = configurationChanged
+      ? {
+          enabled: settings.lapEnabled,
+          intervalM,
+          nextDistanceM:
+            settings.lapEnabled && intervalM > 0
+              ? (Math.floor(totals.distanceM / intervalM) + 1) * intervalM
+              : null,
+          laps: prior?.laps ?? state.laps,
+          // 設定在活動途中變更時，從當前累計建立新錨點，不回填或重複舊分段。
+          anchor: createAutoLapAnchor(
+            configurationChanged && prior ? totals : (prior?.anchor ?? totals),
+          ),
+          previousTotals: totals,
+        }
+      : prior;
+    const result = advanceAutoLapMilestones(totals, milestoneState);
+    autoLapMilestoneStateRef.current = {
+      enabled: settings.lapEnabled,
+      intervalM,
+      nextDistanceM: result.nextDistanceM,
+      laps: result.laps,
+      anchor: result.anchor,
+      previousTotals: result.previousTotals,
+    };
+    nextAutoLapDistanceMRef.current = result.nextDistanceM;
+
+    if (result.completedLaps.length > 0) {
+      dispatch({
+        type: "SYNC_AUTO_LAPS",
+        laps: result.laps,
+        anchor: {
+          elapsedSec: result.anchor.elapsedSec,
+          distanceM: result.anchor.distanceM,
+          ascentM: result.anchor.ascentM,
+          descentM: result.anchor.descentM,
+          powerWorkJ: result.anchor.powerWorkJ,
+          powerSampleDurationSec: result.anchor.powerSampleDurationSec,
+        },
+      });
+    }
+  }, [
+    dispatch,
+    settings.autoLapDistanceKm,
+    settings.lapEnabled,
+    state.distance,
+    state.elapsed,
+    state.laps,
+    state.powerSampleDurationSec,
+    state.powerWorkJ,
+    state.status,
+    state.totalAscent,
+    state.totalDescent,
+  ]);
+
+  const finalizeStopRide = useCallback(async () => {
+    // 在所有非同步儲存與後續畫面重設之前，封存這次騎乘完整統計。
+    const completedRideSnapshot = createRideSummarySnapshot(stateRef.current);
+    dispatch({ type: "STOP" });
+    setMapRideActive(false);
+    setIsNavigating(false);
+    if (idlePauseTimerRef.current) clearTimeout(idlePauseTimerRef.current);
+    idlePauseTimerRef.current = null;
+    pausedAtRef.current = null;
+    idleMonitorLastPositionRef.current = null;
+    setRideLocationTrackingMode("full");
+    locationSubRef.current?.remove();
+    locationSubRef.current = null;
+    await stopBackgroundLocationTracking();
+    await clearBackgroundData(); // 清除背景軌跡數據避免存儲空間增長
+    lastBgSyncTsRef.current = 0; // 重置去重時間戳
+
+    if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
+    await cancelRidingNotification();
+    await clearAllSmartSupplyDueNotifications();
+    // 結束騎乘清除補給重複提醒計時器
+    clearSupplyRepeatTimer();
+    setCalorieAlert(false);
+    setWaterAlert(false);
+    syncSmartSupplyCountdown(null);
+    calorieReminderSentRef.current = false;
+    waterReminderSentRef.current = false;
+    pendingCalorieRef.current = false;
+    pendingWaterRef.current = false;
+    pendingSupplyPlansRef.current = {};
+    supplySnoozedUntilRef.current = { calorie: 0, water: 0 };
+    setSupplyRecommendedMl(undefined);
+    setSupplyRecommendation(undefined);
+    setActiveSupplyPlan(undefined);
+    customSupplyAlertsRef.current = {};
+    setCustomSupplyAlerts({}); // 重置自訂補給品提醒狀態
+    supplyItemsTrackerRef.current = {}; // 重置自訂補給品追蹤器
+    intervalSupplyTrackerRef.current = {
+      "energy-time": 0,
+      "energy-distance": 0,
+      "water-time": 0,
+      "water-distance": 0,
+    };
+    intervalSupplyAlertsRef.current = {};
+    setIntervalSupplyAlerts({});
+    clearIntervalSupplyRepeatTimer();
+
+    // 結束騎乘前先保存節流中的最新恢復快照。恢復資料會保留至活動記錄確實寫入成功。
+    await flushRecoverySnapshot();
+    // 先不帶名稱儲存記錄，之後在摘要 Modal 取得名稱後更新；個人設定與環境摘要只保存在裝置上。
+    try {
+      const environmentSummary = environmentSummaryRef.current;
+      const sampleCount = environmentSummary.sampleCount;
+      const savedRecordId = await saveRecord(undefined, {
+        riderWeightKg: settings.weight,
+        bikeWeightKg: settings.bikeWeight ?? DEFAULT_ROAD_BIKE_MASS_KG,
+        ftpW: estimateFtpW,
+        autoRpeEnabled: settings.autoRpeEnabled,
+        environment: {
+          sampleCount,
+          averageTemperatureC: sampleCount
+            ? environmentSummary.temperatureTotal / sampleCount
+            : undefined,
+          averageHumidityPct: sampleCount
+            ? environmentSummary.humidityTotal / sampleCount
+            : undefined,
+          averageWindSpeedKmh: sampleCount
+            ? environmentSummary.windSpeedTotal / sampleCount
+            : undefined,
+          averageHeadwindMs: sampleCount
+            ? environmentSummary.headwindTotal / sampleCount
+            : undefined,
+          averagePrecipitationProb: sampleCount
+            ? environmentSummary.precipitationTotal / sampleCount
+            : undefined,
+          weatherCode: environmentSummary.latestWeatherCode,
+          source: environmentSummary.hadLiveWeather
+            ? "live-weather"
+            : "offline-fallback",
+        },
+      });
+      setSummaryRecordId(savedRecordId);
+      if (!savedRecordId) throw new Error("活動記錄未建立");
+      setSummarySnapshot(completedRideSnapshot);
+
+      // 僅在歷史活動已成功保存後清除恢復資料，避免儲存空間不足時遺失本次騎乘。
+      await clearSnapshot();
+      if (recoverySessionRef.current) {
+        await completeRideSession(recoverySessionRef.current);
+        recoverySessionRef.current = null;
+      }
+      if (savedRecordId) {
+        const calibrationResult = deriveAutomaticSweatCalibration({
+          rides: [
+            ...stateRef.current.records.filter(
+              (record) => record.id !== savedRecordId,
+            ),
+            {
+              id: savedRecordId,
+              date: Date.now(),
+              duration: stateRef.current.elapsed,
+              movingTime: stateRef.current.elapsed,
+              totalSweatMl: stateRef.current.totalSweatMl,
+              avgPower: stateRef.current.avgPower,
+              avgSpeed: stateRef.current.avgSpeed,
+              totalAscent: stateRef.current.totalAscent,
+              calculationProfile: {
+                riderWeightKg: settings.weight,
+                ftpW: estimateFtpW,
+                environment: {
+                  averageTemperatureC: sampleCount
+                    ? environmentSummary.temperatureTotal / sampleCount
+                    : undefined,
+                  averageHumidityPct: sampleCount
+                    ? environmentSummary.humidityTotal / sampleCount
+                    : undefined,
+                  averageHeadwindMs: sampleCount
+                    ? environmentSummary.headwindTotal / sampleCount
+                    : undefined,
+                  averagePrecipitationProb: sampleCount
+                    ? environmentSummary.precipitationTotal / sampleCount
+                    : undefined,
+                  weatherCode: environmentSummary.latestWeatherCode,
+                },
+              },
+              supplyConfirmations: stateRef.current.supplyConfirmations,
+            },
+          ],
+          currentMultiplier: settings.sweatRateCalibrationMultiplier,
+          completedCalibrations: settings.sweatRateCalibrationCount,
+          lastProcessedRideId: settings.sweatRateCalibrationLastRideId,
+        });
+        if (calibrationResult.applied) {
+          await updateSettings({
+            sweatRateCalibrationMultiplier: calibrationResult.nextMultiplier,
+            sweatRateCalibrationCount: calibrationResult.nextCount,
+            sweatRateCalibrationLastRideId: savedRecordId,
+          });
+        }
+      }
+      // 僅在本機儲存成功後重設本次騎乘暫態並清除當次路線、標記與即時軌跡圖層；保留目前 GPS 位置。
+      setLiveTrail([]);
+      clearAllNavigationLayers(true);
+      setCurrentGrade(0);
+      prevAltRef.current = null;
+      prevPosRef.current = null;
+      liveElevationFilterRef.current = createLiveElevationFilterState();
+      liveGradeRef.current = 0;
+      cogSamplesRef.current = [];
+      lastLocationRef.current = null;
+      lastAcceptedTrackPointRef.current = null;
+      speedWindowRef.current = [];
+      powerWindowRef.current = [];
+      gradeWindowRef.current = [];
+      prevSpeedMsRef.current = 0;
+      lowSpeedCountRef.current = 0;
+      setShowSummary(true);
+      if (settings.vibrationEnabled) vibrateSuccess();
+    } catch {
+      Alert.alert(
+        "本機儲存失敗",
+        "本次騎乘無法寫入裝置儲存空間。請確認可用空間後重新開啟 App，並避免在釋放空間前移除應用程式。",
+      );
+    }
+  }, [
+    clearAllNavigationLayers,
+    clearIntervalSupplyRepeatTimer,
+    clearSnapshot,
+    clearSupplyRepeatTimer,
+    dispatch,
+    estimateFtpW,
+    flushRecoverySnapshot,
+    saveRecord,
+    settings,
+    syncSmartSupplyCountdown,
+    updateSettings,
+  ]);
+
+  const handleStop = useCallback(() => {
+    Alert.alert("確認結束騎乘", "停止追蹤並儲存本次本機紀錄？", [
+      { text: "繼續騎乘", style: "cancel" },
+      {
+        text: "結束並儲存",
+        style: "destructive",
+        onPress: () => {
+          void finalizeStopRide();
+        },
+      },
+    ]);
+  }, [finalizeStopRide]);
+
+  const locationModeControl = {
+    "heading-up": {
+      icon: "arrow.up.circle.fill" as const,
+      label: t("map.headingUp"),
+      accessibilityLabel: t("map.headingUpA11y"),
+      color: "#34C759",
+      backgroundColor: "rgba(52, 197, 89, 0.18)",
+      isFreeHeading: false,
+    },
+    "free-heading": {
+      icon: "hand.raised.fill" as const,
+      label: t("map.freeHeading"),
+      accessibilityLabel: t("map.freeHeadingA11y"),
+      color: colorScheme === "dark" ? "#F9FAFB" : "#374151",
+      backgroundColor: colorScheme === "dark" ? "#2C2C2E" : "#FFFFFF",
+      isFreeHeading: true,
+    },
+    "north-up": {
+      icon: "location.north.circle.fill" as const,
+      label: t("map.northUp"),
+      accessibilityLabel: t("map.northUpA11y"),
+      color: "#34C759",
+      backgroundColor: "rgba(52, 197, 89, 0.1)",
+      isFreeHeading: false,
+    },
+  }[locationCameraMode];
+
+  // ─── 前台恢復背景數據（AppState 監聽） ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const appStateRef = { current: AppState.currentState };
+    const subscription = AppState.addEventListener(
+      "change",
+      async (nextState) => {
+        if (
+          appStateRef.current.match(/inactive|background/) &&
+          nextState === "active" &&
+          mapRideActive
+        ) {
+          try {
+            const bgState = await getBackgroundState();
+            const bgTrack = await getBackgroundTrackPoints();
+            if (bgState?.autoPausedSec !== undefined) {
+              dispatch({
+                type: "SET_AUTO_PAUSED_SECONDS",
+                totalSec: bgState.autoPausedSec,
+              });
+            }
+            if (bgState?.nextAutoLapDistanceM !== undefined) {
+              nextAutoLapDistanceMRef.current = bgState.nextAutoLapDistanceM;
+            }
+            if (
+              bgState?.laps &&
+              bgState.autoLapAnchor &&
+              bgState.laps.length >= stateRef.current.laps.length
+            ) {
+              autoLapMilestoneStateRef.current = {
+                enabled: bgState.autoLapEnabled === true,
+                intervalM: Math.max(0, bgState.autoLapDistanceKm ?? 0) * 1_000,
+                nextDistanceM: bgState.nextAutoLapDistanceM ?? null,
+                laps: bgState.laps,
+                anchor: bgState.autoLapAnchor,
+                previousTotals: bgState.previousAutoLapTotals ?? {
+                  elapsedSec: bgState.movingTimeSec ?? 0,
+                  distanceM: bgState.totalDistanceM,
+                  ascentM: bgState.totalAscentM ?? 0,
+                  descentM: bgState.totalDescentM ?? 0,
+                  powerWorkJ: bgState.powerWorkJ ?? 0,
+                  powerSampleDurationSec: bgState.powerSampleDurationSec ?? 0,
+                },
+              };
+              dispatch({
+                type: "SYNC_AUTO_LAPS",
+                laps: bgState.laps,
+                anchor: {
+                  elapsedSec: bgState.autoLapAnchor.elapsedSec,
+                  distanceM: bgState.autoLapAnchor.distanceM,
+                  ascentM: bgState.autoLapAnchor.ascentM,
+                  descentM: bgState.autoLapAnchor.descentM,
+                  powerWorkJ: bgState.autoLapAnchor.powerWorkJ,
+                  powerSampleDurationSec:
+                    bgState.autoLapAnchor.powerSampleDurationSec,
+                },
+              });
+            }
+            if (
+              bgState?.trackingMode === "full" &&
+              rideLocationTrackingMode === "idle_monitor"
+            ) {
+              pausedAtRef.current = null;
+              setRideLocationTrackingMode("full");
+              dispatch({ type: "RESUME" });
+            }
+            if (
+              settings.supplyReminderEnabled &&
+              bgState &&
+              bgState.supplyReminderEnabled !== false
+            ) {
+              const backgroundSmartChannels =
+                resolveSmartSupplyChannels(bgState);
+              const backgroundElapsedSec = Math.max(
+                0,
+                Math.floor(
+                  (Date.now() - (bgState.rideStartedAt || Date.now())) / 1000,
+                ),
+              );
+              const smartCalorieDue =
+                backgroundSmartChannels.energy &&
+                typeof bgState.smartCalorieCountdownDurationSec === "number" &&
+                backgroundElapsedSec >=
+                  (bgState.smartCalorieCountdownStartedElapsedSec ?? 0) +
+                    bgState.smartCalorieCountdownDurationSec;
+              const smartWaterDue =
+                backgroundSmartChannels.water &&
+                typeof bgState.smartWaterCountdownDurationSec === "number" &&
+                backgroundElapsedSec >=
+                  (bgState.smartWaterCountdownStartedElapsedSec ?? 0) +
+                    bgState.smartWaterCountdownDurationSec;
+              const shouldSkipCalorieReminderRestore =
+                backgroundNotificationConfirmationUntilRef.current.calorie >
+                Date.now();
+              const shouldSkipWaterReminderRestore =
+                backgroundNotificationConfirmationUntilRef.current.water >
+                Date.now();
+              // 只有背景有尚未處理的新到期提醒時才重新開啟彈窗；前景已確認後的 ref
+              // 不得成為重複彈窗來源，否則每次背景返回都會重新顯示。
+              if (
+                !shouldSkipCalorieReminderRestore &&
+                shouldRestoreBackgroundSupplyReminder({
+                  persistedPending: bgState.calorieReminderSent,
+                  countdownDue: smartCalorieDue,
+                  pendingInForeground: pendingCalorieRef.current,
+                })
+              ) {
+                calorieReminderSentRef.current = true;
+                pendingCalorieRef.current = true;
+                setCalorieAlert(true);
+                void setBackgroundSupplyReminderPending("calorie", true);
+              }
+              if (
+                !shouldSkipWaterReminderRestore &&
+                shouldRestoreBackgroundSupplyReminder({
+                  persistedPending: bgState.waterReminderSent,
+                  countdownDue: smartWaterDue,
+                  pendingInForeground: pendingWaterRef.current,
+                })
+              ) {
+                waterReminderSentRef.current = true;
+                pendingWaterRef.current = true;
+                setWaterAlert(true);
+                void setBackgroundSupplyReminderPending("water", true);
+              }
+            }
+            // 軌跡恢復與補給提醒是獨立功能；即使使用者關閉提醒，也必須恢復鎖定期間的軌跡。
+            if (bgState && bgTrack.length > 0) {
+              // 只合併尚未同步的背景點，並再次套用品質檢核，防止鎖定期間的延遲批次產生跨區直線。
+              const newPoints = filterTrackPointBatch(
+                bgTrack
+                  .filter((point) => point.ts > lastBgSyncTsRef.current)
+                  .map((point) => ({
+                    latitude: point.lat,
+                    longitude: point.lon,
+                    timestamp: point.ts,
+                    accuracy: point.accuracy,
+                    altitude: point.altitude,
+                    speed: point.speed,
+                    segmentStart: point.segmentStart,
+                    distanceM: point.distanceM,
+                    ascentM: point.ascentM,
+                    descentM: point.descentM,
+                    acceptedElevationM: point.acceptedElevationM,
+                    powerW: point.powerW,
+                    caloriesKcal: point.caloriesKcal,
+                    intervalSec: point.intervalSec,
+                    autoLapCompleted: point.autoLapCompleted,
+                  })),
+                lastAcceptedTrackPointRef.current,
+              );
+              if (newPoints.length > 0) {
+                setLiveTrail((previous) => [
+                  ...previous,
+                  ...newPoints.map((point) => ({
+                    latitude: point.latitude,
+                    longitude: point.longitude,
+                    segmentStart: point.segmentStart,
+                  })),
+                ]);
+                for (const point of newPoints) {
+                  dispatch({
+                    type: "LOCATION_UPDATE",
+                    point: {
+                      latitude: point.latitude,
+                      longitude: point.longitude,
+                      altitude: point.altitude ?? 0,
+                      speed: point.speed ?? 0,
+                      timestamp: point.timestamp,
+                      segmentStart: point.segmentStart,
+                    },
+                    power: point.powerW ?? 0,
+                    calories: point.caloriesKcal ?? 0,
+                    ascent: point.ascentM ?? 0,
+                    descent: point.descentM ?? 0,
+                    acceptedElevationM: point.acceptedElevationM,
+                    distanceM: point.segmentStart ? 0 : (point.distanceM ?? 0),
+                    intervalSec: point.intervalSec ?? 0,
+                    isBackgroundRecovery: true,
+                    powerSource:
+                      point.powerW !== undefined ? "estimated" : "unavailable",
+                    caloriesSource:
+                      point.caloriesKcal !== undefined
+                        ? "power-estimate"
+                        : "unavailable",
+                  });
+                }
+                lastAcceptedTrackPointRef.current =
+                  newPoints.at(-1) ?? lastAcceptedTrackPointRef.current;
+                // 更新最大同步時間戳
+                lastBgSyncTsRef.current = Math.max(
+                  ...newPoints.map((point) => point.timestamp),
+                );
+              }
+            }
+            if (
+              settings.supplyReminderEnabled &&
+              bgState &&
+              bgState.supplyReminderEnabled !== false
+            ) {
+              const restoredIntervalAlerts: Partial<
+                Record<SupplyIntervalKind, boolean>
+              > = {
+                "energy-time": bgState.intervalEnergyTimeReminderSent || false,
+                "energy-distance":
+                  bgState.intervalEnergyDistanceReminderSent || false,
+                "water-time": bgState.intervalWaterTimeReminderSent || false,
+                "water-distance":
+                  bgState.intervalWaterDistanceReminderSent || false,
+              };
+              if (Object.values(restoredIntervalAlerts).some(Boolean)) {
+                intervalSupplyAlertsRef.current = restoredIntervalAlerts;
+                setIntervalSupplyAlerts(restoredIntervalAlerts);
+                setTouchGuardEnabled(false);
+              }
+            }
+          } catch (error) {
+            reportRecoverableIssue("[AppState] 恢復背景數據失敗", error);
+          }
+        }
+        appStateRef.current = nextState;
+      },
+    );
+    return () => {
+      subscription.remove();
+    };
+  }, [
+    mapRideActive,
+    dispatch,
+    rideLocationTrackingMode,
+    settings.supplyReminderEnabled,
+    settings.ttsEnabled,
+  ]);
+
+  // ─── GPS 精度即時切換（騎乘中更改設定時自動重啟背景追蹤）────────────────────────────
+  const prevGpsAccuracyRef = useRef<GpsAccuracyLevel>(
+    settings.gpsAccuracy || "standard",
+  );
+  useEffect(() => {
+    const currentAccuracy: GpsAccuracyLevel =
+      settings.gpsAccuracy || "standard";
+    if (
+      mapRideActive &&
+      backgroundLocationDisclosureAcceptedRef.current &&
+      currentAccuracy !== prevGpsAccuracyRef.current
+    ) {
+      prevGpsAccuracyRef.current = currentAccuracy;
+      (async () => {
+        await stopBackgroundLocationTracking();
+        await startBackgroundLocationTracking(currentAccuracy);
+      })();
+    } else {
+      prevGpsAccuracyRef.current = currentAccuracy;
+    }
+  }, [settings.gpsAccuracy, mapRideActive]);
+
+  // ─── 電量低自動降級 GPS 精度 ──────────────────────────────────────────────────────
+  const batteryDegradedRef = useRef(false);
+  useEffect(() => {
+    if (
+      !mapRideActive ||
+      Platform.OS === "web" ||
+      !backgroundLocationDisclosureAcceptedRef.current
+    )
+      return;
+    let cancelled = false;
+    const checkBattery = async () => {
+      try {
+        const level = await Battery.getBatteryLevelAsync();
+        const pct = Math.round(level * 100);
+        if (pct > 0 && pct <= 20 && !batteryDegradedRef.current) {
+          batteryDegradedRef.current = true;
+          const currentAccuracy: GpsAccuracyLevel =
+            settings.gpsAccuracy || "standard";
+          if (currentAccuracy !== "power_saving") {
+            await stopBackgroundLocationTracking();
+            await startBackgroundLocationTracking("power_saving");
+            Alert.alert(
+              "低電量提示",
+              `電量剩餘 ${pct}%，已自動將背景 GPS 切換為省電模式以延長續航。`,
+            );
+          }
+        } else if (pct > 30 && batteryDegradedRef.current) {
+          // 電量恢復超過 30%，自動回升為用戶原本設定的精度
+          batteryDegradedRef.current = false;
+          const userAccuracy: GpsAccuracyLevel =
+            settings.gpsAccuracy || "standard";
+          await stopBackgroundLocationTracking();
+          await startBackgroundLocationTracking(userAccuracy);
+          Alert.alert(
+            "電量已恢復",
+            `電量已回升至 ${pct}%，已自動恢復背景 GPS 為「${userAccuracy === "power_saving" ? "省電" : userAccuracy === "standard" ? "標準" : "高精度"}」模式。`,
+          );
+        }
+      } catch {
+        /* 忽略電量讀取失敗 */
+      }
+    };
+    checkBattery();
+    const interval = setInterval(() => {
+      if (!cancelled) checkBattery();
+    }, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [mapRideActive, settings.gpsAccuracy]);
+
+  // ─── Cleanup ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      locationSubRef.current?.remove();
+      if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
+      if (autoRecenterTimerRef.current)
+        clearTimeout(autoRecenterTimerRef.current);
+    };
+  }, []);
+
+  // ─── 騎乘進度快照（每 10 秒儲存一次，用於崩潰恢復）───────────────────────────────────────
+  useEffect(() => {
+    if (state.status !== "active" && state.status !== "paused") return;
+    const timer = setInterval(() => {
+      saveSnapshot();
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [state.status, saveSnapshot]);
+
+  // ─── 精簡導航閒置計時器（自動模式）─────────────────────────────────────────
+  const resetIdleTimer = useCallback(() => {
+    lastInteractionRef.current = Date.now();
+    if (simplifiedNavVisible) setSimplifiedNavVisible(false);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (settings.simplifiedNavMode === "auto" && isActive) {
+      const idleSec = settings.simplifiedNavIdleSec ?? 30;
+      idleTimerRef.current = setTimeout(() => {
+        setSimplifiedNavVisible(true);
+      }, idleSec * 1000);
+    }
+  }, [
+    simplifiedNavVisible,
+    settings.simplifiedNavMode,
+    settings.simplifiedNavIdleSec,
+    isActive,
+  ]);
+
+  // 騎乘開始時啟動閒置計時器
+  useEffect(() => {
+    if (isActive && settings.simplifiedNavMode === "auto") {
+      resetIdleTimer();
+    } else {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      setSimplifiedNavVisible(false);
+    }
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, settings.simplifiedNavMode]);
+
+  // ─── 按鍵控制補給提醒（已移除，使用 UI 按鈕替代）────────────────────────────────────────────────────────
+  // react-native-key-event 與新版 Gradle 不兼容，補給提醒可通過 UI 按鈕關閉
+
+  // ─── 計算值 ──────────────────────────────────────────────────────────────────
+  const gpxPolyline = useMemo(() => {
+    if (!gpxRoute) return [];
+    return gpxRoute.points.map((p) => ({ latitude: p.lat, longitude: p.lon }));
+  }, [gpxRoute]);
+
+  const routeOverlays = useMemo<NavigationRouteOverlay[]>(() => {
+    const overlays: NavigationRouteOverlay[] = [];
+    if (sharedRoute) {
+      overlays.push({
+        id: "imported-gpx",
+        coordinates: sharedRoute.points.map((point) => ({
+          latitude: point.lat,
+          longitude: point.lon,
+        })),
+        color: "#FF3B30",
+        showDirectionArrows: activeNavigationRoute === sharedRoute,
+      });
+    }
+    const pinColors = ["#007AFF", "#AF52DE", "#FF9500", "#34C759"];
+    pinnedNavigationLayers.forEach((layer, index) => {
+      overlays.push({
+        id: layer.id,
+        coordinates: layer.route.points.map((point) => ({
+          latitude: point.lat,
+          longitude: point.lon,
+        })),
+        color: pinColors[index % pinColors.length],
+        // 釘選導航採乾淨折線顯示，避免留下難辨識的小箭頭。
+        showDirectionArrows: false,
+      });
+    });
+    return overlays;
+  }, [activeNavigationRoute, pinnedNavigationLayers, sharedRoute]);
+
+  const passedPolyline = useMemo(() => {
+    if (!gpxRoute || nearestIdx <= 0) return [];
+    return gpxRoute.points
+      .slice(0, nearestIdx + 1)
+      .map((p) => ({ latitude: p.lat, longitude: p.lon }));
+  }, [gpxRoute, nearestIdx]);
+
+  // 計算里程標記（每 1 公里一個）
+  const kilometersMarkers = useMemo(() => {
+    if (!gpxRoute || gpxRoute.points.length === 0) return [];
+    return calculateKilometerMarkers(gpxRoute);
+  }, [gpxRoute]);
+
+  const avgSpeed = useMemo(() => {
+    if (state.elapsed < 5 || state.distance < 10) return 0;
+    return state.distance / 1000 / (state.elapsed / 3600);
+  }, [state.elapsed, state.distance]);
+
+  const sportSpeedKmh = useMemo(() => {
+    if (state.sportType === "cycling" || state.route.length === 0)
+      return state.currentSpeed;
+    return smoothSpeedKmh(
+      state.route.slice(-12).map((point) => ({
+        speedKmh: Math.max(0, (point.speed ?? 0) * 3.6),
+        timestamp: point.timestamp,
+      })),
+    );
+  }, [state.currentSpeed, state.route, state.sportType]);
+  const sportVam = useMemo(
+    () =>
+      calculateVamMPerHour(
+        state.route.slice(-20).map((point) => ({
+          altitudeM: point.altitude,
+          timestamp: point.timestamp,
+        })),
+      ),
+    [state.route],
+  );
+  const sportGapPace = useMemo(() => {
+    const paceSeconds = sportSpeedKmh > 0 ? 3600 / sportSpeedKmh : 0;
+    return calculateGapPaceSecPerKm(paceSeconds, currentGrade);
+  }, [currentGrade, sportSpeedKmh]);
+  const sportDashboardMetrics = useMemo(
+    () =>
+      buildSportDashboardMetrics(
+        {
+          sportType: state.sportType,
+          speedKmh: sportSpeedKmh,
+          averageSpeedKmh: avgSpeed,
+          distanceM: state.distance,
+          elapsedSec: state.elapsed,
+          altitudeM: state.currentAltitude,
+          totalAscentM: state.totalAscent,
+          gradePct: currentGrade,
+          gapPaceSecPerKm: sportGapPace,
+          vamMPerHour: sportVam,
+        },
+        t,
+      ),
+    [
+      avgSpeed,
+      currentGrade,
+      sportGapPace,
+      sportSpeedKmh,
+      sportVam,
+      state.currentAltitude,
+      state.distance,
+      state.elapsed,
+      state.sportType,
+      state.totalAscent,
+      t,
+    ],
+  );
+
+  const calorieWidth = calorieAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+    extrapolate: "clamp",
+  });
+  const waterWidth = waterAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+    extrapolate: "clamp",
+  });
+
+  const sweatCurrent = Math.round(state.sweatSinceLastRefill);
+  const calorieTarget = Math.round(dashboardSupplyPlan.calorieTriggerKcal);
+  const sweatTarget = Math.round(dashboardSupplyPlan.waterTriggerMl);
+  const manualEnergyDashboard = !smartEnergySupplyEnabled
+    ? settings.supplyEnergyTimeIntervalEnabled
+      ? {
+          label: "能量時間",
+          value: `${formatDuration(Math.max(0, state.elapsed - (intervalSupplyTrackerRef.current["energy-time"] ?? 0)))} / ${settings.supplyEnergyTimeIntervalMinutes} ${t("forms.supplyItem.minutes")}`,
+        }
+      : settings.supplyEnergyDistanceIntervalEnabled
+        ? {
+            label: t("dashboard.energyCountdown"),
+            value: `${Math.max(0, state.distance / 1000 - (intervalSupplyTrackerRef.current["energy-distance"] ?? 0)).toFixed(1)} / ${settings.supplyEnergyDistanceIntervalKm} km`,
+          }
+        : null
+    : null;
+  const manualWaterDashboard = !smartWaterSupplyEnabled
+    ? settings.supplyWaterTimeIntervalEnabled
+      ? {
+          label: t("dashboard.hydrationCountdown"),
+          value: `${formatDuration(Math.max(0, state.elapsed - (intervalSupplyTrackerRef.current["water-time"] ?? 0)))} / ${settings.supplyWaterTimeIntervalMinutes} ${t("forms.supplyItem.minutes")}`,
+        }
+      : settings.supplyWaterDistanceIntervalEnabled
+        ? {
+            label: t("dashboard.hydrationCountdown"),
+            value: `${Math.max(0, state.distance / 1000 - (intervalSupplyTrackerRef.current["water-distance"] ?? 0)).toFixed(1)} / ${settings.supplyWaterDistanceIntervalKm} km`,
+          }
+        : null
+    : null;
+  const waterProgress = sweatCurrent / sweatTarget;
+  const waterBarColor =
+    waterProgress < 0.5
+      ? "#4FC3F7"
+      : waterProgress < 0.8
+        ? "#F59E0B"
+        : "#EF4444";
+  const smartCalorieRemainingSec = smartSupplyCountdownRemainingSec(
+    smartSupplyCountdown,
+    "calorie",
+    smartSupplyCountdownNowMs,
+  );
+  const smartWaterRemainingSec = smartSupplyCountdownRemainingSec(
+    smartSupplyCountdown,
+    "water",
+    smartSupplyCountdownNowMs,
+  );
+  const smartCalorieStatus =
+    pendingCalorieRef.current || calorieAlert
+      ? t("dashboard.refuel")
+      : smartCalorieRemainingSec === null
+        ? t("dashboard.calculating")
+        : t("dashboard.nextCountdown", {
+            time: formatDuration(smartCalorieRemainingSec),
+          });
+  const smartWaterStatus =
+    pendingWaterRef.current || waterAlert
+      ? t("dashboard.hydrate")
+      : smartWaterRemainingSec === null
+        ? t("dashboard.calculating")
+        : t("dashboard.nextCountdown", {
+            time: formatDuration(smartWaterRemainingSec),
+          });
+
+  const sweatRateLabel =
+    isActive && state.currentSweatRatePerHour > 0
+      ? formatSweatRate(state.currentSweatRatePerHour)
+      : null;
+
+  const tabBarH = 60 + Math.max(insets.bottom, 8);
+
+  // ─── 渲染 ────────────────────────────────────────────────────────────────────
+  return (
+    <View
+      style={styles.container}
+      onTouchStart={() => powerSavingManagerRef.current.onUserInteraction()}
+    >
+      {/* ── 崩潰恢復強調表示 */}
+      {showRecoveryAlert && recoverySnapshot && (
+        <View style={[styles.recoveryBanner, { top: insets.top + 8 }]}>
+          <Text style={styles.recoveryTitle}>{t("audit.recoveryTitle")}</Text>
+          <Text style={styles.recoveryDesc}>
+            {t("audit.recoveryDescription", {
+              time: formatDuration(recoverySnapshot.elapsed ?? 0),
+              distance: ((recoverySnapshot.distance ?? 0) / 1000).toFixed(2),
+            })}
+          </Text>
+          <View style={styles.recoveryBtns}>
+            <Pressable
+              style={[styles.recoveryBtn, { backgroundColor: "#007AFF" }]}
+              onPress={() => {
+                if (recoverySnapshot) {
+                  dispatch({ type: "RESTORE", snapshot: recoverySnapshot });
+                  setMapRideActive(true);
+                  setShowRecoveryAlert(false);
+                  setRecoverySnapshot(null);
+                  void (async () => {
+                    if (await requestBackgroundLocationDisclosure()) {
+                      await startBackgroundLocationTracking(
+                        settings.gpsAccuracy || "standard",
+                      );
+                    }
+                  })();
+                }
+              }}
+            >
+              <Text style={styles.recoveryBtnText}>
+                {t("audit.resumeRide")}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.recoveryBtn,
+                { backgroundColor: "rgba(255,255,255,0.15)" },
+              ]}
+              onPress={() => {
+                clearSnapshot();
+                setShowRecoveryAlert(false);
+                setRecoverySnapshot(null);
+              }}
+            >
+              <Text style={styles.recoveryBtnText}>{t("audit.newRide")}</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* ── 全螢幕地圖（Leaflet WebView） ── */}
+      <LeafletMapView
+        ref={mapRef}
+        style={[styles.map, { height: SCREEN_H - tabBarH }]}
+        initialRegion={{
+          latitude: 25.0478,
+          longitude: 121.5319,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }}
+        onPanDrag={scheduleAutoRecenter}
+        onMapLongPress={(lat, lon) => {
+          setPinnedLocation({ lat, lon });
+          setPinnedLocationLabel(null);
+          setPinRouteInfo(null);
+          setShowPinCard(true);
+          scheduleAutoRecenter();
+          // 視覺回饋：縮放到釘選位置
+          mapRef.current?.animateCamera(
+            { center: { latitude: lat, longitude: lon }, zoom: 18 },
+            { duration: 300 },
+          );
+        }}
+        currentPos={currentPos}
+        gpxPolyline={gpxPolyline}
+        routeOverlays={routeOverlays}
+        passedPolyline={passedPolyline}
+        liveTrail={liveTrail}
+        returnPolyline={[]}
+        isOffRoute={isOffRoute}
+        centerPinLocation={pinSelectMode ? centerPinLocation : null}
+        onMapCenterChanged={(lat, lon) => {
+          if (pinSelectMode) {
+            setCenterPinLocation({ lat, lon });
+          }
+        }}
+        onMapMoveEnd={(bounds) => {
+          void loadPoiMarkersForBounds(bounds);
+        }}
+        kilometersMarkers={kilometersMarkers}
+        poiMarkers={visiblePoiMarkers}
+        onPoiMarkerPress={(id) => {
+          const poi = visiblePoiMarkers.find((marker) => marker.id === id);
+          if (poi) setSelectedPoi(poi);
+        }}
+        onMapRotateEnd={() => {
+          if (Date.now() < programmaticBearingUntilRef.current) return;
+          scheduleAutoRecenter();
+        }}
+      />
+
+      {pinSelectMode && (
+        <View style={[styles.pinAddressOverlay, { top: insets.top + 10 }]}>
+          <View style={styles.pinAddressBar}>
+            <TextInput
+              value={pinAddress}
+              onChangeText={(value) => {
+                setPinAddress(value);
+                setPinAddressCandidates([]);
+                setPinAddressNotice(null);
+              }}
+              placeholder={t("audit.addressPlaceholder")}
+              placeholderTextColor="rgba(255,255,255,0.52)"
+              style={styles.pinAddressInput}
+              returnKeyType="search"
+              autoCorrect={false}
+              onSubmitEditing={() => {
+                void handleResolvePinAddress();
+              }}
+            />
+            <Pressable
+              style={[
+                styles.pinAddressSearchButton,
+                isResolvingPinAddress && styles.pinAddressSearchButtonDisabled,
+              ]}
+              disabled={isResolvingPinAddress}
+              onPress={() => {
+                void handleResolvePinAddress();
+              }}
+            >
+              <Text style={styles.pinAddressSearchText}>
+                {isResolvingPinAddress
+                  ? t("audit.searching")
+                  : t("audit.search")}
+              </Text>
+            </Pressable>
+          </View>
+          {pinAddressNotice && (
+            <View
+              style={styles.pinAddressNotice}
+              accessibilityLiveRegion="polite"
+            >
+              <Text style={styles.pinAddressNoticeText}>
+                {pinAddressNotice}
+              </Text>
+            </View>
+          )}
+          {pinAddressCandidates.length > 1 && (
+            <View style={styles.pinAddressResults}>
+              <Text style={styles.pinAddressResultsTitle}>
+                {t("audit.chooseDestination")}
+              </Text>
+              {pinAddressCandidates.map((candidate, index) => (
+                <Pressable
+                  key={`${candidate.latitude}-${candidate.longitude}`}
+                  style={styles.pinAddressResultRow}
+                  onPress={() => selectPinAddressDestination(candidate)}
+                >
+                  <Text style={styles.pinAddressResultTitle}>
+                    {candidate.label}
+                  </Text>
+                  <Text style={styles.pinAddressResultMeta}>
+                    {t("audit.candidate", {
+                      index: index + 1,
+                      latitude: candidate.latitude.toFixed(5),
+                      longitude: candidate.longitude.toFixed(5),
+                    })}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          {!pinAddress.trim() &&
+            pinAddressCandidates.length === 0 &&
+            recentAddressSearches.length > 0 && (
+              <View style={styles.pinAddressResults}>
+                <Text style={styles.pinAddressResultsTitle}>
+                  {t("audit.recentSearches")}
+                </Text>
+                {recentAddressSearches.slice(0, 3).map((item) => (
+                  <Pressable
+                    key={`${item.label}-${item.latitude}-${item.longitude}`}
+                    style={styles.pinAddressResultRow}
+                    onPress={() => selectPinAddressDestination(item)}
+                  >
+                    <Text style={styles.pinAddressResultTitle}>
+                      {item.label}
+                    </Text>
+                    <Text style={styles.pinAddressResultMeta}>
+                      {item.latitude.toFixed(5)}, {item.longitude.toFixed(5)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+        </View>
+      )}
+
+      {/* ── 右側工具列 ── */}
+      <View style={[styles.toolBar, { top: insets.top + 8, right: 16 }]}>
+        {/* 三階段定位：COG 朝前 → 自由角度 → 正北置中。 */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={locationModeControl.accessibilityLabel}
+          style={[
+            styles.toolBtn,
+            locationModeControl.isFreeHeading && styles.freeHeadingToolBtn,
+            {
+              backgroundColor: locationModeControl.backgroundColor,
+              borderColor: locationModeControl.color,
+            },
+          ]}
+          onPress={cycleLocationCameraMode}
+        >
+          <IconSymbol
+            name={locationModeControl.icon}
+            size={20}
+            color={locationModeControl.color}
+          />
+          <Text
+            style={[
+              styles.returnBtnLabel,
+              { color: locationModeControl.color },
+            ]}
+          >
+            {locationModeControl.label}
+          </Text>
+        </Pressable>
+        {isActive && settings.touchGuardEnabled && (
+          <Pressable
+            style={[
+              styles.toolBtn,
+              touchGuardEnabled && styles.touchGuardToolBtnActive,
+            ]}
+            onPress={() => {
+              if (!touchGuardEnabled) setTouchGuardEnabled(true);
+            }}
+            onPressIn={(event) => {
+              if (touchGuardEnabled) beginTouchGuardHoldProgress(event);
+            }}
+            onPressOut={resetTouchGuardHoldProgress}
+            onResponderTerminate={resetTouchGuardHoldProgress}
+            onTouchCancel={resetTouchGuardHoldProgress}
+            onLongPress={() => {
+              completeTouchGuardUnlock();
+            }}
+            delayLongPress={settings.touchGuardUnlockHoldMs}
+          >
+            <Text
+              style={{
+                color: touchGuardEnabled ? "#34C759" : "rgba(255,255,255,0.8)",
+                fontSize: 16,
+                fontWeight: "800",
+              }}
+            >
+              {touchGuardEnabled
+                ? t("audit.touchGuardOn")
+                : t("audit.touchGuardOff")}
+            </Text>
+            <Text
+              style={[
+                styles.returnBtnLabel,
+                {
+                  color: touchGuardEnabled
+                    ? "#34C759"
+                    : "rgba(255,255,255,0.8)",
+                },
+              ]}
+            >
+              {t("audit.touchControl")}
+            </Text>
+          </Pressable>
+        )}
+        {/* GPX 路線狀態指示（有路線時顯示清除按鈕） */}
+        {hasExistingRouteLayers && !mapRideActive && (
+          <Pressable
+            style={styles.toolBtn}
+            onPress={() => {
+              Alert.alert(
+                t("audit.clearNavigationLayersTitle"),
+                t("audit.clearNavigationLayersBody"),
+                [
+                  { text: t("audit.cancel"), style: "cancel" },
+                  {
+                    text: t("audit.clear"),
+                    style: "destructive",
+                    onPress: clearAllNavigationLayers,
+                  },
+                ],
+              );
+            }}
+          >
+            <IconSymbol name="xmark.circle.fill" size={20} color="#FF3B30" />
+          </Pressable>
+        )}
+        {/* 精簡導航手動觸發按鈕（騎乘中且設定為手動模式時顯示） */}
+        {isActive && settings.simplifiedNavMode === "manual" && (
+          <Pressable
+            style={[
+              styles.toolBtn,
+              simplifiedNavVisible && styles.toolBtnActive,
+            ]}
+            onPress={() => {
+              setSimplifiedNavVisible(true);
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 16,
+                color: simplifiedNavVisible
+                  ? "#FFD60A"
+                  : "rgba(255,255,255,0.8)",
+              }}
+            >
+              &#9632;
+            </Text>
+            <Text
+              style={[
+                styles.returnBtnLabel,
+                {
+                  color: simplifiedNavVisible
+                    ? "#FFD60A"
+                    : "rgba(255,255,255,0.8)",
+                },
+              ]}
+            >
+              {t("audit.simplified")}
+            </Text>
+          </Pressable>
+        )}
+        {/* 釘選按鈕（中心圖釘釋選導航位置） */}
+        <Pressable
+          style={[styles.toolBtn, pinSelectMode && styles.toolBtnActive]}
+          onPress={() => {
+            if (pinSelectMode) {
+              if (centerPinLocation) {
+                setPinnedLocation(centerPinLocation);
+                setPinnedLocationLabel(null);
+                setPinRouteInfo(null);
+                setShowPinCard(true);
+                setPinSelectMode(false);
+                setCenterPinLocation(null);
+              }
+            } else {
+              if (currentPos) {
+                setCenterPinLocation({
+                  lat: currentPos.lat,
+                  lon: currentPos.lon,
+                });
+                setPinAddress("");
+                setPinnedLocationLabel(null);
+                setPinAddressCandidates([]);
+                setPinSelectMode(true);
+              }
+            }
+          }}
+        >
+          <IconSymbol
+            name="mappin.circle.fill"
+            size={20}
+            color={pinSelectMode ? "#FFD60A" : "#fff"}
+          />
+          <Text
+            style={[
+              styles.returnBtnLabel,
+              { color: pinSelectMode ? "#FFD60A" : "rgba(255,255,255,0.8)" },
+            ]}
+          >
+            {pinSelectMode ? "確認" : "釘選"}
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* ── 底部面板（螢幕下方三分之一，可上滑展開） ── */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[styles.panel, { height: panelAnim, paddingBottom: 0 }]}
+      >
+        {/* 拖拉把手 */}
+        <View style={styles.handleArea}>
+          <View style={styles.panelHandle} />
+          {/* 天氣列 */}
+          {(weather || isActive) && (
+            <View style={styles.weatherRow}>
+              <Text style={styles.weatherItem}>
+                {currentClock.toLocaleTimeString("zh-TW", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                })}
+              </Text>
+              {weather && (
+                <>
+                  <Text style={styles.weatherSep}>·</Text>
+                  <Text style={styles.weatherItem}>
+                    {weather.temperature}°C
+                  </Text>
+                  <Text style={styles.weatherSep}>·</Text>
+                  <Text style={styles.weatherItem}>{weather.humidity}%</Text>
+                </>
+              )}
+              {weather && relativeWindInfo && (
+                <>
+                  <Text style={styles.weatherSep}>·</Text>
+                  <Text
+                    style={[
+                      styles.weatherItem,
+                      {
+                        color:
+                          relativeWindInfo.intensity === "強"
+                            ? "#EF4444"
+                            : relativeWindInfo.intensity === "中"
+                              ? "#F59E0B"
+                              : "rgba(255,255,255,0.5)",
+                      },
+                    ]}
+                  >
+                    {relativeWindInfo.label}
+                  </Text>
+                </>
+              )}
+              {isPaused && (
+                <View style={styles.pausedBadge}>
+                  <Text style={styles.pausedText}>{t("audit.paused")}</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* ── 儀表板（依排序動態顯示，前6格在收縮面板） ── */}
+        <View style={styles.sixGrid}>
+          {state.sportType === "cycling"
+            ? dashPanelFields.map((key) => (
+                <MemoizedDashMetric
+                  key={key}
+                  fieldKey={key}
+                  state={state}
+                  isActive={isActive}
+                  currentGrade={currentGrade}
+                  avgSpeed={avgSpeed}
+                  columnCount={dashboardColumnCount}
+                />
+              ))
+            : sportDashboardMetrics.map((metric) => (
+                <View
+                  key={metric.label}
+                  style={[
+                    styles.sportMetric,
+                    {
+                      width: dashboardCellWidth,
+                      minHeight: dashboardCellMinHeight,
+                    },
+                  ]}
+                >
+                  <Text style={styles.sportMetricLabel}>{metric.label}</Text>
+                  <View style={styles.sportMetricValueRow}>
+                    <Text style={styles.sportMetricValue}>{metric.value}</Text>
+                    {metric.unit ? (
+                      <Text style={styles.sportMetricUnit}>{metric.unit}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+        </View>
+
+        {/* ── 展開後：不重複的摘要 + 補給進度條 ── */}
+        {panelExpanded && (
+          <View style={styles.expandedSection}>
+            {/* 超出6格的儀表板欄位（上拉展開後顯示） */}
+            {dashOverflowFields.length > 0 && (
+              <View
+                style={[
+                  styles.sixGrid,
+                  { marginBottom: 8 /* internal spacing */ },
+                ]}
+              >
+                {dashOverflowFields.map((key) => (
+                  <MemoizedDashMetric
+                    key={key}
+                    fieldKey={key}
+                    state={state}
+                    isActive={isActive}
+                    currentGrade={currentGrade}
+                    avgSpeed={avgSpeed}
+                    columnCount={dashboardColumnCount}
+                  />
+                ))}
+              </View>
+            )}
+            {/* 摘要列只補上主儀表板未呈現的獨立指標；總爬升僅保留一處。 */}
+            <View style={styles.ascentRow}>
+              {dashboardSummaryKeys.map((metric, index) => (
+                <React.Fragment key={metric}>
+                  <DashboardSummaryMetric
+                    metric={metric}
+                    state={state}
+                    isActive={isActive}
+                    currentGrade={currentGrade}
+                    avgSpeed={avgSpeed}
+                  />
+                  {index < dashboardSummaryKeys.length - 1 ? (
+                    <View style={styles.ascentDivider} />
+                  ) : null}
+                </React.Fragment>
+              ))}
+            </View>
+            {/* 卡路里進度條 */}
+            <View style={styles.progressSection}>
+              <View style={styles.progressHeader}>
+                <View style={styles.progressLabelRow}>
+                  <IconSymbol name="flame.fill" size={13} color="#F59E0B" />
+                  <Text style={styles.progressLabel}>
+                    {smartEnergySupplyEnabled
+                      ? t("dashboard.energyCountdown")
+                      : (manualEnergyDashboard?.label ??
+                        t("dashboard.calories"))}
+                  </Text>
+                </View>
+                <Text style={styles.progressValue}>
+                  {smartEnergySupplyEnabled
+                    ? smartCalorieStatus
+                    : manualEnergyDashboard
+                      ? manualEnergyDashboard.value
+                      : `${Math.round(state.calories)} / ${calorieTarget} kcal`}
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <Animated.View
+                  style={[
+                    styles.progressFill,
+                    { width: calorieWidth, backgroundColor: "#F59E0B" },
+                  ]}
+                />
+              </View>
+            </View>
+
+            {/* 自訂補給品進度條 */}
+            {settings.supplyReminderEnabled &&
+              settings.supplyItems
+                .filter((s) => s.enabled)
+                .map((item) => {
+                  const tracker = supplyItemsTrackerRef.current[item.id] || {
+                    lastTriggerTime: 0,
+                    lastTriggerDistance: 0,
+                    triggered: false,
+                  };
+                  let progress = 0;
+                  let currentVal = 0;
+                  let targetVal = 0;
+                  let unit = "";
+
+                  if (item.triggerType === "time") {
+                    const targetSec =
+                      (item.triggerHours || 0) * 3600 +
+                      (item.triggerMinutes || 0) * 60 +
+                      (item.triggerSeconds || 0);
+                    if (targetSec > 0) {
+                      currentVal = state.elapsed - tracker.lastTriggerTime;
+                      targetVal = targetSec;
+                      progress = Math.min(1, currentVal / targetVal);
+                      unit = "分";
+                      currentVal = Math.floor(currentVal / 60);
+                      targetVal = Math.floor(targetVal / 60);
+                    }
+                  } else {
+                    if (item.triggerValue && item.triggerValue > 0) {
+                      currentVal =
+                        state.distance / 1000 - tracker.lastTriggerDistance;
+                      targetVal = item.triggerValue;
+                      progress = Math.min(1, currentVal / targetVal);
+                      unit = "km";
+                      currentVal = Number(currentVal.toFixed(1));
+                    }
+                  }
+
+                  const isAlerting = customSupplyAlerts[item.id];
+                  const barColor = isAlerting ? "#EF4444" : "#9C27B0";
+
+                  return (
+                    <View
+                      key={item.id}
+                      style={[styles.progressSection, { marginTop: 10 }]}
+                    >
+                      <View style={styles.progressHeader}>
+                        <View style={styles.progressLabelRow}>
+                          <IconSymbol
+                            name="bag.fill"
+                            size={13}
+                            color={barColor}
+                          />
+                          <Text style={styles.progressLabel}>{item.name}</Text>
+                        </View>
+                        <Text style={styles.progressValue}>
+                          {currentVal} / {targetVal} {unit}
+                        </Text>
+                      </View>
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            {
+                              width: `${progress * 100}%`,
+                              backgroundColor: barColor,
+                            },
+                          ]}
+                        />
+                      </View>
+                      {isAlerting && (
+                        <Pressable
+                          style={[
+                            styles.supplyConfirmBtn,
+                            { backgroundColor: barColor },
+                          ]}
+                          onPress={() =>
+                            handleConfirmCustomSupply(item.id, item.triggerType)
+                          }
+                        >
+                          <Text style={styles.supplyConfirmText}>
+                            {t("dashboard.confirmRefuel")}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })}
+
+            {/* 水分進度條 */}
+            <View style={[styles.progressSection, { marginTop: 10 }]}>
+              <View style={styles.progressHeader}>
+                <View style={styles.progressLabelRow}>
+                  <IconSymbol
+                    name="drop.fill"
+                    size={13}
+                    color={waterBarColor}
+                  />
+                  <Text style={styles.progressLabel}>
+                    {smartWaterSupplyEnabled
+                      ? t("dashboard.hydrationCountdown")
+                      : (manualWaterDashboard?.label ??
+                        t("dashboard.hydrationCountdown"))}
+                  </Text>
+                  {sweatRateLabel && (
+                    <View
+                      style={[
+                        styles.ratePill,
+                        { backgroundColor: waterBarColor + "30" },
+                      ]}
+                    >
+                      <Text style={[styles.rateText, { color: waterBarColor }]}>
+                        {sweatRateLabel}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.progressValue}>
+                  {smartWaterSupplyEnabled
+                    ? smartWaterStatus
+                    : manualWaterDashboard
+                      ? manualWaterDashboard.value
+                      : `${sweatCurrent} / ${sweatTarget} ml`}
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <Animated.View
+                  style={[
+                    styles.progressFill,
+                    { width: waterWidth, backgroundColor: waterBarColor },
+                  ]}
+                />
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ── 控制按鈕 ── */}
+        <View style={styles.btnRow}>
+          {!isActive ? (
+            <View style={styles.preRideControls}>
+              <Pressable
+                accessibilityLabel={t("dashboard.selectSport")}
+                style={({ pressed }) => [
+                  styles.sportInlineTrigger,
+                  {
+                    borderColor: SPORT_META[state.sportType].accent,
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+                onPress={() => setSportPickerVisible(true)}
+              >
+                <Text style={styles.sportInlineIcon}>
+                  {SPORT_META[state.sportType].icon}
+                </Text>
+                <Text style={styles.sportInlineLabel}>
+                  {t(
+                    `sports.${state.sportType === "trail_running" ? "trailRunning" : state.sportType}`,
+                  )}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.startBtn,
+                  { opacity: pressed ? 0.85 : 1 },
+                ]}
+                onPress={handleStart}
+              >
+                <IconSymbol name="play.fill" size={20} color="#fff" />
+                <Text style={styles.startBtnText}>{t("dashboard.start")}</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.activeButtons}>
+              {isRiding ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.controlBtn,
+                    { opacity: pressed ? 0.7 : 1 },
+                  ]}
+                  onPress={handlePause}
+                >
+                  <IconSymbol name="pause.fill" size={22} color="#fff" />
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.controlBtn,
+                    { borderColor: "#00C853", opacity: pressed ? 0.7 : 1 },
+                  ]}
+                  onPress={handleResume}
+                >
+                  <IconSymbol name="play.fill" size={22} color="#00C853" />
+                </Pressable>
+              )}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.startBtn,
+                  styles.stopBtn,
+                  { opacity: pressed ? 0.85 : 1 },
+                ]}
+                onPress={handleStop}
+              >
+                <IconSymbol name="stop.fill" size={18} color="#fff" />
+                <Text style={styles.startBtnText}>{t("audit.finishRide")}</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+
+        {/* 展開/收縮提示 */}
+        <Pressable
+          style={styles.expandHint}
+          onPress={() => togglePanel(!panelExpanded)}
+        >
+          <Text style={styles.expandHintText}>
+            {panelExpanded ? t("audit.collapsePanel") : t("audit.expandPanel")}
+          </Text>
+          <IconSymbol
+            name="chevron.right"
+            size={12}
+            color="rgba(255,255,255,0.3)"
+            style={{
+              transform: [{ rotate: panelExpanded ? "90deg" : "-90deg" }],
+            }}
+          />
+        </Pressable>
+      </Animated.View>
+
+      <Modal
+        visible={sportPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSportPickerVisible(false)}
+      >
+        <View style={styles.sportPickerBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setSportPickerVisible(false)}
+          />
+          <View
+            style={[
+              styles.sportPickerSheet,
+              { paddingBottom: insets.bottom + 20 },
+            ]}
+          >
+            <View style={styles.sportPickerHandle} />
+            <View style={styles.sportPickerHeader}>
+              <Text style={styles.sportPickerTitle}>
+                {t("audit.chooseSport")}
+              </Text>
+              <Pressable
+                accessibilityLabel={t("audit.closeSportPicker")}
+                onPress={() => setSportPickerVisible(false)}
+                style={styles.sportPickerClose}
+              >
+                <IconSymbol name="xmark" size={24} color="#FFFFFF" />
+              </Pressable>
+            </View>
+            <View style={styles.sportPickerSearch}>
+              <IconSymbol
+                name="magnifyingglass"
+                size={20}
+                color="rgba(255,255,255,0.55)"
+              />
+              <TextInput
+                value={sportPickerQuery}
+                onChangeText={setSportPickerQuery}
+                placeholder={t("audit.searchSports")}
+                placeholderTextColor="rgba(255,255,255,0.42)"
+                style={styles.sportPickerSearchInput}
+                returnKeyType="done"
+              />
+            </View>
+            <Text style={styles.sportPickerSectionTitle}>
+              {t("audit.yourSports")}
+            </Text>
+            {sportPickerOptions.map((sportType) => {
+              const meta = SPORT_META[sportType];
+              const selected = state.sportType === sportType;
+              return (
+                <Pressable
+                  key={sportType}
+                  accessibilityLabel={`${t("audit.chooseSport")}: ${meta.label}`}
+                  style={({ pressed }) => [
+                    styles.sportPickerRow,
+                    { opacity: pressed ? 0.68 : 1 },
+                  ]}
+                  onPress={() => handleSelectSportType(sportType)}
+                >
+                  <View
+                    style={[
+                      styles.sportPickerIcon,
+                      {
+                        backgroundColor: selected
+                          ? `${meta.accent}2A`
+                          : "rgba(255,255,255,0.09)",
+                      },
+                    ]}
+                  >
+                    <Text style={styles.sportPickerIconText}>{meta.icon}</Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.sportPickerRowLabel,
+                      selected && { color: meta.accent },
+                    ]}
+                  >
+                    {meta.label}
+                  </Text>
+                  {selected ? (
+                    <Text
+                      style={[styles.sportPickerCheck, { color: meta.accent }]}
+                    >
+                      ✓
+                    </Text>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── 補給 Modal ── */}
+      <SupplyModal
+        calorieAlert={settings.supplyReminderEnabled && calorieAlert}
+        waterAlert={settings.supplyReminderEnabled && waterAlert}
+        customSupplyAlerts={[
+          ...sortedActiveAlerts.map((id) => {
+            const item = settings.supplyItems.find((i) => i.id === id);
+            return {
+              id,
+              name: item?.name || t("audit.unnamedSupply"),
+              target: item?.target ?? "energy",
+              onConfirm: () =>
+                handleConfirmCustomSupply(id, item?.triggerType || "time"),
+            };
+          }),
+          ...(intervalSupplyAlerts["energy-time"]
+            ? [
+                {
+                  id: "supply-interval-energy-time",
+                  name: t("audit.energyTimeReminder", {
+                    minutes: settings.supplyEnergyTimeIntervalMinutes,
+                  }),
+                  target: "energy" as const,
+                  onConfirm: () => handleConfirmIntervalSupply("energy-time"),
+                },
+              ]
+            : []),
+          ...(intervalSupplyAlerts["energy-distance"]
+            ? [
+                {
+                  id: "supply-interval-energy-distance",
+                  name: t("audit.energyDistanceReminder", {
+                    distance: settings.supplyEnergyDistanceIntervalKm,
+                  }),
+                  target: "energy" as const,
+                  onConfirm: () =>
+                    handleConfirmIntervalSupply("energy-distance"),
+                },
+              ]
+            : []),
+          ...(intervalSupplyAlerts["water-time"]
+            ? [
+                {
+                  id: "supply-interval-water-time",
+                  name: t("audit.waterTimeReminder", {
+                    minutes: settings.supplyWaterTimeIntervalMinutes,
+                  }),
+                  target: "water" as const,
+                  onConfirm: () => handleConfirmIntervalSupply("water-time"),
+                },
+              ]
+            : []),
+          ...(intervalSupplyAlerts["water-distance"]
+            ? [
+                {
+                  id: "supply-interval-water-distance",
+                  name: t("audit.waterDistanceReminder", {
+                    distance: settings.supplyWaterDistanceIntervalKm,
+                  }),
+                  target: "water" as const,
+                  onConfirm: () =>
+                    handleConfirmIntervalSupply("water-distance"),
+                },
+              ]
+            : []),
+        ]}
+        onConfirmCalorie={handleConfirmCalorieSupply}
+        onConfirmWater={handleConfirmWaterSupply}
+        allowSnooze={
+          (!calorieAlert || !smartEnergySupplyEnabled) &&
+          (!waterAlert || !smartWaterSupplyEnabled)
+        }
+        onDismiss={() => {
+          void clearAllSupplyNotifications().finally(() => {
+            if (calorieAlert) handleSnoozeSupply("calorie", undefined, true);
+            if (waterAlert) handleSnoozeSupply("water", undefined, true);
+            sortedActiveAlerts.forEach((id) => {
+              const item = settings.supplyItems.find(
+                (candidate) => candidate.id === id,
+              );
+              handleSnoozeSupply(
+                item?.target === "water" ? "custom-water" : "custom-energy",
+                id,
+                true,
+              );
+            });
+            (
+              Object.entries(intervalSupplyAlerts) as [
+                SupplyIntervalKind,
+                boolean,
+              ][]
+            )
+              .filter(([, active]) => active)
+              .forEach(([kind]) =>
+                handleSnoozeSupply(
+                  `interval-${kind}` as SupplyNotificationKind,
+                  undefined,
+                  true,
+                ),
+              );
+          });
+        }}
+      />
+
+      {/* ── 騎乘摘要 Modal ── */}
+      <RideSummaryModal
+        visible={showSummary}
+        recordId={summaryRecordId}
+        snapshot={summarySnapshot}
+        onClose={async (routeName, mediaItems) => {
+          setShowSummary(false);
+          if (summaryRecordId) {
+            await updateRideActivity(summaryRecordId, {
+              ...(routeName?.trim() ? { name: routeName.trim() } : {}),
+              ...(mediaItems !== undefined ? { mediaItems } : {}),
+            });
+          }
+          setSummaryRecordId(null);
+          setSummarySnapshot(null);
+          dispatch({ type: "RESET" });
+        }}
+      />
+
+      {/* ── 精簡導航模式── */}
+      <SimplifiedNavOverlay
+        visible={simplifiedNavVisible}
+        onDismiss={() => {
+          setSimplifiedNavVisible(false);
+          resetIdleTimer();
+        }}
+        speed={state.currentSpeed ?? 0}
+        distance={(state.distance ?? 0) / 1000}
+        remainingDist={distToEnd !== null ? distToEnd / 1000 : undefined}
+        currentTime={new Date().toLocaleTimeString("zh-TW", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })}
+        elapsedTime={formatDuration(state.elapsed ?? 0)}
+        grade={currentGrade}
+        power={state.currentPower}
+        avgSpeed={avgSpeed}
+        calories={Math.round(state.calories)}
+        pausedTime={formatDuration(state.totalPausedSec ?? 0)}
+        totalAscent={state.totalAscent}
+        currentAltitude={state.currentAltitude}
+        fields={settings.simplifiedModeFields}
+        fieldOrder={settings.simplifiedModeFieldOrder}
+      />
+
+      {selectedPoi && (
+        <View
+          testID="poi-info-sheet"
+          style={[styles.poiCard, { bottom: dynamicCollapsedH + 16 }]}
+        >
+          <View
+            style={[
+              styles.poiCardHeader,
+              { flexDirection: isRTL ? "row-reverse" : "row" },
+            ]}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                style={[
+                  styles.poiCardTitle,
+                  { textAlign: isRTL ? "right" : "left" },
+                ]}
+                numberOfLines={2}
+              >
+                {selectedPoi.name}
+              </Text>
+              <View
+                style={[
+                  styles.poiCategoryBadge,
+                  {
+                    alignSelf: isRTL ? "flex-end" : "flex-start",
+                    backgroundColor:
+                      selectedPoi.kind === "water_refill"
+                        ? "#0A84FF"
+                        : "#FF9500",
+                  },
+                ]}
+              >
+                <Text style={styles.poiCategoryBadgeText}>
+                  {t(`poiLayers.categories.${selectedPoi.category}`)}
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("poiLayers.close")}
+              style={styles.pinCardClose}
+              onPress={() => setSelectedPoi(null)}
+            >
+              <IconSymbol name="xmark.circle.fill" size={20} color="#666" />
+            </Pressable>
+          </View>
+          {selectedPoi.imageUrl ? (
+            <Image
+              source={{ uri: selectedPoi.imageUrl }}
+              accessibilityLabel={t("poiLayers.previewImage", {
+                name: selectedPoi.name,
+              })}
+              allowDownscaling
+              cachePolicy="disk"
+              contentFit="cover"
+              decodeFormat="rgb"
+              enforceEarlyResizing
+              priority="low"
+              recyclingKey={selectedPoi.id}
+              style={styles.poiPreviewImage}
+              transition={150}
+            />
+          ) : null}
+          <View style={styles.poiCardBody}>
+            {selectedPoi.description ? (
+              <Text
+                style={[
+                  styles.poiDescription,
+                  { textAlign: isRTL ? "right" : "left" },
+                ]}
+                numberOfLines={2}
+              >
+                {selectedPoi.description}
+              </Text>
+            ) : null}
+            <Text
+              style={[
+                styles.poiDistance,
+                { textAlign: isRTL ? "right" : "left" },
+              ]}
+            >
+              {currentPos
+                ? t("poiLayers.distanceAway", {
+                    distance: (
+                      haversine(
+                        currentPos.lat,
+                        currentPos.lon,
+                        selectedPoi.latitude,
+                        selectedPoi.longitude,
+                      ) / 1000
+                    ).toFixed(1),
+                  })
+                : t("poiLayers.distanceUnavailable")}
+            </Text>
+            <Text
+              style={[
+                styles.poiDataNotice,
+                { textAlign: isRTL ? "right" : "left" },
+              ]}
+            >
+              {t("poiLayers.dataNotice")}
+            </Text>
+          </View>
+          <Pressable
+            testID="poi-pin-destination"
+            accessibilityRole="button"
+            accessibilityLabel={t("poiLayers.pinDestination", {
+              name: selectedPoi.name,
+            })}
+            style={({ pressed }) => [
+              styles.poiPinButton,
+              { opacity: pressed ? 0.78 : 1 },
+            ]}
+            onPress={() => {
+              setPinnedLocation({
+                lat: selectedPoi.latitude,
+                lon: selectedPoi.longitude,
+              });
+              setPinnedLocationLabel(selectedPoi.name);
+              setPinRouteInfo(null);
+              setShowPinCard(true);
+              setSelectedPoi(null);
+              mapRef.current?.animateCamera(
+                {
+                  center: {
+                    latitude: selectedPoi.latitude,
+                    longitude: selectedPoi.longitude,
+                  },
+                  zoom: 16,
+                },
+                { duration: 320 },
+              );
+            }}
+          >
+            <IconSymbol name="mappin.circle.fill" size={18} color="#fff" />
+            <Text style={styles.poiPinButtonText}>
+              {t("poiLayers.pinDestination", { name: selectedPoi.name })}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* ── 釘選地點卡片 ── */}
+      {showPinCard && pinnedLocation && (
+        <View style={[styles.pinCard, { bottom: dynamicCollapsedH + 16 }]}>
+          <View style={styles.pinCardHeader}>
+            <Text style={styles.pinCardTitle}>
+              {pinnedLocationLabel ?? t("audit.pinnedLocation")}
+            </Text>
+            <Pressable
+              style={styles.pinCardClose}
+              onPress={() => {
+                setShowPinCard(false);
+                setPinnedLocation(null);
+                setPinnedLocationLabel(null);
+                setPinRouteInfo(null);
+              }}
+            >
+              <IconSymbol name="xmark.circle.fill" size={20} color="#666" />
+            </Pressable>
+          </View>
+          <View style={styles.pinCardBody}>
+            <Text style={styles.pinCardCoord}>
+              {pinnedLocation.lat.toFixed(4)}, {pinnedLocation.lon.toFixed(4)}
+            </Text>
+            {isFetchingPinRoute && (
+              <Text style={styles.pinCardStatus}>
+                {t("audit.calculatingRoute")}
+              </Text>
+            )}
+            {pinRouteInfo && (
+              <View style={styles.pinCardRoute}>
+                <Text style={styles.pinCardRouteDist}>
+                  {t("audit.routeDistance", {
+                    distance: (pinRouteInfo.distM / 1000).toFixed(2),
+                  })}
+                </Text>
+                <Text style={styles.pinCardRouteDur}>
+                  {t("audit.routeDuration", {
+                    minutes: Math.round(pinRouteInfo.durSec / 60),
+                  })}
+                </Text>
+              </View>
+            )}
+            <View style={styles.pinDataFreshnessRow}>
+              <View style={styles.pinDataFreshnessTextWrap}>
+                <Text style={styles.pinDataFreshness}>
+                  {formatNavigationDataFreshness(lastNavigationDataRefreshAt)}
+                </Text>
+                <Text style={styles.pinDataFreshnessNote}>
+                  {t("audit.mapDataNotice")}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.pinDataRefreshButton}
+                onPress={handleRefreshPinMapData}
+              >
+                <Text style={styles.pinDataRefreshText}>
+                  {t("audit.refreshMapData")}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+          <View style={styles.pinCardBtns}>
+            <Pressable
+              style={[styles.pinCardBtn, { backgroundColor: "#007AFF" }]}
+              onPress={() => {
+                if (!currentPos) return;
+                setIsFetchingPinRoute(true);
+                fetchBikeRoute(
+                  { latitude: currentPos.lat, longitude: currentPos.lon },
+                  {
+                    latitude: pinnedLocation.lat,
+                    longitude: pinnedLocation.lon,
+                  },
+                  preferCycleway,
+                )
+                  .then((result) => {
+                    setLastNavigationDataRefreshAt(Date.now());
+                    if (result) {
+                      setPinRouteInfo({
+                        distM: result.distanceM,
+                        durSec: result.durationSec,
+                        polyline: result.coordinates,
+                      });
+                    } else {
+                      setPinRouteInfo(null);
+                      Alert.alert(
+                        t("audit.noRoutableRouteTitle"),
+                        t("audit.noRoutableRouteBody"),
+                      );
+                    }
+                  })
+                  .catch(() => {
+                    setPinRouteInfo(null);
+                    Alert.alert(
+                      t("audit.routeServiceUnavailableTitle"),
+                      t("audit.routeServiceUnavailableBody"),
+                    );
+                  })
+                  .finally(() => {
+                    setIsFetchingPinRoute(false);
+                  });
+              }}
+            >
+              <IconSymbol name="location.fill" size={16} color="#fff" />
+              <Text style={styles.pinCardBtnText}>
+                {t("audit.calculateRoute")}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.pinCardBtn, { backgroundColor: "#34C759" }]}
+              onPress={() => {
+                if (!pinRouteInfo) {
+                  Alert.alert(
+                    t("audit.calculateRoute"),
+                    t("audit.calculateRouteFirst"),
+                  );
+                  return;
+                }
+                const osmrRoute = {
+                  name: pinnedLocationLabel
+                    ? t("audit.pinnedNavigationName", {
+                        location: pinnedLocationLabel,
+                      })
+                    : t("audit.pinnedNavigationName", {
+                        location: t("audit.pinnedLocation"),
+                      }),
+                  points: pinRouteInfo.polyline.map((p) => ({
+                    lat: p.latitude,
+                    lon: p.longitude,
+                    ele: 0,
+                  })),
+                  totalDistance: pinRouteInfo.distM,
+                  totalAscent: 0,
+                  totalDescent: 0,
+                  estimatedDuration: pinRouteInfo.durSec,
+                  estimatedCalories: 0,
+                  elevationProfile: [],
+                  gradientDistribution: {},
+                  avgGradient: 0,
+                  maxGradient: 0,
+                };
+                startPinnedNavigationRoute(
+                  osmrRoute,
+                  t("audit.startingNavigation", {
+                    location: pinnedLocationLabel ?? t("audit.pinnedLocation"),
+                  }),
+                );
+                setShowPinCard(false);
+              }}
+            >
+              <IconSymbol name="play.fill" size={16} color="#fff" />
+              <Text style={styles.pinCardBtnText}>
+                {t("audit.startNavigation")}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.pinCardBtn, { backgroundColor: "#FF3B30" }]}
+              onPress={() => {
+                setShowPinCard(false);
+                setPinnedLocation(null);
+                setPinnedLocationLabel(null);
+                setPinRouteInfo(null);
+              }}
+            >
+              <IconSymbol name="xmark.circle.fill" size={16} color="#fff" />
+              <Text style={styles.pinCardBtnText}>{t("audit.cancel")}</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {touchGuardEnabled && isActive && (
+        <Pressable
+          style={styles.touchGuard}
+          onPressIn={beginTouchGuardHoldProgress}
+          onPressOut={resetTouchGuardHoldProgress}
+          onResponderTerminate={resetTouchGuardHoldProgress}
+          onTouchCancel={resetTouchGuardHoldProgress}
+          onLongPress={() => {
+            completeTouchGuardUnlock();
+          }}
+          delayLongPress={settings.touchGuardUnlockHoldMs}
+        >
+          <View
+            style={[
+              styles.touchGuardStatusStack,
+              { top: insets.top + 202, pointerEvents: "none" },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.touchGuardCornerHint,
+                { opacity: touchGuardHintOpacity },
+              ]}
+            >
+              <IconSymbol name="lock.fill" size={14} color="#9CFFB5" />
+              <Text style={styles.touchGuardCornerText}>
+                {t("audit.touchGuardLocked", {
+                  duration: touchGuardHoldLabel,
+                })}
+              </Text>
+            </Animated.View>
+            {touchGuardPointerActiveRef.current && touchGuardHoldProgress > 0 && (
+              <View style={styles.touchGuardProgressRing}>
+                <Svg width={56} height={56} viewBox="0 0 56 56">
+                  <Circle
+                    cx="28"
+                    cy="28"
+                    r="23"
+                    stroke="rgba(255,255,255,0.18)"
+                    strokeWidth="4"
+                    fill="rgba(5, 21, 14, 0.62)"
+                  />
+                  <Circle
+                    cx="28"
+                    cy="28"
+                    r="23"
+                    stroke="#9CFFB5"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    fill="transparent"
+                    strokeDasharray="144.5 144.5"
+                    strokeDashoffset={144.5 * (1 - touchGuardHoldProgress)}
+                    transform="rotate(-90 28 28)"
+                  />
+                </Svg>
+                <Text style={styles.touchGuardProgressText}>
+                  {Math.round(touchGuardHoldProgress * 100)}%
+                </Text>
+                <Text style={styles.touchGuardProgressLabel}>
+                  {t("audit.touchGuardHolding")}
+                </Text>
+              </View>
+            )}
+          </View>
+        </Pressable>
+      )}
+
+      {showTouchGuardUnlockSuccess && (
+        <Animated.View
+          style={[
+            styles.touchGuardUnlockSuccess,
+            {
+              top: insets.top + 56,
+              opacity: touchGuardUnlockSuccessOpacity,
+              pointerEvents: "none",
+              transform: [{ scale: touchGuardUnlockSuccessScale }],
+            },
+          ]}
+        >
+          <Text style={styles.touchGuardUnlockSuccessCheck}>✓</Text>
+        </Animated.View>
+      )}
+      <BackgroundLocationDisclosure
+        visible={backgroundLocationDisclosureVisible}
+        onDecision={handleBackgroundLocationDisclosureDecision}
+      />
+    </View>
+  );
+}
+
+// ─── 子元件 ───────────────────────────────────────────────────────────────────
+
+// DashMetric: 依 fieldKey 渲染對應的儀表板欄位
+function DashMetric({
+  fieldKey,
+  state,
+  isActive,
+  currentGrade,
+  avgSpeed,
+  columnCount,
+}: {
+  fieldKey: NormalFieldKey;
+  state: any;
+  isActive: boolean;
+  currentGrade: number;
+  avgSpeed: number;
+  columnCount: 2 | 3;
+}) {
+  const { t } = useTranslation();
+  switch (fieldKey) {
+    case "showElapsed":
+      return (
+        <BigMetric
+          label={t("dashboard.rideTime")}
+          value={formatDuration(state.elapsed)}
+          unit=""
+          columnCount={columnCount}
+        />
+      );
+    case "showSpeed":
+      return (
+        <BigMetric
+          label={t("dashboard.speed")}
+          value={state.currentSpeed > 0 ? state.currentSpeed.toFixed(1) : "--"}
+          unit="km/h"
+          highlight
+          columnCount={columnCount}
+        />
+      );
+    case "showDistance":
+      return (
+        <BigMetric
+          label={t("dashboard.distance")}
+          value={(state.distance / 1000).toFixed(2)}
+          unit="km"
+          columnCount={columnCount}
+        />
+      );
+    case "showGrade":
+      return (
+        <BigMetric
+          label={t("dashboard.grade")}
+          value={
+            isActive
+              ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}`
+              : "--"
+          }
+          unit="%"
+          warn={currentGrade > 5}
+          columnCount={columnCount}
+        />
+      );
+    case "showPower":
+      return (
+        <BigMetric
+          label={t("dashboard.power")}
+          value={`${state.currentPower}`}
+          unit="W"
+          accent
+          columnCount={columnCount}
+        />
+      );
+    case "showAvgSpeed":
+      return (
+        <BigMetric
+          label={t("dashboard.averageSpeed")}
+          value={avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"}
+          unit="km/h"
+          columnCount={columnCount}
+        />
+      );
+    case "showCalories":
+      return (
+        <BigMetric
+          label={t("dashboard.calories")}
+          value={`${Math.round(state.totalCalories)}`}
+          unit="kcal"
+          columnCount={columnCount}
+        />
+      );
+    case "showPausedTime":
+      return (
+        <BigMetric
+          label={t("dashboard.pausedTime")}
+          value={formatDuration(state.totalPausedSec)}
+          unit=""
+          columnCount={columnCount}
+        />
+      );
+    case "showTotalAscent":
+      return (
+        <BigMetric
+          label={t("dashboard.totalAscent")}
+          value={state.totalAscent ? state.totalAscent.toFixed(0) : "0"}
+          unit="m"
+          columnCount={columnCount}
+        />
+      );
+    case "showCurrentAltitude":
+      return (
+        <BigMetric
+          label={t("dashboard.currentAltitude")}
+          value={
+            state.currentAltitude ? state.currentAltitude.toFixed(0) : "--"
+          }
+          unit="m"
+          columnCount={columnCount}
+        />
+      );
+    case "showGradeDistribution":
+      // 計算坡度分布百分比
+      const totalDist = state.gradeDistribution.reduce(
+        (a: number, b: number) => a + b,
+        0,
+      );
+      const gradePcts =
+        totalDist > 0
+          ? state.gradeDistribution.map((d: number) =>
+              ((d / totalDist) * 100).toFixed(0),
+            )
+          : ["0", "0", "0", "0", "0", "0"];
+      return (
+        <View style={styles.gradeDistributionContainer}>
+          <Text style={styles.gradeDistributionLabel}>
+            {t("dashboard.gradeDistribution")}
+          </Text>
+          <View style={styles.gradeDistributionBars}>
+            <View
+              style={[
+                styles.gradeBar,
+                {
+                  width: `${Math.max(5, parseInt(gradePcts[0]))}%`,
+                  backgroundColor: "#34C759",
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.gradeBar,
+                {
+                  width: `${Math.max(5, parseInt(gradePcts[1]))}%`,
+                  backgroundColor: "#FFD60A",
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.gradeBar,
+                {
+                  width: `${Math.max(5, parseInt(gradePcts[2]))}%`,
+                  backgroundColor: "#FF9500",
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.gradeBar,
+                {
+                  width: `${Math.max(5, parseInt(gradePcts[3]))}%`,
+                  backgroundColor: "#FF6B6B",
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.gradeBar,
+                {
+                  width: `${Math.max(5, parseInt(gradePcts[4]))}%`,
+                  backgroundColor: "#FF453A",
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.gradeBar,
+                {
+                  width: `${Math.max(5, parseInt(gradePcts[5]))}%`,
+                  backgroundColor: "#8B0000",
+                },
+              ]}
+            />
+          </View>
+          <View style={styles.gradeDistributionLabels}>
+            <Text style={styles.gradeDistributionLegend}>1-5%</Text>
+            <Text style={styles.gradeDistributionLegend}>6-10%</Text>
+            <Text style={styles.gradeDistributionLegend}>11-15%</Text>
+            <Text style={styles.gradeDistributionLegend}>16-20%</Text>
+            <Text style={styles.gradeDistributionLegend}>21-25%</Text>
+            <Text style={styles.gradeDistributionLegend}>26%+</Text>
+          </View>
+        </View>
+      );
+    default:
+      return null;
+  }
+}
+
+/** 系統時鐘與地圖視覺更新不應重算未變動的儀表格。 */
+const MemoizedDashMetric = React.memo(DashMetric);
+
+function DashboardSummaryMetric({
+  metric,
+  state,
+  isActive,
+  currentGrade,
+  avgSpeed,
+}: {
+  metric: NavigationDashboardSummaryKey;
+  state: any;
+  isActive: boolean;
+  currentGrade: number;
+  avgSpeed: number;
+}) {
+  const { t } = useTranslation();
+  if (metric === "grade") {
+    const color =
+      currentGrade > 8
+        ? "#EF4444"
+        : currentGrade > 5
+          ? "#F59E0B"
+          : "rgba(255,255,255,0.9)";
+    return (
+      <View style={styles.ascentItem}>
+        <IconSymbol name="arrow.down" size={13} color="#4FC3F7" />
+        <Text style={styles.ascentLabel}>{t("dashboard.grade")}</Text>
+        <Text style={[styles.ascentValue, { color }]}>
+          {isActive
+            ? `${currentGrade > 0 ? "+" : ""}${currentGrade.toFixed(1)}`
+            : "--"}
+        </Text>
+        <Text style={styles.ascentUnit}>%</Text>
+      </View>
+    );
+  }
+
+  if (metric === "avgSpeed") {
+    return (
+      <View style={styles.ascentItem}>
+        <IconSymbol name="speedometer" size={13} color="#A7D8FF" />
+        <Text style={styles.ascentLabel}>{t("dashboard.averageSpeed")}</Text>
+        <Text style={styles.ascentValue}>
+          {avgSpeed > 0 ? avgSpeed.toFixed(1) : "--"}
+        </Text>
+        <Text style={styles.ascentUnit}>km/h</Text>
+      </View>
+    );
+  }
+
+  if (metric === "currentAltitude") {
+    const altitude = Number.isFinite(state.currentAltitude)
+      ? Math.round(state.currentAltitude)
+      : "--";
+    return (
+      <View style={styles.ascentItem}>
+        <IconSymbol name="arrow.up" size={13} color="#00C853" />
+        <Text style={styles.ascentLabel}>{t("dashboard.currentAltitude")}</Text>
+        <Text style={styles.ascentValue}>{altitude}</Text>
+        <Text style={styles.ascentUnit}>m</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.ascentItem}>
+      <IconSymbol name="bolt.fill" size={13} color="#00E676" />
+      <Text style={styles.ascentLabel}>{t("dashboard.maxPower")}</Text>
+      <Text style={[styles.ascentValue, { color: "#00E676" }]}>
+        {state.maxPower}
+      </Text>
+      <Text style={styles.ascentUnit}>W</Text>
+    </View>
+  );
+}
+
+function BigMetric({
+  label,
+  value,
+  unit,
+  accent,
+  highlight,
+  warn,
+  wide,
+  columnCount,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  accent?: boolean;
+  highlight?: boolean;
+  warn?: boolean;
+  wide?: boolean;
+  columnCount: 2 | 3;
+}) {
+  const color = accent
+    ? "#00E676"
+    : highlight
+      ? "#fff"
+      : warn
+        ? "#F59E0B"
+        : "rgba(255,255,255,0.9)";
+  const fontSize = highlight ? 32 : wide ? 26 : 22;
+  return (
+    <View
+      style={[
+        bigMetricStyles.cell,
+        { width: `${100 / columnCount}%` },
+        wide && bigMetricStyles.wideCell,
+      ]}
+    >
+      <Text style={bigMetricStyles.label}>{label}</Text>
+      <View style={bigMetricStyles.valueRow}>
+        <Text style={[bigMetricStyles.value, { color, fontSize }]}>
+          {value}
+        </Text>
+        {unit ? <Text style={bigMetricStyles.unit}>{unit}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+const bigMetricStyles = StyleSheet.create({
+  cell: {
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: "rgba(255,255,255,0.06)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  wideCell: {},
+  label: {
+    color: "rgba(255,255,255,0.76)",
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 16,
+    marginBottom: 3 /* internal spacing */,
+    letterSpacing: 0.3,
+    textAlign: "center",
+  },
+  valueRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    justifyContent: "center",
+    gap: 3,
+  },
+  value: {
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+    textAlign: "center",
+  },
+  unit: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.72)",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+});
+
+// ─── 樣式 ─────────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#0d0d1a" },
+  map: { width: SCREEN_W },
+
+  navBar: {
+    position: "absolute",
+    left: 16,
+    right: 80,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(5,16,10,0.94)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  navText: {
+    flex: 1,
+    flexShrink: 1,
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  navDist: {
+    flexShrink: 1,
+    color: "#7FFFC7",
+    fontSize: 14,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+
+  toolBar: { position: "absolute", gap: 10, zIndex: 30 },
+  pinAddressOverlay: {
+    position: "absolute",
+    left: 16,
+    right: 76,
+    zIndex: 40,
+  },
+  pinAddressBar: {
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingLeft: 14,
+    paddingRight: 6,
+    borderRadius: 14,
+    backgroundColor: "rgba(7,18,11,0.98)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.56)",
+  },
+  pinAddressInput: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    minHeight: 44,
+  },
+  pinAddressSearchButton: {
+    minWidth: 58,
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    marginVertical: 4,
+    backgroundColor: "#087B5A",
+  },
+  pinAddressSearchButtonDisabled: { opacity: 0.58 },
+  pinAddressSearchText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  pinAddressNotice: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,190,92,0.58)",
+    backgroundColor: "rgba(61,42,13,0.94)",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  pinAddressNoticeText: {
+    color: "#FFE3AA",
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 19,
+  },
+  pinAddressResults: {
+    marginTop: 8,
+    overflow: "hidden",
+    borderRadius: 14,
+    backgroundColor: "rgba(7,18,11,0.98)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
+  },
+  pinAddressResultsTitle: {
+    paddingHorizontal: 14,
+    paddingTop: 11,
+    paddingBottom: 7,
+    color: "#34C759",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  pinAddressResultRow: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.12)",
+  },
+  pinAddressResultTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  pinAddressResultMeta: {
+    marginTop: 4,
+    color: "rgba(255,255,255,0.92)",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  toolBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.32)",
+  },
+  freeHeadingToolBtn: {
+    borderWidth: 1.5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  toolBtnActive: {
+    backgroundColor: "rgba(0,122,255,0.2)",
+    borderColor: "#007AFF",
+  },
+  touchGuardToolBtnActive: {
+    backgroundColor: "rgba(52,199,89,0.22)",
+    borderColor: "#34C759",
+  },
+  touchGuard: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 20,
+    backgroundColor: "transparent",
+  },
+  touchGuardStatusStack: {
+    position: "absolute",
+    right: 10,
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  touchGuardCornerHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(10,34,24,0.92)",
+    borderColor: "rgba(52,199,89,0.72)",
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  touchGuardCornerText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
+  touchGuardProgressRing: {
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  touchGuardProgressText: {
+    position: "absolute",
+    top: 13,
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  touchGuardProgressLabel: {
+    position: "absolute",
+    top: 29,
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  touchGuardUnlockSuccess: {
+    position: "absolute",
+    right: 10,
+    zIndex: 36,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(12, 91, 41, 0.96)",
+    borderWidth: 2,
+    borderColor: "#9CFFB5",
+    boxShadow: "0px 0px 10px rgba(52, 197, 89, 0.42)",
+  },
+  touchGuardUnlockSuccessCheck: {
+    color: "#FFFFFF",
+    fontSize: 31,
+    fontWeight: "900",
+    lineHeight: 36,
+  },
+  returnBtn: {
+    backgroundColor: "rgba(255,149,0,0.2)",
+    borderColor: "#FF9500",
+    height: 52,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    flexDirection: "column",
+    gap: 2,
+  },
+  returnBtnLabel: { color: "#FF9500", fontSize: 10, fontWeight: "700" },
+
+  offRouteBanner: {
+    position: "absolute",
+    left: 16,
+    right: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(255,149,0,0.88)",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  offRouteBannerIcon: { fontSize: 18 },
+  offRouteBannerText: { flex: 1 },
+  offRouteBannerTitle: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  offRouteBannerSub: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 12,
+    marginTop: 1,
+  },
+
+  noRouteBadge: {
+    position: "absolute",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  noRouteText: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  // 自動暫停／騎乘定位狀態卡
+  rideTrackingStatusCard: {
+    position: "absolute",
+    left: 16,
+    right: 72,
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(0, 154, 112, 0.94)",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.24)",
+  },
+  rideTrackingStatusAutoPaused: {
+    backgroundColor: "rgba(194, 87, 0, 0.96)",
+    borderColor: "rgba(255, 211, 153, 0.7)",
+  },
+  rideTrackingStatusPending: {
+    backgroundColor: "rgba(120, 92, 0, 0.96)",
+  },
+  rideTrackingStatusIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rideTrackingStatusContent: { flex: 1 },
+  rideTrackingStatusTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  rideTrackingStatusSubtitle: {
+    color: "rgba(255,255,255,0.88)",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  rideTrackingStatusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: "#B9FFCF",
+  },
+  rideTrackingStatusDotPaused: { backgroundColor: "#FFE0A8" },
+
+  // 底部面板（統計面板移至地圖下方）
+  panel: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(7, 17, 11, 0.97)",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.42)",
+    overflow: "hidden",
+  },
+  handleArea: {
+    alignItems: "center",
+    paddingBottom: 8 /* internal spacing */, // 內部間距，不需要動態計算
+  },
+  panelHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderRadius: 2,
+    marginBottom: 6 /* internal spacing */,
+  },
+  weatherRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2 /* internal spacing */,
+  },
+  weatherItem: {
+    color: "rgba(255,255,255,0.94)",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  weatherSep: { color: "rgba(255,255,255,0.78)", fontSize: 13 },
+  pausedBadge: {
+    backgroundColor: "rgba(245,158,11,0.2)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  pausedText: { color: "#FFD27D", fontSize: 12, fontWeight: "800" },
+
+  // 六格儀表板
+  sixGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.16)",
+    marginTop: 2,
+  },
+  sportSelector: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  sportChoice: {
+    flex: 1,
+    minWidth: "22%",
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.26)",
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  sportChoiceIcon: { fontSize: 17 },
+  sportChoiceLabel: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17,
+    textAlign: "center",
+  },
+  preRideControls: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  sportInlineTrigger: {
+    minWidth: 88,
+    minHeight: 52,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    backgroundColor: "rgba(15,15,23,0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 1,
+  },
+  sportInlineIcon: { fontSize: 18 },
+  sportInlineLabel: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17,
+    textAlign: "center",
+  },
+  sportPickerBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.56)",
+  },
+  sportPickerSheet: {
+    backgroundColor: "#151515",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 10,
+    paddingHorizontal: 24,
+    minHeight: "62%",
+  },
+  sportPickerHandle: {
+    alignSelf: "center",
+    width: 42,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.38)",
+    marginBottom: 22,
+  },
+  sportPickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 22,
+  },
+  sportPickerTitle: { color: "#FFFFFF", fontSize: 25, fontWeight: "800" },
+  sportPickerClose: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+  sportPickerSearch: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#3B3B3D",
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    height: 54,
+  },
+  sportPickerSearchInput: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 17,
+    paddingVertical: 0,
+  },
+  sportPickerSectionTitle: {
+    color: "#FFFFFF",
+    fontSize: 19,
+    fontWeight: "800",
+    marginTop: 28,
+    marginBottom: 10,
+  },
+  sportPickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 68,
+    gap: 14,
+  },
+  sportPickerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sportPickerIconText: { fontSize: 24 },
+  sportPickerRowLabel: {
+    flex: 1,
+    color: "#F5F5F5",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  sportPickerCheck: { fontSize: 28, fontWeight: "900" },
+  sportMetric: {
+    width: "33.333%",
+    minHeight: 76,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.16)",
+    paddingHorizontal: 4,
+  },
+  sportMetricLabel: {
+    color: "rgba(255,255,255,0.84)",
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17,
+    textAlign: "center",
+  },
+  sportMetricValueRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    justifyContent: "center",
+    marginTop: 6,
+  },
+  sportMetricValue: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.7,
+    textAlign: "center",
+  },
+  sportMetricUnit: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 11,
+    marginLeft: 3,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  // 展開區域
+  expandedSection: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    paddingTop: 12,
+    marginTop: 4,
+  },
+  progressSection: {},
+  progressHeader: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4 /* internal spacing */,
+  },
+  progressLabelRow: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 5,
+  },
+  progressLabel: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  progressValue: {
+    color: "rgba(255,255,255,0.94)",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 18,
+    textAlign: "right",
+  },
+  progressTrack: {
+    height: 5,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: { height: 4, borderRadius: 2 },
+  ratePill: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 },
+  rateText: { fontSize: 10, fontWeight: "600" },
+
+  // 控制按鈕
+  btnRow: {
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 8 /* internal spacing */,
+  },
+  activeButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  startBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 32,
+    minHeight: 52,
+    borderRadius: 26,
+    backgroundColor: "#00C853",
+    justifyContent: "center",
+  },
+  stopBtn: { backgroundColor: "#FF3B30" },
+  startBtnText: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "700",
+    lineHeight: 23,
+    letterSpacing: 0.5,
+  },
+  controlBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  expandHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingTop: 4,
+  },
+  expandHintText: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
+  // 總爬升資訊列
+  ascentRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginBottom: 12 /* internal spacing */,
+  },
+  ascentItem: {
+    flex: 1,
+    minWidth: 96,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    flexWrap: "wrap",
+  },
+  ascentDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  ascentLabel: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 16,
+    textAlign: "center",
+  },
+  ascentValue: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20,
+    textAlign: "center",
+  },
+  ascentUnit: {
+    color: "rgba(255,255,255,0.74)",
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 16,
+    textAlign: "center",
+  },
+  // 崩潰恢復橫幅
+  recoveryBanner: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(0,0,0,0.88)",
+    borderRadius: 14,
+    padding: 16,
+    zIndex: 200,
+    borderWidth: 1,
+    borderColor: "rgba(0,122,255,0.5)",
+  },
+  recoveryTitle: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 4 /* internal spacing */,
+  },
+  recoveryDesc: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 13,
+    marginBottom: 12 /* internal spacing */,
+  },
+  recoveryBtns: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  recoveryBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  recoveryBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  // 隊伍遙測橫幅
+  teamBanner: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    zIndex: 150,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  teamMember: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  teamDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  teamName: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    maxWidth: 60,
+  },
+  teamDist: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 11,
+  },
+  teamSpeed: {
+    color: "#34C759",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  // 釘選地點卡片
+  pinCard: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(18,18,18,0.96)",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    zIndex: 250,
+    borderWidth: 1,
+    borderColor: "rgba(0,122,255,0.3)",
+  },
+  pinCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8 /* internal spacing */,
+  },
+  pinCardTitle: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    marginRight: 10,
+  },
+  pinCardClose: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pinCardCloseText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 18,
+    lineHeight: 22,
+  },
+  pinCardBody: {
+    marginBottom: 10 /* internal spacing */,
+  },
+  pinCardCoord: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 12,
+    marginBottom: 4 /* internal spacing */,
+  },
+  pinDataFreshnessRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 10,
+    paddingTop: 9,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.14)",
+  },
+  pinDataFreshnessTextWrap: { flex: 1 },
+  pinDataFreshness: { color: "#75C8FF", fontSize: 11, fontWeight: "700" },
+  pinDataFreshnessNote: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  pinDataRefreshButton: {
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "rgba(0,122,255,0.7)",
+    backgroundColor: "rgba(0,122,255,0.16)",
+  },
+  pinDataRefreshText: { color: "#75C8FF", fontSize: 11, fontWeight: "800" },
+  pinCardStatus: {
+    color: "#007AFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  pinCardRoute: {
+    marginTop: 6 /* internal spacing */,
+  },
+  pinCardRouteDist: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  pinCardRouteDur: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    marginTop: 2 /* internal spacing */,
+  },
+  pinCardBtns: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  pinCardBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    borderRadius: 8,
+    paddingVertical: 8,
+  },
+  pinCardBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  poiCard: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(18,18,18,0.98)",
+    borderRadius: 16,
+    padding: 14,
+    zIndex: 260,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  poiCardHeader: {
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  poiCardTitle: {
+    color: "#fff",
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: "800",
+  },
+  poiCategoryBadge: {
+    marginTop: 6,
+    maxWidth: "100%",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  poiCategoryBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  poiPreviewImage: {
+    width: "100%",
+    height: 126,
+    borderRadius: 12,
+    marginTop: 12,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  poiCardBody: {
+    marginTop: 10,
+    gap: 5,
+  },
+  poiDescription: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  poiDistance: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  poiDataNotice: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  poiPinButton: {
+    minHeight: 44,
+    marginTop: 12,
+    borderRadius: 11,
+    backgroundColor: "#007AFF",
+    flexDirection: "row",
+    gap: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  poiPinButtonText: {
+    flexShrink: 1,
+    color: "#fff",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+
+  supplyConfirmBtn: {
+    marginTop: 8,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  supplyConfirmText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  gradeDistributionContainer: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12 /* internal spacing */,
+  },
+  gradeDistributionLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 8 /* internal spacing */,
+  },
+  gradeDistributionBars: {
+    flexDirection: "row",
+    height: 24,
+    gap: 2,
+    marginBottom: 8 /* internal spacing */,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  gradeBar: {
+    flex: 1,
+    borderRadius: 2,
+  },
+  gradeDistributionLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 2,
+  },
+  gradeDistributionLegend: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 9,
+    flex: 1,
+    textAlign: "center",
+  },
+});

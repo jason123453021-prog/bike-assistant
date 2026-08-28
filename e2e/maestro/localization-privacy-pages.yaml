@@ -1,0 +1,54 @@
+appId: com.jason123453021.bikeassistant
+name: ${LOCALE_NAME} navigation, RTL, and privacy policy screenshots
+---
+- launchApp:
+    clearState: true
+    permissions:
+      android.permission.ACCESS_FINE_LOCATION: allow
+      android.permission.ACCESS_COARSE_LOCATION: allow
+      android.permission.POST_NOTIFICATIONS: allow
+- tapOn:
+    text: "Wait"
+    optional: true
+- extendedWaitUntil:
+    visible: "Navigation"
+    timeout: 30000
+- tapOn: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "System & Data"
+    direction: DOWN
+    timeout: 30000
+- runFlow:
+    when:
+      notVisible:
+        id: "settings-language-selector"
+    commands:
+      - tapOn: "System & Data"
+- scrollUntilVisible:
+    element:
+      id: "settings-language-selector"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: "settings-language-selector"
+- runFlow:
+    file: scroll-language-option.yaml
+    env:
+      TARGET_ID: ${LANGUAGE_OPTION_ID}
+- tapOn:
+    id: ${LANGUAGE_OPTION_ID}
+- assertVisible: ${SETTINGS_LABEL}
+- takeScreenshot: ${SCREENSHOT_PREFIX}-settings
+- tapOn: ${NAVIGATION_LABEL}
+- assertVisible: ${NAVIGATION_LABEL}
+- takeScreenshot: ${SCREENSHOT_PREFIX}-navigation
+- tapOn: ${ROUTES_LABEL}
+- assertVisible: ${ROUTES_LABEL}
+- takeScreenshot: ${SCREENSHOT_PREFIX}-routes
+- tapOn: ${HISTORY_LABEL}
+- assertVisible: ${HISTORY_LABEL}
+- takeScreenshot: ${SCREENSHOT_PREFIX}-history
+- openLink: "manus20260617://privacy"
+- assertVisible: ${PRIVACY_LABEL}
+- takeScreenshot: ${SCREENSHOT_PREFIX}-privacy

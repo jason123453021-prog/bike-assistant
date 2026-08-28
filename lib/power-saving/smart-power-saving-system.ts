@@ -1,0 +1,248 @@
+import { reportRecoverableIssue } from "../release-safe-log";
+
+// 動態導入 expo-brightness 以避免編譯錯誤
+let setBrightnessAsync: (brightness: number) => Promise<void> = async () => {};
+let getBrightnessAsync: () => Promise<number> = async () => 0.8;
+let useSystemBrightnessAsync: () => Promise<void> = async () => {};
+let getSystemBrightnessAsync: () => Promise<number> = async () => 0.8;
+
+try {
+  const brightness = require("expo-brightness");
+  setBrightnessAsync = brightness.setBrightnessAsync;
+  getBrightnessAsync = brightness.getBrightnessAsync;
+  useSystemBrightnessAsync = brightness.useSystemBrightnessAsync;
+  getSystemBrightnessAsync = brightness.getSystemBrightnessAsync;
+} catch (e) {
+  reportRecoverableIssue("[PowerSaving] expo-brightness not available");
+}
+import { useEffect, useRef, useCallback } from "react";
+import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+export interface PowerSavingSettings {
+  enabled: boolean;
+  timeoutSeconds: number; // 進入省電模式的時間（秒）
+  minBrightness: number; // 最低亮度（0-1）
+  normalBrightness: number; // 正常亮度（0-1）
+}
+
+const DEFAULT_SETTINGS: PowerSavingSettings = {
+  enabled: true,
+  timeoutSeconds: 300, // 5 分鐘
+  minBrightness: 0.1,
+  normalBrightness: 0.8,
+};
+
+function createDefaultSettings(): PowerSavingSettings {
+  return { ...DEFAULT_SETTINGS };
+}
+
+const STORAGE_KEY = "power_saving_settings";
+
+export class SmartPowerSavingManager {
+  private static instance: SmartPowerSavingManager;
+  private settings: PowerSavingSettings = DEFAULT_SETTINGS;
+  private inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+  private isInPowerSavingMode: boolean = false;
+  private originalBrightness = 1;
+  private brightnessSession = 0;
+  /** 亮度覆寫僅限於實際開始或暫停中的騎乘活動。 */
+  private rideSessionActive = false;
+  private brightnessHolds = new Set<string>();
+  private listeners: Set<(isActive: boolean) => void> = new Set();
+
+  private constructor() {
+    this.loadSettings();
+  }
+
+  static getInstance(): SmartPowerSavingManager {
+    if (!SmartPowerSavingManager.instance) {
+      SmartPowerSavingManager.instance = new SmartPowerSavingManager();
+    }
+    return SmartPowerSavingManager.instance;
+  }
+
+  async loadSettings(): Promise<PowerSavingSettings> {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      }
+    } catch (error) {
+      reportRecoverableIssue("[PowerSaving] Failed to load settings", error);
+    }
+    return this.settings;
+  }
+
+  async saveSettings(newSettings: Partial<PowerSavingSettings>) {
+    try {
+      this.settings = { ...this.settings, ...newSettings };
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
+    } catch (error) {
+      reportRecoverableIssue("[PowerSaving] Failed to save settings", error);
+    }
+  }
+
+  /** 僅恢復省電偏好預設值，不影響任何騎乘活動或補給資料。 */
+  async resetSettings(): Promise<PowerSavingSettings> {
+    const next = createDefaultSettings();
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      this.settings = next;
+      await this.wakeUp();
+      return next;
+    } catch (error) {
+      reportRecoverableIssue("[PowerSaving] Failed to reset settings", error);
+      throw error;
+    }
+  }
+
+  getSettings(): PowerSavingSettings {
+    return this.settings;
+  }
+
+  private resetInactivityTimer() {
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+    }
+
+    if (
+      !this.rideSessionActive ||
+      !this.settings.enabled ||
+      this.brightnessHolds.size > 0
+    )
+      return;
+
+    this.inactivityTimer = setTimeout(() => {
+      this.enterPowerSavingMode();
+    }, this.settings.timeoutSeconds * 1000);
+  }
+
+  private async enterPowerSavingMode() {
+    if (!this.rideSessionActive || this.isInPowerSavingMode) return;
+    const session = ++this.brightnessSession;
+    this.isInPowerSavingMode = true;
+    try {
+      this.originalBrightness = await getBrightnessAsync();
+      // 若手勢或補給彈窗在讀取亮度期間已喚醒，不能再把螢幕調暗。
+      if (!this.isInPowerSavingMode || session !== this.brightnessSession)
+        return;
+      await setBrightnessAsync(this.settings.minBrightness);
+      this.notifyListeners(true);
+    } catch (error) {
+      reportRecoverableIssue(
+        "[PowerSaving] Failed to enter power saving mode",
+        error,
+      );
+    }
+  }
+
+  private async exitPowerSavingMode() {
+    if (!this.isInPowerSavingMode) return;
+    ++this.brightnessSession;
+    this.isInPowerSavingMode = false;
+    this.notifyListeners(false);
+    try {
+      if (Platform.OS === "android") {
+        // 先讀取系統目前亮度，再撤銷 activity 覆寫；若使用者開啟自動亮度，環境光感測器會立刻重新接管。
+        await getSystemBrightnessAsync();
+        await useSystemBrightnessAsync();
+      } else {
+        await setBrightnessAsync(this.originalBrightness);
+      }
+    } catch (error) {
+      reportRecoverableIssue(
+        "[PowerSaving] Failed to exit power saving mode",
+        error,
+      );
+    }
+  }
+
+  async wakeUp() {
+    if (!this.rideSessionActive) return;
+    await this.exitPowerSavingMode();
+    this.resetInactivityTimer();
+  }
+
+  /** 保持亮屏並暫停調暗計時；多個流程可各自持有。 */
+  async holdBrightness(key: string) {
+    if (!this.rideSessionActive) return;
+    this.brightnessHolds.add(key);
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
+    await this.exitPowerSavingMode();
+  }
+
+  /** 只有最後一個亮屏保持解除後，才重新開始調暗倒數。 */
+  releaseBrightnessHold(key: string) {
+    this.brightnessHolds.delete(key);
+    if (this.rideSessionActive && this.brightnessHolds.size === 0)
+      this.resetInactivityTimer();
+  }
+
+  onUserInteraction() {
+    this.wakeUp();
+  }
+
+  onTurnGuidance() {
+    this.wakeUp();
+  }
+
+  onSupplyReminder() {
+    this.wakeUp();
+  }
+
+  subscribe(listener: (isActive: boolean) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notifyListeners(isActive: boolean) {
+    this.listeners.forEach((listener) => listener(isActive));
+  }
+
+  start() {
+    this.rideSessionActive = true;
+    if (!this.settings.enabled) return;
+    this.resetInactivityTimer();
+  }
+
+  stop() {
+    this.rideSessionActive = false;
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
+    this.brightnessHolds.clear();
+    this.exitPowerSavingMode();
+  }
+}
+
+export function useSmartPowerSaving() {
+  const manager = SmartPowerSavingManager.getInstance();
+  const isInPowerSavingMode = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = manager.subscribe((isActive) => {
+      isInPowerSavingMode.current = isActive;
+    });
+
+    manager.start();
+
+    return () => {
+      unsubscribe();
+      manager.stop();
+    };
+  }, []);
+
+  return {
+    manager,
+    isInPowerSavingMode: isInPowerSavingMode.current,
+    wakeUp: () => manager.wakeUp(),
+    onUserInteraction: () => manager.onUserInteraction(),
+    onTurnGuidance: () => manager.onTurnGuidance(),
+    onSupplyReminder: () => manager.onSupplyReminder(),
+  };
+}

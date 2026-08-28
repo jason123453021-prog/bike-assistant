@@ -1,0 +1,6 @@
+appId: com.jason123453021.bikeassistant
+name: Android 背景本機通知排程
+---
+- assertVisible: "E2E notification validation"
+- tapOn: "Schedule fuel notification"
+- assertVisible: "Notification scheduled"

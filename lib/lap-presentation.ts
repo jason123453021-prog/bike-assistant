@@ -1,0 +1,94 @@
+import type { RideLap } from "./ride-context";
+import { formatPaceFromKmh, type SportType } from "./sport-metrics";
+
+export interface LapPresentationMetric {
+  id: "distance" | "average-speed" | "average-power" | "pace" | "cadence" | "ascent" | "descent" | "vam";
+  label: string;
+  value: string;
+}
+
+export interface LapHighlightMetric {
+  label: string;
+  value: string;
+}
+
+function formatDistance(distanceM: number): string {
+  return `${(Math.max(0, distanceM) / 1_000).toFixed(2)} km`;
+}
+
+function formatAscent(ascentM: number): string {
+  return `${Math.round(Math.max(0, ascentM))} m`;
+}
+
+function formatVam(ascentM: number, movingTimeSec: number): string {
+  if (!Number.isFinite(movingTimeSec) || movingTimeSec <= 0) return "資料不足";
+  return `${Math.round((Math.max(0, ascentM) / movingTimeSec) * 3_600)} m/h`;
+}
+
+/**
+ * 單一、可測試的 Lap 顯示模型。它只呈現實際可得的感測資料，絕不補造跑步步頻。
+ */
+export function getLapPresentationMetrics(sportType: SportType, lap: RideLap): LapPresentationMetric[] {
+  const distance: LapPresentationMetric = { id: "distance", label: "距離", value: formatDistance(lap.distanceM) };
+  const ascent: LapPresentationMetric = { id: "ascent", label: "爬升", value: formatAscent(lap.ascentM) };
+
+  if (sportType === "running" || sportType === "trail_running") {
+    const metrics: LapPresentationMetric[] = [
+      distance,
+      { id: "pace", label: "平均配速", value: `${formatPaceFromKmh(lap.averageSpeedKmh ?? 0)} /km` },
+    ];
+    // 僅在定位／感測器真的有步頻樣本時呈現；沒有硬體資料便不顯示此欄位。
+    if (lap.averageCadenceRpm !== undefined) {
+      metrics.push({ id: "cadence", label: "平均步頻", value: `${Math.round(lap.averageCadenceRpm)} spm` });
+    }
+    if (sportType === "trail_running") metrics.push(ascent);
+    return metrics;
+  }
+
+  if (sportType === "hiking") {
+    return [
+      ascent,
+      { id: "descent", label: "下降", value: formatAscent(lap.descentM) },
+      { id: "vam", label: "平均爬升速度", value: formatVam(lap.ascentM, lap.movingTimeSec) },
+      distance,
+    ];
+  }
+
+  return [
+    distance,
+    {
+      id: "average-speed",
+      label: "平均速度",
+      value: lap.averageSpeedKmh === undefined ? "資料不足" : `${lap.averageSpeedKmh.toFixed(1)} km/h`,
+    },
+    {
+      id: "average-power",
+      label: "平均功率",
+      value: lap.averagePowerW === undefined ? "資料不足" : `${Math.round(lap.averagePowerW)} W`,
+    },
+    ascent,
+  ];
+}
+
+export function formatLapMetricsInline(sportType: SportType, lap: RideLap): string {
+  return getLapPresentationMetrics(sportType, lap)
+    .map((metric) => `${metric.label} ${metric.value}`)
+    .join(" · ");
+}
+
+/** 地圖 Toast 與即時面板共用的單圈核心指標，依運動類型避免顯示不適用數據。 */
+export function getLapHighlightMetric(sportType: SportType, lap: RideLap): LapHighlightMetric {
+  if (sportType === "running" || sportType === "trail_running") {
+    return { label: "配速", value: `${formatPaceFromKmh(lap.averageSpeedKmh ?? 0)}` };
+  }
+  if (sportType === "hiking") {
+    return { label: "總爬升", value: `+${Math.round(Math.max(0, lap.ascentM))} m` };
+  }
+  if (lap.averagePowerW !== undefined) {
+    return { label: "均功", value: `${Math.round(lap.averagePowerW)} W` };
+  }
+  return {
+    label: "均速",
+    value: lap.averageSpeedKmh === undefined ? "資料不足" : `${lap.averageSpeedKmh.toFixed(1)} km/h`,
+  };
+}

@@ -1,0 +1,9 @@
+appId: com.jason123453021.bikeassistant
+name: Android 背景通知本體回前景
+---
+- tapOn: "E2E Fuel reminder"
+- extendedWaitUntil:
+    visible: "Refuel"
+    timeout: 30000
+- assertVisible: "Refuel"
+- takeScreenshot: "background-notification-open-refuel-modal"

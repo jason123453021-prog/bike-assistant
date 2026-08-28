@@ -1,0 +1,19 @@
+
+> app-template@1.0.2 test /home/ubuntu/bike_assistant
+> vitest run "tests/share-card-clipboard.test.ts" "tests/overlay-permission-removal.test.ts" "tests/android-release-config.test.ts" "tests/ride-permission-readiness.test.ts" "tests/local-share-card.test.ts" "tests/smart-supply-tts.test.ts"
+
+
+ RUN  v2.1.9 /home/ubuntu/bike_assistant
+
+ ✓ tests/ride-permission-readiness.test.ts (3 tests) 4ms
+ ✓ tests/smart-supply-tts.test.ts (5 tests) 8ms
+ ✓ tests/overlay-permission-removal.test.ts (2 tests) 4ms
+ ✓ tests/android-release-config.test.ts (4 tests) 8ms
+ ✓ tests/local-share-card.test.ts (2 tests) 5ms
+ ✓ tests/share-card-clipboard.test.ts (1 test) 3ms
+
+ Test Files  6 passed (6)
+      Tests  17 passed (17)
+   Start at  00:15:20
+   Duration  575ms (transform 134ms, setup 0ms, collect 204ms, tests 33ms, environment 1ms, prepare 482ms)
+

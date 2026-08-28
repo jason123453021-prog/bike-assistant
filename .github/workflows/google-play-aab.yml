@@ -1,0 +1,119 @@
+name: Google Play 正式 AAB
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: google-play-aab-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-aab:
+    name: 建置 Google Play 上傳 AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: play-production
+    env:
+      CI: true
+      EXPO_NO_DOCTOR: "1"
+      EAS_BUILD_PROFILE: production
+      PLAY_UPLOAD_KEYSTORE_PATH: ${{ github.workspace }}/android/app/play-upload.jks
+      PLAY_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEYSTORE_PASSWORD }}
+      PLAY_UPLOAD_KEY_ALIAS: ${{ secrets.PLAY_UPLOAD_KEY_ALIAS }}
+      PLAY_UPLOAD_KEY_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEY_PASSWORD }}
+    steps:
+      - name: 取得原始碼
+        uses: actions/checkout@v4
+
+      - name: 設定 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: 設定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 設定 Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: 安裝鎖定版本的依賴
+        run: pnpm install --frozen-lockfile
+
+      - name: 執行程式品質守門
+        run: |
+          pnpm check
+          pnpm lint
+          pnpm test
+
+      - name: 產生 Android 原生專案
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: 驗證 Android 15 前景服務開機限制
+        run: |
+          manifest="android/app/src/main/AndroidManifest.xml"
+          properties="android/gradle.properties"
+          app_gradle="android/app/build.gradle"
+          if grep -nE 'android.intent.action.(BOOT_COMPLETED|REBOOT|QUICKBOOT_POWERON)|com.htc.intent.action.QUICKBOOT_POWERON' "$manifest"; then
+            echo "Release manifest still contains a boot receiver action that may launch a restricted foreground service." >&2
+            exit 1
+          fi
+          grep -qx 'android.compileSdkVersion=36' "$properties"
+          grep -qx 'android.targetSdkVersion=36' "$properties"
+          grep -qx 'android.enableMinifyInReleaseBuilds=true' "$properties"
+          grep -qx 'android.enableShrinkResourcesInReleaseBuilds=true' "$properties"
+          grep -qx 'android.r8.optimizedResourceShrinking=true' "$properties"
+          grep -q 'proguard-android-optimize.txt' "$app_gradle"
+          grep -q 'android.permission.RECORD_AUDIO" tools:node="remove"' "$manifest"
+          grep -q 'android.permission.ACCESS_BACKGROUND_LOCATION' "$manifest"
+          grep -q 'android.permission.FOREGROUND_SERVICE_LOCATION' "$manifest"
+
+      - name: 還原受保護的 Play upload keystore
+        env:
+          PLAY_UPLOAD_KEYSTORE_BASE64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$PLAY_UPLOAD_KEYSTORE_BASE64"
+          printf '%s' "$PLAY_UPLOAD_KEYSTORE_BASE64" | base64 --decode > android/app/play-upload.jks
+
+      - name: 套用正式版簽署設定
+        run: node scripts/android-release-signing.cjs android/app/build.gradle
+
+      - name: 建置 Google Play Android App Bundle
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: 驗證封裝 AAB 未含受限制開機 action
+        run: |
+          aab="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
+          test -n "$aab"
+          test -s android/app/build/outputs/mapping/release/mapping.txt
+          if unzip -p "$aab" base/manifest/AndroidManifest.xml | grep -aoE '[[:print:]]{3,}' | grep -E 'android.intent.action.(BOOT_COMPLETED|REBOOT|QUICKBOOT_POWERON)|com.htc.intent.action.QUICKBOOT_POWERON'; then
+            echo "Packaged AAB still contains a boot receiver action that may launch a restricted foreground service." >&2
+            exit 1
+          fi
+          curl --fail --location --retry 2 --silent --show-error \
+            https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar \
+            --output /tmp/bundletool-all.jar
+          java -jar /tmp/bundletool-all.jar dump manifest --bundle="$aab" --module=base > /tmp/aab-manifest.xml
+          grep -q 'android:compileSdkVersion="36"' /tmp/aab-manifest.xml
+          grep -q 'android:targetSdkVersion="36"' /tmp/aab-manifest.xml
+          if grep -q 'android.permission.RECORD_AUDIO' /tmp/aab-manifest.xml; then
+            echo "Packaged AAB still requests RECORD_AUDIO although the app has no recording feature." >&2
+            exit 1
+          fi
+
+      - name: 上傳 Google Play AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bike-assistant-google-play-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
